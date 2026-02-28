@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #060b12;
+  --bg-gradient: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(0, 240, 255, 0.08), transparent 50%),
+    linear-gradient(180deg, #060b12 0%, #0a1018 50%, #060b12 100%);
+  --surface: #0d1219;
+  --surface-hover: #131b24;
+  --border: #1e2a3a;
+  --border-glow: rgba(0, 240, 255, 0.25);
+  --text: #f0f4f8;
+  --text-muted: #8b9cb5;
+  /* Futurista / neon */
+  --accent-cyan: #00f0ff;
+  --accent-cyan-dim: rgba(0, 240, 255, 0.15);
+  --accent-purple: #b24bf3;
+  --accent-purple-dim: rgba(178, 75, 243, 0.15);
+  --accent-green: #00e676;
+  --accent-green-dim: rgba(0, 230, 118, 0.15);
+  --accent-amber: #ffb020;
+  --accent-amber-dim: rgba(255, 176, 32, 0.15);
+  --accent-red: #ff6b7a;
+  --accent-red-dim: rgba(255, 107, 122, 0.15);
+  --accent-blue: #4dabf7;
+  --accent-blue-dim: rgba(77, 171, 247, 0.15);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', 'DM Sans', system-ui, sans-serif;
+  background: var(--bg);
+  background-image: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar futurista */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #1e2a3a 0%, #2a3a4e 100%);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan-dim);
+}
+
+/* KPI card borders + ligero glow */
+.kpi-cyan { border-left-color: var(--accent-cyan); box-shadow: 0 0 20px -8px var(--accent-cyan-dim); }
+.kpi-purple { border-left-color: var(--accent-purple); box-shadow: 0 0 20px -8px var(--accent-purple-dim); }
+.kpi-green { border-left-color: var(--accent-green); box-shadow: 0 0 20px -8px var(--accent-green-dim); }
+.kpi-amber { border-left-color: var(--accent-amber); box-shadow: 0 0 20px -8px var(--accent-amber-dim); }
+.kpi-red { border-left-color: var(--accent-red); box-shadow: 0 0 20px -8px var(--accent-red-dim); }
+.kpi-blue { border-left-color: var(--accent-blue); box-shadow: 0 0 20px -8px var(--accent-blue-dim); }
+
+/* Botones y tablas con toque futurista */
+.rounded-xl.border-surface-500 {
+  border-color: rgba(30, 42, 58, 0.9);
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.35);
+}
+button.bg-accent-cyan:not(:disabled):hover,
+a.bg-accent-cyan:hover {
+  box-shadow: 0 0 20px -4px rgba(0, 240, 255, 0.5);
+}
+.text-accent-cyan:hover { filter: brightness(1.15); }
+.text-accent-purple:hover { filter: brightness(1.15); }
+.text-accent-green:hover { filter: brightness(1.15); }
