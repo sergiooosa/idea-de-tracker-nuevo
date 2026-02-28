@@ -20,8 +20,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Outfit', 'DM Sans', 'system-ui', 'sans-serif'],
-        display: ['Outfit', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
         'glow-cyan': '0 0 20px -4px rgba(0, 240, 255, 0.4), 0 0 40px -12px rgba(0, 240, 255, 0.2)',

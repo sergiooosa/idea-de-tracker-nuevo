@@ -1,4 +1,4 @@
-# Lead Compass
+# AutoKPI
 
 Dashboard V1 para control del equipo comercial, conectado a GoHighLevel (GHL). Centraliza videollamadas, llamadas telefónicas y chats, con resumen por métodos de adquisición.
 

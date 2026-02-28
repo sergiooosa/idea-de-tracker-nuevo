@@ -37,16 +37,61 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Outfit', 'DM Sans', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   background-image: var(--bg-gradient);
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Contenedores de página: responsive, nada se pierde */
+.page-content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1rem;
+}
+@media (min-width: 768px) {
+  .page-content {
+    padding: 1.5rem;
+  }
+}
+
+/* Tablas y listas: scroll horizontal en móvil sin romper layout */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* Tarjetas KPI: mismo tamaño para todas (altura mínima compacta) */
+.kpi-card-fixed {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+}
+.kpi-card-fixed .kpi-card-spacer {
+  min-height: 0.25rem;
+  flex: 1;
+}
+
+/* Tarjetas KPI: texto que no se desborde y letras un poco más chicas */
+.card-futuristic-cyan .break-words,
+.card-futuristic-purple .break-words,
+.card-futuristic-green .break-words,
+.card-futuristic-amber .break-words,
+.card-futuristic-red .break-words,
+.card-futuristic-blue .break-words,
+[class^="card-futuristic"] p {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Scrollbar futurista */
@@ -66,7 +111,46 @@ body {
   box-shadow: 0 0 10px var(--accent-cyan-dim);
 }
 
-/* KPI card borders + ligero glow */
+/* Tarjetas estilo futurista: gradiente oscuro + borde brillante + valor en color acento */
+.card-futuristic-cyan {
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.07) 0%, rgba(0, 240, 255, 0.02) 35%, #080d12 100%);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 0 20px -6px rgba(0, 240, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.card-futuristic-purple {
+  background: linear-gradient(180deg, rgba(178, 75, 243, 0.07) 0%, rgba(178, 75, 243, 0.02) 35%, #0d0814 100%);
+  border: 1px solid rgba(178, 75, 243, 0.35);
+  box-shadow: 0 0 20px -6px rgba(178, 75, 243, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.card-futuristic-green {
+  background: linear-gradient(180deg, rgba(0, 230, 118, 0.07) 0%, rgba(0, 230, 118, 0.02) 35%, #080d0f 100%);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  box-shadow: 0 0 20px -6px rgba(0, 230, 118, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.card-futuristic-amber {
+  background: linear-gradient(180deg, rgba(255, 176, 32, 0.06) 0%, rgba(255, 176, 32, 0.02) 35%, #0f0d08 100%);
+  border: 1px solid rgba(255, 176, 32, 0.35);
+  box-shadow: 0 0 20px -6px rgba(255, 176, 32, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.card-futuristic-red {
+  background: linear-gradient(180deg, rgba(255, 107, 122, 0.06) 0%, rgba(255, 107, 122, 0.02) 35%, #0f0809 100%);
+  border: 1px solid rgba(255, 107, 122, 0.35);
+  box-shadow: 0 0 20px -6px rgba(255, 107, 122, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.card-futuristic-blue {
+  background: linear-gradient(180deg, rgba(77, 171, 247, 0.07) 0%, rgba(77, 171, 247, 0.02) 35%, #080d12 100%);
+  border: 1px solid rgba(77, 171, 247, 0.35);
+  box-shadow: 0 0 20px -6px rgba(77, 171, 247, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Secciones / contenedores estilo futurista */
+.section-futuristic {
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.03) 0%, transparent 25%, #0a0f14 100%);
+  border: 1px solid rgba(30, 42, 58, 0.9);
+  box-shadow: 0 0 24px -8px rgba(0, 240, 255, 0.08), 0 4px 24px -4px rgba(0, 0, 0, 0.35);
+}
+
+/* KPI card borders + ligero glow (legacy, usados por card-futuristic ahora) */
 .kpi-cyan { border-left-color: var(--accent-cyan); box-shadow: 0 0 20px -8px var(--accent-cyan-dim); }
 .kpi-purple { border-left-color: var(--accent-purple); box-shadow: 0 0 20px -8px var(--accent-purple-dim); }
 .kpi-green { border-left-color: var(--accent-green); box-shadow: 0 0 20px -8px var(--accent-green-dim); }

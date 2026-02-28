@@ -11,6 +11,7 @@ import {
   X,
   MessageSquare,
   UserCog,
+  Target,
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReportButton from './ReportButton';
@@ -26,6 +27,7 @@ const nav = [
   { path: '/performance', label: 'Rendimiento', icon: BarChart3 },
   { path: '/asesor', label: 'Panel asesor', icon: UserCheck },
   { path: '/acquisition', label: 'Resumen adquisición', icon: TrendingUp },
+  { path: '/system', label: 'Configuración del sistema', icon: Target },
   { path: '/system', label: 'Control del sistema', icon: Settings },
   { path: '/configuracion', label: 'Configuración', icon: UserCog },
 ];
@@ -44,25 +46,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-purple to-accent-cyan flex items-center justify-center shadow-glow-cyan">
               <LayoutDashboard className="w-5 h-5 text-white" />
             </div>
-            <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Lead Compass</span>
+            <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">AutoKPI</span>
           </Link>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
-          {nav.map(({ path, label, icon: Icon }) => (
-            <Link
-              key={path}
-              to={path}
-              className={clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-                location.pathname === path || (path !== '/' && location.pathname.startsWith(path))
-                  ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 shadow-glow-cyan'
-                  : 'text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent'
-              )}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {label}
-            </Link>
-          ))}
+          {nav.map(({ path, label, icon: Icon, onlyActiveWhenSearch }) => {
+            const isActive = onlyActiveWhenSearch
+              ? location.pathname === path.split('?')[0] && location.search.includes(onlyActiveWhenSearch)
+              : location.pathname === path || (path !== '/' && location.pathname.startsWith(path.split('?')[0]));
+            return (
+              <Link
+                key={path}
+                to={path}
+                className={clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 shadow-glow-cyan'
+                    : 'text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent'
+                )}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
       </aside>
 
@@ -75,7 +82,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         >
           {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
-        <Link to="/" className="font-display font-semibold text-white">Lead Compass</Link>
+        <Link to="/" className="font-display font-semibold text-white">AutoKPI</Link>
         <div className="w-10" />
       </header>
 
@@ -94,34 +101,41 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="p-4 border-b border-surface-500/80 flex items-center justify-between">
-          <span className="font-display font-semibold text-white">Lead Compass</span>
+          <span className="font-display font-semibold text-white">AutoKPI</span>
           <button type="button" onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg hover:bg-surface-600">
             <X className="w-5 h-5" />
           </button>
         </div>
         <nav className="p-2">
-          {nav.map(({ path, label, icon: Icon }) => (
-            <Link
-              key={path}
-              to={path}
-              onClick={() => setSidebarOpen(false)}
-              className={clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-                location.pathname === path || (path !== '/' && location.pathname.startsWith(path))
-                  ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
-                  : 'text-gray-400 hover:bg-surface-600 hover:text-white'
-              )}
-            >
-              <Icon className="w-5 h-5" />
-              {label}
-            </Link>
-          ))}
+          {nav.map(({ path, label, icon: Icon, onlyActiveWhenSearch }) => {
+            const isActive = onlyActiveWhenSearch
+              ? location.pathname === path.split('?')[0] && location.search.includes(onlyActiveWhenSearch)
+              : location.pathname === path || (path !== '/' && location.pathname.startsWith(path.split('?')[0]));
+            return (
+              <Link
+                key={path}
+                to={path}
+                onClick={() => setSidebarOpen(false)}
+                className={clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  isActive
+                    ? 'bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20'
+                    : 'text-gray-400 hover:bg-surface-600 hover:text-white'
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0 pb-20 md:pb-24">
-        {children}
+      {/* Main content: responsive, sin desbordes */}
+      <main className="flex-1 flex flex-col min-w-0 max-w-full overflow-x-hidden pb-20 md:pb-24">
+        <div className="flex-1 min-w-0 max-w-full">
+          {children}
+        </div>
       </main>
 
       {/* Chat FAB - visible en Executive y Asesor */}

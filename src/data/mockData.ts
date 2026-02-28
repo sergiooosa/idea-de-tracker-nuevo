@@ -7,7 +7,7 @@ import type {
   MetricsAggregate,
   AcquisitionRow,
 } from '@/types';
-import { subDays, subHours, formatISO } from 'date-fns';
+import { subDays, subHours, formatISO, startOfDay } from 'date-fns';
 
 const leadNames = [
   'Pedro García', 'Daniela Rojas', 'Nicolás Vargas', 'Juan López', 'Luis Pérez',
@@ -17,7 +17,7 @@ const leadNames = [
 ];
 
 export const advisors: Advisor[] = [
-  { id: 'adv-1', name: 'Sergio', team: 'Ventas', role: 'closer' },
+  { id: 'adv-1', name: 'Sergio', team: 'Ventas', role: 'admin' },
   { id: 'adv-2', name: 'María', team: 'Ventas', role: 'closer' },
   { id: 'adv-3', name: 'Ana', team: 'Ventas', role: 'closer' },
   { id: 'adv-4', name: 'Carlos', team: 'Setters', role: 'setter' },
@@ -25,7 +25,18 @@ export const advisors: Advisor[] = [
   { id: 'adv-6', name: 'Laura', team: 'Chat', role: 'setter' },
   { id: 'adv-7', name: 'Pedro', team: 'Chat', role: 'setter' },
   { id: 'adv-8', name: 'Luis', team: 'Chat', role: 'setter' },
+  { id: 'adv-9', name: 'Roberto', team: 'Ventas', role: 'director_comercial' },
 ];
+
+/** Configuración que define el dueño/gerente: cómo debe trabajar el asesor (meta y reglas de llamadas). */
+export const asesorNorthConfig = {
+  /** Meta mínima de llamadas diarias (leads en seguimiento). */
+  metaLlamadasDiariasSeguimiento: 50,
+  /** Llamadas por día para leads nuevos: día 1, 2, 3... (hasta cubrir los primeros días). */
+  leadsNuevosLlamadasPorDia: [3, 4, 5] as number[],
+  /** Días que se consideran "primeros días" para un lead nuevo. */
+  diasSeguimientoLeadNuevo: 3,
+};
 
 function leadId(i: number) { return `lead-${40000 + i}`; }
 function callId(i: number) { return `call-${i}`; }
@@ -36,7 +47,7 @@ const sources = ['facebook', 'google', 'instagram', 'organic', 'landing'];
 const campaigns = ['curso_ventas_2026', 'webinar_feb', 'lead_magnet', 'retargeting'];
 
 // Distribuir leads entre todos los asesores (i % 8) para que cada uno tenga leads al hacer clic
-export const leads: Lead[] = leadNames.slice(0, 25).map((name, i) => ({
+const baseLeads: Lead[] = leadNames.slice(0, 25).map((name, i) => ({
   id: leadId(i),
   name,
   phone: `+57 ${300 + (i % 10)}${1234567 + i}`,
@@ -53,6 +64,20 @@ export const leads: Lead[] = leadNames.slice(0, 25).map((name, i) => ({
   notes: i % 4 === 0 ? 'Cliente potencial alto' : undefined,
   tags: i % 3 === 0 ? ['caliente', 'interesado'] : i % 5 === 0 ? ['high_ticket'] : [],
 }));
+
+// Leads asignados hoy, ayer y antier a adv-1 para demo del panel "Llamadas por día de asignación"
+const now = new Date();
+const todayStart = startOfDay(now);
+const leadsAsignadosRecientes: Lead[] = [
+  { id: leadId(25), name: 'Andrea Morales', phone: '+57 310 1234001', email: 'andrea@example.com', status: 'nuevo', source: 'facebook', utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: campaigns[0], createdAt: formatISO(todayStart), assignedAdvisorId: 'adv-1', lastContactAt: undefined, tags: [] },
+  { id: leadId(26), name: 'Ricardo Paz', phone: '+57 310 1234002', email: 'ricardo@example.com', status: 'nuevo', source: 'google', utm_source: 'google', utm_medium: 'cpc', utm_campaign: campaigns[1], createdAt: formatISO(todayStart), assignedAdvisorId: 'adv-1', lastContactAt: undefined, tags: [] },
+  { id: leadId(27), name: 'Sandra López', phone: '+57 310 1234003', email: 'sandra@example.com', status: 'contactado', source: 'instagram', utm_source: 'instagram', utm_medium: 'cpc', utm_campaign: campaigns[2], createdAt: formatISO(startOfDay(subDays(now, 1))), assignedAdvisorId: 'adv-1', lastContactAt: formatISO(subHours(now, 2)), tags: [] },
+  { id: leadId(28), name: 'Fernando Gómez', phone: '+57 310 1234004', email: 'fernando@example.com', status: 'nuevo', source: 'organic', utm_source: 'organic', utm_medium: 'cpc', utm_campaign: campaigns[3], createdAt: formatISO(startOfDay(subDays(now, 1))), assignedAdvisorId: 'adv-1', lastContactAt: undefined, tags: [] },
+  { id: leadId(29), name: 'Lucía Martínez', phone: '+57 310 1234005', email: 'lucia@example.com', status: 'interesado', source: 'landing', utm_source: 'landing', utm_medium: 'cpc', utm_campaign: campaigns[0], createdAt: formatISO(startOfDay(subDays(now, 2))), assignedAdvisorId: 'adv-1', lastContactAt: formatISO(subHours(now, 5)), tags: [] },
+  { id: leadId(30), name: 'Javier Ruiz', phone: '+57 310 1234006', email: 'javier@example.com', status: 'nuevo', source: 'facebook', utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: campaigns[1], createdAt: formatISO(startOfDay(subDays(now, 2))), assignedAdvisorId: 'adv-1', lastContactAt: undefined, tags: [] },
+];
+
+export const leads: Lead[] = [...baseLeads, ...leadsAsignadosRecientes];
 
 const outcomes = ['answered', 'no_answer', 'completed'] as const;
 export const calls: CallPhone[] = [];
@@ -107,9 +132,49 @@ for (let i = 0; i < 45; i++) {
     notes: i % 4 === 0 ? 'Muy interesado' : undefined,
     tags: amount > 1000000 ? ['high_ticket'] : [],
     utm_campaign: campaigns[i % 4],
-    objections: i % 5 === 0 ? ['precio', 'desconfianza'] : undefined,
+    objections: i % 5 === 0 ? ['precio', 'desconfianza'] : i % 7 === 0 ? ['competencia'] : i % 11 === 0 ? ['tiempo'] : i % 13 === 0 ? ['precio'] : undefined,
+    objectionDetails: i % 5 === 0
+      ? [
+          { category: 'precio', quote: 'Me parece muy caro para lo que ofrecen, no tengo ese presupuesto ahora mismo.' },
+          { category: 'desconfianza', quote: 'No conozco bien la marca, he escuchado cosas que me generan dudas.' },
+        ]
+      : i % 7 === 0
+        ? [{ category: 'competencia', quote: 'Ya estoy viendo con otra empresa que me da mejor precio y más flexibilidad.' }]
+        : i % 11 === 0
+          ? [{ category: 'tiempo', quote: 'Ahora no tengo tiempo para esto, déjame pensarlo y te contacto después.' }]
+          : i % 13 === 0
+            ? [{ category: 'precio', quote: 'El valor está por encima de lo que puedo invertir en este momento.' }]
+            : undefined,
   });
 }
+
+// Llamadas extra: mismo lead + mismo asesor para ver selector "Seleccione cuál quiere ver" (varios registros)
+const extraCalls: CallPhone[] = [
+  { id: callId(80), leadId: leads[0].id, advisorId: advisors[0].id, datetime: formatISO(subHours(new Date(), 24)), duration: 120, outcome: 'answered', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(new Date(), 24)), notes: 'Primera llamada de seguimiento.', tags: [], objections: undefined },
+  { id: callId(81), leadId: leads[0].id, advisorId: advisors[0].id, datetime: formatISO(subHours(new Date(), 48)), duration: 90, outcome: 'completed', attemptsCountForLead: 2, firstContactAt: formatISO(subHours(new Date(), 50)), notes: 'Mencionó precio.', tags: [], objections: ['precio'] },
+  { id: callId(82), leadId: leads[0].id, advisorId: advisors[0].id, datetime: formatISO(subHours(new Date(), 72)), duration: 180, outcome: 'answered', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(new Date(), 72)), notes: 'Interesado en agendar.', tags: [], objections: undefined },
+  { id: callId(83), leadId: leads[2].id, advisorId: advisors[0].id, datetime: formatISO(subHours(new Date(), 12)), duration: 60, outcome: 'answered', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(new Date(), 12)), notes: 'Callback solicitado.', tags: [], objections: undefined },
+  { id: callId(84), leadId: leads[2].id, advisorId: advisors[0].id, datetime: formatISO(subHours(new Date(), 36)), duration: 200, outcome: 'completed', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(new Date(), 36)), notes: 'Cita agendada.', tags: [], objections: undefined },
+];
+// Llamadas de adv-1 a leads asignados hoy/ayer/antier (para panel "Llamadas por día de asignación")
+calls.push(
+  { id: callId(85), leadId: leadId(25), advisorId: 'adv-1', datetime: formatISO(subHours(now, 1)), duration: 90, outcome: 'answered', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(now, 1)), notes: undefined, tags: [] },
+  { id: callId(86), leadId: leadId(27), advisorId: 'adv-1', datetime: formatISO(subHours(now, 3)), duration: 120, outcome: 'completed', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(now, 3)), notes: undefined, tags: [] },
+  { id: callId(87), leadId: leadId(27), advisorId: 'adv-1', datetime: formatISO(subHours(now, 24)), duration: 60, outcome: 'answered', attemptsCountForLead: 2, firstContactAt: formatISO(subHours(now, 24)), notes: undefined, tags: [] },
+  { id: callId(88), leadId: leadId(28), advisorId: 'adv-1', datetime: formatISO(subHours(now, 12)), duration: 0, outcome: 'no_answer', attemptsCountForLead: 1, firstContactAt: undefined, notes: undefined, tags: [] },
+  { id: callId(89), leadId: leadId(29), advisorId: 'adv-1', datetime: formatISO(subHours(now, 6)), duration: 180, outcome: 'completed', attemptsCountForLead: 1, firstContactAt: formatISO(subHours(now, 6)), notes: undefined, tags: [] },
+);
+calls.push(...extraCalls);
+
+// Videollamadas extra: mismo lead + mismo asesor para ver selector (varios registros)
+const extraMeetings: VideoMeeting[] = [
+  { id: meetingId(45), leadId: leads[0].id, advisorId: advisors[0].id, datetime: formatISO(subDays(new Date(), 1)), attended: true, qualified: true, booked: true, canceled: false, outcome: 'seguimiento', amountBought: 500000, amountPaid: 300000, cashCollected: 200000, ticket: 500000, notes: 'Muy interesado.', tags: [], utm_campaign: campaigns[0], objections: ['precio'], objectionDetails: [{ category: 'precio', quote: 'Me parece caro.' }] },
+  { id: meetingId(46), leadId: leads[0].id, advisorId: advisors[0].id, datetime: formatISO(subDays(new Date(), 3)), attended: true, qualified: true, booked: true, canceled: false, outcome: 'cerrado', amountBought: 700000, amountPaid: 420000, cashCollected: 280000, ticket: 700000, notes: 'Cerró en esta reunión.', tags: [], utm_campaign: campaigns[0], objections: undefined, objectionDetails: undefined },
+  { id: meetingId(47), leadId: leads[0].id, advisorId: advisors[0].id, datetime: formatISO(subDays(new Date(), 5)), attended: false, qualified: false, booked: true, canceled: false, outcome: 'no_show', amountBought: 0, amountPaid: 0, cashCollected: 0, ticket: 0, notes: 'No asistió.', tags: [], utm_campaign: campaigns[1], objections: undefined, objectionDetails: undefined },
+  { id: meetingId(48), leadId: leads[1].id, advisorId: advisors[0].id, datetime: formatISO(subDays(new Date(), 2)), attended: true, qualified: true, booked: true, canceled: false, outcome: 'seguimiento', amountBought: 0, amountPaid: 0, cashCollected: 0, ticket: 0, notes: 'Segunda reunión de seguimiento.', tags: [], utm_campaign: campaigns[0], objections: undefined, objectionDetails: undefined },
+  { id: meetingId(49), leadId: leads[1].id, advisorId: advisors[0].id, datetime: formatISO(subDays(new Date(), 4)), attended: true, qualified: false, booked: true, canceled: false, outcome: 'seguimiento', amountBought: 0, amountPaid: 0, cashCollected: 0, ticket: 0, notes: 'Pendiente de cierre.', tags: [], utm_campaign: campaigns[0], objections: ['tiempo'], objectionDetails: [{ category: 'tiempo', quote: 'Necesito pensarlo.' }] },
+];
+videoMeetings.push(...extraMeetings);
 
 const emojis = ['👍', '👎', '💡', '💰', '⏳', '💬'] as const;
 const chatNotes = [
@@ -256,10 +321,10 @@ export const metricsByAdvisor: Record<string, Partial<MetricsAggregate>> = {
 };
 
 export const acquisitionRows: AcquisitionRow[] = [
-  { id: 'acq-1', utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: 'curso_ventas_2026', leads: 120, answered: 86, booked: 42, attended: 31, closed: 18, revenue: 18500, contactRate: 0.72, bookingRate: 0.49, attendanceRate: 0.74, closingRate: 31 > 0 ? 18 / 31 : 0 },
-  { id: 'acq-2', utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'webinar_feb', leads: 85, answered: 62, booked: 28, attended: 22, closed: 14, revenue: 14200, contactRate: 0.73, bookingRate: 0.45, attendanceRate: 0.79, closingRate: 22 > 0 ? 14 / 22 : 0 },
-  { id: 'acq-3', utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'lead_magnet', leads: 45, answered: 38, booked: 15, attended: 10, closed: 5, revenue: 6200, contactRate: 0.84, bookingRate: 0.39, attendanceRate: 0.67, closingRate: 10 > 0 ? 5 / 10 : 0 },
-  { id: 'acq-4', utm_source: 'organic', medium: 'organic', leads: 25, answered: 20, booked: 6, attended: 6, closed: 3, revenue: 3444.17, contactRate: 0.8, bookingRate: 0.3, attendanceRate: 1, closingRate: 6 > 0 ? 3 / 6 : 0 },
+  { id: 'acq-1', utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: 'curso_ventas_2026', leads: 120, called: 118, answered: 86, booked: 42, attended: 31, closed: 18, revenue: 18500, contactRate: 0.72, bookingRate: 0.49, attendanceRate: 0.74, closingRate: 31 > 0 ? 18 / 31 : 0 },
+  { id: 'acq-2', utm_source: 'google', utm_medium: 'cpc', utm_campaign: 'webinar_feb', leads: 85, called: 82, answered: 62, booked: 28, attended: 22, closed: 14, revenue: 14200, contactRate: 0.73, bookingRate: 0.45, attendanceRate: 0.79, closingRate: 22 > 0 ? 14 / 22 : 0 },
+  { id: 'acq-3', utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'lead_magnet', leads: 45, called: 44, answered: 38, booked: 15, attended: 10, closed: 5, revenue: 6200, contactRate: 0.84, bookingRate: 0.39, attendanceRate: 0.67, closingRate: 10 > 0 ? 5 / 10 : 0 },
+  { id: 'acq-4', utm_source: 'organic', medium: 'organic', leads: 25, called: 24, answered: 20, booked: 6, attended: 6, closed: 3, revenue: 3444.17, contactRate: 0.8, bookingRate: 0.3, attendanceRate: 1, closingRate: 6 > 0 ? 3 / 6 : 0 },
 ];
 
 // Objeciones agregadas para reportes

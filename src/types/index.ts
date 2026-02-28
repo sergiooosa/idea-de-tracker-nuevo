@@ -1,6 +1,6 @@
-// Lead Compass - Data Model V1 (GHL-ready)
+// AutoKPI - Data Model V1 (GHL-ready)
 
-export type AdvisorRole = 'closer' | 'setter' | 'admin';
+export type AdvisorRole = 'closer' | 'setter' | 'admin' | 'gerente' | 'director_comercial';
 
 export interface Advisor {
   id: string;
@@ -77,6 +77,10 @@ export interface VideoMeeting {
   utm_campaign?: string;
   ad_name?: string;
   objections?: string[];
+  /** Por cada objeción, la cita exacta de lo que dijo el lead (IA/transcripción). */
+  objectionDetails?: { category: string; quote: string }[];
+  /** URL de la grabación de la videollamada (ej. Fathom, Zoom). */
+  recordingUrl?: string;
 }
 
 export type EmojiStatus = '👍' | '👎' | '💡' | '💰' | '⏳' | '💬' | '☀️';
@@ -130,12 +134,12 @@ export interface AcquisitionRow {
   ad_name?: string;
   medium?: string;
   leads: number;
+  called: number; // leads a los que se les llamó
   answered: number;
   booked: number;
   attended: number;
   closed?: number; // reuniones cerradas (venta)
   revenue: number;
-  roas?: number;
   contactRate: number;
   bookingRate: number;
   attendanceRate: number;
@@ -157,4 +161,12 @@ export interface CustomMetricRule {
   condition: string;
   increment: number;
   source: 'call' | 'chat' | 'meeting';
+  /** Cuándo se mide (ej: al finalizar la llamada, cada mensaje en chat). */
+  whenMeasured?: string;
+  /** Si la métrica es recurrente (suma cada vez) o única (solo cuenta una vez por lead/evento). */
+  isRecurring?: 'recurrente' | 'unica';
+  /** Sección donde se muestra la métrica (ej: Performance, Panel asesor). */
+  section?: string;
+  /** Panel concreto donde se añade (ej: Llamadas, Videollamadas, Resumen adquisición). */
+  panel?: string;
 }

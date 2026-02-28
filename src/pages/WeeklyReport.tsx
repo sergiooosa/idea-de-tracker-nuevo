@@ -67,67 +67,62 @@ export default function WeeklyReport() {
           </div>
         }
       />
-      <div className="p-4 md:p-6 space-y-8 max-w-6xl mx-auto">
+      <div className="p-3 md:p-4 space-y-3 max-w-6xl mx-auto min-w-0 max-w-full overflow-x-hidden text-sm">
         {/* Hero */}
-        <section className="rounded-2xl border border-surface-500/80 bg-gradient-to-br from-surface-800 to-surface-800/50 p-6 md:p-8 shadow-card">
-          <p className="text-accent-cyan font-medium text-sm uppercase tracking-wider mb-1">Semana seleccionada</p>
-          <h2 className="text-2xl md:text-3xl font-display font-bold text-white mb-2">
+        <section className="rounded-lg border border-surface-500/80 bg-gradient-to-br from-surface-800 to-surface-800/50 p-4 shadow-card">
+          <p className="text-accent-cyan font-medium text-xs uppercase tracking-wider mb-0.5">Semana seleccionada</p>
+          <h2 className="text-xl md:text-2xl font-display font-bold text-white mb-1">
             {weekLabel}
           </h2>
-          <p className="text-gray-400 text-sm">
+          <p className="text-gray-400 text-xs">
             Resumen de actividad, llamadas, citas y cierres de la semana.
           </p>
         </section>
 
         {/* KPIs en grid */}
         <section>
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-accent-cyan" />
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-accent-cyan" />
             Números de la semana
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            <div className="rounded-xl border border-surface-500/80 bg-surface-800 pl-4 border-l-4 border-l-accent-blue overflow-hidden shadow-[0_0_20px_-8px_rgba(77,171,247,0.2)]">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 flex items-center gap-0.5">Leads <KpiTooltip significado="Total de leads con actividad en la semana." calculo="Leads únicos con llamada o reunión en el período." /></p>
-              <p className="text-xl font-bold text-accent-blue mt-0.5">{metricsGlobal.totalLeads}</p>
-              <div className="mb-3" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 sm:gap-2">
+            <div className="rounded-lg pl-3 overflow-hidden card-futuristic-blue kpi-card-fixed">
+              <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">Leads generados <KpiTooltip significado="Contactos creados en GHL. Calificados = lo que determina la IA en la llamada." calculo="Contactos creados en GHL en el rango." /></p>
+              <p className="text-base font-bold text-accent-blue mt-0.5">{metricsGlobal.totalLeads}</p>
+              <div className="kpi-card-spacer" />
             </div>
-            <div className="rounded-xl border border-surface-500/80 bg-surface-800 pl-4 border-l-4 border-l-accent-cyan overflow-hidden shadow-[0_0_20px_-8px_rgba(0,240,255,0.2)]">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 flex items-center gap-0.5">Llamadas <KpiTooltip significado="Total de llamadas realizadas." calculo="Suma de todas las llamadas en la semana." /></p>
-              <p className="text-xl font-bold text-accent-cyan mt-0.5">{metricsGlobal.callsMade}</p>
-              <p className="text-xs text-gray-500 mb-3">Contestación {pct(metricsGlobal.answerRate)}</p>
+            <div className="rounded-lg pl-3 overflow-hidden card-futuristic-cyan kpi-card-fixed">
+              <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">Llamadas <KpiTooltip significado="Todas las llamadas realizadas en el rango seleccionado." calculo="Suma de todas las llamadas en el período." /></p>
+              <p className="text-base font-bold text-accent-cyan mt-0.5">{metricsGlobal.callsMade}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Contestación {pct(metricsGlobal.answerRate)}</p>
             </div>
-            <div className="rounded-xl border border-surface-500/80 bg-surface-800 pl-4 border-l-4 border-l-accent-purple overflow-hidden shadow-[0_0_20px_-8px_rgba(178,75,243,0.2)]">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 flex items-center gap-0.5">Agendadas <KpiTooltip significado="Reuniones agendadas en la semana." calculo="Cantidad de citas/videollamadas programadas." /></p>
-              <p className="text-xl font-bold text-accent-purple mt-0.5">{metricsGlobal.meetingsBooked}</p>
-              <p className="text-xs text-gray-500 mb-3">Asistieron {metricsGlobal.meetingsAttended}</p>
+            <div className="rounded-lg pl-3 overflow-hidden card-futuristic-purple kpi-card-fixed">
+              <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">Agendadas <KpiTooltip significado="Citas o presentaciones. Vienen de los calendarios de citas o presentaciones." calculo="Videollamadas de los calendarios en el período." /></p>
+              <p className="text-base font-bold text-accent-purple mt-0.5">{metricsGlobal.meetingsBooked}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Asistieron {metricsGlobal.meetingsAttended}</p>
             </div>
-            <div className="rounded-xl border border-surface-500/80 bg-surface-800 pl-4 border-l-4 border-l-accent-green overflow-hidden shadow-[0_0_20px_-8px_rgba(0,230,118,0.2)]">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 flex items-center gap-0.5">Facturación <KpiTooltip significado="Ingresos por ventas en la semana." calculo="Suma del monto vendido en reuniones cerradas." /></p>
-              <p className="text-xl font-bold text-accent-green mt-0.5">{fm(metricsGlobal.revenue)}</p>
-              <p className="text-xs text-gray-500 mb-3">Efectivo cobrado {fm(metricsGlobal.cashCollected)}</p>
+            <div className="rounded-lg pl-3 overflow-hidden card-futuristic-green kpi-card-fixed">
+              <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">Facturación <KpiTooltip significado="Lo que se vendió de la propiedad." calculo="Suma del monto vendido en reuniones cerradas." /></p>
+              <p className="text-base font-bold text-accent-green mt-0.5">{fm(metricsGlobal.revenue)}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Efectivo {fm(metricsGlobal.cashCollected)}</p>
             </div>
-            <div className="rounded-xl border border-surface-500/80 bg-surface-800 pl-4 border-l-4 border-l-accent-amber overflow-hidden shadow-[0_0_20px_-8px_rgba(255,176,32,0.2)]">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 flex items-center gap-0.5">ROAS <KpiTooltip significado="Retorno de la inversión en publicidad." calculo="Ingresos atribuidos / gasto en publicidad." /></p>
-              <p className="text-xl font-bold text-accent-amber mt-0.5">{metricsGlobal.ROAS}x</p>
-              <div className="mb-3" />
-            </div>
-            <div className="rounded-xl border border-surface-500/80 bg-surface-800 pl-4 border-l-4 border-l-accent-cyan overflow-hidden shadow-[0_0_20px_-8px_rgba(0,240,255,0.2)]">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mt-3 flex items-center gap-0.5">Tiempo al lead <KpiTooltip significado="Tiempo promedio hasta el primer contacto." calculo="Promedio de (primer contacto − creación del lead)." /></p>
-              <p className="text-xl font-bold text-accent-cyan mt-0.5">
+            <div className="rounded-lg pl-3 overflow-hidden card-futuristic-cyan kpi-card-fixed">
+              <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">Tiempo al lead <KpiTooltip significado="Tiempo que se demoran en contactar al lead." calculo="Promedio de (primer contacto − creación del lead)." /></p>
+              <p className="text-base font-bold text-accent-cyan mt-0.5">
                 {metricsGlobal.speedToLeadAvg != null ? min(metricsGlobal.speedToLeadAvg) : '—'}
               </p>
-              <div className="mb-3" />
+              <div className="kpi-card-spacer" />
             </div>
           </div>
         </section>
 
         {/* Volumen por día */}
-        <section className="rounded-xl border border-surface-500/80 bg-surface-800 p-4 md:p-6 shadow-card">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Phone className="w-4 h-4 text-accent-cyan" />
-            Volumen: llamadas, citas/presentaciones y cierres
+        <section className="rounded-lg p-3 section-futuristic">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Phone className="w-3.5 h-3.5 text-accent-cyan" />
+            Volumen: llamadas, citas y cierres
           </h3>
-          <div className="h-56">
+          <div className="h-36">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={callsVolumeByDay} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e2a3a" />
@@ -147,25 +142,25 @@ export default function WeeklyReport() {
         </section>
 
         {/* Ranking por asesor */}
-        <section className="rounded-xl border border-surface-500/80 bg-surface-800 overflow-hidden shadow-card">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider p-4 pb-0 flex items-center gap-2">
-            <Users className="w-4 h-4 text-accent-cyan" />
+        <section className="rounded-lg overflow-hidden section-futuristic border border-surface-500">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider p-3 pb-0 flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-accent-cyan" />
             Ranking por asesor
           </h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="bg-surface-700/80 text-left text-gray-400">
-                  <th className="px-4 py-3 font-medium">Asesor</th>
-                  <th className="px-4 py-3 font-medium">Leads</th>
-                  <th className="px-4 py-3 font-medium">Llamadas</th>
-                  <th className="px-4 py-3 font-medium">Tiempo al lead</th>
-                  <th className="px-4 py-3 font-medium">Agendadas</th>
-                  <th className="px-4 py-3 font-medium">Asistidas</th>
-                  <th className="px-4 py-3 font-medium">Facturación</th>
-                  <th className="px-4 py-3 font-medium">Efectivo cobrado</th>
-                  <th className="px-4 py-3 font-medium">Tasa contacto</th>
-                  <th className="px-4 py-3 font-medium">Tasa agendamiento</th>
+                  <th className="px-2 py-2 font-medium">Asesor</th>
+                  <th className="px-2 py-2 font-medium">Leads generados</th>
+                  <th className="px-2 py-2 font-medium">Llamadas</th>
+                  <th className="px-2 py-2 font-medium">Tiempo al lead</th>
+                  <th className="px-2 py-2 font-medium">Agendadas</th>
+                  <th className="px-2 py-2 font-medium">Asistidas</th>
+                  <th className="px-2 py-2 font-medium">Facturación</th>
+                  <th className="px-2 py-2 font-medium">Efectivo</th>
+                  <th className="px-2 py-2 font-medium">Tasa contacto</th>
+                  <th className="px-2 py-2 font-medium">Tasa agend.</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,23 +168,23 @@ export default function WeeklyReport() {
                   const m = metricsByAdvisor[a.id]!;
                   return (
                     <tr key={a.id} className="border-t border-surface-500 hover:bg-surface-700/50">
-                      <td className="px-4 py-3 text-white font-medium">
+                      <td className="px-2 py-2 text-white font-medium">
                         {i === 0 && '🥇 '}
                         {i === 1 && '🥈 '}
                         {i === 2 && '🥉 '}
                         {a.name}
                       </td>
-                      <td className="px-4 py-3 text-accent-cyan">{m.totalLeads ?? 0}</td>
-                      <td className="px-4 py-3 text-accent-cyan">{m.callsMade ?? 0}</td>
-                      <td className="px-4 py-3 text-gray-300">
+                      <td className="px-2 py-2 text-accent-cyan">{m.totalLeads ?? 0}</td>
+                      <td className="px-2 py-2 text-accent-cyan">{m.callsMade ?? 0}</td>
+                      <td className="px-2 py-2 text-gray-300">
                         {m.speedToLeadAvg != null ? min(m.speedToLeadAvg) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-accent-purple">{m.meetingsBooked ?? 0}</td>
-                      <td className="px-4 py-3 text-accent-cyan">{m.meetingsAttended ?? 0}</td>
-                      <td className="px-4 py-3 text-accent-green">{m.revenue != null ? fm(m.revenue) : '—'}</td>
-                      <td className="px-4 py-3 text-accent-green">{m.cashCollected != null ? fm(m.cashCollected) : '—'}</td>
-                      <td className="px-4 py-3">{m.contactRate != null ? pct(m.contactRate) : '—'}</td>
-                      <td className="px-4 py-3">{m.bookingRate != null ? pct(m.bookingRate) : '—'}</td>
+                      <td className="px-2 py-2 text-accent-purple">{m.meetingsBooked ?? 0}</td>
+                      <td className="px-2 py-2 text-accent-cyan">{m.meetingsAttended ?? 0}</td>
+                      <td className="px-2 py-2 text-accent-green">{m.revenue != null ? fm(m.revenue) : '—'}</td>
+                      <td className="px-2 py-2 text-accent-green">{m.cashCollected != null ? fm(m.cashCollected) : '—'}</td>
+                      <td className="px-2 py-2">{m.contactRate != null ? pct(m.contactRate) : '—'}</td>
+                      <td className="px-2 py-2">{m.bookingRate != null ? pct(m.bookingRate) : '—'}</td>
                     </tr>
                   );
                 })}
@@ -199,44 +194,44 @@ export default function WeeklyReport() {
         </section>
 
         {/* Estado de agendas + Objeciones */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <section className="rounded-xl border border-surface-500/80 bg-surface-800 p-4 md:p-6 shadow-card">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Video className="w-4 h-4 text-accent-purple" />
+        <div className="grid md:grid-cols-2 gap-3">
+          <section className="rounded-lg p-3 section-futuristic">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Video className="w-3.5 h-3.5 text-accent-purple" />
               Estado de agendas
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="rounded-lg bg-surface-700/80 p-3 text-center">
-                <p className="text-2xl font-bold text-accent-purple">{agendadas}</p>
-                <p className="text-xs text-gray-400">Agendadas</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="rounded-lg bg-surface-700/80 p-2 text-center">
+                <p className="text-lg font-bold text-accent-purple">{agendadas}</p>
+                <p className="text-[10px] text-gray-400">Agendadas</p>
               </div>
-              <div className="rounded-lg bg-surface-700/80 p-3 text-center">
-                <p className="text-2xl font-bold text-accent-amber">{pendientes}</p>
-                <p className="text-xs text-gray-400">Pendientes</p>
+              <div className="rounded-lg bg-surface-700/80 p-2 text-center">
+                <p className="text-lg font-bold text-accent-amber">{pendientes}</p>
+                <p className="text-[10px] text-gray-400">Pendientes</p>
               </div>
-              <div className="rounded-lg bg-surface-700/80 p-3 text-center">
-                <p className="text-2xl font-bold text-accent-red">{canceladas}</p>
-                <p className="text-xs text-gray-400">Canceladas</p>
+              <div className="rounded-lg bg-surface-700/80 p-2 text-center">
+                <p className="text-lg font-bold text-accent-red">{canceladas}</p>
+                <p className="text-[10px] text-gray-400">Canceladas</p>
               </div>
-              <div className="rounded-lg bg-surface-700/80 p-3 text-center">
-                <p className="text-2xl font-bold text-accent-cyan">{asistidas}</p>
-                <p className="text-xs text-gray-400">Asistieron</p>
+              <div className="rounded-lg bg-surface-700/80 p-2 text-center">
+                <p className="text-lg font-bold text-accent-cyan">{asistidas}</p>
+                <p className="text-[10px] text-gray-400">Asistieron</p>
               </div>
-              <div className="rounded-lg bg-surface-700/80 p-3 text-center">
-                <p className="text-2xl font-bold text-accent-green">{metricsGlobal.effectiveAppointments ?? 0}</p>
-                <p className="text-xs text-gray-400">Calificadas</p>
+              <div className="rounded-lg bg-surface-700/80 p-2 text-center">
+                <p className="text-lg font-bold text-accent-green">{metricsGlobal.effectiveAppointments ?? 0}</p>
+                <p className="text-[10px] text-gray-400">Calificadas</p>
               </div>
             </div>
           </section>
-          <section className="rounded-xl border border-surface-500/80 bg-surface-800 p-4 md:p-6 shadow-card">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          <section className="rounded-lg p-3 section-futuristic">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Objeciones más repetidas
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {objectionsByCount.map((o) => (
-                <li key={o.name} className="flex items-center justify-between rounded-lg bg-surface-700/80 px-3 py-2">
+                <li key={o.name} className="flex items-center justify-between rounded-lg bg-surface-700/80 px-2 py-1.5 text-xs">
                   <span className="font-medium text-white capitalize">{o.name}</span>
-                  <span className="px-2 py-0.5 rounded bg-accent-red/20 text-accent-red text-sm font-medium">
+                  <span className="px-1.5 py-0.5 rounded bg-accent-red/20 text-accent-red text-xs font-medium">
                     {o.count}x
                   </span>
                 </li>
@@ -246,12 +241,12 @@ export default function WeeklyReport() {
         </div>
 
         {/* Resumen e accionables */}
-        <section className="rounded-xl border border-surface-500/80 bg-surface-800 p-4 md:p-6 shadow-card">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-accent-green" />
+        <section className="rounded-lg p-3 section-futuristic">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <DollarSign className="w-3.5 h-3.5 text-accent-green" />
             Resumen y accionables
           </h3>
-          <ul className="space-y-2 text-sm text-gray-300">
+          <ul className="space-y-1.5 text-xs text-gray-300">
             <li className="flex gap-2">
               <span className="text-accent-cyan">•</span>
               Tasa de contestación en <strong className="text-white">{pct(metricsGlobal.answerRate)}</strong>; reforzar seguimiento en &lt; 48h a leads sin respuesta.
@@ -262,7 +257,7 @@ export default function WeeklyReport() {
             </li>
             <li className="flex gap-2">
               <span className="text-accent-cyan">•</span>
-              Facturación semanal <strong className="text-accent-green">{fm(metricsGlobal.revenue)}</strong>, efectivo cobrado {fm(metricsGlobal.cashCollected)}. ROAS {metricsGlobal.ROAS}x.
+              Facturación semanal <strong className="text-accent-green">{fm(metricsGlobal.revenue)}</strong>, efectivo cobrado {fm(metricsGlobal.cashCollected)}.
             </li>
           </ul>
         </section>

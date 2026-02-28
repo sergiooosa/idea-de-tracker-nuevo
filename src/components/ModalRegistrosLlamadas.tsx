@@ -1,4 +1,4 @@
-import { X, FileText, Sparkles } from 'lucide-react';
+import { X, FileText, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CallPhone } from '@/types';
 import { outcomeLlamadaToSpanish } from '@/utils/outcomeLabels';
@@ -7,10 +7,12 @@ export default function ModalRegistrosLlamadas({
   registros,
   leadName,
   onClose,
+  onVerTranscripcionIA,
 }: {
   registros: CallPhone[];
   leadName: string;
   onClose: () => void;
+  onVerTranscripcionIA?: (call: CallPhone) => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -46,33 +48,35 @@ export default function ModalRegistrosLlamadas({
                         <span className="text-gray-400">Duración: {c.duration}s</span>
                       )}
                     </div>
-                    {contesto ? (
-                      <>
-                        {c.notes && (
-                          <p className="mt-2 text-gray-300">Qué se habló: {c.notes}</p>
-                        )}
-                        {c.objections && c.objections.length > 0 && (
-                          <p className="mt-1 text-xs text-accent-amber">Objeciones: {c.objections.join(', ')}</p>
-                        )}
-                        <div className="mt-2 flex gap-2">
-                          <button type="button" className="text-xs text-accent-cyan hover:underline flex items-center gap-1">
-                            <FileText className="w-3.5 h-3.5" /> Ver transcripción
-                          </button>
-                          <button type="button" className="text-xs text-accent-purple hover:underline flex items-center gap-1">
-                            <Sparkles className="w-3.5 h-3.5" /> Ver análisis IA
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-2 flex gap-2">
-                        <button type="button" className="text-xs text-accent-cyan hover:underline flex items-center gap-1">
-                          <FileText className="w-3.5 h-3.5" /> Ver transcripción
-                        </button>
-                        <button type="button" className="text-xs text-accent-purple hover:underline flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5" /> Ver análisis IA
-                        </button>
-                      </div>
+                    {c.notes && <p className="mt-2 text-gray-300">Qué se habló: {c.notes}</p>}
+                    {c.objections && c.objections.length > 0 && (
+                      <p className="mt-1 text-xs text-accent-amber">Objeciones: {c.objections.join(', ')}</p>
                     )}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {onVerTranscripcionIA && (
+                        <button
+                          type="button"
+                          onClick={() => onVerTranscripcionIA(c)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-cyan/20 text-accent-cyan text-xs font-medium hover:bg-accent-cyan/30"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Transcripción y análisis IA
+                        </button>
+                      )}
+                      {c.recordingUrl ? (
+                        <a
+                          href={c.recordingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-green/20 text-accent-green text-xs font-medium hover:bg-accent-green/30"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Ver grabación
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-600 text-gray-500 text-xs">
+                          <ExternalLink className="w-3.5 h-3.5" /> Sin grabación
+                        </span>
+                      )}
+                    </div>
                   </li>
                 );
               })}
