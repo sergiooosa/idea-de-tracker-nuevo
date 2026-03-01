@@ -67,7 +67,7 @@ export default auth(async (req) => {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/auth")) return NextResponse.next();
+  if (pathname.startsWith("/api")) return NextResponse.next();
 
   if (!req.auth) {
     const protocol = req.nextUrl.protocol;
