@@ -129,6 +129,7 @@ Archivo `.env.local` (nunca se sube al repo):
 | `AUTH_URL` | `https://autokpi.net` | **Siempre** el dominio raíz. Nunca un subdominio ni URL de Cloud Run. |
 | `AUTH_TRUST_HOST` | `true` | Necesario para proxies (Traefik, Coolify, etc.) |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `autokpi.net` | Dominio raíz para el middleware y cookies |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://autokpi.net` | URL base para webhooks e integraciones (Zapier, Make). Si no se define, usa `AUTH_URL`. |
 
 ---
 
@@ -143,6 +144,11 @@ src/
 │   ├── login/
 │   │   ├── page.tsx                  # Página de login
 │   │   └── actions.ts               # Server Action: signIn + fetch subdominio
+│   ├── integraciones/
+│   │   └── page.tsx                  # Documentación API webhooks (pública)
+│   ├── webhooks/
+│   │   └── external-data/
+│   │       └── [locationId]/route.ts  # POST: inyectar KPIs financieros vía API Key
 │   ├── api/
 │   │   ├── auth/
 │   │   │   ├── [...nextauth]/route.ts  # Handlers Auth.js (GET + POST)
@@ -236,7 +242,7 @@ El middleware es el cerebro del routing multi-tenant. Corre en **Edge Runtime** 
 | Condición | Acción |
 |---|---|
 | Dominio raíz + `/login` + ya autenticado | Redirect a `[subdominio].autokpi.net/dashboard` |
-| Dominio raíz + cualquier otra ruta | `NextResponse.next()` (landing, login, etc.) |
+| Dominio raíz + cualquier otra ruta | `NextResponse.next()` (landing, login, integraciones, webhooks) |
 | Subdominio + `/api/*` | `NextResponse.next()` (APIs no se reescriben) |
 | Subdominio + sin sesión | Redirect a `autokpi.net/login` |
 | Subdominio + sesión con subdominio distinto | `403 Forbidden` |
@@ -511,6 +517,11 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | `/api/data/usuarios` | PUT | usuarios_dashboard | body JSON (`id`) | Editar usuario |
 | `/api/data/usuarios` | DELETE | usuarios_dashboard | `?id=` | Eliminar usuario |
 | `/api/auth/logout` | POST | *(limpia cookie)* | | Cerrar sesión |
+| `/webhooks/external-data/[subdominio]` | POST | kpis_externos | Header `x-api-key`, body `{ data: [{ fecha, metricas }] }` | Zapier, Make, CRMs externos |
+
+### Webhook de datos financieros externos
+
+Permite inyectar facturación real (Stripe, PayPal, CRM) al dashboard. No requiere sesión: se autentica con `x-api-key`. Documentación pública en `autokpi.net/integraciones`.
 
 ---
 

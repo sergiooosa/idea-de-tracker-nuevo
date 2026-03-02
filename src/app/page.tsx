@@ -27,6 +27,7 @@ const LOGO_URL =
 const NAV_LINKS = [
   { label: "Funcionalidades", href: "#features" },
   { label: "Cómo funciona", href: "#como-funciona" },
+  { label: "Integraciones", href: "/integraciones" },
   { label: "Casos de éxito", href: "#testimonios" },
 ];
 
