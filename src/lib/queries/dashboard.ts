@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   DashboardKpis,
@@ -17,6 +17,15 @@ export async function getDashboard(
 ): Promise<DashboardResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+
+  const [cuentaRow] = await db
+    .select({ configuracion_ui: cuentas.configuracion_ui })
+    .from(cuentas)
+    .where(eq(cuentas.id_cuenta, idCuenta))
+    .limit(1);
+
+  const fuenteFinanciera = cuentaRow?.configuracion_ui?.fuente_datos_financieros;
+  const useExterna = fuenteFinanciera === "api_externa";
 
   const [agendas, calls] = await Promise.all([
     db
@@ -46,10 +55,39 @@ export async function getDashboard(
   const canceladas = agendas.filter((a) => a.categoria === "CANCELADA").length;
   const cerradas = agendas.filter((a) => a.categoria === "Cerrada").length;
   const efectivas = agendas.filter((a) => a.categoria === "Cerrada" || a.categoria === "Ofertada").length;
-  const revenue = agendas
+  const revenueNativo = agendas
     .filter((a) => a.categoria === "Cerrada")
     .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
-  const cash = agendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
+  const cashNativo = agendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
+
+  let revenue = revenueNativo;
+  let cash = cashNativo;
+
+  if (useExterna) {
+    const kpisExt = await db
+      .select({ metricas: kpisExternos.metricas })
+      .from(kpisExternos)
+      .where(
+        and(
+          eq(kpisExternos.id_cuenta, idCuenta),
+          gte(kpisExternos.fecha, dateFrom),
+          lte(kpisExternos.fecha, dateTo),
+        ),
+      );
+
+    let extRevenue = 0;
+    let extCash = 0;
+    let extIngresos = 0;
+    for (const row of kpisExt) {
+      const m = row.metricas ?? {};
+      extRevenue += m.facturacion ?? 0;
+      extCash += m.cash_collected ?? 0;
+      extIngresos += m.ingresos ?? 0;
+    }
+
+    revenue = extRevenue || extIngresos;
+    cash = extCash;
+  }
 
   const efectivasCalls = calls.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
   const contestadas = efectivasCalls;
@@ -118,10 +156,13 @@ export async function getDashboard(
         ...aa.map((a) => a.email_lead).filter(Boolean),
       ]).size;
       const aAsistidas = aa.filter((a) => attended.includes(a.categoria ?? "")).length;
-      const aRevenue = aa
-        .filter((a) => a.categoria === "Cerrada")
-        .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
-      const aCash = aa.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
+      const aRevenue = useExterna
+        ? 0
+        : aa.filter((a) => a.categoria === "Cerrada")
+            .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+      const aCash = useExterna
+        ? 0
+        : aa.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
       const aSpeeds = ac
         .filter((c) => c.speed_to_lead)
         .map((c) => parseFloat(c.speed_to_lead!) || 0)
@@ -186,5 +227,12 @@ export async function getDashboard(
     email: a.advisorEmail ?? undefined,
   }));
 
-  return { kpis, advisorRanking, volumeByDay, objeciones, advisors };
+  return {
+    kpis,
+    advisorRanking,
+    volumeByDay,
+    objeciones,
+    advisors,
+    fuenteDatosFinancieros: fuenteFinanciera ?? "nativa",
+  };
 }

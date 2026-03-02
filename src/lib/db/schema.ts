@@ -9,6 +9,7 @@ import {
   timestamp,
   varchar,
   numeric,
+  boolean,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -30,6 +31,7 @@ export interface ConfiguracionUI {
   nombres_secciones?: Record<string, string>;
   columnas_visibles?: Record<string, string[]>;
   kpis_visibles?: Record<string, string[]>;
+  fuente_datos_financieros?: "nativa" | "api_externa";
 }
 
 export interface ReglaEtiqueta {
@@ -216,4 +218,44 @@ export const metasCuenta = pgTable("metas_cuenta", {
   updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("metas_cuenta_id_cuenta_unique").on(table.id_cuenta),
+]);
+
+/* ------------------------------------------------------------------ */
+/*  kpis_externos — datos financieros inyectados vía API externa       */
+/* ------------------------------------------------------------------ */
+
+export const kpisExternos = pgTable("kpis_externos", {
+  id_registro: serial("id_registro").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta),
+  fecha: date("fecha").notNull(),
+  origen: text("origen").default("api_externa"),
+  metricas: jsonb("metricas").$type<Record<string, number>>().notNull().default({}),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+/* ------------------------------------------------------------------ */
+/*  api_keys_cuenta — tokens de autenticación para webhooks externos   */
+/* ------------------------------------------------------------------ */
+
+export const apiKeysCuenta = pgTable("api_keys_cuenta", {
+  id_key: serial("id_key").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta),
+  nombre_key: text("nombre_key").notNull(),
+  token: text("token").unique().notNull(),
+  activa: boolean("activa").default(true),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+/* ------------------------------------------------------------------ */
+/*  uso_api_mensual — tracking de consumo mensual por cuenta           */
+/* ------------------------------------------------------------------ */
+
+export const usoApiMensual = pgTable("uso_api_mensual", {
+  id_uso: serial("id_uso").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta),
+  mes_anio: text("mes_anio").notNull(),
+  tipo_consumo: text("tipo_consumo").notNull(),
+  cantidad: integer("cantidad").default(0),
+}, (table) => [
+  uniqueIndex("uso_api_mensual_unique").on(table.id_cuenta, table.mes_anio, table.tipo_consumo),
 ]);

@@ -367,6 +367,7 @@ export interface DashboardResponse {
   volumeByDay: DashboardVolumeDay[];
   objeciones: DashboardObjecion[];
   advisors: ApiAdvisor[];
+  fuenteDatosFinancieros: "nativa" | "api_externa";
 }
 
 export interface AsesorLeadCRM {
