@@ -1,8 +1,34 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth.edge";
+import { decode } from "@auth/core/jwt";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
+const isProduction = process.env.NODE_ENV === "production";
+const COOKIE_NAME = isProduction
+  ? "__Secure-next-auth.session-token"
+  : "next-auth.session-token";
+
+type SessionPayload = {
+  subdominio?: string;
+  rol?: string;
+  id_cuenta?: number;
+  [key: string]: unknown;
+};
+
+async function getSession(req: NextRequest): Promise<SessionPayload | null> {
+  const cookieValue = req.cookies.get(COOKIE_NAME)?.value;
+  if (!cookieValue) return null;
+  try {
+    const decoded = await decode({
+      token: cookieValue,
+      secret: process.env.AUTH_SECRET!,
+      salt: COOKIE_NAME,
+    });
+    return decoded as SessionPayload | null;
+  } catch {
+    return null;
+  }
+}
 
 function getHostnameData(req: NextRequest): {
   isRoot: boolean;
@@ -40,24 +66,25 @@ function getHostnameData(req: NextRequest): {
   return { isRoot: true, subdomain: null };
 }
 
-export default auth(async (req) => {
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const { isRoot, subdomain } = getHostnameData(req);
 
+  // ── Dominio raíz (autokpi.net) ──────────────────────────────────────────
   if (isRoot) {
     if (pathname.startsWith("/api/auth")) return NextResponse.next();
 
-    if (pathname === "/login" && req.auth) {
-      const userSubdomain = (req.auth.user as any)?.subdominio;
-      if (userSubdomain) {
+    if (pathname === "/login") {
+      const session = await getSession(req);
+      if (session?.subdominio) {
         const protocol = req.nextUrl.protocol;
         const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
         const isLocalDev = (req.headers.get("host") ?? "").includes(
           "localhost"
         );
         const targetHost = isLocalDev
-          ? `${userSubdomain}.localhost${port}`
-          : `${userSubdomain}.${ROOT_DOMAIN}`;
+          ? `${session.subdominio}.localhost${port}`
+          : `${session.subdominio}.${ROOT_DOMAIN}`;
         return NextResponse.redirect(
           new URL(`${protocol}//${targetHost}/dashboard`)
         );
@@ -67,9 +94,14 @@ export default auth(async (req) => {
     return NextResponse.next();
   }
 
+  // ── Subdominio tenant (ej. testv1.autokpi.net) ──────────────────────────
+  // Todas las rutas /api/* pasan directo sin reescribir
   if (pathname.startsWith("/api")) return NextResponse.next();
 
-  if (!req.auth) {
+  const session = await getSession(req);
+
+  // Sin sesión → redirigir al login central
+  if (!session) {
     const protocol = req.nextUrl.protocol;
     const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
     const isLocalDev = (req.headers.get("host") ?? "").includes("localhost");
@@ -79,23 +111,25 @@ export default auth(async (req) => {
     );
   }
 
-  const userSubdomain = (req.auth.user as any)?.subdominio;
-  if (userSubdomain !== subdomain) {
+  // Subdominio del token no coincide con el host
+  if (session.subdominio !== subdomain) {
     return new NextResponse("Acceso no autorizado a este tenant.", {
       status: 403,
     });
   }
 
+  // Raíz del subdominio → /dashboard
   if (pathname === "/" || pathname === "") {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
+  // Rewrite interno: testv1.autokpi.net/dashboard → /app/testv1/dashboard
   const url = req.nextUrl.clone();
   url.pathname = `/app/${subdomain}${pathname}`;
   return NextResponse.rewrite(url);
-});
+}
 
 export const config = {
   matcher: [
