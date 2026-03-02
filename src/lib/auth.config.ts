@@ -15,39 +15,63 @@ export const authConfig: NextAuthConfig = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const email = credentials.email as string;
+
+        const email = (credentials.email as string).trim().toLowerCase();
         const password = credentials.password as string;
 
-        const result = await db
-          .select({
-            id_evento: usuariosDashboard.id_evento,
-            id_cuenta: usuariosDashboard.id_cuenta,
-            nombre: usuariosDashboard.nombre,
-            email: usuariosDashboard.email,
-            pass: usuariosDashboard.pass,
-            rol: usuariosDashboard.rol,
-            permisos: usuariosDashboard.permisos,
-            subdominio: cuentas.subdominio,
-          })
-          .from(usuariosDashboard)
-          .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
-          .where(eq(usuariosDashboard.email, email))
-          .limit(1);
+        try {
+          const result = await db
+            .select({
+              id_evento: usuariosDashboard.id_evento,
+              id_cuenta: usuariosDashboard.id_cuenta,
+              nombre: usuariosDashboard.nombre,
+              email: usuariosDashboard.email,
+              pass: usuariosDashboard.pass,
+              rol: usuariosDashboard.rol,
+              permisos: usuariosDashboard.permisos,
+              subdominio: cuentas.subdominio,
+            })
+            .from(usuariosDashboard)
+            .innerJoin(
+              cuentas,
+              eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta),
+            )
+            .where(eq(usuariosDashboard.email, email))
+            .limit(1);
 
-        if (result.length === 0) return null;
-        const user = result[0];
-        const passwordMatch = await compare(password, user.pass);
-        if (!passwordMatch) return null;
+          if (result.length === 0) {
+            console.error("[auth] usuario no encontrado:", email);
+            return null;
+          }
 
-        return {
-          id: String(user.id_evento),
-          id_cuenta: user.id_cuenta!,
-          email: user.email,
-          name: user.nombre,
-          rol: user.rol,
-          subdominio: user.subdominio,
-          permisos: user.permisos,
-        };
+          const user = result[0];
+
+          let passwordMatch = false;
+          try {
+            passwordMatch = await compare(password, user.pass);
+          } catch (bcryptErr) {
+            console.error("[auth] bcrypt compare falló:", bcryptErr);
+            return null;
+          }
+
+          if (!passwordMatch) {
+            console.error("[auth] password incorrecta para:", email);
+            return null;
+          }
+
+          return {
+            id: String(user.id_evento),
+            id_cuenta: user.id_cuenta!,
+            email: user.email,
+            name: user.nombre,
+            rol: user.rol,
+            subdominio: user.subdominio,
+            permisos: user.permisos,
+          };
+        } catch (dbErr) {
+          console.error("[auth] error de DB en authorize:", dbErr);
+          return null;
+        }
       },
     }),
   ],
