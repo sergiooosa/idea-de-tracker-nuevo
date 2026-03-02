@@ -8,6 +8,8 @@ import {
   date,
   timestamp,
   varchar,
+  numeric,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -25,6 +27,28 @@ export interface ConfiguracionUI {
     llamadas_twilio?: boolean;
     videollamadas_fathom?: boolean;
   };
+  nombres_secciones?: Record<string, string>;
+  columnas_visibles?: Record<string, string[]>;
+  kpis_visibles?: Record<string, string[]>;
+}
+
+export interface ReglaEtiqueta {
+  id: string;
+  condition: string;
+  tag: string;
+  source: string;
+}
+
+export interface MetricaPersonalizada {
+  id: string;
+  name: string;
+  description: string;
+  condition: string;
+  increment: number;
+  whenMeasured: string;
+  isRecurring: "recurrente" | "unica";
+  section: string;
+  panel: string;
 }
 
 export const cuentas = pgTable("cuentas", {
@@ -35,6 +59,10 @@ export const cuentas = pgTable("cuentas", {
   estado_cuenta: text("estado_cuenta"),
   zona_horaria_iana: text("zona_horaria_iana"),
   prompt_ventas: text("prompt_ventas"),
+  prompt_videollamadas: text("prompt_videollamadas"),
+  prompt_llamadas: text("prompt_llamadas"),
+  reglas_etiquetas: jsonb("reglas_etiquetas").$type<ReglaEtiqueta[]>(),
+  metricas_personalizadas: jsonb("metricas_personalizadas").$type<MetricaPersonalizada[]>(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -156,4 +184,36 @@ export const chatsLogs = pgTable("chats_logs", {
   notas_extra: text("notas_extra"),
   id_lead: text("id_lead"),
   chatid: text("chatid"),
+  origen: text("origen"),
 });
+
+/* ------------------------------------------------------------------ */
+/*  metas_cuenta — metas persistentes multi-tenant                    */
+/* ------------------------------------------------------------------ */
+
+export interface MetaPorAsesor {
+  email: string;
+  meta_llamadas_diarias?: number;
+  meta_cierres_semanales?: number;
+}
+
+export const metasCuenta = pgTable("metas_cuenta", {
+  id_meta: serial("id_meta").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta),
+  meta_llamadas_diarias: integer("meta_llamadas_diarias").notNull().default(50),
+  leads_nuevos_dia_1: integer("leads_nuevos_dia_1").notNull().default(3),
+  leads_nuevos_dia_2: integer("leads_nuevos_dia_2").notNull().default(4),
+  leads_nuevos_dia_3: integer("leads_nuevos_dia_3").notNull().default(5),
+  meta_citas_semanales: integer("meta_citas_semanales"),
+  meta_cierres_semanales: integer("meta_cierres_semanales"),
+  meta_revenue_mensual: numeric("meta_revenue_mensual", { precision: 12, scale: 2 }),
+  meta_cash_collected_mensual: numeric("meta_cash_collected_mensual", { precision: 12, scale: 2 }),
+  meta_tasa_cierre: numeric("meta_tasa_cierre", { precision: 5, scale: 4 }),
+  meta_tasa_contestacion: numeric("meta_tasa_contestacion", { precision: 5, scale: 4 }),
+  meta_speed_to_lead_min: numeric("meta_speed_to_lead_min", { precision: 8, scale: 2 }),
+  metas_por_asesor: jsonb("metas_por_asesor").$type<MetaPorAsesor[]>(),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("metas_cuenta_id_cuenta_unique").on(table.id_cuenta),
+]);

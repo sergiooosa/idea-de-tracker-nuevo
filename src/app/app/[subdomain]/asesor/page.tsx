@@ -7,7 +7,6 @@ import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
-import { getMetasFromStorage } from '@/utils/metasStorage';
 import type { AsesorResponse, AsesorLeadCRM } from '@/types';
 import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X } from 'lucide-react';
 import { format, subDays } from 'date-fns';
@@ -66,8 +65,8 @@ export default function AsesorPage() {
   const [dateTo, setDateTo] = useState(format(defaultTo, 'yyyy-MM-dd'));
   const [selectedAdvisorEmail, setSelectedAdvisorEmail] = useState<string>('');
 
-  const metas = getMetasFromStorage();
-  const { metaLlamadasDiarias } = metas;
+  const { data: metasData } = useApiData<{ meta_llamadas_diarias: number }>('/api/data/metas');
+  const metaLlamadasDiarias = metasData?.meta_llamadas_diarias ?? 50;
 
   const advisorParam = selectedAdvisorEmail || undefined;
   const { data, loading } = useApiData<AsesorResponse>('/api/data/asesor', {

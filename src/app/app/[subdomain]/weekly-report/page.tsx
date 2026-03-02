@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import PageHeader from '@/components/dashboard/PageHeader';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse } from '@/types';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Download, Calendar, TrendingUp, Phone, Users, Video, DollarSign } from 'lucide-react';
+import { Download, Calendar, TrendingUp, Phone, Users, Video, DollarSign, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const fm = (n: number) =>
@@ -17,6 +17,33 @@ const minFmt = (m: number) => (m < 1 ? `${Math.round(m * 60)}s` : `${m.toFixed(1
 
 export default function WeeklyReportPage() {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const downloadPdf = useCallback(async () => {
+    if (!reportRef.current) return;
+    setGeneratingPdf(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(reportRef.current, { scale: 2, backgroundColor: '#0d1219', useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.setFillColor(13, 18, 25);
+      pdf.rect(0, 0, pdfWidth, 12, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10);
+      pdf.text('AutoKPI — Reporte Semanal', 8, 8);
+      pdf.setFontSize(7);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(new Date().toLocaleDateString('es-CO'), pdfWidth - 30, 8);
+      pdf.addImage(imgData, 'PNG', 0, 14, pdfWidth, pdfHeight);
+      pdf.save(`reporte-semanal-autokpi-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch { /* ignore */ }
+    setGeneratingPdf(false);
+  }, []);
   const now = new Date();
   const weekEnd = subDays(now, weekOffset * 7);
   const weekStart = subDays(weekEnd, 6);
@@ -64,13 +91,14 @@ export default function WeeklyReportPage() {
                 })}
               </select>
             </div>
-            <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:shadow-glow-cyan">
-              <Download className="w-4 h-4" /> Descargar PDF
+            <button type="button" onClick={downloadPdf} disabled={generatingPdf}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:shadow-glow-cyan disabled:opacity-50">
+              {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {generatingPdf ? 'Generando...' : 'Descargar PDF'}
             </button>
           </div>
         }
       />
-      <div className="p-3 md:p-4 space-y-3 max-w-6xl mx-auto min-w-0 max-w-full overflow-x-hidden text-sm">
+      <div ref={reportRef} className="p-3 md:p-4 space-y-3 max-w-6xl mx-auto min-w-0 max-w-full overflow-x-hidden text-sm">
         {loading ? (
           <div className="flex items-center justify-center min-h-[300px]"><div className="text-gray-400 text-sm animate-pulse">Cargando reporte...</div></div>
         ) : (
