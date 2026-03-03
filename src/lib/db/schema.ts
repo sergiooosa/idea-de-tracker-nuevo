@@ -58,6 +58,7 @@ export interface EmbudoEtapa {
   nombre: string;
   color?: string;
   orden: number;
+  condition?: string;
 }
 
 export interface ChatTrigger {

@@ -368,6 +368,7 @@ export interface EmbudoEtapaUI {
   nombre: string;
   color?: string;
   orden: number;
+  condition?: string;
 }
 
 export interface DashboardResponse {

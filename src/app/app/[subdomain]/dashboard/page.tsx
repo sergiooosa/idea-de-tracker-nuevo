@@ -8,7 +8,7 @@ import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse } from '@/types';
-import { Target, X, UserCircle, Trophy } from 'lucide-react';
+import { Target, X, UserCircle, Trophy, GitBranch } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -74,21 +74,17 @@ export default function DashboardPage() {
         </section>
 
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Top KPIs globales</h2>
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">KPIs operativos</h2>
           <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
             {[
               { label: 'Leads generados', value: kpis.totalLeads, color: 'blue' },
               { label: 'Llamadas', value: kpis.callsMade, color: 'cyan' },
               { label: 'Contestadas', value: kpis.contestadas, color: 'cyan', sub: `Tasa: ${pctFmt(kpis.answerRate)}` },
-              { label: 'Agendadas', value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${kpis.tasaAgendamiento.toFixed(1)}%` },
-              { label: 'Asistidas', value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
-              { label: 'Canceladas', value: kpis.meetingsCanceled, color: 'red' },
-              { label: 'Cerradas', value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${kpis.tasaCierre.toFixed(1)}%` },
+              { label: 'Tiempo al lead', value: minFmt(kpis.speedToLeadAvg), color: 'purple' },
+              { label: 'Intentos promedio', value: kpis.avgAttempts.toFixed(1), color: 'amber' },
               { label: 'Ingresos', value: fm(kpis.revenue), color: 'green' },
               { label: 'Efectivo cobrado', value: fm(kpis.cashCollected), color: 'green' },
               { label: 'Ticket promedio', value: fm(kpis.avgTicket), color: 'blue' },
-              { label: 'Tiempo al lead', value: minFmt(kpis.speedToLeadAvg), color: 'purple' },
-              { label: 'Intentos promedio', value: kpis.avgAttempts.toFixed(1), color: 'amber' },
             ].map(({ label, value, color, sub }) => (
               <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
                 <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
@@ -97,6 +93,52 @@ export default function DashboardPage() {
                 <div className="kpi-card-spacer" />
               </div>
             ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <GitBranch className="w-3.5 h-3.5 text-accent-purple" />
+            Embudo de ventas
+          </h2>
+          <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+            {data?.embudoPersonalizado && data.embudoPersonalizado.length > 0 ? (
+              data.embudoPersonalizado
+                .sort((a, b) => a.orden - b.orden)
+                .map((etapa) => {
+                  const count = data.distribucionEmbudo?.[etapa.nombre] ?? 0;
+                  const total = kpis.meetingsBooked || 1;
+                  const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0';
+                  return (
+                    <div
+                      key={etapa.id}
+                      className="rounded-lg pl-3 overflow-hidden flex flex-col bg-surface-800/80 border border-surface-500 kpi-card-fixed"
+                      style={{ borderLeftColor: etapa.color ?? '#8b5cf6', borderLeftWidth: 3 }}
+                    >
+                      <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{etapa.nombre}</p>
+                      <p className="text-base font-bold mt-0.5 text-white">{count}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{pct}% del total</p>
+                      <div className="kpi-card-spacer" />
+                    </div>
+                  );
+                })
+            ) : (
+              <>
+                {[
+                  { label: 'Agendadas', value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${kpis.tasaAgendamiento.toFixed(1)}%` },
+                  { label: 'Asistidas', value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
+                  { label: 'Canceladas', value: kpis.meetingsCanceled, color: 'red' },
+                  { label: 'Cerradas', value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${kpis.tasaCierre.toFixed(1)}%` },
+                ].map(({ label, value, color, sub }) => (
+                  <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
+                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
+                    <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{value}</p>
+                    {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+                    <div className="kpi-card-spacer" />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </section>
 

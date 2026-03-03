@@ -282,6 +282,7 @@ export async function getDashboard(
       nombre: e.nombre,
       color: e.color,
       orden: e.orden,
+      condition: e.condition,
     })),
     distribucionEmbudo,
     tagsDisponibles: [...allTags].sort(),

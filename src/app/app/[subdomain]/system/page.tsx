@@ -11,7 +11,7 @@ interface MetricRule {
   increment: number; whenMeasured: string; isRecurring: 'recurrente' | 'unica';
   section: string; panel: string;
 }
-interface EmbudoEtapa { id: string; nombre: string; color?: string; orden: number }
+interface EmbudoEtapa { id: string; nombre: string; color?: string; orden: number; condition?: string }
 interface ChatTrigger { trigger: string; accion: string; valor: string }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
@@ -374,7 +374,7 @@ export default function SystemPage() {
                 <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><GitBranch className="w-5 h-5 text-accent-purple" /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">Embudo IA personalizado</h3>
-                  <p className="text-sm text-gray-400">Define las etapas de tu embudo de ventas. La IA clasificará leads según estos estados.</p>
+                  <p className="text-sm text-gray-400">Define cada etapa de tu embudo y escribe la condición exacta que la IA debe evaluar para clasificar al lead en ese estado.</p>
                 </div>
               </div>
               {embudoEtapas.length === 0 && (
@@ -382,29 +382,40 @@ export default function SystemPage() {
                   Sin embudo personalizado. Se usa el estándar (Cerrada, Ofertada, No_Ofertada, CANCELADA, PDTE).
                 </div>
               )}
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {embudoEtapas.map((etapa, i) => (
-                  <li key={etapa.id} className="flex items-center gap-2 rounded-lg p-3 bg-surface-700/80 border border-surface-500">
-                    <GripVertical className="w-4 h-4 text-gray-600 shrink-0" />
-                    <span className="text-xs text-gray-500 font-mono w-6 shrink-0">#{etapa.orden}</span>
-                    <input
-                      type="color"
-                      value={etapa.color ?? '#06b6d4'}
-                      onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, color: e.target.value } : x))}
-                      className="w-8 h-8 rounded-lg border border-surface-500 bg-transparent cursor-pointer shrink-0"
-                    />
-                    <input
-                      type="text"
-                      value={etapa.nombre}
-                      onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, nombre: e.target.value } : x))}
-                      placeholder={`Etapa ${i + 1} (ej: Demo Agendada)`}
-                      className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40"
-                    />
-                    {i < embudoEtapas.length - 1 && <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />}
-                    <button type="button" onClick={() => removeEmbudoEtapa(etapa.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <li key={etapa.id} className="rounded-xl p-4 space-y-3 border-l-4 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500" style={{ borderLeftColor: etapa.color ?? '#8b5cf6' }}>
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="w-4 h-4 text-gray-600 shrink-0" />
+                      <span className="text-xs text-gray-500 font-mono w-6 shrink-0">#{etapa.orden}</span>
+                      <input
+                        type="color"
+                        value={etapa.color ?? '#06b6d4'}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, color: e.target.value } : x))}
+                        className="w-8 h-8 rounded-lg border border-surface-500 bg-transparent cursor-pointer shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={etapa.nombre}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, nombre: e.target.value } : x))}
+                        placeholder={`Nombre de la etapa (ej: Demo Agendada)`}
+                        className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white font-medium focus:ring-2 focus:ring-accent-purple/40"
+                      />
+                      {i < embudoEtapas.length - 1 && <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />}
+                      <button type="button" onClick={() => removeEmbudoEtapa(etapa.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-accent-cyan mb-1">Condición para la IA</label>
+                      <textarea
+                        value={etapa.condition ?? ''}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.value } : x))}
+                        placeholder={`Describe cuándo un lead debe clasificarse en esta etapa.\nEj: "El lead mostró interés real, preguntó por precios o pidió una propuesta formal."`}
+                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-600 min-h-[60px] focus:ring-2 focus:ring-accent-cyan/40 resize-y"
+                      />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -412,8 +423,10 @@ export default function SystemPage() {
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30 transition-all">
                 <Plus className="w-4 h-4" /> Añadir etapa
               </button>
-              <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 px-3 py-2 text-sm text-gray-400">
-                <strong className="text-accent-purple">Tip:</strong> Si el nombre contiene &quot;cerrad&quot; (ej. &quot;Cerrada MRR&quot;), el sistema lo considera automáticamente como cierre para calcular revenue.
+              <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 px-3 py-2 text-sm text-gray-400 space-y-1">
+                <p><strong className="text-accent-purple">Cómo funciona:</strong></p>
+                <p>La IA lee la transcripción de cada llamada/videollamada y la compara con las condiciones que escribas aquí. El estado que mejor coincida es el que se asigna al lead.</p>
+                <p>Si el nombre de la etapa contiene &quot;cerrad&quot; (ej. &quot;Cerrada MRR&quot;), el sistema lo trata automáticamente como cierre para calcular revenue.</p>
               </div>
             </div>
           )}
