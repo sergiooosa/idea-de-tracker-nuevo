@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
+import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse } from '@/types';
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const [dateTo, setDateTo] = useState(format(defaultDateTo, 'yyyy-MM-dd'));
   const [modalObjeciones, setModalObjeciones] = useState(false);
   const [selectedObjeccion, setSelectedObjeccion] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const { data, loading } = useApiData<DashboardResponse>('/api/data/dashboard', { from: dateFrom, to: dateTo });
 
@@ -63,6 +65,11 @@ export default function DashboardPage() {
             onRange={(from, to) => { setDateFrom(from); setDateTo(to); }}
             defaultFrom={format(defaultDateFrom, 'yyyy-MM-dd')}
             defaultTo={format(defaultDateTo, 'yyyy-MM-dd')}
+          />
+          <TagFilter
+            tags={data?.tagsDisponibles ?? []}
+            selected={selectedTags}
+            onChange={setSelectedTags}
           />
         </section>
 

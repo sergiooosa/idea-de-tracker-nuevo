@@ -53,6 +53,25 @@ export interface MetricaPersonalizada {
   panel: string;
 }
 
+export interface EmbudoEtapa {
+  id: string;
+  nombre: string;
+  color?: string;
+  orden: number;
+}
+
+export interface ChatTrigger {
+  trigger: string;
+  accion: string;
+  valor: string;
+}
+
+export interface TipoEventoConfig {
+  id: string;
+  nombre: string;
+  activo: boolean;
+}
+
 export const cuentas = pgTable("cuentas", {
   id_cuenta: serial("id_cuenta").primaryKey(),
   nombre_cuenta: varchar("nombre_cuenta"),
@@ -65,6 +84,10 @@ export const cuentas = pgTable("cuentas", {
   prompt_llamadas: text("prompt_llamadas"),
   reglas_etiquetas: jsonb("reglas_etiquetas").$type<ReglaEtiqueta[]>(),
   metricas_personalizadas: jsonb("metricas_personalizadas").$type<MetricaPersonalizada[]>(),
+  openai_api_key: text("openai_api_key"),
+  embudo_personalizado: jsonb("embudo_personalizado").$type<EmbudoEtapa[]>(),
+  chat_triggers: jsonb("chat_triggers").$type<ChatTrigger[]>(),
+  tipos_eventos_config: jsonb("tipos_eventos_config").$type<TipoEventoConfig[]>(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -111,6 +134,7 @@ export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {
   link_llamada: text("link_llamada"),
   objeciones_ia: jsonb("objeciones_ia").$type<ObjecionIA[]>(),
   reportmarketing: text("reportmarketing"),
+  tags_internos: jsonb("tags_internos").$type<string[]>(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -136,6 +160,7 @@ export const logLlamadas = pgTable("log_llamadas", {
   creativo_origen: text("creativo_origen"),
   speed_to_lead: text("speed_to_lead"),
   ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
+  tags_internos: jsonb("tags_internos").$type<string[]>(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -161,6 +186,7 @@ export const registrosDeLlamada = pgTable("registros_de_llamada", {
   callsid: varchar("callsid"),
   iadescripcion: text("iadescripcion"),
   id_user_ghl: text("id_user_ghl"),
+  tags_internos: jsonb("tags_internos").$type<string[]>(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -187,6 +213,7 @@ export const chatsLogs = pgTable("chats_logs", {
   id_lead: text("id_lead"),
   chatid: text("chatid"),
   origen: text("origen"),
+  tags_internos: jsonb("tags_internos").$type<string[]>(),
 });
 
 /* ------------------------------------------------------------------ */

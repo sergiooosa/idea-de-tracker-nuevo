@@ -1,14 +1,30 @@
-# AutoKPI — Panel de Clientes SaaS Multi-tenant
+# 🚀 AutoKPI v2.0 — Panel de Clientes SaaS Multi-tenant (Marca Blanca)
 
-> Dashboard de ventas B2B que centraliza videollamadas, llamadas telefónicas y chats. Cada cliente (tenant) accede a su panel personalizado desde un subdominio dedicado.
+> Dashboard de ventas B2B que centraliza videollamadas, llamadas telefónicas y chats. Cada cliente (tenant) accede a su panel personalizado desde un subdominio dedicado. **v2.0** agrega embudos dinámicos, triggers de chat por emoji, API externa de ingresos, tags internos y BYOK (Bring Your Own Key) de OpenAI.
 
 **URL de producción:** `autokpi.net` (landing + login) · `[subdominio].autokpi.net` (panel del tenant)
 
 ---
 
+## 🆕 Novedades v2.0 — Marca Blanca Absoluta
+
+| Feature | Descripción | Impacto |
+|---|---|---|
+| 🎯 **Embudo Dinámico** | Cada tenant define sus propias etapas de embudo (`embudo_personalizado`). KPIs, gráficas y clasificaciones se adaptan automáticamente. | Dashboard, Performance, Acquisition |
+| 💬 **Triggers de Chat por Emoji** | Los asesores cambian el estado del lead enviando un emoji en el chat (ej. 💰 → Cerrada). Sin IA, sin latencia. | Performance > Chats |
+| 🏷️ **Tags Internos** | Campo `tags_internos` (JSONB) en las 4 tablas de eventos. Filtro global de etiquetas en el Dashboard. | Dashboard, filtros |
+| 🔑 **Bring Your Own Key** | El tenant conecta su propia API Key de OpenAI para procesamiento sin límites. | Cerebro + Documentación |
+| 📊 **API Externa de Ingresos** | Endpoint `POST /webhooks/external-data/:locationid` para inyectar datos financieros reales. | Dashboard financiero |
+| 📖 **Documentación Interactiva** | Nueva página `/documentacion` dentro del panel del tenant con guías vivas de todas las features. | UX del tenant |
+| 🤖 **InsightsChat v2** | El chatbot ahora entiende embudo, etiquetas y triggers. Nuevas intenciones + respuestas con datos dinámicos. | Chatbot |
+
+---
+
 ## Tabla de Contenidos
 
+- [Novedades v2.0](#-novedades-v20--marca-blanca-absoluta)
 - [Arquitectura General](#arquitectura-general)
+- [Arquitectura v2.0 — Flujo de Datos](#-arquitectura-v20--flujo-de-datos)
 - [Stack Tecnológico](#stack-tecnológico)
 - [Primeros Pasos](#primeros-pasos)
 - [Variables de Entorno](#variables-de-entorno)
@@ -16,11 +32,14 @@
 - [Sistema Multi-tenant](#sistema-multi-tenant)
 - [Autenticación](#autenticación)
 - [Base de Datos — Tablas y Columnas](#base-de-datos--tablas-y-columnas)
+- [Nuevas Columnas v2.0](#-nuevas-columnas-v20)
 - [API Routes](#api-routes)
 - [Capa de Queries](#capa-de-queries)
 - [Páginas del Dashboard](#páginas-del-dashboard)
 - [Componentes Reutilizables](#componentes-reutilizables)
 - [Chatbot "Habla con tus datos"](#chatbot-habla-con-tus-datos)
+- [Triggers de Chat por Emoji](#-triggers-de-chat-por-emoji)
+- [Embudo Dinámico](#-embudo-dinámico)
 - [Descarga de PDF](#descarga-de-pdf)
 - [Relación con el Cerebro (Backend)](#relación-con-el-cerebro-backend)
 - [Despliegue con Docker](#despliegue-con-docker)
@@ -68,6 +87,52 @@
 7. Rewrite interno: `/dashboard` → `/app/[subdomain]/dashboard`
 8. Las páginas (Client Components) hacen fetch a `/api/data/*`
 9. Cada API route extrae `id_cuenta` del JWT y filtra toda la data por ese tenant
+
+---
+
+## 🏗️ Arquitectura v2.0 — Flujo de Datos
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        PostgreSQL (compartida)                       │
+│                                                                      │
+│  cuentas                        Tablas de Eventos                    │
+│  ├── embudo_personalizado []    ├── resumenes_diarios_agendas        │
+│  ├── chat_triggers []           │   └── tags_internos []             │
+│  ├── openai_api_key             ├── log_llamadas                     │
+│  └── tipos_eventos_config []    │   └── tags_internos []             │
+│                                 ├── registros_de_llamada             │
+│                                 │   └── tags_internos []             │
+│                                 └── chats_logs                       │
+│                                     └── tags_internos []             │
+└──────────────┬──────────────────────────────┬────────────────────────┘
+               │                              │
+    ┌──────────▼──────────┐       ┌───────────▼──────────────┐
+    │  getChats()         │       │  getDashboard()           │
+    │  1. Fetch triggers  │       │  1. Fetch embudo          │
+    │  2. Fetch chats     │       │  2. Classify dynamically  │
+    │  3. Apply triggers  │       │  3. Collect tags          │
+    │  4. Override estado  │       │  4. Return distribution   │
+    └──────────┬──────────┘       └───────────┬──────────────┘
+               │                              │
+    ┌──────────▼──────────┐       ┌───────────▼──────────────┐
+    │  Performance/Chats  │       │  Dashboard                │
+    │  Estado sobrescrito │       │  + Embudo dinámico        │
+    │  por emoji triggers │       │  + Tag filter             │
+    └─────────────────────┘       │  + Distribución embudo    │
+                                  └──────────────────────────┘
+```
+
+### Nuevas tablas y endpoints v2.0
+
+| Recurso | Tipo | Descripción |
+|---|---|---|
+| `cuentas.embudo_personalizado` | `jsonb` | Array de `{id, nombre, color, orden}` — etapas del embudo del tenant |
+| `cuentas.chat_triggers` | `jsonb` | Array de `{trigger, accion, valor}` — emoji → cambio de estado |
+| `cuentas.openai_api_key` | `text` | API Key propia del tenant para OpenAI |
+| `cuentas.tipos_eventos_config` | `jsonb` | Configuración de tipos de eventos activos |
+| `*.tags_internos` | `jsonb` | Tags internos por evento (en 4 tablas) |
+| `/documentacion` | Página | Guía interactiva del superpoder del panel |
 
 ---
 
@@ -176,6 +241,7 @@ src/
 │       ├── acquisition/page.tsx        # Resumen de adquisición por canal
 │       ├── weekly-report/page.tsx      # Reporte semanal + PDF
 │       ├── system/page.tsx             # Control del sistema (prompts, metas)
+│       ├── documentacion/page.tsx     # 📖 Documentación interactiva (v2.0)
 │       ├── configuracion/page.tsx      # CRUD de usuarios
 │       ├── equipo/page.tsx             # Placeholder (superadmin)
 │       └── apariencia/page.tsx         # Placeholder (superadmin)
@@ -187,6 +253,7 @@ src/
 │   │   ├── DateRangePicker.tsx       # Selector de rango de fechas
 │   │   ├── DateRangeQuick.tsx        # Atajos rápidos (hoy, 7d, 30d)
 │   │   ├── PageHeader.tsx            # Header de página con título y acciones
+│   │   ├── TagFilter.tsx              # 🏷️ Filtro multi-select de tags (v2.0)
 │   │   ├── Lead360Drawer.tsx         # Drawer de detalle de lead (placeholder)
 │   │   ├── ReportButton.tsx          # FAB "Generar reporte semanal"
 │   │   └── modals/                   # Modales de detalle
@@ -198,7 +265,7 @@ src/
 │   ├── landing/
 │   │   └── DemoModal.tsx             # Modal tipo Calendly (4 pasos)
 │   ├── login-form.tsx                # Formulario de login
-│   └── ui/                           # Shadcn UI (button, card, dialog, input, label)
+│   └── ui/                           # Shadcn UI (accordion, badge, button, card, dialog, input, label, separator, tabs)
 ├── lib/
 │   ├── auth.config.ts                # Credentials Provider (Node.js runtime)
 │   ├── auth.ts                       # Instancia NextAuth (cookies cross-subdomain)
@@ -206,7 +273,7 @@ src/
 │   ├── utils.ts                      # cn() para Tailwind
 │   ├── db/
 │   │   ├── index.ts                  # Pool PostgreSQL + Drizzle
-│   │   └── schema.ts                 # 7 tablas mapeadas con Drizzle
+│   │   └── schema.ts                 # 9 tablas mapeadas con Drizzle (v2.0: +4 columnas en cuentas, +tags_internos en 4 tablas)
 │   └── queries/                      # Lógica de negocio por dominio
 │       ├── dashboard.ts              # KPIs, ranking, objeciones, volumen
 │       ├── videollamadas.ts          # Agendas con mapeo de categorías
@@ -474,6 +541,48 @@ export async function withAuth(
 
 La query de chats extrae del JSONB: nombre del agente (`role: "agent"` → `name`), conteo de mensajes por rol, y speed to lead (diferencia entre primer mensaje del lead y primer respuesta del agente).
 
+### 🆕 Nuevas Columnas v2.0
+
+#### Nuevas columnas en `cuentas`
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `openai_api_key` | `text` | API Key propia del tenant para OpenAI (BYOK) |
+| `embudo_personalizado` | `jsonb` | Array de `[{id, nombre, color, orden}]` — etapas del embudo custom |
+| `chat_triggers` | `jsonb` | Array de `[{trigger, accion, valor}]` — emoji → cambio de estado |
+| `tipos_eventos_config` | `jsonb` | Array de `[{id, nombre, activo}]` — tipos de eventos activos |
+
+**Formato de `embudo_personalizado`:**
+
+```json
+[
+  {"id": "demo", "nombre": "Demo Agendada", "color": "#06b6d4", "orden": 1},
+  {"id": "propuesta", "nombre": "Propuesta Enviada", "color": "#8b5cf6", "orden": 2},
+  {"id": "cerrada", "nombre": "Cerrada", "color": "#22c55e", "orden": 3}
+]
+```
+
+**Formato de `chat_triggers`:**
+
+```json
+[
+  {"trigger": "💰", "accion": "cambiar_estado", "valor": "Cerrada"},
+  {"trigger": "✅", "accion": "cambiar_estado", "valor": "Interesado"},
+  {"trigger": "❌", "accion": "cambiar_estado", "valor": "No_Interesado"}
+]
+```
+
+#### Nueva columna `tags_internos` (en 4 tablas de eventos)
+
+| Tabla | Columna | Tipo |
+|---|---|---|
+| `resumenes_diarios_agendas` | `tags_internos` | `jsonb` (`string[]`) |
+| `log_llamadas` | `tags_internos` | `jsonb` (`string[]`) |
+| `registros_de_llamada` | `tags_internos` | `jsonb` (`string[]`) |
+| `chats_logs` | `tags_internos` | `jsonb` (`string[]`) |
+
+Estos tags son escritos por el Cerebro (backend) y leídos por el Dashboard para filtrado y agrupación.
+
 ### `metas_cuenta` — Metas persistentes por tenant
 
 | Columna | Tipo | Descripción |
@@ -566,6 +675,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `/acquisition` | `acquisition/page.tsx` | `/api/data/acquisition` |
 | `/weekly-report` | `weekly-report/page.tsx` | `/api/data/weekly-report` |
 | `/system` | `system/page.tsx` | `/api/data/system-config` + `/api/data/metas` |
+| `/documentacion` | `documentacion/page.tsx` | `/api/data/system-config` |
 | `/configuracion` | `configuracion/page.tsx` | `/api/data/usuarios` |
 
 ---
@@ -581,7 +691,8 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `PageHeader` | Header con título, subtítulo, botón back y slot de acciones |
 | `ReportButton` | FAB fijo que enlaza a `/weekly-report` |
 | `Lead360Drawer` | Drawer lateral de detalle de lead (placeholder) |
-| `InsightsChat` | Chatbot "Habla con tus datos" con datos reales |
+| `InsightsChat` | Chatbot "Habla con tus datos" v2 — soporta embudo, tags, triggers |
+| `TagFilter` | 🏷️ Multi-select de etiquetas internas para filtrado client-side |
 
 ---
 
@@ -593,9 +704,48 @@ El componente `InsightsChat.tsx` es un chatbot client-side que:
 2. Clasifica la intención del usuario con matching de keywords
 3. Genera respuestas con datos reales del dashboard
 
-**Intenciones soportadas:** objeciones, speed to lead, ranking de asesores, leads sin seguimiento, revenue/facturación, tasa de cierre, tasa de contestación, volumen de llamadas, citas, resumen general.
+**Intenciones soportadas (v2.0):** objeciones, speed to lead, ranking de asesores, leads sin seguimiento, revenue/facturación, tasa de cierre, tasa de contestación, volumen de llamadas, citas, resumen general, **embudo/etapas** 🆕, **etiquetas/tags** 🆕, **triggers de chat** 🆕.
 
 Si no detecta intención, responde honestamente que no puede ayudar con eso y lista las opciones disponibles.
+
+---
+
+## 💬 Triggers de Chat por Emoji
+
+Los **Chat Triggers** permiten que los asesores cambien el estado de un lead directamente desde el chat, sin necesidad de IA.
+
+### ¿Cómo funciona?
+
+1. El admin configura triggers en `cuentas.chat_triggers` (ej. `[{"trigger": "💰", "accion": "cambiar_estado", "valor": "Cerrada"}]`)
+2. Cuando `getChats()` obtiene los registros de BD, recorre los mensajes donde `role === "agent"`
+3. Si un mensaje del agente contiene un trigger configurado, se sobrescribe el campo `estado` del chat
+4. El estado modificado se propaga a los KPIs y métricas del frontend
+
+**Prioridad:** Se aplica el último trigger encontrado (recorriendo mensajes del agente de más reciente a más antiguo).
+
+**Ahorro:** Elimina el costo de IA para clasificar chats que los asesores ya saben cómo categorizar.
+
+---
+
+## 🎯 Embudo Dinámico
+
+El embudo ya no está hardcodeado. Cada tenant define sus propias etapas en `cuentas.embudo_personalizado`.
+
+### Retrocompatibilidad
+
+| Condición | Comportamiento |
+|---|---|
+| `embudo_personalizado` es `null` o `[]` | Usa el embudo estándar: `Cerrada`, `Ofertada`, `No_Ofertada`, `CANCELADA`, `PDTE` |
+| `embudo_personalizado` tiene etapas | Usa las etapas del tenant para clasificar KPIs |
+
+### Archivos afectados
+
+| Archivo | Cambio |
+|---|---|
+| `queries/dashboard.ts` | Lee `embudo_personalizado`, construye sets dinámicos, retorna `distribucionEmbudo` |
+| `queries/videollamadas.ts` | `mapCategoria()` acepta embudo dinámico como parámetro |
+| `queries/acquisition.ts` | Sets dinámicos para `attended` y `closed` |
+| `dashboard/page.tsx` | Muestra distribución por etapa + filtro de tags |
 
 ---
 
@@ -679,14 +829,29 @@ Las metas se persisten en `metas_cuenta` con UPSERT por `id_cuenta`. El Panel As
 
 ## Pendientes y Roadmap
 
+### ✅ Completado en v2.0
+- [x] Embudo dinámico por tenant (`embudo_personalizado`)
+- [x] Chat Triggers por emoji (`chat_triggers`)
+- [x] Tags internos en 4 tablas de eventos (`tags_internos`)
+- [x] BYOK — Bring Your Own Key de OpenAI (`openai_api_key`)
+- [x] Página de documentación interactiva (`/documentacion`)
+- [x] Filtro global de etiquetas en Dashboard (`TagFilter`)
+- [x] InsightsChat v2 con intents de embudo, tags y triggers
+- [x] API `system-config` ampliada con triggers, embudo y status de BYOK
+
+### 🔜 Próximos pasos
+
 ### Lead 360 Drawer
 Actualmente es un placeholder. Necesita una query UNION que consolide timeline del lead desde las 3 tablas (`resumenes_diarios_agendas`, `log_llamadas`, `chats_logs`) unificando por email.
 
 ### InsightsChat con IA real
-El chatbot actual usa datos reales pero genera respuestas con templates. El siguiente paso es conectar a GPT-4o-mini con el contexto de KPIs para respuestas conversacionales.
+El chatbot actual usa datos reales pero genera respuestas con templates. El siguiente paso es conectar a GPT-4o-mini con el contexto de KPIs + embudo dinámico para respuestas conversacionales.
 
 ### Personalización extrema
 La estructura de `configuracion_ui` ya soporta `nombres_secciones`, `columnas_visibles` y `kpis_visibles`, pero el frontend aún no lee esos valores para personalizar la UI dinámicamente.
+
+### Editor de triggers y embudo en UI
+Actualmente los triggers y el embudo se configuran directamente en la BD. Se necesita un editor visual en `/system` para que el admin del tenant pueda gestionarlos.
 
 ### UTMs granulares
 La columna `origen` en las tablas es texto libre. Para un funnel de adquisición más preciso, el Cerebro debería guardar `utm_source`, `utm_medium`, `utm_campaign` como campos separados o JSONB.

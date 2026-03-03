@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, cuentas } from "@/lib/db/schema";
+import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   ApiVideollamada,
@@ -8,9 +9,20 @@ import type {
   ApiAdvisor,
 } from "@/types";
 
-function mapCategoria(cat: string | null) {
+const DEFAULT_ATTENDED_CATS = new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
+
+function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   if (!cat) return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
   const c = cat.trim();
+
+  if (embudo && embudo.length > 0) {
+    const match = embudo.find((e) => e.nombre === c);
+    if (match) {
+      const isClosed = c.toLowerCase().includes("cerrad");
+      return { attended: true, qualified: isClosed, canceled: false, outcome: c.toLowerCase() };
+    }
+  }
+
   switch (c) {
     case "Cerrada":
       return { attended: true, qualified: true, canceled: false, outcome: "cerrado" };
@@ -37,20 +49,31 @@ export async function getVideollamadas(
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
-  const rows = await db
-    .select()
-    .from(resumenesDiariosAgendas)
-    .where(
-      and(
-        eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-        gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
-        lte(resumenesDiariosAgendas.fecha_reunion, toDate),
-      ),
-    )
-    .orderBy(sql`${resumenesDiariosAgendas.fecha_reunion} DESC`);
+  const [[cuentaRow], rows] = await Promise.all([
+    db
+      .select({ embudo_personalizado: cuentas.embudo_personalizado })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1),
+    db
+      .select()
+      .from(resumenesDiariosAgendas)
+      .where(
+        and(
+          eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
+          gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+          lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+        ),
+      )
+      .orderBy(sql`${resumenesDiariosAgendas.fecha_reunion} DESC`),
+  ]);
+
+  const embudo = Array.isArray(cuentaRow?.embudo_personalizado)
+    ? cuentaRow.embudo_personalizado
+    : null;
 
   const registros: ApiVideollamada[] = rows.map((r) => {
-    const m = mapCategoria(r.categoria);
+    const m = mapCategoria(r.categoria, embudo);
     return {
       id: r.id_registro_agenda,
       datetime: r.fecha_reunion?.toISOString() ?? r.fecha,

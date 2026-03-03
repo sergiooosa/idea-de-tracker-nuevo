@@ -15,6 +15,7 @@ import {
   UserCog,
   Target,
   LogOut,
+  BookOpen,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -28,6 +29,7 @@ const nav = [
   { path: "/asesor", label: "Panel asesor", icon: UserCheck },
   { path: "/acquisition", label: "Resumen adquisición", icon: TrendingUp },
   { path: "/system", label: "Control del sistema", icon: Target },
+  { path: "/documentacion", label: "Documentación", icon: BookOpen },
   { path: "/configuracion", label: "Configuración", icon: UserCog },
 ];
 

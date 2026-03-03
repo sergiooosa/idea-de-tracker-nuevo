@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { chatsLogs } from "@/lib/db/schema";
-import type { ChatMessage } from "@/lib/db/schema";
+import { chatsLogs, cuentas } from "@/lib/db/schema";
+import type { ChatMessage, ChatTrigger } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   ApiChatLead,
@@ -25,6 +25,23 @@ function computeSpeedToLead(messages: ChatMessage[]): number | null {
   return diffSec > 0 ? diffSec : null;
 }
 
+function applyTriggers(
+  msgs: ChatMessage[],
+  triggers: ChatTrigger[],
+): { nuevoEstado: string | null; triggerUsado: string | null } {
+  if (!triggers.length) return { nuevoEstado: null, triggerUsado: null };
+  const agentMsgs = msgs.filter((m) => m.role === "agent");
+  for (let i = agentMsgs.length - 1; i >= 0; i--) {
+    const text = agentMsgs[i].message ?? "";
+    for (const t of triggers) {
+      if (text.includes(t.trigger)) {
+        return { nuevoEstado: t.valor, triggerUsado: t.trigger };
+      }
+    }
+  }
+  return { nuevoEstado: null, triggerUsado: null };
+}
+
 export async function getChats(
   idCuenta: number,
   dateFrom: string,
@@ -33,17 +50,28 @@ export async function getChats(
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
-  const rows = await db
-    .select()
-    .from(chatsLogs)
-    .where(
-      and(
-        eq(chatsLogs.id_cuenta, idCuenta),
-        gte(chatsLogs.fecha_y_hora_z, fromDate),
-        lte(chatsLogs.fecha_y_hora_z, toDate),
-      ),
-    )
-    .orderBy(sql`${chatsLogs.fecha_y_hora_z} DESC`);
+  const [[cuentaRow], rows] = await Promise.all([
+    db
+      .select({ chat_triggers: cuentas.chat_triggers })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1),
+    db
+      .select()
+      .from(chatsLogs)
+      .where(
+        and(
+          eq(chatsLogs.id_cuenta, idCuenta),
+          gte(chatsLogs.fecha_y_hora_z, fromDate),
+          lte(chatsLogs.fecha_y_hora_z, toDate),
+        ),
+      )
+      .orderBy(sql`${chatsLogs.fecha_y_hora_z} DESC`),
+  ]);
+
+  const triggers: ChatTrigger[] = Array.isArray(cuentaRow?.chat_triggers)
+    ? cuentaRow.chat_triggers
+    : [];
 
   const chatsList: ApiChatLead[] = rows.map((r) => {
     const msgs: ChatMessage[] = Array.isArray(r.chat) ? r.chat : [];
@@ -51,6 +79,8 @@ export async function getChats(
     const leadMsgs = msgs.filter((m) => m.role === "lead");
     const agentName = extractAgentName(msgs);
     const speed = computeSpeedToLead(msgs);
+
+    const { nuevoEstado, triggerUsado } = applyTriggers(msgs, triggers);
 
     return {
       id: r.id_evento,
@@ -62,7 +92,7 @@ export async function getChats(
       agentMessages: agentMsgs.length,
       leadMessages: leadMsgs.length,
       speedToLeadSeconds: speed,
-      estado: r.estado,
+      estado: nuevoEstado ?? r.estado,
       notasExtra: r.notas_extra,
       messages: msgs.map((m) => ({
         name: m.name,
@@ -71,6 +101,8 @@ export async function getChats(
         message: m.message,
         timestamp: m.timestamp,
       })),
+      tagsInternos: Array.isArray(r.tags_internos) ? r.tags_internos : undefined,
+      triggerAplicado: triggerUsado ?? undefined,
     };
   });
 

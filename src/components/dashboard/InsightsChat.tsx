@@ -13,10 +13,13 @@ interface Message {
 type Intent =
   | 'objeciones' | 'speed_to_lead' | 'ranking' | 'leads_caida'
   | 'revenue' | 'tasa_cierre' | 'tasa_contestacion' | 'volumen_llamadas'
-  | 'citas' | 'resumen_general' | 'unknown';
+  | 'citas' | 'resumen_general' | 'embudo' | 'tags' | 'triggers' | 'unknown';
 
 function detectIntent(query: string): Intent {
   const q = query.toLowerCase();
+  if (/embudo|funnel|etapa|fase|pipeline/.test(q)) return 'embudo';
+  if (/tag|etiqueta|label|marca/.test(q)) return 'tags';
+  if (/trigger|emoji|disparador/.test(q)) return 'triggers';
   if (/objecion|objeciones/.test(q)) return 'objeciones';
   if (/speed|tiempo.*lead|rapidez|respuesta/.test(q)) return 'speed_to_lead';
   if (/ranking|mejor|peor|top|asesor|equipo/.test(q)) return 'ranking';
@@ -76,14 +79,43 @@ function buildResponse(intent: Intent, data: DashboardResponse): string {
     case 'resumen_general':
       return `Resumen de la semana:\n• **${kpis.totalLeads}** leads, **${kpis.callsMade}** llamadas (${pctFmt(kpis.answerRate)} contestación)\n• **${kpis.meetingsBooked}** citas agendadas, **${kpis.meetingsAttended}** asistidas\n• **${kpis.meetingsClosed}** cerradas, tasa cierre **${kpis.tasaCierre.toFixed(1)}%**\n• Facturación **${fm(kpis.revenue)}**, cobrado **${fm(kpis.cashCollected)}**\n• Speed to lead promedio: **${minFmt(kpis.speedToLeadAvg)}**`;
 
+    case 'embudo': {
+      const dist = data.distribucionEmbudo;
+      const etapas = data.embudoPersonalizado;
+      if (etapas && etapas.length > 0) {
+        const lines = etapas
+          .sort((a, b) => a.orden - b.orden)
+          .map((e) => `• **${e.nombre}**: ${dist?.[e.nombre] ?? 0} leads`);
+        return `Tu embudo personalizado tiene ${etapas.length} etapas:\n${lines.join('\n')}`;
+      }
+      if (dist && Object.keys(dist).length > 0) {
+        const lines = Object.entries(dist)
+          .sort(([, a], [, b]) => b - a)
+          .map(([k, v]) => `• **${k}**: ${v}`);
+        return `Distribución por categoría:\n${lines.join('\n')}`;
+      }
+      return 'No hay datos de embudo disponibles en este período.';
+    }
+
+    case 'tags': {
+      const tags = data.tagsDisponibles;
+      if (tags && tags.length > 0) {
+        return `Hay **${tags.length}** etiquetas internas en uso: ${tags.slice(0, 15).map((t) => `**${t}**`).join(', ')}${tags.length > 15 ? ` y ${tags.length - 15} más` : ''}. Puedes filtrar por etiquetas en el dashboard.`;
+      }
+      return 'No hay etiquetas internas registradas en este período.';
+    }
+
+    case 'triggers':
+      return 'Los **Triggers de Chat** permiten que los asesores cambien el estado de un lead enviando un emoji en el chat (ej. 💰 → Cerrada). Consulta la sección de **Documentación** en el menú lateral para ver tus triggers configurados.';
+
     case 'unknown':
-      return 'No tengo contexto suficiente para responder eso. Puedes preguntar por:\n• Objeciones de la semana\n• Speed to lead por asesor\n• Ranking de asesores\n• Facturación y revenue\n• Tasa de cierre o contestación\n• Citas pendientes o canceladas\n• Resumen general\n\nEscribe tu pregunta y la respondo con datos reales.';
+      return 'No tengo contexto suficiente para responder eso. Puedes preguntar por:\n• Objeciones de la semana\n• Speed to lead por asesor\n• Ranking de asesores\n• Facturación y revenue\n• Tasa de cierre o contestación\n• Citas pendientes o canceladas\n• Embudo y distribución por etapa\n• Etiquetas internas\n• Triggers de chat\n• Resumen general\n\nEscribe tu pregunta y la respondo con datos reales.';
   }
 }
 
 export default function InsightsChat({ onClose }: { onClose: () => void }) {
   const [messages, setMessages] = useState<Message[]>([
-    { id: '0', role: 'assistant', content: 'Hola. Soy tu copiloto de datos. Puedo responderte con información real de los últimos 7 días. Pregunta por objeciones, speed to lead, ranking, revenue, citas y más.' },
+    { id: '0', role: 'assistant', content: 'Hola. Soy tu copiloto de datos v2.0. Puedo responderte con información real de los últimos 7 días. Pregunta por objeciones, speed to lead, ranking, revenue, citas, embudo personalizado, etiquetas internas, triggers de chat y más.' },
   ]);
   const [input, setInput] = useState('');
   const [dashData, setDashData] = useState<DashboardResponse | null>(null);

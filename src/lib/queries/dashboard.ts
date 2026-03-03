@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
+import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   DashboardKpis,
@@ -10,6 +11,30 @@ import type {
   ApiAdvisor,
 } from "@/types";
 
+const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada"];
+const DEFAULT_CLOSED = "Cerrada";
+const DEFAULT_EFFECTIVE = ["Cerrada", "Ofertada"];
+
+function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
+  if (!embudo || embudo.length === 0) {
+    return {
+      attendedSet: new Set(DEFAULT_ATTENDED),
+      closedSet: new Set([DEFAULT_CLOSED]),
+      effectiveSet: new Set(DEFAULT_EFFECTIVE),
+      etapas: null,
+    };
+  }
+  const nombres = embudo.map((e) => e.nombre);
+  return {
+    attendedSet: new Set(nombres),
+    closedSet: new Set(nombres.filter((n) => n.toLowerCase().includes("cerrad"))),
+    effectiveSet: new Set(nombres.filter((n) =>
+      n.toLowerCase().includes("cerrad") || n.toLowerCase().includes("ofertad"),
+    )),
+    etapas: embudo,
+  };
+}
+
 export async function getDashboard(
   idCuenta: number,
   dateFrom: string,
@@ -19,13 +44,18 @@ export async function getDashboard(
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
   const [cuentaRow] = await db
-    .select({ configuracion_ui: cuentas.configuracion_ui })
+    .select({
+      configuracion_ui: cuentas.configuracion_ui,
+      embudo_personalizado: cuentas.embudo_personalizado,
+    })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
     .limit(1);
 
   const fuenteFinanciera = cuentaRow?.configuracion_ui?.fuente_datos_financieros;
   const useExterna = fuenteFinanciera === "api_externa";
+  const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : null;
+  const { attendedSet, closedSet, effectiveSet, etapas } = buildFunnelSets(embudoRaw);
 
   const [agendas, calls] = await Promise.all([
     db
@@ -50,13 +80,12 @@ export async function getDashboard(
       ),
   ]);
 
-  const attended = ["Cerrada", "Ofertada", "No_Ofertada"];
-  const asistidas = agendas.filter((a) => attended.includes(a.categoria ?? "")).length;
+  const asistidas = agendas.filter((a) => attendedSet.has(a.categoria ?? "")).length;
   const canceladas = agendas.filter((a) => a.categoria === "CANCELADA").length;
-  const cerradas = agendas.filter((a) => a.categoria === "Cerrada").length;
-  const efectivas = agendas.filter((a) => a.categoria === "Cerrada" || a.categoria === "Ofertada").length;
+  const cerradas = agendas.filter((a) => closedSet.has(a.categoria ?? "")).length;
+  const efectivas = agendas.filter((a) => effectiveSet.has(a.categoria ?? "")).length;
   const revenueNativo = agendas
-    .filter((a) => a.categoria === "Cerrada")
+    .filter((a) => closedSet.has(a.categoria ?? ""))
     .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
   const cashNativo = agendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
 
@@ -155,10 +184,10 @@ export async function getDashboard(
         ...ac.map((c) => c.mail_lead).filter(Boolean),
         ...aa.map((a) => a.email_lead).filter(Boolean),
       ]).size;
-      const aAsistidas = aa.filter((a) => attended.includes(a.categoria ?? "")).length;
+      const aAsistidas = aa.filter((a) => attendedSet.has(a.categoria ?? "")).length;
       const aRevenue = useExterna
         ? 0
-        : aa.filter((a) => a.categoria === "Cerrada")
+        : aa.filter((a) => closedSet.has(a.categoria ?? ""))
             .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
       const aCash = useExterna
         ? 0
@@ -195,7 +224,7 @@ export async function getDashboard(
     const d = a.fecha_reunion?.toISOString().slice(0, 10) ?? a.fecha;
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].citasPresentaciones++;
-    if (a.categoria === "Cerrada") volumeMap[d].cierres++;
+    if (closedSet.has(a.categoria ?? "")) volumeMap[d].cierres++;
   }
   const volumeByDay = Object.values(volumeMap).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -227,6 +256,20 @@ export async function getDashboard(
     email: a.advisorEmail ?? undefined,
   }));
 
+  const distribucionEmbudo: Record<string, number> = {};
+  for (const a of agendas) {
+    const cat = a.categoria ?? "sin_categoria";
+    distribucionEmbudo[cat] = (distribucionEmbudo[cat] ?? 0) + 1;
+  }
+
+  const allTags = new Set<string>();
+  for (const a of agendas) {
+    if (Array.isArray(a.tags_internos)) a.tags_internos.forEach((t) => allTags.add(t));
+  }
+  for (const c of calls) {
+    if (Array.isArray(c.tags_internos)) c.tags_internos.forEach((t) => allTags.add(t));
+  }
+
   return {
     kpis,
     advisorRanking,
@@ -234,5 +277,13 @@ export async function getDashboard(
     objeciones,
     advisors,
     fuenteDatosFinancieros: fuenteFinanciera ?? "nativa",
+    embudoPersonalizado: etapas?.map((e) => ({
+      id: e.id,
+      nombre: e.nombre,
+      color: e.color,
+      orden: e.orden,
+    })),
+    distribucionEmbudo,
+    tagsDisponibles: [...allTags].sort(),
   };
 }

@@ -1,4 +1,4 @@
-// AutoKPI - Data Model V1 (GHL-ready)
+// AutoKPI - Data Model V2 (GHL-ready, Marca Blanca)
 
 export type AdvisorRole = 'closer' | 'setter' | 'admin' | 'gerente' | 'director_comercial';
 
@@ -284,6 +284,8 @@ export interface ApiChatLead {
   estado: string | null;
   notasExtra: string | null;
   messages: ApiChatMessage[];
+  tagsInternos?: string[];
+  triggerAplicado?: string;
 }
 
 export interface ChatsAdvisorMetrics {
@@ -361,6 +363,13 @@ export interface DashboardObjecionDetail {
   quote: string;
 }
 
+export interface EmbudoEtapaUI {
+  id: string;
+  nombre: string;
+  color?: string;
+  orden: number;
+}
+
 export interface DashboardResponse {
   kpis: DashboardKpis;
   advisorRanking: DashboardAdvisorRow[];
@@ -368,6 +377,9 @@ export interface DashboardResponse {
   objeciones: DashboardObjecion[];
   advisors: ApiAdvisor[];
   fuenteDatosFinancieros: "nativa" | "api_externa";
+  embudoPersonalizado?: EmbudoEtapaUI[];
+  distribucionEmbudo?: Record<string, number>;
+  tagsDisponibles?: string[];
 }
 
 export interface AsesorLeadCRM {

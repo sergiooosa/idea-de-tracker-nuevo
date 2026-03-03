@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada } from "@/lib/db/schema";
+import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export interface SystemConfigData {
@@ -9,6 +9,10 @@ export interface SystemConfigData {
   prompt_llamadas: string;
   reglas_etiquetas: ReglaEtiqueta[];
   metricas_personalizadas: MetricaPersonalizada[];
+  chat_triggers: ChatTrigger[];
+  embudo_personalizado: EmbudoEtapa[];
+  tipos_eventos_config: TipoEventoConfig[];
+  has_openai_key: boolean;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -26,6 +30,10 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       prompt_llamadas: cuentas.prompt_llamadas,
       reglas_etiquetas: cuentas.reglas_etiquetas,
       metricas_personalizadas: cuentas.metricas_personalizadas,
+      chat_triggers: cuentas.chat_triggers,
+      embudo_personalizado: cuentas.embudo_personalizado,
+      tipos_eventos_config: cuentas.tipos_eventos_config,
+      openai_api_key: cuentas.openai_api_key,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -38,6 +46,10 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       prompt_llamadas: DEFAULT_PROMPT_LLAMADAS,
       reglas_etiquetas: [],
       metricas_personalizadas: [],
+      chat_triggers: [],
+      embudo_personalizado: [],
+      tipos_eventos_config: [],
+      has_openai_key: false,
     };
   }
 
@@ -48,6 +60,10 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     prompt_llamadas: r.prompt_llamadas ?? DEFAULT_PROMPT_LLAMADAS,
     reglas_etiquetas: Array.isArray(r.reglas_etiquetas) ? r.reglas_etiquetas : [],
     metricas_personalizadas: Array.isArray(r.metricas_personalizadas) ? r.metricas_personalizadas : [],
+    chat_triggers: Array.isArray(r.chat_triggers) ? r.chat_triggers : [],
+    embudo_personalizado: Array.isArray(r.embudo_personalizado) ? r.embudo_personalizado : [],
+    tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
+    has_openai_key: !!r.openai_api_key,
   };
 }
 

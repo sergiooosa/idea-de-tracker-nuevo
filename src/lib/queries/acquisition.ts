@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, chatsLogs } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas } from "@/lib/db/schema";
+import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 
 export interface AcquisitionRow {
@@ -29,6 +30,24 @@ export async function getAcquisition(
 ): Promise<AcquisitionResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+
+  const [cuentaRow] = await db
+    .select({ embudo_personalizado: cuentas.embudo_personalizado })
+    .from(cuentas)
+    .where(eq(cuentas.id_cuenta, idCuenta))
+    .limit(1);
+
+  const embudoRaw: EmbudoEtapa[] | null = Array.isArray(cuentaRow?.embudo_personalizado)
+    ? cuentaRow.embudo_personalizado
+    : null;
+
+  const attendedSet = embudoRaw && embudoRaw.length > 0
+    ? new Set(embudoRaw.map((e) => e.nombre))
+    : new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
+
+  const closedSet = embudoRaw && embudoRaw.length > 0
+    ? new Set(embudoRaw.filter((e) => e.nombre.toLowerCase().includes("cerrad")).map((e) => e.nombre))
+    : new Set(["Cerrada"]);
 
   const [agendas, calls, chats] = await Promise.all([
     db
@@ -63,7 +82,6 @@ export async function getAcquisition(
       ),
   ]);
 
-  const attended = ["Cerrada", "Ofertada", "No_Ofertada"];
   const origenMap: Record<string, {
     leadEmails: Set<string>;
     calledEmails: Set<string>;
@@ -94,8 +112,8 @@ export async function getAcquisition(
     const bucket = getOrCreate(a.origen ?? "sin_origen");
     if (a.email_lead) bucket.leadEmails.add(a.email_lead);
     bucket.booked++;
-    if (attended.includes(a.categoria ?? "")) bucket.attended++;
-    if (a.categoria === "Cerrada") {
+    if (attendedSet.has(a.categoria ?? "")) bucket.attended++;
+    if (closedSet.has(a.categoria ?? "")) {
       bucket.closed++;
       bucket.revenue += parseFloat(a.facturacion || "0") || 0;
     }
