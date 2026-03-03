@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useUserFilter } from "@/contexts/UserFilterContext";
 
 export function useApiData<T>(
   url: string,
@@ -10,6 +11,14 @@ export function useApiData<T>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  let effectiveCloserEmail: string | undefined;
+  try {
+    const ctx = useUserFilter();
+    effectiveCloserEmail = ctx.effectiveCloserEmail;
+  } catch {
+    effectiveCloserEmail = undefined;
+  }
 
   const serialized = JSON.stringify(params ?? {});
 
@@ -26,6 +35,10 @@ export function useApiData<T>(
       const p = JSON.parse(serialized) as Record<string, string | undefined>;
       for (const [k, v] of Object.entries(p)) {
         if (v != null) sp.set(k, v);
+      }
+
+      if (effectiveCloserEmail && !sp.has("closerEmail")) {
+        sp.set("closerEmail", effectiveCloserEmail);
       }
 
       const res = await fetch(`${url}?${sp.toString()}`, {
@@ -48,7 +61,7 @@ export function useApiData<T>(
     } finally {
       if (!ctrl.signal.aborted) setLoading(false);
     }
-  }, [url, serialized]);
+  }, [url, serialized, effectiveCloserEmail]);
 
   useEffect(() => {
     fetchData();

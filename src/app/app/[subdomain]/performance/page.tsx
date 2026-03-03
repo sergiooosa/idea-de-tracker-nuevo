@@ -6,8 +6,10 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripcionIA';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Sparkles, User, X, ExternalLink } from 'lucide-react';
-import type { VideollamadasResponse, ApiVideollamada, VideoMeeting } from '@/types';
+import { FileText, Pencil, Sparkles, User, X, ExternalLink } from 'lucide-react';
+import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
+import type { VideollamadasResponse, ApiVideollamada, VideoMeeting, MetricaPersonalizadaUI } from '@/types';
+import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
 
 const fm = (n: number) =>
@@ -52,8 +54,13 @@ export default function PerformanceVideollamadasPage() {
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
   const [modalSelectorMeetings, setModalSelectorMeetings] = useState<VideoMeeting[] | null>(null);
   const [modalTranscripcionIA, setModalTranscripcionIA] = useState<VideoMeeting | null>(null);
+  const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
 
   const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo });
+  const { data: sysConfig } = useApiData<{ metricas_personalizadas: MetricaPersonalizadaUI[] }>('/api/data/system-config');
+  const rendimientoMetrics = (sysConfig?.metricas_personalizadas ?? []).filter(
+    (m) => m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos'
+  );
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[]) => {
     if (meetingsOfLead.length === 1) setModalTranscripcionIA(meetingsOfLead[0]);
@@ -117,6 +124,25 @@ export default function PerformanceVideollamadasPage() {
           </div>
         ))}
       </div>
+
+      {rendimientoMetrics.length > 0 && (
+        <section>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <BarChart3 className="w-3.5 h-3.5 text-accent-green" />
+            Métricas personalizadas
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+            {rendimientoMetrics.map((m) => (
+              <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
+                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.name}</p>
+                <p className="text-base font-bold mt-0.5 text-accent-green">{m.increment}</p>
+                {m.description && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.description}</p>}
+                <div className="kpi-card-spacer" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
@@ -195,6 +221,7 @@ export default function PerformanceVideollamadasPage() {
                                               <td className="px-2 py-2 text-gray-300">{outcomeVideollamadaToSpanish(m.outcome)}</td>
                                               <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex flex-wrap gap-1">
+                                                  <button type="button" onClick={() => setEditingRecord({ id: m.id, nombre_lead: m.leadName, closer: m.closer, estado: m.categoria })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-1"><Pencil className="w-3 h-3" /> Editar</button>
                                                   <button type="button" onClick={() => openTranscripcionIA(allForLead.map(apiToVideoMeeting))} className="text-accent-cyan text-[10px] inline-flex items-center gap-0.5"><FileText className="w-3 h-3" /> Transcripción</button>
                                                   <button type="button" onClick={() => openTranscripcionIA(allForLead.map(apiToVideoMeeting))} className="text-accent-purple text-[10px] inline-flex items-center gap-0.5"><Sparkles className="w-3 h-3" /> Análisis IA</button>
                                                   {m.linkLlamada ? (
@@ -250,6 +277,15 @@ export default function PerformanceVideollamadasPage() {
       )}
       {modalTranscripcionIA && (
         <ModalTranscripcionIA meeting={modalTranscripcionIA} onClose={() => setModalTranscripcionIA(null)} />
+      )}
+      {editingRecord && (
+        <EditRecordSheet
+          type="videollamada"
+          record={editingRecord}
+          advisors={data?.advisors?.map(a => ({ name: a.name, email: a.email })) ?? []}
+          onClose={() => setEditingRecord(null)}
+          onSaved={() => setEditingRecord(null)}
+        />
       )}
     </div>
   );

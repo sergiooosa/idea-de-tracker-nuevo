@@ -1,12 +1,26 @@
-# 🚀 AutoKPI v2.0 — Panel de Clientes SaaS Multi-tenant (Marca Blanca)
+# 🚀 AutoKPI — Panel de Clientes SaaS Multi-tenant (Marca Blanca)
 
-> Dashboard de ventas B2B que centraliza videollamadas, llamadas telefónicas y chats. Cada cliente (tenant) accede a su panel personalizado desde un subdominio dedicado. **v2.0** agrega embudos dinámicos, triggers de chat por emoji, API externa de ingresos, tags internos y BYOK (Bring Your Own Key) de OpenAI.
+> Dashboard de ventas B2B que centraliza videollamadas, llamadas telefónicas y chats. Cada cliente (tenant) accede a su panel personalizado desde un subdominio dedicado. **v2.0** añade embudos dinámicos, triggers por emoji y BYOK. **v3.0 Enterprise** añade roles/permisos dinámicos, filtro "Solo mis datos", bandeja de huérfanos, editor CRUD en tablas de rendimiento, constructor de layouts para métricas y UI profesional para reglas/emojis.
 
 **URL de producción:** `autokpi.net` (landing + login) · `[subdominio].autokpi.net` (panel del tenant)
 
 ---
 
-## 🆕 Novedades v2.0 — Marca Blanca Absoluta
+## 🆕 Novedades v3.0 — Enterprise
+
+| Feature | Descripción | Impacto |
+|---|---|---|
+| 🔐 **Roles y Permisos Dinámicos** | `roles_config` (JSONB) en `cuentas` define roles y permisos por tenant. JWT incluye `permisosArray` resuelto desde `roles_config`. Rol ya no está fijo a `superadmin \| usuario`. | Auth, Panel Asesor, Layout |
+| 👁️ **Toggle "Solo mis datos"** | Switch global en el sidebar. Si está activo, todas las consultas filtran por `closer_mail = session.user.email`. Solo visible para usuarios con permiso `ver_todo`. | Dashboard, Performance, Asesor, Acquisition |
+| 📥 **Bandeja de Huérfanos** | Nueva vista `/bandeja`. Lista eventos de `eventos_huerfanos` (estado pendiente). Input + botón "Corregir y Procesar" llama al Cerebro `POST /webhooks/retry-orphan/:id` con el correo. | Bandeja, Cerebro |
+| ✏️ **Editor Global (CRUD)** | En Llamadas, Videollamadas y Chats: columna "Acciones" con botón Editar. Sheet lateral para editar estado del embudo, closer asignado y nombre del lead. Mutación directa en BD. | Performance (3 tabs) |
+| 📐 **Constructor de Layouts** | En Métricas Custom (Control del sistema): Select "Ubicación de la tarjeta" (Panel Ejecutivo / Rendimiento / Ambos). Dashboard y Performance renderizan métricas según `ubicacion`. | System, Dashboard, Performance |
+| 🏷️ **Reglas de Etiquetas (UI)** | Selects agrupados: Condición IA (Mención de precio, Enojo, Interés…), Condición Fija (Duración > X, Intentos > Y). Campo "Mover etapa de funnel a" con etapas del embudo. | System paso 4 |
+| 😀 **Triggers por Emoji (UI)** | Emoji Picker en grid; emojis ya usados en otra regla se bloquean. Estado destino = Select con etapas del embudo. | System paso 8 |
+
+---
+
+## Novedades v2.0 — Marca Blanca Absoluta
 
 | Feature | Descripción | Impacto |
 |---|---|---|
@@ -23,7 +37,8 @@
 
 ## Tabla de Contenidos
 
-- [Novedades v2.0](#-novedades-v20--marca-blanca-absoluta)
+- [Novedades v3.0 Enterprise](#-novedades-v30--enterprise)
+- [Novedades v2.0](#novedades-v20--marca-blanca-absoluta)
 - [Arquitectura General](#arquitectura-general)
 - [Arquitectura v2.0 — Flujo de Datos](#-arquitectura-v20--flujo-de-datos)
 - [Stack Tecnológico](#stack-tecnológico)
@@ -218,30 +233,33 @@ src/
 │   ├── api/
 │   │   ├── auth/
 │   │   │   ├── [...nextauth]/route.ts  # Handlers Auth.js (GET + POST)
+│   │   │   ├── session-info/route.ts   # GET: session + permisos (v3.0)
 │   │   │   └── logout/route.ts         # POST: cierra sesión
 │   │   └── data/
-│   │       ├── dashboard/route.ts      # KPIs globales, ranking, objeciones
-│   │       ├── videollamadas/route.ts  # Citas y videollamadas
-│   │       ├── llamadas/route.ts       # Llamadas telefónicas
-│   │       ├── chats/route.ts          # Conversaciones de chat
+│   │       ├── dashboard/route.ts      # KPIs globales, ranking, objeciones (+ closerEmail)
+│   │       ├── videollamadas/route.ts  # GET/PUT Citas y videollamadas
+│   │       ├── llamadas/route.ts       # GET/PUT Llamadas telefónicas
+│   │       ├── chats/route.ts          # GET/PUT Conversaciones de chat
 │   │       ├── weekly-report/route.ts  # Reporte semanal (reutiliza dashboard)
-│   │       ├── asesor/route.ts         # Panel asesor + mini CRM
+│   │       ├── asesor/route.ts         # Panel asesor + mini CRM (+ closerEmail)
+│   │       ├── huerfanos/route.ts      # GET lista, PATCH corregir/descartar (v3.0)
 │   │       ├── metas/route.ts          # GET + PUT metas por tenant
 │   │       ├── system-config/route.ts  # GET + PUT prompts y reglas
 │   │       ├── usuarios/route.ts       # CRUD usuarios del tenant
-│   │       └── acquisition/route.ts    # Datos por origen/canal
+│   │       └── acquisition/route.ts    # Datos por origen/canal (+ closerEmail)
 │   └── app/[subdomain]/               # Zona tenant (rewrite del middleware)
-│       ├── layout.tsx                  # Sidebar + logout + FAB chat
+│       ├── layout.tsx                  # Sidebar + toggle "Solo mis datos" + logout + FAB chat
 │       ├── dashboard/page.tsx          # Panel ejecutivo
 │       ├── performance/
 │       │   ├── layout.tsx              # Tabs: Videollamadas / Llamadas / Chats
 │       │   ├── page.tsx                # Videollamadas
 │       │   ├── llamadas/page.tsx       # Llamadas telefónicas
 │       │   └── chats/page.tsx          # Chats
-│       ├── asesor/page.tsx             # Panel asesor + mini CRM
+│       ├── asesor/page.tsx             # Panel asesor + mini CRM (Combobox por permisos)
+│       ├── bandeja/page.tsx            # Bandeja de eventos huérfanos (v3.0)
 │       ├── acquisition/page.tsx        # Resumen de adquisición por canal
 │       ├── weekly-report/page.tsx      # Reporte semanal + PDF
-│       ├── system/page.tsx             # Control del sistema (prompts, metas)
+│       ├── system/page.tsx             # Control del sistema (prompts, reglas, métricas, triggers)
 │       ├── documentacion/page.tsx     # 📖 Documentación interactiva (v2.0)
 │       ├── configuracion/page.tsx      # CRUD de usuarios
 │       ├── equipo/page.tsx             # Placeholder (superadmin)
@@ -262,7 +280,8 @@ src/
 │   │       ├── ModalRegistrosLlamadas.tsx
 │   │       ├── ModalConversacionChat.tsx
 │   │       ├── ModalTranscripcionIA.tsx
-│   │       └── ModalTranscripcionIALlamadas.tsx
+│   │       ├── ModalTranscripcionIALlamadas.tsx
+│   │       └── EditRecordSheet.tsx         # Sheet edición estado/closer/nombre (v3.0)
 │   ├── landing/
 │   │   └── DemoModal.tsx             # Modal tipo Calendly (4 pasos)
 │   ├── login-form.tsx                # Formulario de login
@@ -274,20 +293,24 @@ src/
 │   ├── utils.ts                      # cn() para Tailwind
 │   ├── db/
 │   │   ├── index.ts                  # Pool PostgreSQL + Drizzle
-│   │   └── schema.ts                 # 9 tablas mapeadas con Drizzle (v2.0: +4 columnas en cuentas, +tags_internos en 4 tablas)
+│   │   └── schema.ts                 # Tablas + eventos_huerfanos, roles_config (v3.0)
 │   └── queries/                      # Lógica de negocio por dominio
-│       ├── dashboard.ts              # KPIs, ranking, objeciones, volumen
-│       ├── videollamadas.ts          # Agendas con mapeo de categorías
-│       ├── llamadas.ts              # Log de llamadas con mapeo de outcomes
-│       ├── chats.ts                  # Parsing JSONB + speed to lead
-│       ├── asesor.ts                 # Panel asesor + CRM leads
+│       ├── dashboard.ts              # KPIs, ranking, objeciones, volumen (+ closer opcional)
+│       ├── videollamadas.ts          # Agendas con mapeo de categorías (+ update)
+│       ├── llamadas.ts               # Log de llamadas con mapeo de outcomes (+ update)
+│       ├── chats.ts                  # Parsing JSONB + speed to lead (+ update)
+│       ├── asesor.ts                 # Panel asesor + CRM leads (+ closer opcional)
+│       ├── huerfanos.ts              # Bandeja: getHuerfanos, updateHuerfanoEstado (v3.0)
 │       ├── metas.ts                  # GET/UPSERT metas_cuenta
 │       ├── system-config.ts          # GET/UPDATE prompts y reglas
-│       ├── usuarios.ts              # CRUD usuarios_dashboard
-│       └── acquisition.ts            # Agregación por origen cruzando 3 tablas
+│       ├── usuarios.ts               # CRUD usuarios_dashboard
+│       └── acquisition.ts           # Agregación por origen cruzando 3 tablas
+├── contexts/
+│   └── UserFilterContext.tsx         # Contexto "Solo mis datos" (v3.0)
 ├── middleware.ts                     # Multi-tenant: subdominio → rewrite
 ├── hooks/
-│   └── useApiData.ts                 # Hook genérico: fetch + loading + error + refetch
+│   ├── useApiData.ts                 # Fetch + inyecta closerEmail cuando filtro activo
+│   └── useSession.ts                 # Session + permisos (v3.0)
 ├── types/
 │   ├── index.ts                      # Interfaces compartidas (40+ tipos)
 │   └── next-auth.d.ts                # Extensiones de tipos Auth.js
@@ -352,11 +375,14 @@ Cuando un usuario se autentica, el JWT contiene:
   id_cuenta: number;    // FK a cuentas.id_cuenta
   email: string;
   name: string | null;
-  rol: "superadmin" | "usuario";
+  rol: string;         // Rol del usuario (resuelto desde roles_config del tenant)
   subdominio: string;   // e.g. "testv1"
   permisos: Record<string, boolean> | null;
+  permisosArray: string[];  // Array de códigos de permiso (ej. "ver_todo", "editar_metas")
 }
 ```
+
+Los permisos se resuelven en `auth.config.ts` desde `cuentas.roles_config` según el `rol` del usuario en `usuarios_dashboard`.
 
 ### Flujo de Login
 
@@ -397,6 +423,7 @@ export async function withAuth(
 | `log_llamadas` | **Cerebro** (webhooks Twilio) | Dashboard |
 | `registros_de_llamada` | **Cerebro** (webhooks Twilio) | Dashboard (Panel Asesor) |
 | `chats_logs` | **Cerebro** (proceso de chats) | Dashboard |
+| `eventos_huerfanos` | **Cerebro** (eventos sin lead) | Dashboard (Bandeja) — PATCH desde bandeja al corregir/descartar |
 | `metas_cuenta` | Dashboard | Dashboard |
 
 ### `cuentas` — Tabla maestra de tenants
@@ -413,7 +440,8 @@ export async function withAuth(
 | `prompt_videollamadas` | `text` | Prompt para evaluar videollamadas |
 | `prompt_llamadas` | `text` | Prompt para evaluar llamadas |
 | `reglas_etiquetas` | `jsonb` | Array de `{id, condition, tag, source}` |
-| `metricas_personalizadas` | `jsonb` | Array de `{id, name, condition, increment, ...}` |
+| `metricas_personalizadas` | `jsonb` | Array de `{id, name, condition, increment, ubicacion?, ...}` — `ubicacion`: `panel_ejecutivo` \| `rendimiento` \| `ambos` (v3.0) |
+| `roles_config` | `jsonb` | Array de `{rol, permisos: string[]}` — permisos dinámicos por tenant (v3.0) |
 
 **Estructura de `configuracion_ui`:**
 
@@ -584,6 +612,20 @@ La query de chats extrae del JSONB: nombre del agente (`role: "agent"` → `name
 
 Estos tags son escritos por el Cerebro (backend) y leídos por el Dashboard para filtrado y agrupación.
 
+### 🆕 Tabla `eventos_huerfanos` (v3.0)
+
+Eventos que el Cerebro no pudo asociar a un lead (falta de correo, etc.). La bandeja permite corregir el correo y reintentar.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | `serial PK` | |
+| `id_cuenta` | `integer NOT NULL` | Tenant |
+| `tipo` | `text` | Origen del evento (ej. `videollamada`, `llamada`) |
+| `payload` | `jsonb` | Datos crudos del evento |
+| `estado` | `text` | `pendiente`, `corregido`, `descartado` |
+| `correo_asignado` | `text` | Correo asignado al corregir (opcional) |
+| `created_at` | `timestamptz` | |
+
 ### `metas_cuenta` — Metas persistentes por tenant
 
 | Columna | Tipo | Descripción |
@@ -611,12 +653,18 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 
 | Ruta | Método | Tabla(s) | Params | Página |
 |---|---|---|---|---|
-| `/api/data/dashboard` | GET | agendas + log_llamadas | `from`, `to` | Panel ejecutivo |
-| `/api/data/videollamadas` | GET | resumenes_diarios_agendas | `from`, `to` | Performance > Videollamadas |
-| `/api/data/llamadas` | GET | log_llamadas | `from`, `to` | Performance > Llamadas |
-| `/api/data/chats` | GET | chats_logs | `from`, `to` | Performance > Chats |
+| `/api/auth/session-info` | GET | *(JWT)* | | Session + permisos para contexto "Solo mis datos" (v3.0) |
+| `/api/data/dashboard` | GET | agendas + log_llamadas | `from`, `to`, `closerEmail?` | Panel ejecutivo |
+| `/api/data/videollamadas` | GET | resumenes_diarios_agendas | `from`, `to`, `closerEmail?` | Performance > Videollamadas |
+| `/api/data/videollamadas` | PUT | resumenes_diarios_agendas | body: id, nombre_lead?, closer?, categoria? | Editar registro (v3.0) |
+| `/api/data/llamadas` | GET | log_llamadas | `from`, `to`, `closerEmail?` | Performance > Llamadas |
+| `/api/data/llamadas` | PUT | log_llamadas | body: id, nombre_lead?, closer_mail?, estado_resultado? | Editar registro (v3.0) |
+| `/api/data/chats` | GET | chats_logs | `from`, `to`, `closerEmail?` | Performance > Chats |
+| `/api/data/chats` | PUT | chats_logs | body: id, nombre_lead?, estado? | Editar registro (v3.0) |
 | `/api/data/weekly-report` | GET | agendas + log_llamadas | `from`, `to` | Reporte semanal |
-| `/api/data/asesor` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `advisorEmail?` | Panel asesor |
+| `/api/data/asesor` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `advisorEmail?`, `closerEmail?` | Panel asesor |
+| `/api/data/huerfanos` | GET | eventos_huerfanos | `estado?` | Bandeja: lista huérfanos (v3.0) |
+| `/api/data/huerfanos` | PATCH | eventos_huerfanos | body: id, accion (corregir\|descartar), correo? | Corregir/Descartar + retry Cerebro (v3.0) |
 | `/api/data/acquisition` | GET | agendas + log_llamadas + chats_logs | `from`, `to` | Adquisición |
 | `/api/data/metas` | GET | metas_cuenta | | System + Asesor |
 | `/api/data/metas` | PUT | metas_cuenta | body JSON | System paso 6 |
@@ -644,8 +692,9 @@ Cada archivo en `src/lib/queries/` encapsula la lógica de negocio para un domin
 | `dashboard.ts` | `getDashboard()` | Combina agendas + llamadas, calcula KPIs, ranking por asesor, objeciones, volumen diario |
 | `videollamadas.ts` | `getVideollamadas()` | Mapea `categoria` a estados del UI (attended/qualified/canceled), parsea montos text→number |
 | `llamadas.ts` | `getLlamadas()` | Mapea `tipo_evento` a outcomes (answered/no_answer/voicemail), agrupa por closer |
-| `chats.ts` | `getChats()` | Parsea JSONB, extrae agente, cuenta mensajes, calcula speed to lead |
-| `asesor.ts` | `getAsesorData()` | Filtra por `closer_mail`, builds mini CRM con categorías de leads |
+| `chats.ts` | `getChats()`, `updateChat()` | Parsea JSONB, extrae agente; update estado/nombre (v3.0) |
+| `asesor.ts` | `getAsesorData()` | Filtra por `closer_mail` (opcional), builds mini CRM |
+| `huerfanos.ts` | `getHuerfanos()`, `getHuerfanoById()`, `updateHuerfanoEstado()` | Bandeja: lista por estado, PATCH corregir/descartar (v3.0) |
 | `acquisition.ts` | `getAcquisition()` | Cruza 3 tablas por origen, calcula tasas de conversión |
 | `metas.ts` | `getMetas()` / `upsertMetas()` | GET con defaults si no existe, UPSERT con ON CONFLICT |
 | `system-config.ts` | `getSystemConfig()` / `updateSystemConfig()` | Lee/escribe prompts y reglas en `cuentas` |
@@ -677,6 +726,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `/weekly-report` | `weekly-report/page.tsx` | `/api/data/weekly-report` |
 | `/system` | `system/page.tsx` | `/api/data/system-config` + `/api/data/metas` (10 pasos: prompts, etiquetas, métricas, metas, embudo, triggers, BYOK, fuente financiera) |
 | `/documentacion` | `documentacion/page.tsx` | `/api/data/system-config` |
+| `/bandeja` | `bandeja/page.tsx` | `/api/data/huerfanos` (v3.0) |
 | `/configuracion` | `configuracion/page.tsx` | `/api/data/usuarios` |
 
 ---
@@ -692,8 +742,10 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `PageHeader` | Header con título, subtítulo, botón back y slot de acciones |
 | `ReportButton` | FAB fijo que enlaza a `/weekly-report` |
 | `Lead360Drawer` | Drawer lateral de detalle de lead (placeholder) |
+| `EditRecordSheet` | Sheet lateral para editar estado, closer y nombre del lead (Llamadas/Videollamadas/Chats) (v3.0) |
 | `InsightsChat` | Chatbot "Habla con tus datos" v2 — soporta embudo, tags, triggers |
 | `TagFilter` | 🏷️ Multi-select de etiquetas internas para filtrado client-side |
+| `UserFilterContext` | Contexto para toggle "Solo mis datos" y estado del filtro (v3.0) |
 
 ---
 
@@ -770,6 +822,7 @@ GoHighLevel ──webhook──► Cerebro ──INSERT──► resumenes_diari
 Twilio       ──webhook──► Cerebro ──INSERT──► log_llamadas + registros_de_llamada
 Fathom       ──webhook──► Cerebro ──UPSERT──► resumenes_diarios_agendas
 Proceso chats           ► Cerebro ──INSERT──► chats_logs
+Dashboard (Bandeja)     ► PATCH evento      ► Cerebro POST /webhooks/retry-orphan/:id (al corregir huérfano)
 ```
 
 **Este dashboard es de solo lectura** para las tablas del Cerebro. Solo escribe en:
@@ -829,6 +882,16 @@ Las metas se persisten en `metas_cuenta` con UPSERT por `id_cuenta`. El Panel As
 ---
 
 ## Pendientes y Roadmap
+
+### ✅ Completado en v3.0 Enterprise
+- [x] Roles y permisos dinámicos (`roles_config` en cuentas, `permisosArray` en JWT)
+- [x] Toggle "Solo mis datos" en sidebar + filtro `closerEmail` en APIs (dashboard, llamadas, videollamadas, chats, asesor, acquisition)
+- [x] Bandeja de huérfanos: tabla `eventos_huerfanos`, API GET/PATCH, retry al Cerebro al corregir
+- [x] Editor global: `EditRecordSheet` + PUT en llamadas, videollamadas y chats
+- [x] Constructor de layouts: campo `ubicacion` en métricas personalizadas (panel_ejecutivo / rendimiento / ambos)
+- [x] Reglas de etiquetas: selects agrupados (Condición IA, Condición Fija, mover etapa funnel)
+- [x] Triggers por emoji: emoji picker en grid, emojis usados bloqueados, estado = Select con etapas del embudo
+- [x] Panel asesor: Combobox de asesores solo si `canViewAll`; si no, filtro fijo al email del usuario
 
 ### ✅ Completado en v2.0
 - [x] Embudo dinámico por tenant (`embudo_personalizado`)

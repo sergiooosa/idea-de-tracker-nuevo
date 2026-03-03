@@ -8,7 +8,6 @@ import {
   BarChart3,
   UserCheck,
   TrendingUp,
-  Settings,
   Menu,
   X,
   Sparkles,
@@ -16,10 +15,14 @@ import {
   Target,
   LogOut,
   BookOpen,
+  Inbox,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
 import ReportButton from "@/components/dashboard/ReportButton";
+import { UserFilterProvider, useUserFilter } from "@/contexts/UserFilterContext";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
@@ -27,13 +30,49 @@ const nav = [
   { path: "/dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
   { path: "/performance", label: "Rendimiento", icon: BarChart3 },
   { path: "/asesor", label: "Panel asesor", icon: UserCheck },
+  { path: "/bandeja", label: "Bandeja", icon: Inbox },
   { path: "/acquisition", label: "Resumen adquisición", icon: TrendingUp },
   { path: "/system", label: "Control del sistema", icon: Target },
   { path: "/documentacion", label: "Documentación", icon: BookOpen },
   { path: "/configuracion", label: "Configuración", icon: UserCog },
 ];
 
-export default function TenantLayout({ children }: { children: React.ReactNode }) {
+function SoloMisDatosToggle() {
+  const { soloMisDatos, toggleSoloMisDatos, canViewAll, sessionLoading } = useUserFilter();
+
+  if (sessionLoading || !canViewAll) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={toggleSoloMisDatos}
+      className={clsx(
+        "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-medium transition-all border",
+        soloMisDatos
+          ? "bg-accent-amber/10 text-accent-amber border-accent-amber/30"
+          : "bg-surface-700/60 text-gray-400 border-surface-500 hover:text-white hover:bg-surface-600"
+      )}
+    >
+      {soloMisDatos ? <EyeOff className="w-4 h-4 shrink-0" /> : <Eye className="w-4 h-4 shrink-0" />}
+      <span className="truncate">Solo mis datos</span>
+      <div
+        className={clsx(
+          "ml-auto w-8 h-[18px] rounded-full p-[2px] transition-colors shrink-0",
+          soloMisDatos ? "bg-accent-amber" : "bg-surface-500"
+        )}
+      >
+        <div
+          className={clsx(
+            "w-[14px] h-[14px] rounded-full bg-white transition-transform",
+            soloMisDatos ? "translate-x-[14px]" : "translate-x-0"
+          )}
+        />
+      </div>
+    </button>
+  );
+}
+
+function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
@@ -89,7 +128,8 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             </Link>
           ))}
         </nav>
-        <div className="p-2 border-t border-surface-500/80">
+        <div className="p-2 space-y-1 border-t border-surface-500/80">
+          <SoloMisDatosToggle />
           {logoutButton}
         </div>
       </aside>
@@ -129,7 +169,8 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             </Link>
           ))}
         </nav>
-        <div className="p-2 border-t border-surface-500/80">
+        <div className="p-2 space-y-1 border-t border-surface-500/80">
+          <SoloMisDatosToggle />
           {logoutButton}
         </div>
       </aside>
@@ -150,5 +191,13 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       {insightsOpen && <InsightsChat onClose={() => setInsightsOpen(false)} />}
       <ReportButton />
     </div>
+  );
+}
+
+export default function TenantLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <UserFilterProvider>
+      <TenantLayoutInner>{children}</TenantLayoutInner>
+    </UserFilterProvider>
   );
 }

@@ -7,7 +7,8 @@ import { useApiData } from '@/hooks/useApiData';
 import type { ChatsResponse, ApiChatLead } from '@/types';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { User, X } from 'lucide-react';
+import { Pencil, User, X } from 'lucide-react';
+import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 
 const minFmt = (s: number | null) => {
   if (s == null || s === 0) return '—';
@@ -26,6 +27,7 @@ export default function PerformanceChatsPage() {
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
   const [modalConversacion, setModalConversacion] = useState<ApiChatLead | null>(null);
+  const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
 
   const { data, loading } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
 
@@ -151,6 +153,7 @@ export default function PerformanceChatsPage() {
                                             <td className="px-2 py-2 text-gray-400">{minFmt(chat.speedToLeadSeconds)}</td>
                                             <td className="px-2 py-2 text-gray-300">{chat.estado ?? '—'}</td>
                                             <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                                              <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-2"><Pencil className="w-3 h-3" /> Editar</button>
                                               <button type="button" onClick={() => setModalConversacion(chat)} className="text-accent-cyan text-[10px] font-medium hover:underline">
                                                 Ver conversación
                                               </button>
@@ -174,6 +177,15 @@ export default function PerformanceChatsPage() {
         </div>
       </section>
 
+      {editingRecord && (
+        <EditRecordSheet
+          type="chat"
+          record={editingRecord}
+          advisors={data?.advisors?.map(a => ({ name: a.name, email: a.email })) ?? []}
+          onClose={() => setEditingRecord(null)}
+          onSaved={() => setEditingRecord(null)}
+        />
+      )}
       {modalConversacion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalConversacion(null)} aria-hidden />

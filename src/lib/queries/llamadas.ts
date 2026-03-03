@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { logLlamadas } from "@/lib/db/schema";
+import { logLlamadas, registrosDeLlamada } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   ApiLlamadaLog,
@@ -20,20 +20,22 @@ export async function getLlamadas(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
+  closerEmail?: string,
 ): Promise<LlamadasResponse> {
   const fromTs = new Date(`${dateFrom}T00:00:00Z`);
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
 
+  const conditions = [
+    eq(logLlamadas.id_cuenta, idCuenta),
+    gte(logLlamadas.ts, fromTs),
+    lte(logLlamadas.ts, toTs),
+  ];
+  if (closerEmail) conditions.push(eq(logLlamadas.closer_mail, closerEmail));
+
   const rows = await db
     .select()
     .from(logLlamadas)
-    .where(
-      and(
-        eq(logLlamadas.id_cuenta, idCuenta),
-        gte(logLlamadas.ts, fromTs),
-        lte(logLlamadas.ts, toTs),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(sql`${logLlamadas.ts} DESC`);
 
   const registros: ApiLlamadaLog[] = rows.map((r) => ({
@@ -110,4 +112,43 @@ export async function getLlamadas(
   }
 
   return { registros, agg, advisorMetrics, advisors };
+}
+
+export async function updateLlamada(
+  id: number,
+  idCuenta: number,
+  data: { nombre_lead?: string; closer?: string; estado?: string },
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: logLlamadas.id, id_cuenta: logLlamadas.id_cuenta, id_registro: logLlamadas.id_registro })
+    .from(logLlamadas)
+    .where(eq(logLlamadas.id, id))
+    .limit(1);
+
+  if (!row || row.id_cuenta !== idCuenta) return false;
+
+  const setClause: Record<string, unknown> = {};
+  if (data.nombre_lead !== undefined) setClause.nombre_lead = data.nombre_lead;
+  if (data.closer !== undefined) {
+    setClause.closer_mail = data.closer;
+    setClause.nombre_closer = data.closer;
+  }
+  if (data.estado !== undefined) setClause.estado_resultado = data.estado;
+
+  if (Object.keys(setClause).length > 0) {
+    await db.update(logLlamadas).set(setClause).where(eq(logLlamadas.id, id));
+  }
+
+  if (row.id_registro && (data.nombre_lead || data.closer || data.estado)) {
+    const regSet: Record<string, unknown> = {};
+    if (data.nombre_lead) regSet.nombre_lead = data.nombre_lead;
+    if (data.closer) {
+      regSet.closer_mail = data.closer;
+      regSet.nombre_closer = data.closer;
+    }
+    if (data.estado) regSet.estado = data.estado;
+    await db.update(registrosDeLlamada).set(regSet).where(eq(registrosDeLlamada.id_registro, row.id_registro));
+  }
+
+  return true;
 }

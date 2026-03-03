@@ -11,6 +11,7 @@ import {
   numeric,
   boolean,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -51,6 +52,7 @@ export interface MetricaPersonalizada {
   isRecurring: "recurrente" | "unica";
   section: string;
   panel: string;
+  ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
 }
 
 export interface EmbudoEtapa {
@@ -73,6 +75,12 @@ export interface TipoEventoConfig {
   activo: boolean;
 }
 
+export interface RolConfig {
+  id: string;
+  nombre: string;
+  permisos: string[];
+}
+
 export const cuentas = pgTable("cuentas", {
   id_cuenta: serial("id_cuenta").primaryKey(),
   nombre_cuenta: varchar("nombre_cuenta"),
@@ -89,6 +97,7 @@ export const cuentas = pgTable("cuentas", {
   embudo_personalizado: jsonb("embudo_personalizado").$type<EmbudoEtapa[]>(),
   chat_triggers: jsonb("chat_triggers").$type<ChatTrigger[]>(),
   tipos_eventos_config: jsonb("tipos_eventos_config").$type<TipoEventoConfig[]>(),
+  roles_config: jsonb("roles_config").$type<RolConfig[]>(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -101,7 +110,7 @@ export const usuariosDashboard = pgTable("usuarios_dashboard", {
   nombre: text("nombre"),
   email: text("email").unique().notNull(),
   pass: text("pass").notNull(),
-  rol: text("rol").$type<"superadmin" | "usuario">().notNull(),
+  rol: text("rol").notNull(),
   permisos: jsonb("permisos").$type<Record<string, boolean>>(),
   fathom: text("fathom"),
   id_webhook_fathom: text("id_webhook_fathom"),
@@ -286,4 +295,21 @@ export const usoApiMensual = pgTable("uso_api_mensual", {
   cantidad: integer("cantidad").default(0),
 }, (table) => [
   uniqueIndex("uso_api_mensual_unique").on(table.id_cuenta, table.mes_anio, table.tipo_consumo),
+]);
+
+/* ------------------------------------------------------------------ */
+/*  eventos_huerfanos — sala de espera de eventos fallidos             */
+/* ------------------------------------------------------------------ */
+
+export const eventosHuerfanos = pgTable("eventos_huerfanos", {
+  id_huerfano: serial("id_huerfano").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  origen: text("origen").notNull(),
+  motivo: text("motivo").notNull(),
+  payload_original: jsonb("payload_original").notNull(),
+  estado: text("estado").default("pendiente"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_huerfanos_cuenta_estado").on(table.id_cuenta, table.estado),
 ]);

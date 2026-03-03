@@ -7,8 +7,9 @@ import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
+import { useUserFilter } from '@/contexts/UserFilterContext';
 import type { AsesorResponse, AsesorLeadCRM } from '@/types';
-import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X } from 'lucide-react';
+import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
 type CrmCategory = 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
@@ -56,6 +57,97 @@ function CRMCard({ lead }: { lead: AsesorLeadCRM }) {
   );
 }
 
+function AdvisorCombobox({
+  advisors,
+  value,
+  onChange,
+  disabled,
+}: {
+  advisors: { id: string; name: string; email?: string }[];
+  value: string;
+  onChange: (val: string) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search) return advisors;
+    const q = search.toLowerCase();
+    return advisors.filter((a) =>
+      a.name.toLowerCase().includes(q) || (a.email ?? '').toLowerCase().includes(q)
+    );
+  }, [advisors, search]);
+
+  const selectedLabel = value
+    ? advisors.find((a) => (a.email ?? a.id) === value)?.name ?? value
+    : 'Todos los asesores';
+
+  if (disabled) {
+    return (
+      <div className="rounded-lg bg-surface-700/60 border border-surface-500/50 px-3 py-1.5 text-xs text-gray-400 cursor-not-allowed">
+        {selectedLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 rounded-lg bg-surface-700 border border-surface-500 px-3 py-1.5 text-xs text-white hover:border-accent-cyan/50 transition-colors min-w-[180px]"
+      >
+        <User className="w-3.5 h-3.5 text-accent-cyan shrink-0" />
+        <span className="truncate flex-1 text-left">{selectedLabel}</span>
+        <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute top-full left-0 mt-1 z-50 w-64 rounded-lg bg-surface-800 border border-surface-500 shadow-xl overflow-hidden">
+            <div className="p-2 border-b border-surface-500">
+              <div className="flex items-center gap-2 rounded-lg bg-surface-700 px-2 py-1.5">
+                <Search className="w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar asesor..."
+                  className="flex-1 bg-transparent text-xs text-white placeholder-gray-500 outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="max-h-48 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => { onChange(''); setOpen(false); setSearch(''); }}
+                className="w-full px-3 py-2 text-xs text-left hover:bg-surface-700 text-gray-300 transition-colors"
+              >
+                Todos los asesores
+              </button>
+              {filtered.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => { onChange(a.email ?? a.id); setOpen(false); setSearch(''); }}
+                  className={`w-full px-3 py-2 text-xs text-left hover:bg-surface-700 transition-colors ${
+                    value === (a.email ?? a.id) ? 'text-accent-cyan bg-accent-cyan/10' : 'text-white'
+                  }`}
+                >
+                  <div className="font-medium">{a.name}</div>
+                  {a.email && <div className="text-[10px] text-gray-500">{a.email}</div>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const defaultTo = new Date();
 const defaultFrom = subDays(defaultTo, 7);
 
@@ -65,10 +157,15 @@ export default function AsesorPage() {
   const [dateTo, setDateTo] = useState(format(defaultTo, 'yyyy-MM-dd'));
   const [selectedAdvisorEmail, setSelectedAdvisorEmail] = useState<string>('');
 
+  const { canViewAll, session, sessionLoading } = useUserFilter();
+
   const { data: metasData } = useApiData<{ meta_llamadas_diarias: number }>('/api/data/metas');
   const metaLlamadasDiarias = metasData?.meta_llamadas_diarias ?? 50;
 
-  const advisorParam = selectedAdvisorEmail || undefined;
+  const advisorParam = canViewAll
+    ? (selectedAdvisorEmail || undefined)
+    : (session?.email || undefined);
+
   const { data, loading } = useApiData<AsesorResponse>('/api/data/asesor', {
     from: dateFrom,
     to: dateTo,
@@ -95,17 +192,13 @@ export default function AsesorPage() {
         subtitle="Métricas y leads del asesor"
         action={
           <div className="flex items-center gap-2">
-            {advisors.length > 1 && (
-              <select
-                value={selectedAdvisorEmail}
-                onChange={(e) => setSelectedAdvisorEmail(e.target.value)}
-                className="rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-xs text-white"
-              >
-                <option value="">Todos</option>
-                {advisors.map((a) => (
-                  <option key={a.id} value={a.email ?? a.id}>{a.name}</option>
-                ))}
-              </select>
+            {!sessionLoading && advisors.length > 0 && (
+              <AdvisorCombobox
+                advisors={advisors}
+                value={canViewAll ? selectedAdvisorEmail : (session?.email ?? '')}
+                onChange={setSelectedAdvisorEmail}
+                disabled={!canViewAll}
+              />
             )}
           </div>
         }

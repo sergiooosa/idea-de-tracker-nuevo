@@ -371,6 +371,19 @@ export interface EmbudoEtapaUI {
   condition?: string;
 }
 
+export interface MetricaPersonalizadaUI {
+  id: string;
+  name: string;
+  description: string;
+  condition: string;
+  increment: number;
+  whenMeasured: string;
+  isRecurring: "recurrente" | "unica";
+  section: string;
+  panel: string;
+  ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
+}
+
 export interface DashboardResponse {
   kpis: DashboardKpis;
   advisorRanking: DashboardAdvisorRow[];
@@ -381,6 +394,7 @@ export interface DashboardResponse {
   embudoPersonalizado?: EmbudoEtapaUI[];
   distribucionEmbudo?: Record<string, number>;
   tagsDisponibles?: string[];
+  metricasPersonalizadas?: MetricaPersonalizadaUI[];
 }
 
 export interface AsesorLeadCRM {

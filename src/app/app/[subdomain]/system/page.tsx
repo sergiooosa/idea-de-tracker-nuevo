@@ -9,7 +9,7 @@ interface TagRule { id: string; condition: string; tag: string; source: string }
 interface MetricRule {
   id: string; name: string; description: string; condition: string;
   increment: number; whenMeasured: string; isRecurring: 'recurrente' | 'unica';
-  section: string; panel: string;
+  section: string; panel: string; ubicacion?: 'panel_ejecutivo' | 'rendimiento' | 'ambos';
 }
 interface EmbudoEtapa { id: string; nombre: string; color?: string; orden: number; condition?: string }
 interface ChatTrigger { trigger: string; accion: string; valor: string }
@@ -131,7 +131,7 @@ export default function SystemPage() {
   };
 
   const addTagRule = () => setTagRules((r) => [...r, { id: Date.now().toString(), condition: '', tag: '', source: 'call' }]);
-  const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '' }]);
+  const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '', ubicacion: 'ambos' }]);
   const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1 }]);
   const removeEmbudoEtapa = (id: string) => setEmbudoEtapas((e) => e.filter((x) => x.id !== id).map((x, i) => ({ ...x, orden: i + 1 })));
   const addChatTrigger = () => setChatTriggers((t) => [...t, { trigger: '', accion: 'cambiar_estado', valor: '' }]);
@@ -234,25 +234,83 @@ export default function SystemPage() {
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><Tag className="w-5 h-5 text-accent-amber" /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">Reglas de etiquetas para GHL</h3>
-                  <p className="text-sm text-gray-400">Si en llamada/chats/meetings pasa X → aplicar etiqueta Y.</p>
+                  <p className="text-sm text-gray-400">Selecciona una condición y asigna una etiqueta GHL.</p>
                 </div>
               </div>
               <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200/90">
-                <strong className="text-amber-200">Aviso:</strong> Esta etiqueta no se le va a añadir al cliente si no está creada tal cual se escribe aquí en GHL.
+                <strong className="text-amber-200">Aviso:</strong> La etiqueta debe existir tal cual en GHL para que se asigne correctamente.
               </div>
               <ul className="space-y-3">
                 {tagRules.map((r) => (
-                  <li key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg p-3 border-l-4 border-accent-amber/60 bg-surface-700/80 border border-surface-500 shadow-[0_0_20px_-6px_rgba(255,176,32,0.12)]">
-                    <span className="text-accent-amber text-sm font-medium">Si</span>
-                    <input type="text" value={r.condition} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, condition: e.target.value } : x))} placeholder="condición"
-                      className="flex-1 min-w-[140px] rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
-                    <span className="text-accent-cyan text-sm font-medium">→ tag</span>
-                    <input type="text" value={r.tag} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, tag: e.target.value } : x))} placeholder="nombre_etiqueta"
-                      className="w-32 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
-                    <select value={r.source} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, source: e.target.value } : x))}
-                      className="rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                      <option value="call">Llamada</option><option value="chat">Chat</option><option value="meeting">Meeting</option>
-                    </select>
+                  <li key={r.id} className="rounded-xl p-4 space-y-3 border-l-4 border-accent-amber/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500">
+                    <div className="flex flex-wrap gap-3">
+                      <div className="flex-1 min-w-[180px]">
+                        <label className="block text-[11px] font-medium text-accent-amber mb-1">Condición</label>
+                        <select
+                          value={['mencion_precio', 'enojo', 'interes_alto', 'solicitud_propuesta', 'objecion_precio', 'objecion_tiempo', 'duracion_mayor', 'intentos_mayor', 'speed_mayor'].includes(r.condition) ? r.condition : '_custom'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val !== '_custom') setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, condition: val } : x));
+                          }}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                        >
+                          <optgroup label="Condición IA">
+                            <option value="mencion_precio">Mención de precio</option>
+                            <option value="enojo">Enojo del lead</option>
+                            <option value="interes_alto">Interés alto</option>
+                            <option value="solicitud_propuesta">Solicitud de propuesta</option>
+                            <option value="objecion_precio">Objeción por precio</option>
+                            <option value="objecion_tiempo">Objeción por tiempo</option>
+                          </optgroup>
+                          <optgroup label="Condición Fija">
+                            <option value="duracion_mayor">Duración mayor a X min</option>
+                            <option value="intentos_mayor">Intentos mayor a Y</option>
+                            <option value="speed_mayor">Speed to lead mayor a Z min</option>
+                          </optgroup>
+                          <optgroup label="Personalizada">
+                            <option value="_custom">Texto libre...</option>
+                          </optgroup>
+                        </select>
+                        {!['mencion_precio', 'enojo', 'interes_alto', 'solicitud_propuesta', 'objecion_precio', 'objecion_tiempo', 'duracion_mayor', 'intentos_mayor', 'speed_mayor'].includes(r.condition) && (
+                          <input type="text" value={r.condition} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, condition: e.target.value } : x))}
+                            placeholder="Condición personalizada"
+                            className="w-full mt-1.5 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
+                        )}
+                      </div>
+                      <div className="w-36">
+                        <label className="block text-[11px] font-medium text-accent-cyan mb-1">Etiqueta GHL</label>
+                        <input type="text" value={r.tag} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, tag: e.target.value } : x))} placeholder="nombre_etiqueta"
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
+                      </div>
+                      <div className="w-32">
+                        <label className="block text-[11px] font-medium text-gray-400 mb-1">Fuente</label>
+                        <select value={r.source} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, source: e.target.value } : x))}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
+                          <option value="call">Llamada</option><option value="chat">Chat</option><option value="meeting">Meeting</option>
+                        </select>
+                      </div>
+                    </div>
+                    {embudoEtapas.length > 0 && (
+                      <div>
+                        <label className="block text-[11px] font-medium text-accent-purple mb-1">Mover etapa de funnel a (opcional)</label>
+                        <select
+                          value=""
+                          onChange={() => {}}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                        >
+                          <option value="">No mover etapa</option>
+                          {embudoEtapas.map((e) => (
+                            <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="flex justify-end">
+                      <button type="button" onClick={() => setTagRules((prev) => prev.filter((x) => x.id !== r.id))}
+                        className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1">
+                        <Trash2 className="w-3 h-3" /> Eliminar regla
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -323,6 +381,15 @@ export default function SystemPage() {
                       <label className="block text-xs font-medium text-gray-400 mb-1">Descripción</label>
                       <input type="text" value={r.description} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, description: e.target.value } : x))} placeholder="Detalle adicional"
                         className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-accent-amber mb-1">Ubicación de la tarjeta</label>
+                      <select value={r.ubicacion ?? 'ambos'} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, ubicacion: e.target.value as MetricRule['ubicacion'] } : x))}
+                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
+                        <option value="panel_ejecutivo">Panel Ejecutivo</option>
+                        <option value="rendimiento">Rendimiento</option>
+                        <option value="ambos">Ambos</option>
+                      </select>
                     </div>
                   </li>
                 ))}
@@ -431,7 +498,10 @@ export default function SystemPage() {
             </div>
           )}
 
-          {currentStep === 8 && (
+          {currentStep === 8 && (() => {
+            const EMOJI_GRID = ['💰', '✅', '❌', '🔥', '⏳', '📞', '📅', '🤝', '👍', '👎', '💡', '⭐', '🎯', '💬', '☀️', '🚀', '💎', '🏆', '📊', '🔔'];
+            const usedEmojis = new Set(chatTriggers.map((t) => t.trigger));
+            return (
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><MessageSquare className="w-5 h-5 text-accent-amber" /></div>
@@ -445,29 +515,77 @@ export default function SystemPage() {
                   Sin triggers configurados. Los estados de chat se gestionan solo con IA.
                 </div>
               )}
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {chatTriggers.map((t, idx) => (
-                  <li key={idx} className="flex flex-wrap items-center gap-2 rounded-lg p-3 bg-surface-700/80 border border-surface-500 border-l-4 border-l-accent-amber/60">
-                    <span className="text-accent-amber text-sm font-medium shrink-0">Si el agente envía</span>
-                    <input
-                      type="text"
-                      value={t.trigger}
-                      onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, trigger: e.target.value } : x))}
-                      placeholder="💰"
-                      className="w-20 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-center text-lg text-white focus:ring-2 focus:ring-accent-amber/40"
-                    />
-                    <span className="text-accent-cyan text-sm font-medium shrink-0">→ estado cambia a</span>
-                    <input
-                      type="text"
-                      value={t.valor}
-                      onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
-                      placeholder="Cerrada"
-                      className="flex-1 min-w-[120px] rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
-                    />
-                    <button type="button" onClick={() => removeChatTrigger(idx)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <li key={idx} className="rounded-xl p-4 space-y-3 bg-surface-700/80 border border-surface-500 border-l-4 border-l-accent-amber/60">
+                    <div className="flex items-center gap-3">
+                      <span className="text-accent-amber text-xs font-medium shrink-0 uppercase">Emoji trigger</span>
+                      <div className="flex-1" />
+                      <button type="button" onClick={() => removeChatTrigger(idx)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-accent-amber mb-2">Selecciona un emoji</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {EMOJI_GRID.map((emoji) => {
+                          const isUsed = usedEmojis.has(emoji) && t.trigger !== emoji;
+                          const isSelected = t.trigger === emoji;
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              disabled={isUsed}
+                              onClick={() => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, trigger: emoji } : x))}
+                              className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all border ${
+                                isSelected
+                                  ? 'bg-accent-amber/20 border-accent-amber/60 shadow-[0_0_12px_-4px_rgba(255,176,32,0.5)] scale-110'
+                                  : isUsed
+                                    ? 'bg-surface-700 border-surface-500 opacity-30 cursor-not-allowed'
+                                    : 'bg-surface-600 border-surface-500 hover:bg-surface-500 hover:border-accent-amber/30'
+                              }`}
+                              title={isUsed ? 'Ya usado en otra regla' : emoji}
+                            >
+                              {emoji}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {t.trigger && !EMOJI_GRID.includes(t.trigger) && (
+                        <div className="mt-2 text-xs text-gray-400">Emoji actual: <span className="text-xl">{t.trigger}</span></div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-accent-cyan mb-1">Estado al que cambia el lead</label>
+                      {embudoEtapas.length > 0 ? (
+                        <select
+                          value={t.valor}
+                          onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                        >
+                          <option value="">Seleccionar estado...</option>
+                          {embudoEtapas.map((e) => (
+                            <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={t.valor}
+                          onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
+                          placeholder="Cerrada"
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                        />
+                      )}
+                    </div>
+                    {t.trigger && t.valor && (
+                      <div className="rounded-lg bg-surface-800/60 border border-surface-500/50 px-3 py-2 text-xs text-gray-400 flex items-center gap-2">
+                        <span className="text-2xl">{t.trigger}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-accent-cyan" />
+                        <span className="text-accent-cyan font-medium">{t.valor}</span>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -480,7 +598,8 @@ export default function SystemPage() {
                 cuando un asesor envíe 💰 en el chat de WhatsApp, el lead pasa automáticamente a estado &quot;Cerrada&quot; sin usar IA.
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {currentStep === 9 && (
             <div className="space-y-4">

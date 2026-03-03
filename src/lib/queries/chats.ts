@@ -46,6 +46,7 @@ export async function getChats(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
+  closerEmail?: string,
 ): Promise<ChatsResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
@@ -106,20 +107,25 @@ export async function getChats(
     };
   });
 
-  const contacted = chatsList.filter((c) => c.agentMessages > 0);
-  const speedVals = chatsList
+  const filteredChats = closerEmail
+    ? chatsList.filter((c) => c.agentName?.toLowerCase() === closerEmail.toLowerCase())
+    : chatsList;
+  const chatsFinal = closerEmail ? filteredChats : chatsList;
+
+  const contacted = chatsFinal.filter((c) => c.agentMessages > 0);
+  const speedVals = chatsFinal
     .filter((c) => c.speedToLeadSeconds != null)
     .map((c) => c.speedToLeadSeconds!);
 
   const agg = {
-    assigned: chatsList.length,
+    assigned: chatsFinal.length,
     activos: contacted.length,
-    seguimientosTotal: chatsList.reduce((s, c) => s + c.totalMessages, 0),
+    seguimientosTotal: chatsFinal.reduce((s, c) => s + c.totalMessages, 0),
     speedAvg: speedVals.length > 0 ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length : 0,
   };
 
   const byAgent: Record<string, ApiChatLead[]> = {};
-  for (const c of chatsList) {
+  for (const c of chatsFinal) {
     const key = c.agentName ?? "Sin asignar";
     if (!byAgent[key]) byAgent[key] = [];
     byAgent[key].push(c);
@@ -141,5 +147,29 @@ export async function getChats(
     advisors.push({ id: name, name });
   }
 
-  return { chats: chatsList, agg, advisorMetrics, advisors };
+  return { chats: chatsFinal, agg, advisorMetrics, advisors };
+}
+
+export async function updateChat(
+  id: number,
+  idCuenta: number,
+  data: { nombre_lead?: string; closer?: string; estado?: string },
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: chatsLogs.id_evento, id_cuenta: chatsLogs.id_cuenta })
+    .from(chatsLogs)
+    .where(eq(chatsLogs.id_evento, id))
+    .limit(1);
+
+  if (!row || row.id_cuenta !== idCuenta) return false;
+
+  const setClause: Record<string, unknown> = {};
+  if (data.nombre_lead !== undefined) setClause.nombre_lead = data.nombre_lead;
+  if (data.estado !== undefined) setClause.estado = data.estado;
+
+  if (Object.keys(setClause).length > 0) {
+    await db.update(chatsLogs).set(setClause).where(eq(chatsLogs.id_evento, id));
+  }
+
+  return true;
 }

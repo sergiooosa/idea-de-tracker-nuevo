@@ -45,9 +45,17 @@ export async function getVideollamadas(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
+  closerEmail?: string,
 ): Promise<VideollamadasResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+
+  const agendaConditions = [
+    eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
+    gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+    lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+  ];
+  if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
 
   const [[cuentaRow], rows] = await Promise.all([
     db
@@ -58,13 +66,7 @@ export async function getVideollamadas(
     db
       .select()
       .from(resumenesDiariosAgendas)
-      .where(
-        and(
-          eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-          gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
-          lte(resumenesDiariosAgendas.fecha_reunion, toDate),
-        ),
-      )
+      .where(and(...agendaConditions))
       .orderBy(sql`${resumenesDiariosAgendas.fecha_reunion} DESC`),
   ]);
 
@@ -140,4 +142,32 @@ export async function getVideollamadas(
   }
 
   return { registros, agg, advisorMetrics, advisors };
+}
+
+export async function updateVideollamada(
+  id: number,
+  idCuenta: number,
+  data: { nombre_lead?: string; closer?: string; estado?: string },
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: resumenesDiariosAgendas.id_registro_agenda, id_cuenta: resumenesDiariosAgendas.id_cuenta })
+    .from(resumenesDiariosAgendas)
+    .where(eq(resumenesDiariosAgendas.id_registro_agenda, id))
+    .limit(1);
+
+  if (!row || row.id_cuenta !== idCuenta) return false;
+
+  const setClause: Record<string, unknown> = {};
+  if (data.nombre_lead !== undefined) setClause.nombre_de_lead = data.nombre_lead;
+  if (data.closer !== undefined) setClause.closer = data.closer;
+  if (data.estado !== undefined) setClause.categoria = data.estado;
+
+  if (Object.keys(setClause).length > 0) {
+    await db
+      .update(resumenesDiariosAgendas)
+      .set(setClause)
+      .where(eq(resumenesDiariosAgendas.id_registro_agenda, id));
+  }
+
+  return true;
 }

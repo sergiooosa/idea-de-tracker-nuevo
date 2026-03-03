@@ -3,7 +3,24 @@ import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
+import type { RolConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+
+const DEFAULT_ROLES_CONFIG: RolConfig[] = [
+  { id: "superadmin", nombre: "Administrador General", permisos: ["ver_todo", "editar_registros", "configurar_sistema"] },
+  { id: "asesor", nombre: "Asesor de Ventas", permisos: ["ver_solo_propios"] },
+];
+
+function resolvePermisos(rol: string, rolesConfig: RolConfig[] | null): string[] {
+  const config = Array.isArray(rolesConfig) && rolesConfig.length > 0
+    ? rolesConfig
+    : DEFAULT_ROLES_CONFIG;
+  const match = config.find((r) => r.id === rol);
+  if (match) return match.permisos;
+  if (rol === "superadmin") return ["ver_todo", "editar_registros", "configurar_sistema"];
+  if (rol === "usuario") return ["ver_solo_propios"];
+  return [];
+}
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -30,6 +47,7 @@ export const authConfig: NextAuthConfig = {
               rol: usuariosDashboard.rol,
               permisos: usuariosDashboard.permisos,
               subdominio: cuentas.subdominio,
+              roles_config: cuentas.roles_config,
             })
             .from(usuariosDashboard)
             .innerJoin(
@@ -59,6 +77,8 @@ export const authConfig: NextAuthConfig = {
             return null;
           }
 
+          const permisosArray = resolvePermisos(user.rol, user.roles_config);
+
           return {
             id: String(user.id_evento),
             id_cuenta: user.id_cuenta!,
@@ -67,6 +87,7 @@ export const authConfig: NextAuthConfig = {
             rol: user.rol,
             subdominio: user.subdominio,
             permisos: user.permisos,
+            permisosArray,
           };
         } catch (dbErr) {
           console.error("[auth] error de DB en authorize:", dbErr);
@@ -85,15 +106,17 @@ export const authConfig: NextAuthConfig = {
         token.rol = (user as any).rol;
         token.subdominio = (user as any).subdominio;
         token.permisos = (user as any).permisos;
+        token.permisosArray = (user as any).permisosArray;
       }
       return token;
     },
     async session({ session, token }) {
       session.user.id = token.id as string;
       session.user.id_cuenta = token.id_cuenta as number;
-      session.user.rol = token.rol as "superadmin" | "usuario";
+      session.user.rol = token.rol as string;
       session.user.subdominio = token.subdominio as string;
       session.user.permisos = token.permisos as Record<string, boolean> | null;
+      session.user.permisosArray = (token.permisosArray as string[]) ?? [];
       return session;
     },
   },

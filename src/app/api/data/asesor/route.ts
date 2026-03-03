@@ -8,7 +8,9 @@ export async function GET(req: Request) {
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
     const advisorEmail = searchParams.get("advisorEmail") ?? email;
-    const data = await getAsesorData(idCuenta, from, to, advisorEmail || undefined);
+    const closerEmail = searchParams.get("closerEmail") || undefined;
+    const effectiveAdvisor = closerEmail ?? advisorEmail;
+    const data = await getAsesorData(idCuenta, from, to, effectiveAdvisor || undefined);
     return NextResponse.json(data);
   });
 }

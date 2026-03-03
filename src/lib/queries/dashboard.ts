@@ -39,6 +39,7 @@ export async function getDashboard(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
+  closerEmail?: string,
 ): Promise<DashboardResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
@@ -47,6 +48,7 @@ export async function getDashboard(
     .select({
       configuracion_ui: cuentas.configuracion_ui,
       embudo_personalizado: cuentas.embudo_personalizado,
+      metricas_personalizadas: cuentas.metricas_personalizadas,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -57,27 +59,29 @@ export async function getDashboard(
   const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : null;
   const { attendedSet, closedSet, effectiveSet, etapas } = buildFunnelSets(embudoRaw);
 
+  const agendaConditions = [
+    eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
+    gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+    lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+  ];
+  if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
+
+  const callConditions = [
+    eq(logLlamadas.id_cuenta, idCuenta),
+    gte(logLlamadas.ts, fromDate),
+    lte(logLlamadas.ts, toDate),
+  ];
+  if (closerEmail) callConditions.push(eq(logLlamadas.closer_mail, closerEmail));
+
   const [agendas, calls] = await Promise.all([
     db
       .select()
       .from(resumenesDiariosAgendas)
-      .where(
-        and(
-          eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-          gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
-          lte(resumenesDiariosAgendas.fecha_reunion, toDate),
-        ),
-      ),
+      .where(and(...agendaConditions)),
     db
       .select()
       .from(logLlamadas)
-      .where(
-        and(
-          eq(logLlamadas.id_cuenta, idCuenta),
-          gte(logLlamadas.ts, fromDate),
-          lte(logLlamadas.ts, toDate),
-        ),
-      ),
+      .where(and(...callConditions)),
   ]);
 
   const asistidas = agendas.filter((a) => attendedSet.has(a.categoria ?? "")).length;
@@ -286,5 +290,6 @@ export async function getDashboard(
     })),
     distribucionEmbudo,
     tagsDisponibles: [...allTags].sort(),
+    metricasPersonalizadas: Array.isArray(cuentaRow?.metricas_personalizadas) ? cuentaRow.metricas_personalizadas : [],
   };
 }
