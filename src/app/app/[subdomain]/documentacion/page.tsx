@@ -128,7 +128,7 @@ function TriggerSection({ triggers }: { triggers: SystemConfig["chat_triggers"] 
       ) : (
         <Card className="bg-surface-700/30 border-surface-500 border-dashed">
           <CardContent className="py-6 text-center text-gray-500 text-sm">
-            No tienes triggers configurados aún. Contacta a soporte para activarlos.
+            No tienes triggers configurados aún. Ve a <strong className="text-accent-cyan">Control del sistema</strong> → paso 8 para crearlos.
           </CardContent>
         </Card>
       )}
@@ -289,7 +289,7 @@ function EmbudoSection({ embudo }: { embudo: SystemConfig["embudo_personalizado"
         <Card className="bg-surface-700/30 border-surface-500 border-dashed">
           <CardContent className="py-6 text-center text-gray-500 text-sm">
             Estás usando el embudo estándar (Cerrada, Ofertada, No_Ofertada, CANCELADA, PDTE).
-            Contacta a soporte para personalizar tu embudo.
+            Ve a <strong className="text-accent-cyan">Control del sistema</strong> → paso 7 para crear tu embudo personalizado.
           </CardContent>
         </Card>
       )}
@@ -348,8 +348,7 @@ function BYOKSection({ hasKey }: { hasKey: boolean }) {
       {!hasKey && (
         <Card className="bg-accent-amber/5 border-accent-amber/20">
           <CardContent className="py-3 text-sm text-gray-300">
-            Para conectar tu API Key, contacta a tu administrador de cuenta o agrégala desde la sección
-            de configuración avanzada.
+            Para conectar tu API Key, ve a <strong className="text-accent-cyan">Control del sistema</strong> → paso 9 (OpenAI Key).
           </CardContent>
         </Card>
       )}

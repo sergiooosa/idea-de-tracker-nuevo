@@ -17,6 +17,7 @@
 | 📊 **API Externa de Ingresos** | Endpoint `POST /webhooks/external-data/:locationid` para inyectar datos financieros reales. | Dashboard financiero |
 | 📖 **Documentación Interactiva** | Nueva página `/documentacion` dentro del panel del tenant con guías vivas de todas las features. | UX del tenant |
 | 🤖 **InsightsChat v2** | El chatbot ahora entiende embudo, etiquetas y triggers. Nuevas intenciones + respuestas con datos dinámicos. | Chatbot |
+| 🛠️ **Self-Service Config** | El CLIENTE configura todo desde `/system` (pasos 7-10): embudo, triggers, OpenAI key, fuente financiera. Sin depender del admin del SaaS. | Control del sistema |
 
 ---
 
@@ -674,7 +675,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `/asesor` | `asesor/page.tsx` | `/api/data/asesor` + `/api/data/metas` |
 | `/acquisition` | `acquisition/page.tsx` | `/api/data/acquisition` |
 | `/weekly-report` | `weekly-report/page.tsx` | `/api/data/weekly-report` |
-| `/system` | `system/page.tsx` | `/api/data/system-config` + `/api/data/metas` |
+| `/system` | `system/page.tsx` | `/api/data/system-config` + `/api/data/metas` (10 pasos: prompts, etiquetas, métricas, metas, embudo, triggers, BYOK, fuente financiera) |
 | `/documentacion` | `documentacion/page.tsx` | `/api/data/system-config` |
 | `/configuracion` | `configuracion/page.tsx` | `/api/data/usuarios` |
 
@@ -838,6 +839,8 @@ Las metas se persisten en `metas_cuenta` con UPSERT por `id_cuenta`. El Panel As
 - [x] Filtro global de etiquetas en Dashboard (`TagFilter`)
 - [x] InsightsChat v2 con intents de embudo, tags y triggers
 - [x] API `system-config` ampliada con triggers, embudo y status de BYOK
+- [x] Self-service: el CLIENTE configura embudo, triggers, BYOK y fuente financiera desde `/system` (pasos 7-10)
+- [x] PUT `/api/data/system-config` persiste `openai_api_key`, `embudo_personalizado`, `chat_triggers`, `fuente_datos_financieros`
 
 ### 🔜 Próximos pasos
 
@@ -849,9 +852,6 @@ El chatbot actual usa datos reales pero genera respuestas con templates. El sigu
 
 ### Personalización extrema
 La estructura de `configuracion_ui` ya soporta `nombres_secciones`, `columnas_visibles` y `kpis_visibles`, pero el frontend aún no lee esos valores para personalizar la UI dinámicamente.
-
-### Editor de triggers y embudo en UI
-Actualmente los triggers y el embudo se configuran directamente en la BD. Se necesita un editor visual en `/system` para que el admin del tenant pueda gestionarlos.
 
 ### UTMs granulares
 La columna `origen` en las tablas es texto libre. Para un funnel de adquisición más preciso, el Cerebro debería guardar `utm_source`, `utm_medium`, `utm_campaign` como campos separados o JSONB.

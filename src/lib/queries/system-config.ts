@@ -13,6 +13,11 @@ export interface SystemConfigData {
   embudo_personalizado: EmbudoEtapa[];
   tipos_eventos_config: TipoEventoConfig[];
   has_openai_key: boolean;
+  fuente_datos_financieros: "nativa" | "api_externa";
+}
+
+export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key">> {
+  openai_api_key?: string;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -34,6 +39,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       embudo_personalizado: cuentas.embudo_personalizado,
       tipos_eventos_config: cuentas.tipos_eventos_config,
       openai_api_key: cuentas.openai_api_key,
+      configuracion_ui: cuentas.configuracion_ui,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -50,6 +56,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       embudo_personalizado: [],
       tipos_eventos_config: [],
       has_openai_key: false,
+      fuente_datos_financieros: "nativa",
     };
   }
 
@@ -64,23 +71,39 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     embudo_personalizado: Array.isArray(r.embudo_personalizado) ? r.embudo_personalizado : [],
     tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
     has_openai_key: !!r.openai_api_key,
+    fuente_datos_financieros: r.configuracion_ui?.fuente_datos_financieros ?? "nativa",
   };
 }
 
 export async function updateSystemConfig(
   idCuenta: number,
-  data: Partial<SystemConfigData>,
+  data: SystemConfigUpdatePayload,
 ): Promise<SystemConfigData> {
-  await db
-    .update(cuentas)
-    .set({
-      ...(data.prompt_ventas !== undefined && { prompt_ventas: data.prompt_ventas }),
-      ...(data.prompt_videollamadas !== undefined && { prompt_videollamadas: data.prompt_videollamadas }),
-      ...(data.prompt_llamadas !== undefined && { prompt_llamadas: data.prompt_llamadas }),
-      ...(data.reglas_etiquetas !== undefined && { reglas_etiquetas: data.reglas_etiquetas }),
-      ...(data.metricas_personalizadas !== undefined && { metricas_personalizadas: data.metricas_personalizadas }),
-    })
-    .where(eq(cuentas.id_cuenta, idCuenta));
+  const setClause: Record<string, unknown> = {};
+
+  if (data.prompt_ventas !== undefined) setClause.prompt_ventas = data.prompt_ventas;
+  if (data.prompt_videollamadas !== undefined) setClause.prompt_videollamadas = data.prompt_videollamadas;
+  if (data.prompt_llamadas !== undefined) setClause.prompt_llamadas = data.prompt_llamadas;
+  if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
+  if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
+  if (data.chat_triggers !== undefined) setClause.chat_triggers = data.chat_triggers;
+  if (data.embudo_personalizado !== undefined) setClause.embudo_personalizado = data.embudo_personalizado;
+  if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
+  if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
+
+  if (data.fuente_datos_financieros !== undefined) {
+    const [row] = await db
+      .select({ configuracion_ui: cuentas.configuracion_ui })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+    const existing = row?.configuracion_ui ?? {};
+    setClause.configuracion_ui = { ...existing, fuente_datos_financieros: data.fuente_datos_financieros };
+  }
+
+  if (Object.keys(setClause).length > 0) {
+    await db.update(cuentas).set(setClause).where(eq(cuentas.id_cuenta, idCuenta));
+  }
 
   return getSystemConfig(idCuenta);
 }
