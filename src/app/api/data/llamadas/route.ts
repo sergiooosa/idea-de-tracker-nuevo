@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-auth";
+import { withAuthAndPermission } from "@/lib/api-auth";
 import { getLlamadas, updateLlamada } from "@/lib/queries/llamadas";
 
 export async function GET(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "ver_rendimiento", async (idCuenta) => {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "editar_registros", async (idCuenta) => {
     const body = await req.json();
     const { id, nombre_lead, closer, estado } = body;
     if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });

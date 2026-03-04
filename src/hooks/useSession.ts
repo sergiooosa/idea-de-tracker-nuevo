@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { canViewAll as canViewAllPerm, canEditRecords } from "@/lib/permisos";
 
 export interface SessionInfo {
   email: string;
@@ -33,11 +34,11 @@ export function useSession() {
   }, [fetchSession]);
 
   const canViewAll = session
-    ? session.permisosArray.includes("ver_todo") || session.rol === "superadmin"
+    ? session.rol === "superadmin" || canViewAllPerm(session.permisosArray)
     : false;
 
   const canEdit = session
-    ? session.permisosArray.includes("editar_registros") || session.rol === "superadmin"
+    ? session.rol === "superadmin" || canEditRecords(session.permisosArray)
     : false;
 
   return { session, loading, canViewAll, canEdit };

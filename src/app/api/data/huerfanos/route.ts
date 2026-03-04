@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-auth";
+import { withAuthAndPermission } from "@/lib/api-auth";
 import { getHuerfanos, getHuerfanoById, updateHuerfanoEstado } from "@/lib/queries/huerfanos";
 import { API_BASE_URL } from "@/lib/api-config";
 
 export async function GET(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "ver_bandeja", async (idCuenta) => {
     const { searchParams } = new URL(req.url);
     const estado = searchParams.get("estado") || undefined;
     const data = await getHuerfanos(idCuenta, estado);
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "ver_bandeja", async (idCuenta) => {
     const body = await req.json();
     const { id_huerfano, correo_corregido, accion } = body as {
       id_huerfano: number;

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   BarChart3,
@@ -18,15 +18,17 @@ import {
   Inbox,
   Eye,
   EyeOff,
+  ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
 import ReportButton from "@/components/dashboard/ReportButton";
 import { UserFilterProvider, useUserFilter } from "@/contexts/UserFilterContext";
+import { puedeVerRuta, NAV_PERMISOS } from "@/lib/permisos";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
-const nav = [
+const NAV_ITEMS = [
   { path: "/dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
   { path: "/performance", label: "Rendimiento", icon: BarChart3 },
   { path: "/asesor", label: "Panel asesor", icon: UserCheck },
@@ -38,38 +40,136 @@ const nav = [
 ];
 
 function SoloMisDatosToggle() {
-  const { soloMisDatos, toggleSoloMisDatos, canViewAll, sessionLoading } = useUserFilter();
+  const { soloMisDatos, toggleSoloMisDatos, canViewAll, sessionLoading, asesorSeleccionado, setAsesorSeleccionado, asesores, session } = useUserFilter();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   if (sessionLoading || !canViewAll) return null;
 
   return (
-    <button
-      type="button"
-      onClick={toggleSoloMisDatos}
-      className={clsx(
-        "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-medium transition-all border",
-        soloMisDatos
-          ? "bg-accent-amber/10 text-accent-amber border-accent-amber/30"
-          : "bg-surface-700/60 text-gray-400 border-surface-500 hover:text-white hover:bg-surface-600"
-      )}
-    >
-      {soloMisDatos ? <EyeOff className="w-4 h-4 shrink-0" /> : <Eye className="w-4 h-4 shrink-0" />}
-      <span className="truncate">Solo mis datos</span>
-      <div
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={toggleSoloMisDatos}
         className={clsx(
-          "ml-auto w-8 h-[18px] rounded-full p-[2px] transition-colors shrink-0",
-          soloMisDatos ? "bg-accent-amber" : "bg-surface-500"
+          "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-medium transition-all border",
+          soloMisDatos
+            ? "bg-accent-amber/10 text-accent-amber border-accent-amber/30"
+            : "bg-surface-700/60 text-gray-400 border-surface-500 hover:text-white hover:bg-surface-600"
         )}
       >
+        {soloMisDatos ? <EyeOff className="w-4 h-4 shrink-0" /> : <Eye className="w-4 h-4 shrink-0" />}
+        <span className="truncate">Solo data del asesor</span>
         <div
           className={clsx(
-            "w-[14px] h-[14px] rounded-full bg-white transition-transform",
-            soloMisDatos ? "translate-x-[14px]" : "translate-x-0"
+            "ml-auto w-8 h-[18px] rounded-full p-[2px] transition-colors shrink-0",
+            soloMisDatos ? "bg-accent-amber" : "bg-surface-500"
           )}
-        />
-      </div>
-    </button>
+        >
+          <div
+            className={clsx(
+              "w-[14px] h-[14px] rounded-full bg-white transition-transform",
+              soloMisDatos ? "translate-x-[14px]" : "translate-x-0"
+            )}
+          />
+        </div>
+      </button>
+      {soloMisDatos && asesores.length > 0 && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDropdownOpen((o) => !o)}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-surface-700/60 border border-surface-500 text-xs text-left"
+          >
+            <span className="truncate flex-1">
+              {asesorSeleccionado ? asesores.find((a) => a.email === asesorSeleccionado)?.name ?? asesorSeleccionado : session?.email ?? "Seleccionar asesor"}
+            </span>
+            <ChevronDown className="w-4 h-4 shrink-0" />
+          </button>
+          {dropdownOpen && (
+            <>
+              <div className="absolute inset-0 -top-1 -bottom-1 z-10" onClick={() => setDropdownOpen(false)} aria-hidden />
+              <ul className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg bg-surface-800 border border-surface-500 shadow-xl z-20 py-1">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => { setAsesorSeleccionado(session?.email ?? ""); setDropdownOpen(false); }}
+                    className={clsx("w-full px-3 py-2 text-left text-xs", (session?.email === asesorSeleccionado || (!asesorSeleccionado && session?.email)) ? "bg-accent-cyan/20 text-accent-cyan" : "text-gray-300 hover:bg-surface-600")}
+                  >
+                    Yo ({session?.email})
+                  </button>
+                </li>
+                {asesores.filter((a) => a.email !== session?.email).map((a) => (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => { setAsesorSeleccionado(a.email ?? a.id); setDropdownOpen(false); }}
+                      className={clsx("w-full px-3 py-2 text-left text-xs", a.email === asesorSeleccionado ? "bg-accent-cyan/20 text-accent-cyan" : "text-gray-300 hover:bg-surface-600")}
+                    >
+                      {a.name} {a.email && a.email !== a.name ? `(${a.email})` : ""}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
+}
+
+function NavFiltered({ onLinkClick }: { onLinkClick?: () => void }) {
+  const pathname = usePathname();
+  const { session, sessionLoading } = useUserFilter();
+  const permisos = session?.permisosArray ?? [];
+  const navFiltered = useMemo(() => {
+    if (sessionLoading) return NAV_ITEMS;
+    return NAV_ITEMS.filter((item) => puedeVerRuta(permisos, item.path) || session?.rol === "superadmin");
+  }, [sessionLoading, permisos, session?.rol]);
+
+  const isActive = (path: string) => {
+    if (path === "/dashboard") return pathname.endsWith("/dashboard");
+    return pathname.includes(path);
+  };
+
+  return (
+    <>
+      {navFiltered.map(({ path, label, icon: Icon }) => (
+        <Link key={`${path}-${label}`} href={path} onClick={onLinkClick}
+          className={clsx(
+            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+            isActive(path)
+              ? "bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 shadow-glow-cyan"
+              : "text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent"
+          )}>
+          <Icon className="w-5 h-5 shrink-0" />
+          {label}
+        </Link>
+      ))}
+    </>
+  );
+}
+
+function NavFilteredMobile({ onClose }: { onClose: () => void }) {
+  return <NavFiltered onLinkClick={onClose} />;
+}
+
+function PermissionGuard({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { session, sessionLoading } = useUserFilter();
+
+  useEffect(() => {
+    if (sessionLoading || !session) return;
+    const path = pathname.replace(/^\/app\/[^/]+/, "") || "/dashboard";
+    const basePath = Object.keys(NAV_PERMISOS).find((p) => path === p || (p !== "/dashboard" && path.startsWith(p + "/")));
+    const perm = basePath ? NAV_PERMISOS[basePath as keyof typeof NAV_PERMISOS] : null;
+    if (!perm) return;
+    const puede = session.rol === "superadmin" || puedeVerRuta(session.permisosArray ?? [], basePath!);
+    if (!puede) router.replace("/dashboard");
+  }, [pathname, session, sessionLoading, router]);
+
+  return <>{children}</>;
 }
 
 function TenantLayoutInner({ children }: { children: React.ReactNode }) {
@@ -115,18 +215,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
-          {nav.map(({ path, label, icon: Icon }) => (
-            <Link key={`${path}-${label}`} href={path}
-              className={clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                isActive(path)
-                  ? "bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 shadow-glow-cyan"
-                  : "text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent"
-              )}>
-              <Icon className="w-5 h-5 shrink-0" />
-              {label}
-            </Link>
-          ))}
+          <NavFiltered />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           <SoloMisDatosToggle />
@@ -156,18 +245,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex-1 p-2">
-          {nav.map(({ path, label, icon: Icon }) => (
-            <Link key={`${path}-${label}`} href={path} onClick={() => setSidebarOpen(false)}
-              className={clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                isActive(path)
-                  ? "bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20"
-                  : "text-gray-400 hover:bg-surface-600 hover:text-white"
-              )}>
-              <Icon className="w-5 h-5" />
-              {label}
-            </Link>
-          ))}
+          <NavFilteredMobile onClose={() => setSidebarOpen(false)} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           <SoloMisDatosToggle />
@@ -176,7 +254,9 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 max-w-full overflow-x-hidden pb-20 md:pb-24">
-        <div className="flex-1 min-w-0 max-w-full">{children}</div>
+        <div className="flex-1 min-w-0 max-w-full">
+          <PermissionGuard>{children}</PermissionGuard>
+        </div>
       </main>
 
       {(pathname.endsWith("/dashboard") || pathname.includes("/asesor")) && (

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada } from "@/lib/db/schema";
+import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   AsesorKpis,
@@ -105,4 +105,24 @@ export async function getAsesorData(
   });
 
   return { kpis, leads, advisors };
+}
+
+/** Lista de asesores (closers) del tenant para el filtro "Solo data del asesor" */
+export async function getAsesoresList(idCuenta: number): Promise<ApiAdvisor[]> {
+  const [callRows, agendaRows] = await Promise.all([
+    db.select({ closer_mail: logLlamadas.closer_mail, nombre_closer: logLlamadas.nombre_closer })
+      .from(logLlamadas)
+      .where(eq(logLlamadas.id_cuenta, idCuenta)),
+    db.select({ closer: resumenesDiariosAgendas.closer })
+      .from(resumenesDiariosAgendas)
+      .where(eq(resumenesDiariosAgendas.id_cuenta, idCuenta)),
+  ]);
+  const advisorMap = new Map<string, string>();
+  for (const r of callRows) {
+    if (r.closer_mail) advisorMap.set(r.closer_mail, r.nombre_closer ?? r.closer_mail);
+  }
+  for (const a of agendaRows) {
+    if (a.closer && !advisorMap.has(a.closer)) advisorMap.set(a.closer, a.closer);
+  }
+  return [...advisorMap.entries()].map(([email, name]) => ({ id: email, name, email }));
 }

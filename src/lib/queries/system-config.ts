@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig } from "@/lib/db/schema";
+import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export interface SystemConfigData {
@@ -14,6 +14,7 @@ export interface SystemConfigData {
   tipos_eventos_config: TipoEventoConfig[];
   has_openai_key: boolean;
   fuente_datos_financieros: "nativa" | "api_externa";
+  roles_config: RolConfig[];
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key">> {
@@ -40,6 +41,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       tipos_eventos_config: cuentas.tipos_eventos_config,
       openai_api_key: cuentas.openai_api_key,
       configuracion_ui: cuentas.configuracion_ui,
+      roles_config: cuentas.roles_config,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -57,6 +59,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       tipos_eventos_config: [],
       has_openai_key: false,
       fuente_datos_financieros: "nativa",
+      roles_config: [],
     };
   }
 
@@ -72,6 +75,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
     has_openai_key: !!r.openai_api_key,
     fuente_datos_financieros: r.configuracion_ui?.fuente_datos_financieros ?? "nativa",
+    roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
   };
 }
 
@@ -90,6 +94,7 @@ export async function updateSystemConfig(
   if (data.embudo_personalizado !== undefined) setClause.embudo_personalizado = data.embudo_personalizado;
   if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
   if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
+  if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
 
   if (data.fuente_datos_financieros !== undefined) {
     const [row] = await db

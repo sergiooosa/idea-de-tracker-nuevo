@@ -10,8 +10,10 @@
 
 | Feature | Descripción | Impacto |
 |---|---|---|
-| 🔐 **Roles y Permisos Dinámicos** | `roles_config` (JSONB) en `cuentas` define roles y permisos por tenant. JWT incluye `permisosArray` resuelto desde `roles_config`. Rol ya no está fijo a `superadmin \| usuario`. | Auth, Panel Asesor, Layout |
-| 👁️ **Toggle "Solo mis datos"** | Switch global en el sidebar. Si está activo, todas las consultas filtran por `closer_mail = session.user.email`. Solo visible para usuarios con permiso `ver_todo`. | Dashboard, Performance, Asesor, Acquisition |
+| 🔐 **Roles y Permisos Granulares** | CRUD de roles en Configuración. Cada rol define permisos por sección (`ver_dashboard`, `ver_rendimiento`, `ver_asesor`, `ver_bandeja`, `ver_system`, `ver_configuracion`, `ver_todo`, `editar_registros`, `configurar_sistema`, `gestionar_usuarios`, `gestionar_roles`). Al crear/editar usuarios se asigna un rol. | Configuración, Auth, Layout |
+| 📋 **Nav Filtrado por Permisos** | El sidebar solo muestra las rutas para las que el usuario tiene permiso. Redirección a `/dashboard` si accede por URL sin permiso. | Layout, todas las páginas |
+| 🔒 **Protección de APIs** | Cada API route verifica el permiso correspondiente (`withAuthAndPermission`). 403 si no tiene acceso. | Todas las APIs |
+| 👁️ **Toggle "Solo data del asesor"** | Switch en sidebar para usuarios con `ver_todo`. Cuando activo: filtro por asesor seleccionado. Selector desplegable para elegir qué asesor ver (Yo u otros). Si no tiene `ver_todo`, siempre ve solo sus datos. | Dashboard, Performance, Asesor |
 | 📥 **Bandeja de Huérfanos** | Nueva vista `/bandeja`. Lista eventos de `eventos_huerfanos` (estado pendiente). Input + botón "Corregir y Procesar" llama al Cerebro `POST /webhooks/retry-orphan/:id` con el correo. | Bandeja, Cerebro |
 | ✏️ **Editor Global (CRUD)** | En Llamadas, Videollamadas y Chats: columna "Acciones" con botón Editar. Sheet lateral para editar estado del embudo, closer asignado y nombre del lead. Mutación directa en BD. | Performance (3 tabs) |
 | 📐 **Constructor de Layouts** | En Métricas Custom (Control del sistema): Select "Ubicación de la tarjeta" (Panel Ejecutivo / Rendimiento / Ambos). Dashboard y Performance renderizan métricas según `ubicacion`. | System, Dashboard, Performance |
@@ -287,6 +289,7 @@ src/
 │   ├── login-form.tsx                # Formulario de login
 │   └── ui/                           # Shadcn UI (accordion, badge, button, card, dialog, input, label, separator, tabs)
 ├── lib/
+│   ├── permisos.ts                   # Permisos granulares, NAV_PERMISOS, helpers (v3.0)
 │   ├── auth.config.ts                # Credentials Provider (Node.js runtime)
 │   ├── auth.ts                       # Instancia NextAuth (cookies cross-subdomain)
 │   ├── api-auth.ts                   # Helper withAuth() para API routes
@@ -670,10 +673,13 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | `/api/data/metas` | PUT | metas_cuenta | body JSON | System paso 6 |
 | `/api/data/system-config` | GET | cuentas (prompts, reglas) | | System pasos 1-5 |
 | `/api/data/system-config` | PUT | cuentas (prompts, reglas) | body JSON | System guardar |
-| `/api/data/usuarios` | GET | usuarios_dashboard | | Configuración |
+| `/api/data/usuarios` | GET | usuarios_dashboard | | Configuración (requiere `gestionar_usuarios`) |
 | `/api/data/usuarios` | POST | usuarios_dashboard | body JSON | Crear usuario |
 | `/api/data/usuarios` | PUT | usuarios_dashboard | body JSON (`id`) | Editar usuario |
 | `/api/data/usuarios` | DELETE | usuarios_dashboard | `?id=` | Eliminar usuario |
+| `/api/data/roles` | GET | cuentas.roles_config | | Lista roles (requiere `gestionar_roles` o `gestionar_usuarios`) |
+| `/api/data/roles` | PUT | cuentas.roles_config | body: `{ roles_config: RolConfig[] }` | Actualizar roles (requiere `gestionar_roles`) |
+| `/api/data/asesores` | GET | log_llamadas + agendas | | Lista asesores para filtro (requiere `ver_todo`) |
 | `/api/auth/logout` | POST | *(limpia cookie)* | | Cerrar sesión |
 | `/webhooks/external-data/[subdominio]` | POST | kpis_externos | Header `x-api-key`, body `{ data: [{ fecha, metricas }] }` | Zapier, Make, CRMs externos |
 
@@ -727,7 +733,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `/system` | `system/page.tsx` | `/api/data/system-config` + `/api/data/metas` (10 pasos: prompts, etiquetas, métricas, metas, embudo, triggers, BYOK, fuente financiera) |
 | `/documentacion` | `documentacion/page.tsx` | `/api/data/system-config` |
 | `/bandeja` | `bandeja/page.tsx` | `/api/data/huerfanos` (v3.0) |
-| `/configuracion` | `configuracion/page.tsx` | `/api/data/usuarios` |
+| `/configuracion` | `configuracion/page.tsx` | `/api/data/usuarios` + `/api/data/roles` (CRUD roles + usuarios) |
 
 ---
 
@@ -884,9 +890,12 @@ Las metas se persisten en `metas_cuenta` con UPSERT por `id_cuenta`. El Panel As
 ## Pendientes y Roadmap
 
 ### ✅ Completado en v3.0 Enterprise
-- [x] Roles y permisos dinámicos (`roles_config` en cuentas, `permisosArray` en JWT)
-- [x] Toggle "Solo mis datos" en sidebar + filtro `closerEmail` en APIs (dashboard, llamadas, videollamadas, chats, asesor, acquisition)
-- [x] Bandeja de huérfanos: tabla `eventos_huerfanos`, API GET/PATCH, retry al Cerebro al corregir
+- [x] CRUD de roles con permisos granulares (Configuración > Roles)
+- [x] Asignar rol al crear/editar usuario (select dinámico desde `roles_config`)
+- [x] Nav filtrado por permisos + redirección si acceso sin permiso
+- [x] Protección de APIs con `withAuthAndPermission` / `withAuthAndAnyPermission`
+- [x] Toggle "Solo data del asesor" + selector de asesor (solo para `ver_todo`)
+- [x] Bandeja de huérfanos + filtro `closerEmail` en APIs (dashboard, llamadas, videollamadas, chats, asesor)
 - [x] Editor global: `EditRecordSheet` + PUT en llamadas, videollamadas y chats
 - [x] Constructor de layouts: campo `ubicacion` en métricas personalizadas (panel_ejecutivo / rendimiento / ambos)
 - [x] Reglas de etiquetas: selects agrupados (Condición IA, Condición Fija, mover etapa funnel)

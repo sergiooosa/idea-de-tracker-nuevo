@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-auth";
+import { withAuthAndPermission } from "@/lib/api-auth";
 import { listUsuarios, createUsuario, updateUsuario, deleteUsuario } from "@/lib/queries/usuarios";
 
 export async function GET(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "gestionar_usuarios", async (idCuenta) => {
     const data = await listUsuarios(idCuenta);
     return NextResponse.json(data);
   });
 }
 
 export async function POST(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "gestionar_usuarios", async (idCuenta) => {
     const body = await req.json();
     if (!body.email || !body.password) {
       return NextResponse.json({ error: "Email y password son obligatorios" }, { status: 400 });
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "gestionar_usuarios", async (idCuenta) => {
     const body = await req.json();
     if (!body.id) {
       return NextResponse.json({ error: "Se requiere id del usuario" }, { status: 400 });
@@ -39,7 +39,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthAndPermission(req, "gestionar_usuarios", async (idCuenta) => {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) {

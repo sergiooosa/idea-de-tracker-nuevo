@@ -5,20 +5,23 @@ import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import type { RolConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { PERMISOS_DISPONIBLES } from "@/lib/permisos";
+
+const ALL_PERMISOS = PERMISOS_DISPONIBLES.map((p) => p.id);
 
 const DEFAULT_ROLES_CONFIG: RolConfig[] = [
-  { id: "superadmin", nombre: "Administrador General", permisos: ["ver_todo", "editar_registros", "configurar_sistema"] },
-  { id: "asesor", nombre: "Asesor de Ventas", permisos: ["ver_solo_propios"] },
+  { id: "superadmin", nombre: "Administrador General", permisos: ["ver_todo", "editar_registros", "configurar_sistema", "gestionar_usuarios", "gestionar_roles"] },
+  { id: "usuario", nombre: "Usuario", permisos: ["ver_solo_propios", "ver_dashboard", "ver_rendimiento", "ver_asesor", "ver_bandeja", "ver_acquisition", "ver_documentacion"] },
 ];
 
 function resolvePermisos(rol: string, rolesConfig: RolConfig[] | null): string[] {
+  if (rol === "superadmin") return ALL_PERMISOS;
   const config = Array.isArray(rolesConfig) && rolesConfig.length > 0
     ? rolesConfig
     : DEFAULT_ROLES_CONFIG;
   const match = config.find((r) => r.id === rol);
   if (match) return match.permisos;
-  if (rol === "superadmin") return ["ver_todo", "editar_registros", "configurar_sistema"];
-  if (rol === "usuario") return ["ver_solo_propios"];
+  if (rol === "usuario") return DEFAULT_ROLES_CONFIG[1]!.permisos;
   return [];
 }
 
