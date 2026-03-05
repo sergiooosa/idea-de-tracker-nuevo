@@ -20,6 +20,7 @@ import {
   Shield,
   Cpu,
   BarChart3,
+  Tag,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-config";
 
@@ -304,6 +305,156 @@ function EmbudoSection({ embudo }: { embudo: SystemConfig["embudo_personalizado"
   );
 }
 
+function EtiquetasSection() {
+  const configEndpoint = `${API_BASE_URL}/webhooks/config/:subdominio`;
+  const curlConfigExample = `curl -X GET \\
+  "${API_BASE_URL}/webhooks/config/tu-subdominio" \\
+  -H "x-api-key: TU_API_KEY_AQUÍ"`;
+
+  const responseExample = JSON.stringify(
+    {
+      ok: true,
+      id_cuenta: 1,
+      subdominio: "tu-subdominio",
+      reglas_etiquetas: [
+        { id: "r1", source: "call", condition: "interes_alto", tag: "lead_caliente", funnelStage: "Ofertada" },
+        { id: "r2", source: "call", condition: "objecion_precio", tag: "objecion_precio" },
+        { id: "r3", source: "meeting", condition: "mencion_precio", tag: "mencion_precio" },
+      ],
+      embudo_personalizado: [
+        { id: "e1", nombre: "Agendada", orden: 1 },
+        { id: "e2", nombre: "Ofertada", orden: 2 },
+        { id: "e3", nombre: "Cerrada", orden: 3 },
+      ],
+      prompts: { llamadas: "...", videollamadas: "...", ventas: "..." },
+    },
+    null,
+    2,
+  );
+
+  const CONDITIONS_DESCRIPTION = [
+    { key: "interes_alto", label: "Interés alto", desc: "La IA detecta alto interés en comprar" },
+    { key: "mencion_precio", label: "Mención de precio", desc: "El lead preguntó por el precio" },
+    { key: "objecion_precio", label: "Objeción de precio", desc: "El lead objetó el precio" },
+    { key: "objecion_tiempo", label: "Objeción de tiempo", desc: "\"Ahora no es buen momento\"" },
+    { key: "enojo", label: "Enojo / frustración", desc: "Tono negativo detectado" },
+    { key: "solicitud_propuesta", label: "Solicita propuesta", desc: "Pide presupuesto o propuesta" },
+    { key: "duracion_mayor", label: "Duración extendida", desc: "Llamada más larga de lo habitual" },
+    { key: "intentos_mayor", label: "Varios intentos", desc: "Múltiples intentos de contacto" },
+    { key: "speed_mayor", label: "Speed to lead alto", desc: "Tardanza en el primer contacto" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent-amber/20 flex items-center justify-center shrink-0">
+          <Tag className="w-5 h-5 text-accent-amber" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Reglas de Etiquetas — Integración Cerebro</h3>
+          <p className="text-sm text-gray-400 mt-1">
+            Cómo el Cerebro debe obtener y aplicar las reglas de etiquetas configuradas en este panel.
+          </p>
+        </div>
+      </div>
+
+      <Card className="bg-accent-amber/5 border-accent-amber/30">
+        <CardContent className="py-3 text-sm text-gray-300 flex items-start gap-2">
+          <Shield className="w-4 h-4 text-accent-amber shrink-0 mt-0.5" />
+          <span>
+            <strong className="text-accent-amber">Importante:</strong> Las etiquetas que el Cerebro asigna a{" "}
+            <code className="bg-surface-700 px-1 py-0.5 rounded text-xs">tags_internos</code> deben
+            provenir de las <strong>reglas configuradas en el paso 4 del Sistema</strong>, NO de
+            contenido libre generado por la IA. Este endpoint te permite obtener las reglas actuales.
+          </span>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-accent-cyan" />
+            Endpoint: Obtener configuración del tenant
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex items-center gap-2 rounded-lg bg-[#0d1117] px-3 py-2 border border-surface-500">
+            <Badge variant="default" className="shrink-0 bg-accent-cyan/20 text-accent-cyan border-accent-cyan/30">GET</Badge>
+            <code className="text-sm text-accent-cyan font-mono break-all">{configEndpoint}</code>
+          </div>
+          <p className="text-xs text-gray-500">
+            Devuelve <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">reglas_etiquetas</code>,{" "}
+            <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">embudo_personalizado</code>,{" "}
+            <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">chat_triggers</code> y los prompts configurados.
+            Requiere header <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">x-api-key</code>.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-accent-cyan" />
+            Flujo correcto para aplicar etiquetas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-gray-400">
+          {[
+            { n: 1, text: "Cerebro recibe webhook de llamada o videollamada." },
+            { n: 2, text: <>Llama a <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">GET /webhooks/config/:subdominio</code> para obtener las reglas actuales.</> },
+            { n: 3, text: "La IA evalúa la transcripción y detecta condiciones (ver tabla abajo)." },
+            { n: 4, text: "Para cada regla cuya condición match, añade el tag de esa regla a tags_internos." },
+            { n: 5, text: "Si la regla tiene funnelStage, mover el lead a esa etapa del pipeline." },
+            { n: 6, text: "Si aplica, llamar al endpoint de GHL para sincronizar las etiquetas en el CRM." },
+          ].map(({ n, text }) => (
+            <div key={n} className="flex items-start gap-2">
+              <span className="w-6 h-6 rounded-full bg-accent-cyan/20 text-accent-cyan flex items-center justify-center text-xs font-bold shrink-0">{n}</span>
+              <span>{text}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Condiciones disponibles</h4>
+        <div className="rounded-lg border border-surface-500 overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-surface-700 text-left text-gray-400">
+                <th className="px-3 py-2 font-medium">Clave</th>
+                <th className="px-3 py-2 font-medium">Label</th>
+                <th className="px-3 py-2 font-medium hidden sm:table-cell">Descripción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CONDITIONS_DESCRIPTION.map((c, i) => (
+                <tr key={c.key} className={i > 0 ? "border-t border-surface-500" : ""}>
+                  <td className="px-3 py-2">
+                    <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">{c.key}</code>
+                  </td>
+                  <td className="px-3 py-2 text-gray-300">{c.label}</td>
+                  <td className="px-3 py-2 text-gray-500 hidden sm:table-cell">{c.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-gray-600 mt-1">Condiciones personalizadas: el usuario puede escribir cualquier texto libre — el Cerebro decide cómo evaluarlas.</p>
+      </div>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ejemplo cURL</h4>
+        <CodeBlock code={curlConfigExample} language="bash" />
+      </div>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Respuesta de ejemplo</h4>
+        <CodeBlock code={responseExample} language="json" />
+      </div>
+    </div>
+  );
+}
+
 function MetricasSection() {
   return (
     <div className="space-y-4">
@@ -475,6 +626,10 @@ export default function DocumentacionPage() {
                 <MessageSquare className="w-3.5 h-3.5" />
                 Triggers de Chat
               </TabsTrigger>
+              <TabsTrigger value="etiquetas" className="flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" />
+                Etiquetas
+              </TabsTrigger>
               <TabsTrigger value="api" className="flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5" />
                 API de Ingresos
@@ -497,6 +652,10 @@ export default function DocumentacionPage() {
 
             <TabsContent value="triggers">
               <TriggerSection triggers={triggers} />
+            </TabsContent>
+
+            <TabsContent value="etiquetas">
+              <EtiquetasSection />
             </TabsContent>
 
             <TabsContent value="api">

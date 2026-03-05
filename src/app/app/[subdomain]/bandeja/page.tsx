@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { useApiData } from "@/hooks/useApiData";
-import { Inbox, AlertTriangle, CheckCircle2, XCircle, Mail, Send, Loader2, Phone, User, Calendar, Radio, ExternalLink, FileText } from "lucide-react";
+import { Inbox, AlertTriangle, CheckCircle2, XCircle, Mail, Send, Loader2, Phone, User, Calendar, Radio, ExternalLink, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import clsx from "clsx";
@@ -15,7 +15,7 @@ interface HuerfanoData {
   id_cuenta: number;
   origen: string;
   motivo: string;
-  payload_original: Record<string, unknown>;
+  payload_original: unknown;
   estado: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -32,13 +32,15 @@ const ORIGEN_COLORS: Record<string, string> = {
   twilio: "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/30",
 };
 
-function extractPayloadDetails(payload: Record<string, unknown>) {
-  const nombre = (payload.nombre_lead ?? payload.leadName ?? payload.nombre ?? payload.name ?? payload.visitor_name ?? "") as string;
-  const telefono = (payload.phone ?? payload.telefono ?? payload.phone_raw_format ?? "") as string;
-  const email = (payload.email ?? payload.mail_lead ?? payload.email_lead ?? payload.visitor_email ?? "") as string;
-  const fecha = (payload.fecha ?? payload.ts ?? payload.datetime ?? payload.timestamp ?? payload.created_at ?? payload.occurred_at ?? "") as string;
-  const shareUrl = (payload.share_url ?? payload.recording_url ?? payload.video_url ?? (payload.properties as Record<string, unknown> | undefined)?.share_url ?? "") as string;
-  const transcript = (payload.transcript ?? payload.summary ?? payload.transcription ?? "") as string;
+function extractPayloadDetails(payload: unknown) {
+  const p = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  const nombre = String(p.nombre_lead ?? p.leadName ?? p.nombre ?? p.name ?? p.visitor_name ?? "");
+  const telefono = String(p.phone ?? p.telefono ?? p.phone_raw_format ?? "");
+  const email = String(p.email ?? p.mail_lead ?? p.email_lead ?? p.visitor_email ?? "");
+  const fecha = String(p.fecha ?? p.ts ?? p.datetime ?? p.timestamp ?? p.created_at ?? p.occurred_at ?? "");
+  const props = (p.properties && typeof p.properties === "object") ? p.properties as Record<string, unknown> : {};
+  const shareUrl = String(p.share_url ?? p.recording_url ?? p.video_url ?? props.share_url ?? "");
+  const transcript = String(p.transcript ?? p.summary ?? p.transcription ?? "");
   return { nombre, telefono, email, fecha, shareUrl, transcript };
 }
 
@@ -223,11 +225,11 @@ function HuerfanoCard({
 export default function BandejaPage() {
   const [activeTab, setActiveTab] = useState<EstadoTab>("pendiente");
 
-  const { data, loading, refetch } = useApiData<HuerfanoData[]>("/api/data/huerfanos", {
+  const { data, loading, error, refetch } = useApiData<HuerfanoData[]>("/api/data/huerfanos", {
     estado: activeTab,
   });
 
-  const items = data ?? [];
+  const items = Array.isArray(data) ? data : [];
   const pendingCount = activeTab === "pendiente" ? items.length : null;
 
   return (
@@ -269,7 +271,24 @@ export default function BandejaPage() {
 
         {loading ? (
           <div className="flex items-center justify-center min-h-[200px]">
-            <div className="text-gray-400 text-sm animate-pulse">Cargando eventos...</div>
+            <div className="flex items-center gap-2 text-gray-400 text-sm animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Cargando eventos...
+            </div>
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-8 text-center">
+            <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+            <p className="text-red-400 text-sm font-medium mb-1">Error al cargar eventos</p>
+            <p className="text-gray-500 text-xs mb-4">{error}</p>
+            <button
+              type="button"
+              onClick={refetch}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-600 text-gray-300 border border-surface-500 hover:bg-surface-500 transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Reintentar
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-surface-500 bg-surface-700/30 px-4 py-12 text-center">
