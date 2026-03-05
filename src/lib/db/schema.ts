@@ -74,16 +74,17 @@ export interface MetricaFormulaConfig {
   valorSiNo?: number | string;
 }
 
-/** Configuración de métrica (manual o automática) */
+/** Configuración de métrica (manual, automática o fija) */
 export interface MetricaConfig {
   id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "manual" | "automatica";
+  tipo: "manual" | "automatica" | "fija";
   ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
   orden?: number;
   campos?: MetricaCampoConfig[];
   formula?: MetricaFormulaConfig;
+  valorFijo?: number | string;
 }
 
 /** Entrada manual: valores por campo */

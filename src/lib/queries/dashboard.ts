@@ -292,6 +292,7 @@ export async function getDashboard(
   const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket"]);
 
   const getDeps = (m: MetricaConfig): string[] => {
+    if (m.tipo === "fija") return [];
     if (m.tipo !== "automatica" || !m.formula) return [];
     const f = m.formula;
     if (f.fuente && !kpiKeys.has(f.fuente)) return [f.fuente];
@@ -311,7 +312,9 @@ export async function getDashboard(
       const deps = getDeps(m);
       if (deps.some((d) => !computed.has(d))) continue;
       let valor: string | number;
-      if (m.tipo === "manual") {
+      if (m.tipo === "fija") {
+        valor = m.valorFijo ?? 0;
+      } else if (m.tipo === "manual") {
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
       } else {

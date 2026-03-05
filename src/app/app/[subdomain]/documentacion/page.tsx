@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Shield,
   Cpu,
+  BarChart3,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-config";
 
@@ -297,6 +298,72 @@ function EmbudoSection({ embudo }: { embudo: SystemConfig["embudo_personalizado"
   );
 }
 
+function MetricasSection() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent-green/20 flex items-center justify-center shrink-0">
+          <BarChart3 className="w-5 h-5 text-accent-green" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Métricas Personalizadas</h3>
+          <p className="text-sm text-gray-400 mt-1">
+            Crea métricas manuales (con campos), automáticas (fórmulas con KPIs) o fijas (valor constante).
+            Sin IA, solo configuración.
+          </p>
+        </div>
+      </div>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-accent-green" />
+            Tipos de métricas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-gray-400">
+          <div>
+            <strong className="text-white">Manual:</strong> Define campos (texto, número, fecha, sí/no). Añade datos manualmente.
+            Si tienes un campo fecha, se filtra por el rango del panel. Si hay número, se suma; si hay boolean, se cuentan los true.
+          </div>
+          <div>
+            <strong className="text-white">Automática:</strong> Fórmula con KPIs u otras métricas. Operaciones: directo, suma, promedio,
+            división, multiplicación, resta, condición (si X &gt; Y entonces Z sino W). Busca por nombre al elegir fuentes.
+          </div>
+          <div>
+            <strong className="text-white">Fija:</strong> Valor constante siempre visible (ej. meta mensual = 100).
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300">Ubicación</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-gray-400">
+          Cada métrica puede mostrarse en <strong className="text-white">Panel Ejecutivo</strong>, <strong className="text-white">Rendimiento</strong> (videollamadas) o <strong className="text-white">Ambos</strong>.
+        </CardContent>
+      </Card>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300">Orden y edición</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-gray-400">
+          Arrastra las métricas para ordenarlas. Haz clic en el icono de lápiz en cada tarjeta en el Dashboard o Rendimiento para editar.
+          Al eliminar una métrica que alimenta a otras, verás un aviso: &quot;Esta métrica alimenta a X otras, si la eliminas esas fallarán&quot;.
+        </CardContent>
+      </Card>
+
+      <Card className="bg-accent-green/5 border-accent-green/20">
+        <CardContent className="py-3 text-sm text-gray-300">
+          Para configurar métricas: <strong className="text-accent-cyan">Control del sistema</strong> → paso 5 (Métricas custom).
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function BYOKSection({ hasKey }: { hasKey: boolean }) {
   return (
     <div className="space-y-4">
@@ -410,6 +477,10 @@ export default function DocumentacionPage() {
                 <Brain className="w-3.5 h-3.5" />
                 Embudo IA
               </TabsTrigger>
+              <TabsTrigger value="metricas" className="flex items-center gap-1.5">
+                <BarChart3 className="w-3.5 h-3.5" />
+                Métricas
+              </TabsTrigger>
               <TabsTrigger value="byok" className="flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5" />
                 OpenAI Key
@@ -428,6 +499,10 @@ export default function DocumentacionPage() {
 
             <TabsContent value="embudo">
               <EmbudoSection embudo={embudo} />
+            </TabsContent>
+
+            <TabsContent value="metricas">
+              <MetricasSection />
             </TabsContent>
 
             <TabsContent value="byok">

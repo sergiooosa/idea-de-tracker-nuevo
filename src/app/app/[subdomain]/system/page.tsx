@@ -3,7 +3,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { getMetricasQueDependenDe } from '@/lib/metricas-engine';
+import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
+import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
 
 interface TagRule { id: string; condition: string; tag: string; source: string }
 interface MetricRule {
@@ -16,6 +36,7 @@ interface ChatTrigger { trigger: string; accion: string; valor: string }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
   reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
+  metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
   chat_triggers: ChatTrigger[]; embudo_personalizado: EmbudoEtapa[];
   has_openai_key: boolean; fuente_datos_financieros: 'nativa' | 'api_externa';
 }
@@ -34,6 +55,61 @@ const panelsBySection: Record<string, string[]> = {
   'Panel ejecutivo': ['KPIs globales', 'Ranking asesores'],
   Otro: [],
 };
+
+function SortableMetricaCard({
+  m,
+  onEdit,
+  onDelete,
+}: {
+  m: MetricaConfig;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: m.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  const tipoLabel = m.tipo === 'manual' ? 'Manual' : m.tipo === 'automatica' ? 'Automática' : 'Fija';
+  const ubicLabel = m.ubicacion === 'panel_ejecutivo' ? 'Panel' : m.ubicacion === 'rendimiento' ? 'Rendimiento' : 'Ambos';
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-xl p-4 border-l-4 border-accent-green/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500 flex items-center gap-3 ${
+        isDragging ? 'opacity-50' : ''
+      }`}
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-gray-500 hover:text-gray-300">
+        <GripVertical className="w-4 h-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-white truncate">{m.nombre}</p>
+        <p className="text-[10px] text-gray-500">
+          {tipoLabel} · {ubicLabel}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onEdit}
+        className="p-1.5 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-accent-cyan"
+        title="Editar"
+      >
+        <Pencil className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400"
+        title="Eliminar"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </li>
+  );
+}
 
 export default function SystemPage() {
   const searchParams = useSearchParams();
@@ -56,6 +132,12 @@ export default function SystemPage() {
   const [embudoEtapas, setEmbudoEtapas] = useState<EmbudoEtapa[]>([]);
   const [chatTriggers, setChatTriggers] = useState<ChatTrigger[]>([]);
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
+  const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
+  const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
+  const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
+  const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija'>('manual');
+  const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
+  const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
@@ -75,6 +157,12 @@ export default function SystemPage() {
         setEmbudoEtapas(Array.isArray(cfg.embudo_personalizado) ? cfg.embudo_personalizado : []);
         setHasOpenaiKey(cfg.has_openai_key ?? false);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
+        setMetricasConfig(Array.isArray(cfg.metricas_config) ? cfg.metricas_config : []);
+        setMetricasManualData(
+          cfg.metricas_manual_data && typeof cfg.metricas_manual_data === 'object'
+            ? cfg.metricas_manual_data
+            : {},
+        );
       }
       if (metasRes.ok) {
         const m = await metasRes.json();
@@ -86,6 +174,18 @@ export default function SystemPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const editParam = searchParams.get('edit');
+  useEffect(() => {
+    if (editParam && !loadingConfig && currentStep === 5) {
+      const m = metricasConfig.find((x) => x.id === editParam);
+      if (m) {
+        setMetricasEditingId(m.id);
+        setMetricasSheetTipo(m.tipo);
+        setMetricasSheetOpen(true);
+      }
+    }
+  }, [editParam, loadingConfig, currentStep, metricasConfig]);
+
   const saveConfig = async () => {
     setSaving(true);
     try {
@@ -95,6 +195,8 @@ export default function SystemPage() {
         prompt_llamadas: promptLlamadas,
         reglas_etiquetas: tagRules,
         metricas_personalizadas: metricRules,
+        metricas_config: metricasConfig,
+        metricas_manual_data: metricasManualData,
         chat_triggers: chatTriggers,
         embudo_personalizado: embudoEtapas,
         fuente_datos_financieros: fuenteFinanciera,
@@ -130,6 +232,10 @@ export default function SystemPage() {
     else saveConfig();
   };
 
+  const dndSensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const addTagRule = () => setTagRules((r) => [...r, { id: Date.now().toString(), condition: '', tag: '', source: 'call' }]);
   const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '', ubicacion: 'ambos' }]);
   const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1 }]);
@@ -325,78 +431,164 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-green/30">
                 <div className="rounded-lg p-2 bg-accent-green/20 border border-accent-green/40"><BarChart3 className="w-5 h-5 text-accent-green" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Reglas para métricas personalizadas</h3>
-                  <p className="text-sm text-gray-400">Define métricas que suman N cuando se cumple X.</p>
+                  <h3 className="text-lg font-semibold text-white">Métricas personalizadas</h3>
+                  <p className="text-sm text-gray-400">Manuales (campos), automáticas (fórmulas) o fijas (valor constante). Arrastra para ordenar.</p>
                 </div>
               </div>
-              <ul className="space-y-4">
-                {metricRules.map((r) => (
-                  <li key={r.id} className="rounded-xl p-4 space-y-3 border-l-4 border-accent-green/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500">
-                    <div>
-                      <label className="block text-xs font-medium text-accent-cyan mb-1">Nombre</label>
-                      <input type="text" value={r.name} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, name: e.target.value } : x))} placeholder="Ej: Mención de precio"
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
+              <DndContext
+                sensors={dndSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(event: DragEndEvent) => {
+                  const { active, over } = event;
+                  if (over && active.id !== over.id) {
+                    setMetricasConfig((prev) => {
+                      const ids = prev.map((x) => x.id);
+                      const oldIdx = ids.indexOf(String(active.id));
+                      const newIdx = ids.indexOf(String(over.id));
+                      if (oldIdx === -1 || newIdx === -1) return prev;
+                      const reordered = arrayMove(prev, oldIdx, newIdx);
+                      return reordered.map((m, i) => ({ ...m, orden: i }));
+                    });
+                  }
+                }}
+              >
+                <SortableContext items={metricasConfig.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                  <ul className="space-y-2">
+                    {metricasConfig
+                      .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999))
+                      .map((m) => (
+                        <SortableMetricaCard
+                          key={m.id}
+                          m={m}
+                          onEdit={() => {
+                            setMetricasEditingId(m.id);
+                            setMetricasSheetTipo(m.tipo);
+                            setMetricasSheetOpen(true);
+                          }}
+                          onDelete={() => {
+                            const deps = getMetricasQueDependenDe(m.id, metricasConfig);
+                            if (deps.length > 0) {
+                              setMetricasDeleteConfirm({ id: m.id, dependientes: deps });
+                            } else {
+                              setMetricasConfig((prev) => prev.filter((x) => x.id !== m.id));
+                              setMetricasManualData((prev) => {
+                                const next = { ...prev };
+                                delete next[m.id];
+                                return next;
+                              });
+                            }
+                          }}
+                        />
+                      ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMetricasEditingId(null);
+                    setMetricasSheetTipo('manual');
+                    setMetricasSheetOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-green/20 text-accent-green border border-accent-green/50 hover:bg-accent-green/30"
+                >
+                  <Plus className="w-4 h-4" /> Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMetricasEditingId(null);
+                    setMetricasSheetTipo('automatica');
+                    setMetricasSheetOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50 hover:bg-accent-cyan/30"
+                >
+                  <Plus className="w-4 h-4" /> Automática
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMetricasEditingId(null);
+                    setMetricasSheetTipo('fija');
+                    setMetricasSheetOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30"
+                >
+                  <Plus className="w-4 h-4" /> Fija
+                </button>
+              </div>
+              {metricasDeleteConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-black/60" onClick={() => setMetricasDeleteConfirm(null)} aria-hidden />
+                  <div className="relative rounded-xl bg-surface-800 border border-surface-500 p-4 max-w-md">
+                    <h4 className="font-semibold text-white mb-2">Eliminar métrica</h4>
+                    <p className="text-sm text-gray-400 mb-3">
+                      Esta métrica alimenta a {metricasDeleteConfirm.dependientes.length} otra(s):{' '}
+                      {metricasDeleteConfirm.dependientes.map((d) => d.nombre).join(', ')}. Si la eliminas, esas fallarán.
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">¿Continuar?</p>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setMetricasDeleteConfirm(null)}
+                        className="px-3 py-1.5 rounded-lg bg-surface-600 text-gray-300"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const id = metricasDeleteConfirm.id;
+                          setMetricasConfig((prev) => prev.filter((x) => x.id !== id));
+                          setMetricasManualData((prev) => {
+                            const next = { ...prev };
+                            delete next[id];
+                            return next;
+                          });
+                          setMetricasDeleteConfirm(null);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      >
+                        Eliminar
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-accent-purple mb-1">Cuándo se mide</label>
-                      <input type="text" value={r.whenMeasured} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, whenMeasured: e.target.value } : x))} placeholder="Ej: Cuando la llamada termine"
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-accent-amber mb-1">Recurrente o única</label>
-                      <select value={r.isRecurring} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, isRecurring: e.target.value as 'recurrente' | 'unica' } : x))}
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                        <option value="recurrente">Recurrente</option><option value="unica">Única</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-accent-cyan mb-1">Condición</label>
-                      <input type="text" value={r.condition} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, condition: e.target.value } : x))} placeholder="Ej: 'precio' en transcripción"
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-accent-green mb-1">Incremento</label>
-                        <input type="number" min={1} value={r.increment} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, increment: Math.max(1, +e.target.value || 1) } : x))}
-                          className="w-20 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white" />
-                      </div>
-                      <div className="flex-1 min-w-[160px]">
-                        <label className="block text-xs font-medium text-accent-blue mb-1">Sección</label>
-                        <select value={r.section} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, section: e.target.value, panel: '' } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                          <option value="">Seleccionar</option>
-                          {sections.map((s) => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                      <div className="flex-1 min-w-[160px]">
-                        <label className="block text-xs font-medium text-accent-purple mb-1">Panel</label>
-                        <select value={r.panel} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, panel: e.target.value } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                          <option value="">Seleccionar</option>
-                          {(panelsBySection[r.section] || []).map((p) => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1">Descripción</label>
-                      <input type="text" value={r.description} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, description: e.target.value } : x))} placeholder="Detalle adicional"
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-accent-amber mb-1">Ubicación de la tarjeta</label>
-                      <select value={r.ubicacion ?? 'ambos'} onChange={(e) => setMetricRules((prev) => prev.map((x) => x.id === r.id ? { ...x, ubicacion: e.target.value as MetricRule['ubicacion'] } : x))}
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                        <option value="panel_ejecutivo">Panel Ejecutivo</option>
-                        <option value="rendimiento">Rendimiento</option>
-                        <option value="ambos">Ambos</option>
-                      </select>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" onClick={addMetricRule} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-accent-green/20 text-accent-green border border-accent-green/50 hover:bg-accent-green/30 transition-all">
-                <BarChart3 className="w-4 h-4" /> + Añadir métrica
-              </button>
+                  </div>
+                </div>
+              )}
+              {metricasSheetOpen && (
+                <MetricaEditSheet
+                  metricasConfig={metricasConfig}
+                  metricasManualData={metricasManualData}
+                  editingMetric={metricasEditingId ? metricasConfig.find((x) => x.id === metricasEditingId) ?? null : null}
+                  tipoInicial={metricasSheetTipo}
+                  onClose={() => {
+                    setMetricasSheetOpen(false);
+                    setMetricasEditingId(null);
+                  }}
+                  onSave={(config, manualData) => {
+                    setMetricasConfig((prev) => {
+                      const idx = prev.findIndex((x) => x.id === config.id);
+                      const next = [...prev];
+                      if (idx >= 0) {
+                        next[idx] = config;
+                      } else {
+                        next.push(config);
+                      }
+                      return next.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+                    });
+                    if (manualData !== undefined) {
+                      setMetricasManualData((prev) => {
+                        const next = { ...prev };
+                        next[config.id] = manualData;
+                        return next;
+                      });
+                    }
+                    setMetricasSheetOpen(false);
+                    setMetricasEditingId(null);
+                  }}
+                />
+              )}
             </div>
           )}
 

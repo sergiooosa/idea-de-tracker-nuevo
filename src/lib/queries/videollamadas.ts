@@ -155,6 +155,7 @@ export async function getVideollamadas(
   const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string }[] = [];
 
   const getDeps = (m: MetricaConfig): string[] => {
+    if (m.tipo === "fija") return [];
     if (m.tipo !== "automatica" || !m.formula) return [];
     const f = m.formula;
     if (f.fuente && !kpiKeysVideollamadas.has(f.fuente)) return [f.fuente];
@@ -176,7 +177,9 @@ export async function getVideollamadas(
       const deps = getDeps(m);
       if (deps.some((d) => !computed.has(d))) continue;
       let valor: string | number;
-      if (m.tipo === "manual") {
+      if (m.tipo === "fija") {
+        valor = m.valorFijo ?? 0;
+      } else if (m.tipo === "manual") {
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
       } else {

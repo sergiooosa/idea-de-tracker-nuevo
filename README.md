@@ -19,6 +19,7 @@
 | 📐 **Constructor de Layouts** | En Métricas Custom (Control del sistema): Select "Ubicación de la tarjeta" (Panel Ejecutivo / Rendimiento / Ambos). Dashboard y Performance renderizan métricas según `ubicacion`. | System, Dashboard, Performance |
 | 🏷️ **Reglas de Etiquetas (UI)** | Selects agrupados: Condición IA (Mención de precio, Enojo, Interés…), Condición Fija (Duración > X, Intentos > Y). Campo "Mover etapa de funnel a" con etapas del embudo. | System paso 4 |
 | 😀 **Triggers por Emoji (UI)** | Emoji Picker en grid; emojis ya usados en otra regla se bloquean. Estado destino = Select con etapas del embudo. | System paso 8 |
+| 📊 **Métricas Personalizadas v2** | Sistema completo: métricas manuales (campos texto/número/fecha/boolean), automáticas (fórmulas con KPIs), fijas (valor constante). Búsqueda por nombre, aviso al borrar si alimenta otras, drag-and-drop para ordenar. Ver Documentación → Métricas. | System paso 5, Dashboard, Performance |
 
 ---
 
@@ -58,6 +59,7 @@
 - [Chatbot "Habla con tus datos"](#chatbot-habla-con-tus-datos)
 - [Triggers de Chat por Emoji](#-triggers-de-chat-por-emoji)
 - [Embudo Dinámico](#-embudo-dinámico)
+- [Métricas Personalizadas v2](#-métricas-personalizadas-v2)
 - [Descarga de PDF](#descarga-de-pdf)
 - [Relación con el Cerebro (Backend)](#relación-con-el-cerebro-backend)
 - [Despliegue con Docker](#despliegue-con-docker)
@@ -443,7 +445,9 @@ export async function withAuth(
 | `prompt_videollamadas` | `text` | Prompt para evaluar videollamadas |
 | `prompt_llamadas` | `text` | Prompt para evaluar llamadas |
 | `reglas_etiquetas` | `jsonb` | Array de `{id, condition, tag, source}` |
-| `metricas_personalizadas` | `jsonb` | Array de `{id, name, condition, increment, ubicacion?, ...}` — `ubicacion`: `panel_ejecutivo` \| `rendimiento` \| `ambos` (v3.0) |
+| `metricas_personalizadas` | `jsonb` | Array formato legacy (fallback). `ubicacion`: `panel_ejecutivo` \| `rendimiento` \| `ambos` |
+| `metricas_config` | `jsonb` | Array de `MetricaConfig` — métricas manuales, automáticas o fijas (v3.0) |
+| `metricas_manual_data` | `jsonb` | `Record<metricId, MetricaManualEntry[]>` — datos de métricas manuales (v3.0) |
 | `roles_config` | `jsonb` | Array de `{rol, permisos: string[]}` — permisos dinámicos por tenant (v3.0) |
 
 **Estructura de `configuracion_ui`:**
@@ -805,6 +809,25 @@ El embudo ya no está hardcodeado. Cada tenant define sus propias etapas en `cue
 | `queries/videollamadas.ts` | `mapCategoria()` acepta embudo dinámico como parámetro |
 | `queries/acquisition.ts` | Sets dinámicos para `attended` y `closed` |
 | `dashboard/page.tsx` | Muestra distribución por etapa + filtro de tags |
+
+---
+
+## 📊 Métricas Personalizadas v2
+
+Sistema de métricas configurable en Control del sistema → paso 5. Tres tipos:
+
+| Tipo | Descripción |
+|---|---|
+| **Manual** | Campos personalizados (texto, número, fecha, boolean). Añades datos manualmente. Si hay campo fecha, filtra por rango del panel. Número → suma; boolean → conteo de true. |
+| **Automática** | Fórmula con KPIs u otras métricas. Operaciones: directo, suma, promedio, división, multiplicación, resta, condición (si X op Y entonces Z sino W). Búsqueda por nombre al elegir fuentes. |
+| **Fija** | Valor constante (ej. meta mensual = 100). |
+
+- **Ubicación:** Panel Ejecutivo, Rendimiento (videollamadas) o Ambos.
+- **Orden:** Drag-and-drop en la lista.
+- **Editar:** Botón lápiz en cada tarjeta (Dashboard/Performance) → `/system?step=5&edit=metricId`.
+- **Borrar:** Si la métrica alimenta a otras, aviso: "Esta métrica alimenta a X otras, si la eliminas esas fallarán".
+
+Ver guía completa en **Documentación** → pestaña Métricas.
 
 ---
 

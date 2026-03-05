@@ -6,6 +6,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripcionIA';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
+import Link from 'next/link';
 import { FileText, Pencil, Sparkles, User, X, ExternalLink } from 'lucide-react';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { VideollamadasResponse, ApiVideollamada, VideoMeeting } from '@/types';
@@ -130,11 +131,18 @@ export default function PerformanceVideollamadasPage() {
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
             {rendimientoMetrics.map((m) => (
-              <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
+              <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed relative group">
                 <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
                 <p className="text-base font-bold mt-0.5 text-accent-green">{m.valor}</p>
                 {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
                 <div className="kpi-card-spacer" />
+                <Link
+                  href={`/system?step=5&edit=${m.id}`}
+                  className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
+                  title="Editar métrica"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Link>
               </div>
             ))}
           </div>
