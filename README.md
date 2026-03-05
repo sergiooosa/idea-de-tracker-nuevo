@@ -14,7 +14,7 @@
 | 📋 **Nav Filtrado por Permisos** | El sidebar solo muestra las rutas para las que el usuario tiene permiso. Redirección a `/dashboard` si accede por URL sin permiso. | Layout, todas las páginas |
 | 🔒 **Protección de APIs** | Cada API route verifica el permiso correspondiente (`withAuthAndPermission`). 403 si no tiene acceso. | Todas las APIs |
 | 👁️ **Toggle "Solo data del asesor"** | Switch en sidebar para usuarios con `ver_todo`. Cuando activo: filtro por asesor seleccionado. Selector desplegable para elegir qué asesor ver (Yo u otros). Si no tiene `ver_todo`, siempre ve solo sus datos. | Dashboard, Performance, Asesor |
-| 📥 **Bandeja de Huérfanos** | Nueva vista `/bandeja`. Lista eventos de `eventos_huerfanos` (estado pendiente). Input + botón "Corregir y Procesar" llama al Cerebro `POST /webhooks/retry-orphan/:id` con el correo. | Bandeja, Cerebro |
+| 📥 **Bandeja de Huérfanos** | Vista `/bandeja`. Lista eventos de `eventos_huerfanos` (tabs: pendiente, resuelto, descartado). Input + "Corregir" llama al Cerebro `POST /webhooks/retry-orphan/:id`. Si la API falla se muestra error con botón "Reintentar". Extrae `share_url` y `transcript` del payload Fathom. | Bandeja, Cerebro |
 | ✏️ **Editor Global (CRUD)** | En Llamadas, Videollamadas y Chats: columna "Acciones" con botón Editar. Sheet lateral para editar estado del embudo, closer asignado y nombre del lead. Mutación directa en BD. | Performance (3 tabs) |
 | 📐 **Constructor de Layouts** | En Métricas Custom (Control del sistema): Select "Ubicación de la tarjeta" (Panel Ejecutivo / Rendimiento / Ambos). Dashboard y Performance renderizan métricas según `ubicacion`. | System, Dashboard, Performance |
 | 🏷️ **Reglas de Etiquetas (UI)** | Selects agrupados: Condición IA (Mención de precio, Enojo, Interés…), Condición Fija (Duración > X, Intentos > Y). Campo "Mover etapa de funnel a" con etapas del embudo. | System paso 4 |
@@ -232,8 +232,10 @@ src/
 │   ├── integraciones/
 │   │   └── page.tsx                  # Documentación API webhooks (pública)
 │   ├── webhooks/
-│   │   └── external-data/
-│   │       └── [locationId]/route.ts  # POST: inyectar KPIs financieros vía API Key
+│   │   ├── external-data/
+│   │   │   └── [locationId]/route.ts  # POST: inyectar KPIs financieros vía API Key
+│   │   └── config/
+│   │       └── [locationId]/route.ts  # GET: reglas_etiquetas, embudo, prompts (Cerebro, x-api-key)
 │   ├── api/
 │   │   ├── auth/
 │   │   │   ├── [...nextauth]/route.ts  # Handlers Auth.js (GET + POST)
@@ -444,7 +446,7 @@ export async function withAuth(
 | `prompt_ventas` | `text` | Prompt de contexto de empresa para IA |
 | `prompt_videollamadas` | `text` | Prompt para evaluar videollamadas |
 | `prompt_llamadas` | `text` | Prompt para evaluar llamadas |
-| `reglas_etiquetas` | `jsonb` | Array de `{id, condition, tag, source}` |
+| `reglas_etiquetas` | `jsonb` | Array de `{id, condition, tag, source, funnelStage?}` — usadas por Cerebro (ver GET /webhooks/config) |
 | `metricas_personalizadas` | `jsonb` | Array formato legacy (fallback). `ubicacion`: `panel_ejecutivo` \| `rendimiento` \| `ambos` |
 | `metricas_config` | `jsonb` | Array de `MetricaConfig` — métricas manuales, automáticas o fijas (v3.0) |
 | `metricas_manual_data` | `jsonb` | `Record<metricId, MetricaManualEntry[]>` — datos de métricas manuales (v3.0) |
@@ -621,17 +623,18 @@ Estos tags son escritos por el Cerebro (backend) y leídos por el Dashboard para
 
 ### 🆕 Tabla `eventos_huerfanos` (v3.0)
 
-Eventos que el Cerebro no pudo asociar a un lead (falta de correo, etc.). La bandeja permite corregir el correo y reintentar.
+Eventos que el Cerebro no pudo asociar a un lead (falta de correo, etc.). La bandeja (`/bandeja`) permite corregir el correo y reintentar vía Cerebro `POST /webhooks/retry-orphan/:id`. Si la API falla, la página muestra error con botón "Reintentar" (no pantalla en blanco).
 
 | Columna | Tipo | Descripción |
 |---|---|---|
-| `id` | `serial PK` | |
+| `id_huerfano` | `serial PK` | |
 | `id_cuenta` | `integer NOT NULL` | Tenant |
-| `tipo` | `text` | Origen del evento (ej. `videollamada`, `llamada`) |
-| `payload` | `jsonb` | Datos crudos del evento |
-| `estado` | `text` | `pendiente`, `corregido`, `descartado` |
-| `correo_asignado` | `text` | Correo asignado al corregir (opcional) |
+| `origen` | `text NOT NULL` | Origen del evento (ej. `fathom`, `twilio`) |
+| `motivo` | `text NOT NULL` | Motivo de huérfano (ej. "sin_email") |
+| `payload_original` | `jsonb NOT NULL` | Datos crudos del evento (Fathom: puede incluir share_url, transcript) |
+| `estado` | `text` | `pendiente`, `resuelto`, `descartado` (default `pendiente`) |
 | `created_at` | `timestamptz` | |
+| `updated_at` | `timestamptz` | |
 
 ### `metas_cuenta` — Metas persistentes por tenant
 
@@ -686,10 +689,15 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | `/api/data/asesores` | GET | log_llamadas + agendas | | Lista asesores para filtro (requiere `ver_todo`) |
 | `/api/auth/logout` | POST | *(limpia cookie)* | | Cerrar sesión |
 | `/webhooks/external-data/[subdominio]` | POST | kpis_externos | Header `x-api-key`, body `{ data: [{ fecha, metricas }] }` | Zapier, Make, CRMs externos |
+| `/webhooks/config/[subdominio]` | GET | cuentas (solo lectura) | Header `x-api-key` | Cerebro: obtener reglas_etiquetas, embudo_personalizado, chat_triggers, prompts |
 
 ### Webhook de datos financieros externos
 
 Permite inyectar facturación real (Stripe, PayPal, CRM) al dashboard. No requiere sesión: se autentica con `x-api-key`. Documentación pública en `autokpi.net/integraciones`.
+
+### Webhook de configuración para el Cerebro (GET)
+
+`GET /webhooks/config/:subdominio` devuelve la configuración activa del tenant para que el Cerebro aplique reglas de etiquetas correctamente. Autenticación: header `x-api-key` (misma API Key que external-data). Respuesta incluye: `reglas_etiquetas`, `embudo_personalizado`, `chat_triggers`, `prompts` (ventas, videollamadas, llamadas), `has_openai_key`. El Cerebro debe llamar este endpoint antes de procesar una llamada/videollamada, evaluar las condiciones de cada regla contra el resultado de la IA y escribir solo los tags configurados en `tags_internos` (no generar tags libres). Ver **Documentación** → pestaña **Etiquetas** para el flujo completo y condiciones disponibles.
 
 ---
 
@@ -735,7 +743,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `/acquisition` | `acquisition/page.tsx` | `/api/data/acquisition` |
 | `/weekly-report` | `weekly-report/page.tsx` | `/api/data/weekly-report` |
 | `/system` | `system/page.tsx` | `/api/data/system-config` + `/api/data/metas` (10 pasos: prompts, etiquetas, métricas, metas, embudo, triggers, BYOK, fuente financiera) |
-| `/documentacion` | `documentacion/page.tsx` | `/api/data/system-config` |
+| `/documentacion` | `documentacion/page.tsx` | `/api/data/system-config` — pestañas: Triggers de Chat, **Etiquetas** (flujo Cerebro + endpoint config), API de Ingresos, Embudo IA, Métricas, OpenAI Key |
 | `/bandeja` | `bandeja/page.tsx` | `/api/data/huerfanos` (v3.0) |
 | `/configuracion` | `configuracion/page.tsx` | `/api/data/usuarios` + `/api/data/roles` (CRUD roles + usuarios) |
 
@@ -851,6 +859,7 @@ GoHighLevel ──webhook──► Cerebro ──INSERT──► resumenes_diari
 Twilio       ──webhook──► Cerebro ──INSERT──► log_llamadas + registros_de_llamada
 Fathom       ──webhook──► Cerebro ──UPSERT──► resumenes_diarios_agendas
 Proceso chats           ► Cerebro ──INSERT──► chats_logs
+Cerebro                 ► GET /webhooks/config/:subdominio (x-api-key) ► Panel: reglas_etiquetas, embudo, prompts
 Dashboard (Bandeja)     ► PATCH evento      ► Cerebro POST /webhooks/retry-orphan/:id (al corregir huérfano)
 ```
 
