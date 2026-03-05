@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas } from "@/lib/db/schema";
 import type { EmbudoEtapa } from "@/lib/db/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 
 export interface AcquisitionRow {
   origen: string;
@@ -56,8 +56,7 @@ export async function getAcquisition(
       .where(
         and(
           eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-          gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
-          lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+          sql`COALESCE(${resumenesDiariosAgendas.fecha_reunion}::date, ${resumenesDiariosAgendas.fecha}) BETWEEN ${dateFrom}::date AND ${dateTo}::date`,
         ),
       ),
     db

@@ -21,7 +21,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getMetricasQueDependenDe, KPI_DEFAULT_LABELS } from '@/lib/metricas-engine';
+import { getMetricasQueDependenDe } from '@/lib/metricas-engine';
 import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
 
@@ -46,6 +46,60 @@ interface MetasData {
 }
 
 const EMBUDO_COLORS = ['#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ef4444', '#eab308', '#ec4899', '#14b8a6'];
+
+const KPI_INFO: {
+  key: string;
+  label: string;
+  tipo: 'Conteo' | 'Porcentaje' | 'Suma' | 'Promedio';
+  fuente: string;
+  formula: string;
+  color: string;
+}[] = [
+  { key: 'totalLeads', label: 'Leads generados', tipo: 'Conteo', color: 'blue',
+    fuente: 'Llamadas + Citas', formula: 'Cuenta emails únicos entre todas las llamadas y citas del período. Un lead es un email único.' },
+  { key: 'callsMade', label: 'Llamadas', tipo: 'Conteo', color: 'cyan',
+    fuente: 'log_llamadas', formula: 'Total de registros en el log de llamadas para el período.' },
+  { key: 'contestadas', label: 'Contestadas', tipo: 'Conteo', color: 'cyan',
+    fuente: 'log_llamadas', formula: 'Llamadas cuyo tipo_evento empieza por "efectiva_" (ej. efectiva_agendó, efectiva_no_agendó).' },
+  { key: 'answerRate', label: 'Tasa de contestación', tipo: 'Porcentaje', color: 'cyan',
+    fuente: 'log_llamadas', formula: 'Contestadas ÷ Total llamadas × 100. Ejemplo: 20 contestadas de 100 llamadas = 20%.' },
+  { key: 'meetingsBooked', label: 'Citas agendadas', tipo: 'Conteo', color: 'purple',
+    fuente: 'resumenes_diarios_agendas', formula: 'Total de registros de citas en el período, sin filtro de categoría.' },
+  { key: 'meetingsAttended', label: 'Asistidas', tipo: 'Conteo', color: 'purple',
+    fuente: 'resumenes_diarios_agendas', formula: 'Citas cuya categoría está en el embudo del cliente (o Cerrada/Ofertada/No_Ofertada por defecto).' },
+  { key: 'meetingsCanceled', label: 'Canceladas', tipo: 'Conteo', color: 'amber',
+    fuente: 'resumenes_diarios_agendas', formula: 'Citas con categoría = "CANCELADA".' },
+  { key: 'meetingsClosed', label: 'Cerradas', tipo: 'Conteo', color: 'green',
+    fuente: 'resumenes_diarios_agendas', formula: 'Citas con categoría "Cerrada" según tu embudo (o la etapa que contenga "cerrad").' },
+  { key: 'effectiveAppointments', label: 'Efectivas', tipo: 'Conteo', color: 'green',
+    fuente: 'resumenes_diarios_agendas', formula: 'Citas "Cerrada" u "Ofertada". Son las que produjeron un resultado positivo.' },
+  { key: 'tasaCierre', label: 'Tasa de cierre', tipo: 'Porcentaje', color: 'green',
+    fuente: 'resumenes_diarios_agendas', formula: 'Cerradas ÷ Asistidas × 100. Ejemplo: 5 cerradas de 20 asistidas = 25%.' },
+  { key: 'tasaAgendamiento', label: 'Tasa agendamiento', tipo: 'Porcentaje', color: 'purple',
+    fuente: 'Llamadas + Citas', formula: 'Total citas ÷ Contestadas × 100. Ejemplo: 10 citas / 50 contestadas = 20%.' },
+  { key: 'revenue', label: 'Ingresos', tipo: 'Suma', color: 'green',
+    fuente: 'resumenes_diarios_agendas (campo facturación)', formula: 'Suma del campo "facturación" en citas cerradas. Si usas fuente externa, viene de tu API.' },
+  { key: 'cashCollected', label: 'Efectivo cobrado', tipo: 'Suma', color: 'green',
+    fuente: 'resumenes_diarios_agendas (campo cash_collected)', formula: 'Suma del campo "cash_collected" en todas las citas del período.' },
+  { key: 'avgTicket', label: 'Ticket promedio', tipo: 'Promedio', color: 'blue',
+    fuente: 'resumenes_diarios_agendas', formula: 'Ingresos ÷ Citas efectivas. Si hay 0 efectivas, muestra $0.' },
+  { key: 'speedToLeadAvg', label: 'Tiempo al lead (min)', tipo: 'Promedio', color: 'purple',
+    fuente: 'log_llamadas (campo speed_to_lead)', formula: 'Promedio del tiempo en minutos desde que llega el lead hasta la primera llamada.' },
+  { key: 'avgAttempts', label: 'Intentos promedio', tipo: 'Promedio', color: 'amber',
+    fuente: 'log_llamadas', formula: 'Total llamadas ÷ Leads únicos. Cuántas llamadas promedio se hacen a cada lead.' },
+  { key: 'noShows', label: 'No shows', tipo: 'Conteo', color: 'amber',
+    fuente: 'resumenes_diarios_agendas', formula: 'Citas con categoría = "no_show" (la persona no se presentó).' },
+  { key: 'agendadas', label: 'Agendadas (videollamadas)', tipo: 'Conteo', color: 'cyan',
+    fuente: 'resumenes_diarios_agendas', formula: 'Alias de "Citas agendadas", mismo valor. Disponible para fórmulas de videollamadas.' },
+  { key: 'asistidas', label: 'Asistidas (videollamadas)', tipo: 'Conteo', color: 'cyan',
+    fuente: 'resumenes_diarios_agendas', formula: 'Alias de "Asistidas". Disponible para fórmulas de videollamadas.' },
+  { key: 'canceladas', label: 'Canceladas (videollamadas)', tipo: 'Conteo', color: 'amber',
+    fuente: 'resumenes_diarios_agendas', formula: 'Alias de "Canceladas". Disponible para fórmulas de videollamadas.' },
+  { key: 'efectivas', label: 'Efectivas (videollamadas)', tipo: 'Conteo', color: 'green',
+    fuente: 'resumenes_diarios_agendas', formula: 'Alias de "Efectivas". Disponible para fórmulas de videollamadas.' },
+  { key: 'ticket', label: 'Ticket (videollamadas)', tipo: 'Promedio', color: 'blue',
+    fuente: 'resumenes_diarios_agendas', formula: 'Ingresos ÷ Asistidas. Cuánto ingresó en promedio por cita asistida.' },
+];
 
 const sections = ['Performance', 'Panel asesor', 'Resumen adquisición', 'Panel ejecutivo', 'Otro'];
 const panelsBySection: Record<string, string[]> = {
@@ -138,6 +192,7 @@ export default function SystemPage() {
   const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija'>('manual');
   const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
+  const [kpiExpandido, setKpiExpandido] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
@@ -436,46 +491,67 @@ export default function SystemPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-surface-500 bg-surface-800/50 p-4">
-                <h4 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider mb-3">
-                  Métricas principales (ya en el panel)
-                </h4>
-                <p className="text-[11px] text-gray-500 mb-3">
-                  Estas métricas ya se muestran en el Panel ejecutivo debajo de &quot;KPIs operativos&quot;. Puedes usarlas como fuente al crear métricas automáticas.
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {[
-                    'totalLeads',
-                    'callsMade',
-                    'contestadas',
-                    'answerRate',
-                    'meetingsBooked',
-                    'meetingsAttended',
-                    'meetingsCanceled',
-                    'meetingsClosed',
-                    'effectiveAppointments',
-                    'tasaCierre',
-                    'tasaAgendamiento',
-                    'revenue',
-                    'cashCollected',
-                    'avgTicket',
-                    'speedToLeadAvg',
-                    'avgAttempts',
-                    'agendadas',
-                    'asistidas',
-                    'canceladas',
-                    'efectivas',
-                    'noShows',
-                    'ticket',
-                  ].map((key) => (
-                    <div
-                      key={key}
-                      className="rounded-lg bg-surface-700/80 border border-surface-500 px-2 py-1.5 text-xs"
-                    >
-                      <span className="text-white font-medium">{KPI_DEFAULT_LABELS[key] ?? key}</span>
-                    </div>
-                  ))}
+              <div className="rounded-xl border border-accent-cyan/30 bg-surface-800/50 p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider">
+                    Métricas del sistema (ya incluidas)
+                  </h4>
+                  <span className="text-[10px] bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 rounded-full px-2 py-0.5">
+                    {KPI_INFO.length} métricas
+                  </span>
                 </div>
+                <p className="text-[11px] text-gray-500 mb-3">
+                  Estas métricas ya se calculan y aparecen en tu Panel ejecutivo. Haz clic en cualquiera para ver exactamente cómo se calcula. Úsalas como fuente al crear métricas automáticas.
+                </p>
+                <ul className="space-y-1.5">
+                  {KPI_INFO.map((kpi) => {
+                    const isOpen = kpiExpandido === kpi.key;
+                    const tipoBadgeColor = kpi.tipo === 'Conteo' ? 'text-blue-400 bg-blue-400/10 border-blue-400/30'
+                      : kpi.tipo === 'Porcentaje' ? 'text-purple-400 bg-purple-400/10 border-purple-400/30'
+                      : kpi.tipo === 'Suma' ? 'text-green-400 bg-green-400/10 border-green-400/30'
+                      : 'text-amber-400 bg-amber-400/10 border-amber-400/30';
+                    return (
+                      <li key={kpi.key}>
+                        <button
+                          type="button"
+                          onClick={() => setKpiExpandido(isOpen ? null : kpi.key)}
+                          className="w-full rounded-lg bg-surface-700/80 border border-surface-500 hover:border-accent-cyan/40 hover:bg-surface-600/80 transition-colors px-3 py-2 flex items-center gap-2 text-left"
+                        >
+                          <div className="flex-1 flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-white truncate">{kpi.label}</span>
+                            <span className={`text-[9px] font-semibold border rounded-full px-1.5 py-0.5 shrink-0 ${tipoBadgeColor}`}>
+                              {kpi.tipo}
+                            </span>
+                          </div>
+                          <span className={`text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                          </span>
+                        </button>
+                        {isOpen && (
+                          <div className="mt-1 rounded-lg bg-surface-900/80 border border-accent-cyan/20 px-3 py-3 text-xs space-y-2">
+                            <div>
+                              <span className="text-gray-400 font-medium">Fuente de datos: </span>
+                              <span className="text-accent-cyan">{kpi.fuente}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 font-medium">Cómo se calcula: </span>
+                              <span className="text-gray-200">{kpi.formula}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 font-medium">Clave interna: </span>
+                              <code className="text-amber-300 bg-amber-500/10 rounded px-1">{kpi.key}</code>
+                              <span className="text-gray-500 ml-1">(úsala en fórmulas automáticas)</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 pt-1 border-t border-surface-500">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                              <span className="text-gray-500">Solo lectura · No se puede eliminar · Se actualiza sola con cada período</span>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
 
               <DndContext

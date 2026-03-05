@@ -53,8 +53,7 @@ export async function getVideollamadas(
 
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-    gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
-    lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    sql`COALESCE(${resumenesDiariosAgendas.fecha_reunion}::date, ${resumenesDiariosAgendas.fecha}) BETWEEN ${dateFrom}::date AND ${dateTo}::date`,
   ];
   if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
 
