@@ -1,9 +1,10 @@
 "use client";
 
+import { toast } from 'sonner';
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -21,18 +22,18 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getMetricasQueDependenDe, DEFAULT_METRICAS_CONFIG } from '@/lib/metricas-engine';
+import { getMetricasQueDependenDe, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from '@/lib/metricas-engine';
 import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
 
-interface TagRule { id: string; condition: string; tag: string; source: string }
+interface TagRule { id: string; condition: string; tag: string; source: string; funnelStage?: string }
 interface MetricRule {
   id: string; name: string; description: string; condition: string;
   increment: number; whenMeasured: string; isRecurring: 'recurrente' | 'unica';
   section: string; panel: string; ubicacion?: 'panel_ejecutivo' | 'rendimiento' | 'ambos';
 }
 interface EmbudoEtapa { id: string; nombre: string; color?: string; orden: number; condition?: string }
-interface ChatTrigger { trigger: string; accion: string; valor: string }
+interface ChatTrigger { trigger: string; accion: 'cambiar_estado' | 'asignar_etiqueta'; valor: string }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
   reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
@@ -43,6 +44,10 @@ interface SystemConfig {
 interface MetasData {
   meta_llamadas_diarias: number; leads_nuevos_dia_1: number;
   leads_nuevos_dia_2: number; leads_nuevos_dia_3: number;
+  meta_citas_semanales: number | null; meta_cierres_semanales: number | null;
+  meta_revenue_mensual: number | null; meta_cash_collected_mensual: number | null;
+  meta_tasa_cierre: number | null; meta_tasa_contestacion: number | null;
+  meta_speed_to_lead_min: number | null;
 }
 
 const EMBUDO_COLORS = ['#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ef4444', '#eab308', '#ec4899', '#14b8a6'];
@@ -128,12 +133,13 @@ export default function SystemPage() {
   const [promptLlamadas, setPromptLlamadas] = useState('');
   const [tagRules, setTagRules] = useState<TagRule[]>([]);
   const [metricRules, setMetricRules] = useState<MetricRule[]>([]);
-  const [metas, setMetas] = useState<MetasData>({ meta_llamadas_diarias: 50, leads_nuevos_dia_1: 3, leads_nuevos_dia_2: 4, leads_nuevos_dia_3: 5 });
+  const [metas, setMetas] = useState<MetasData>({ meta_llamadas_diarias: 50, leads_nuevos_dia_1: 3, leads_nuevos_dia_2: 4, leads_nuevos_dia_3: 5, meta_citas_semanales: null, meta_cierres_semanales: null, meta_revenue_mensual: null, meta_cash_collected_mensual: null, meta_tasa_cierre: null, meta_tasa_contestacion: null, meta_speed_to_lead_min: null });
 
   const [openaiKey, setOpenaiKey] = useState('');
   const [hasOpenaiKey, setHasOpenaiKey] = useState(false);
   const [embudoEtapas, setEmbudoEtapas] = useState<EmbudoEtapa[]>([]);
   const [chatTriggers, setChatTriggers] = useState<ChatTrigger[]>([]);
+  const [emojiSearch, setEmojiSearch] = useState('');
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
@@ -157,7 +163,8 @@ export default function SystemPage() {
         setTagRules(cfg.reglas_etiquetas.length > 0 ? cfg.reglas_etiquetas : []);
         setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
         setChatTriggers(Array.isArray(cfg.chat_triggers) ? cfg.chat_triggers : []);
-        setEmbudoEtapas(Array.isArray(cfg.embudo_personalizado) ? cfg.embudo_personalizado : []);
+        const loadedEmbudo = Array.isArray(cfg.embudo_personalizado) ? cfg.embudo_personalizado : [];
+        setEmbudoEtapas(loadedEmbudo.length > 0 ? loadedEmbudo : DEFAULT_EMBUDO_CONFIG);
         setHasOpenaiKey(cfg.has_openai_key ?? false);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
@@ -170,7 +177,7 @@ export default function SystemPage() {
       }
       if (metasRes.ok) {
         const m = await metasRes.json();
-        setMetas({ meta_llamadas_diarias: m.meta_llamadas_diarias, leads_nuevos_dia_1: m.leads_nuevos_dia_1, leads_nuevos_dia_2: m.leads_nuevos_dia_2, leads_nuevos_dia_3: m.leads_nuevos_dia_3 });
+        setMetas({ meta_llamadas_diarias: m.meta_llamadas_diarias, leads_nuevos_dia_1: m.leads_nuevos_dia_1, leads_nuevos_dia_2: m.leads_nuevos_dia_2, leads_nuevos_dia_3: m.leads_nuevos_dia_3, meta_citas_semanales: m.meta_citas_semanales ?? null, meta_cierres_semanales: m.meta_cierres_semanales ?? null, meta_revenue_mensual: m.meta_revenue_mensual ?? null, meta_cash_collected_mensual: m.meta_cash_collected_mensual ?? null, meta_tasa_cierre: m.meta_tasa_cierre ?? null, meta_tasa_contestacion: m.meta_tasa_contestacion ?? null, meta_speed_to_lead_min: m.meta_speed_to_lead_min ?? null });
       }
     } catch { /* silently use defaults */ }
     setLoadingConfig(false);
@@ -190,7 +197,7 @@ export default function SystemPage() {
     }
   }, [editParam, loadingConfig, currentStep, metricasConfig]);
 
-  const saveConfig = async () => {
+  const saveConfig = async (): Promise<boolean> => {
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
@@ -206,34 +213,48 @@ export default function SystemPage() {
         fuente_datos_financieros: fuenteFinanciera,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
-      await fetch('/api/data/system-config', {
+      const res = await fetch('/api/data/system-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error('Error al guardar');
       if (openaiKey) {
         setHasOpenaiKey(true);
         setOpenaiKey('');
       }
-    } catch { /* ignore */ }
-    setSaving(false);
+      toast.success('Configuración guardada');
+      setSaving(false);
+      return true;
+    } catch {
+      toast.error('Error al guardar la configuración');
+      setSaving(false);
+      return false;
+    }
   };
 
-  const saveMetas = async () => {
+  const saveMetas = async (): Promise<boolean> => {
     setSaving(true);
     try {
-      await fetch('/api/data/metas', {
+      const res = await fetch('/api/data/metas', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(metas),
       });
-    } catch { /* ignore */ }
-    setSaving(false);
+      if (!res.ok) throw new Error('Error al guardar metas');
+      toast.success('Metas guardadas');
+      setSaving(false);
+      return true;
+    } catch {
+      toast.error('Error al guardar las metas');
+      setSaving(false);
+      return false;
+    }
   };
 
-  const handleSave = () => {
-    if (currentStep === 6) saveMetas();
-    else saveConfig();
+  const handleSave = async () => {
+    if (currentStep === 6) await saveMetas();
+    else await saveConfig();
   };
 
   const dndSensors = useSensors(
@@ -305,6 +326,7 @@ export default function SystemPage() {
               <textarea value={promptEmpresa} onChange={(e) => setPromptEmpresa(e.target.value)}
                 className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-blue/50 focus:border-accent-blue/50 transition-colors"
                 placeholder="Qué hace la empresa..." />
+              <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
             </div>
           )}
 
@@ -320,6 +342,7 @@ export default function SystemPage() {
               <textarea value={promptEvaluacion} onChange={(e) => setPromptEvaluacion(e.target.value)}
                 className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-colors"
                 placeholder="Evalúa la videollamada según..." />
+              <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
             </div>
           )}
 
@@ -335,6 +358,7 @@ export default function SystemPage() {
               <textarea value={promptLlamadas} onChange={(e) => setPromptLlamadas(e.target.value)}
                 className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
                 placeholder="Evalúa la llamada telefónica según..." />
+              <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
             </div>
           )}
 
@@ -343,12 +367,9 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><Tag className="w-5 h-5 text-accent-amber" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Reglas de etiquetas para GHL</h3>
-                  <p className="text-sm text-gray-400">Selecciona una condición y asigna una etiqueta GHL.</p>
+                  <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
+                  <p className="text-sm text-gray-400">Define condiciones para asignar etiquetas automáticamente.</p>
                 </div>
-              </div>
-              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200/90">
-                <strong className="text-amber-200">Aviso:</strong> La etiqueta debe existir tal cual en GHL para que se asigne correctamente.
               </div>
               <ul className="space-y-3">
                 {tagRules.map((r) => (
@@ -388,8 +409,8 @@ export default function SystemPage() {
                         )}
                       </div>
                       <div className="w-36">
-                        <label className="block text-[11px] font-medium text-accent-cyan mb-1">Etiqueta GHL</label>
-                        <input type="text" value={r.tag} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, tag: e.target.value } : x))} placeholder="nombre_etiqueta"
+                        <label className="block text-[11px] font-medium text-accent-cyan mb-1">Etiqueta</label>
+                        <input type="text" value={r.tag} onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, tag: v } : x)); }} placeholder="nombre_etiqueta"
                           className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
                       </div>
                       <div className="w-32">
@@ -404,8 +425,8 @@ export default function SystemPage() {
                       <div>
                         <label className="block text-[11px] font-medium text-accent-purple mb-1">Mover etapa de funnel a (opcional)</label>
                         <select
-                          value=""
-                          onChange={() => {}}
+                          value={r.funnelStage ?? ''}
+                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, funnelStage: e.target.value || undefined } : x))}
                           className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
                         >
                           <option value="">No mover etapa</option>
@@ -436,7 +457,7 @@ export default function SystemPage() {
                 <div className="rounded-lg p-2 bg-accent-green/20 border border-accent-green/40"><BarChart3 className="w-5 h-5 text-accent-green" /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">Métricas personalizadas</h3>
-                  <p className="text-sm text-gray-400">Manuales (campos), automáticas (fórmulas) o fijas (valor constante). Arrastra para ordenar.</p>
+                  <p className="text-sm text-gray-400">Manuales (campos) o automáticas (fórmulas). Arrastra para ordenar.</p>
                 </div>
               </div>
 
@@ -510,17 +531,6 @@ export default function SystemPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50 hover:bg-accent-cyan/30"
                 >
                   <Plus className="w-4 h-4" /> Automática
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMetricasEditingId(null);
-                    setMetricasSheetTipo('fija');
-                    setMetricasSheetOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30"
-                >
-                  <Plus className="w-4 h-4" /> Fija
                 </button>
               </div>
               {metricasDeleteConfirm && (
@@ -602,10 +612,11 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-cyan/30">
                 <div className="rounded-lg p-2 bg-accent-cyan/20 border border-accent-cyan/40"><Target className="w-5 h-5 text-accent-cyan" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Establecer metas y proceso de llamadas</h3>
-                  <p className="text-sm text-gray-400">Define la meta diaria de llamadas y cuántas llamadas hacer a leads nuevos los primeros días.</p>
+                  <h3 className="text-lg font-semibold text-white">Establecer metas</h3>
+                  <p className="text-sm text-gray-400">Define metas por periodo para medir el rendimiento de tu equipo comercial.</p>
                 </div>
               </div>
+              <h4 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider">Metas diarias</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-accent-cyan mb-1">Meta de llamadas diarias</label>
@@ -628,7 +639,58 @@ export default function SystemPage() {
                     className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500">Meta semanal = meta diaria x 7 · Meta mensual = meta diaria x 30.</p>
+              <h4 className="text-xs font-semibold text-accent-green uppercase tracking-wider pt-2">Metas semanales</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-accent-green mb-1">Meta de citas semanales</label>
+                  <input type="number" min={0} value={metas.meta_citas_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_citas_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-accent-green mb-1">Meta de cierres semanales</label>
+                  <input type="number" min={0} value={metas.meta_cierres_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cierres_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
+                </div>
+              </div>
+              <h4 className="text-xs font-semibold text-accent-amber uppercase tracking-wider pt-2">Metas mensuales</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-accent-amber mb-1">Meta revenue mensual</label>
+                  <input type="number" min={0} value={metas.meta_revenue_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_revenue_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-accent-amber mb-1">Meta cash collected mensual</label>
+                  <input type="number" min={0} value={metas.meta_cash_collected_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cash_collected_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
+                </div>
+              </div>
+              <h4 className="text-xs font-semibold text-accent-purple uppercase tracking-wider pt-2">Metas de rendimiento</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-accent-purple mb-1">Meta tasa de cierre (%)</label>
+                  <input type="number" min={0} max={100} step={0.1} value={metas.meta_tasa_cierre != null ? (metas.meta_tasa_cierre * 100).toFixed(1) : ''} onChange={(e) => setMetas((m) => ({ ...m, meta_tasa_cierre: e.target.value ? Math.max(0, +e.target.value) / 100 : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-accent-purple mb-1">Meta tasa de contestación (%)</label>
+                  <input type="number" min={0} max={100} step={0.1} value={metas.meta_tasa_contestacion != null ? (metas.meta_tasa_contestacion * 100).toFixed(1) : ''} onChange={(e) => setMetas((m) => ({ ...m, meta_tasa_contestacion: e.target.value ? Math.max(0, +e.target.value) / 100 : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-accent-purple mb-1">Meta speed to lead (min)</label>
+                  <input type="number" min={0} step={0.5} value={metas.meta_speed_to_lead_min ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_speed_to_lead_min: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                    placeholder="Sin meta"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500">Deja vacío un campo si no quieres establecer esa meta. Meta semanal de llamadas = meta diaria × 7.</p>
             </div>
           )}
 
@@ -637,7 +699,7 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
                 <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><GitBranch className="w-5 h-5 text-accent-purple" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Embudo IA personalizado</h3>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Embudo IA personalizado <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">Define las etapas de tu embudo de ventas. La IA clasifica los leads según las condiciones que definas. Aplica a llamadas y videollamadas.</span></span></h3>
                   <p className="text-sm text-gray-400">Define cada etapa de tu embudo y escribe la condición exacta que la IA debe evaluar para clasificar al lead en ese estado.</p>
                 </div>
               </div>
@@ -696,15 +758,16 @@ export default function SystemPage() {
           )}
 
           {currentStep === 8 && (() => {
-            const EMOJI_GRID = ['💰', '✅', '❌', '🔥', '⏳', '📞', '📅', '🤝', '👍', '👎', '💡', '⭐', '🎯', '💬', '☀️', '🚀', '💎', '🏆', '📊', '🔔'];
+            const EMOJI_GRID = ['💰','✅','❌','🔥','⏳','📞','📅','🤝','👍','👎','💡','⭐','🎯','💬','☀️','🚀','💎','🏆','📊','🔔','❤️','💙','💚','💛','💜','🖤','🤍','🧡','💗','💕','😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','🥴','😠','😡','🤬','🥱','😷','🤒','🤕','🤢','🤮','🥺','💪','👏','🙌','🤲','🤝','🙏','✍️','💅','🤳','💄','🦷','👀','🧠','👄','💋','🩸','🦴','👶','🧒','👦','👧','🧑','👱','👨','👩','🧔','🏃','🚶','🧎','🧑‍💻','👨‍💻','👩‍💻','🧑‍💼','👨‍💼','👩‍💼','🧑‍🏫','💼','📱','💻','⌨️','🖥️','🖨️','📸','📹','🎥','📽️','🎬','📺','📻','🎙️','🎧','🎵','🎶','🎹','🥁','🎸','🎺','🎻','🎷','🪗','📧','📨','📩','📤','📥','📦','📫','📪','📬','📭','📮','📝','📃','📄','📑','🗒️','📋','📂','🗂️','🗄️','📎','🖇️','📌','📍','📏','📐','✂️','🗑️','🔒','🔓','🔑','🔐','🔧','🔨','⛏️','🪓','🔩','⚙️','🧰','🪛','🧲','💊','🩹','🩺','🔬','🔭','📡','🛰️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🏰','💒','⛪','🕌','🛕','🕍','⛩️','🕋','⛲','⛺','🏕️','🗻','🌋','🏔️','❓','❗','‼️','⁉️','❕','❔','⭕','🚫','🔴','🟠','🟡','🟢','🔵','🟣','🟤','⚫','⚪','🔶','🔷','🔸','🔹','🔺','🔻','💠','🔘','🔳','🔲','🏁','🚩','🎌','🏴','🏳️','🇦🇷','🇧🇷','🇨🇱','🇨🇴','🇨🇷','🇪🇨','🇪🇸','🇲🇽','🇵🇪','🇺🇸','🇻🇪','🇵🇦','🇩🇴','🇬🇹','🇭🇳','🇳🇮','🇵🇾','🇺🇾','🇧🇴','🇸🇻'];
             const usedEmojis = new Set(chatTriggers.map((t) => t.trigger));
+            const filteredEmojis = emojiSearch ? EMOJI_GRID.filter((e) => e.includes(emojiSearch)) : EMOJI_GRID;
             return (
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><MessageSquare className="w-5 h-5 text-accent-amber" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Triggers de chat por emoji</h3>
-                  <p className="text-sm text-gray-400">Cuando un asesor envía un emoji en el chat, el estado del lead cambia automáticamente.</p>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Triggers de chat por emoji <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Cuando un agente de chat envía un mensaje con este emoji, el sistema cambia automáticamente el estado del lead al valor configurado. También puede asignar etiquetas.</span></span></h3>
+                  <p className="text-sm text-gray-400">Configura emojis para automatizar cambios de estado y asignación de etiquetas en chats.</p>
                 </div>
               </div>
               {chatTriggers.length === 0 && (
@@ -725,8 +788,15 @@ export default function SystemPage() {
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-accent-amber mb-2">Selecciona un emoji</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {EMOJI_GRID.map((emoji) => {
+                      <input
+                        type="text"
+                        value={emojiSearch}
+                        onChange={(e) => setEmojiSearch(e.target.value)}
+                        placeholder="Buscar emoji..."
+                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white mb-2 focus:ring-2 focus:ring-accent-amber/40"
+                      />
+                      <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+                        {filteredEmojis.map((emoji) => {
                           const isUsed = usedEmojis.has(emoji) && t.trigger !== emoji;
                           const isSelected = t.trigger === emoji;
                           return (
@@ -749,38 +819,59 @@ export default function SystemPage() {
                           );
                         })}
                       </div>
-                      {t.trigger && !EMOJI_GRID.includes(t.trigger) && (
+                      {t.trigger && !filteredEmojis.includes(t.trigger) && (
                         <div className="mt-2 text-xs text-gray-400">Emoji actual: <span className="text-xl">{t.trigger}</span></div>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-accent-cyan mb-1">Estado al que cambia el lead</label>
-                      {embudoEtapas.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-400 mb-1">Acción</label>
                         <select
-                          value={t.valor}
-                          onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                          value={t.accion}
+                          onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, accion: e.target.value as 'cambiar_estado' | 'asignar_etiqueta', valor: '' } : x))}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
                         >
-                          <option value="">Seleccionar estado...</option>
-                          {embudoEtapas.map((e) => (
-                            <option key={e.id} value={e.nombre}>{e.nombre}</option>
-                          ))}
+                          <option value="cambiar_estado">Cambiar estado del lead</option>
+                          <option value="asignar_etiqueta">Asignar etiqueta</option>
                         </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={t.valor}
-                          onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
-                          placeholder="Cerrada"
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
-                        />
-                      )}
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-accent-cyan mb-1">{t.accion === 'asignar_etiqueta' ? 'Etiqueta a asignar' : 'Estado al que cambia el lead'}</label>
+                        {t.accion === 'asignar_etiqueta' ? (
+                          <input
+                            type="text"
+                            value={t.valor}
+                            onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: v } : x)); }}
+                            placeholder="nombre_etiqueta"
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                          />
+                        ) : embudoEtapas.length > 0 ? (
+                          <select
+                            value={t.valor}
+                            onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                          >
+                            <option value="">Seleccionar estado...</option>
+                            {embudoEtapas.map((e) => (
+                              <option key={e.id} value={e.nombre}>{e.nombre}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={t.valor}
+                            onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
+                            placeholder="Cerrada"
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                          />
+                        )}
+                      </div>
                     </div>
                     {t.trigger && t.valor && (
                       <div className="rounded-lg bg-surface-800/60 border border-surface-500/50 px-3 py-2 text-xs text-gray-400 flex items-center gap-2">
                         <span className="text-2xl">{t.trigger}</span>
                         <ArrowRight className="w-3.5 h-3.5 text-accent-cyan" />
-                        <span className="text-accent-cyan font-medium">{t.valor}</span>
+                        <span className="text-accent-cyan font-medium">{t.accion === 'asignar_etiqueta' ? `🏷️ ${t.valor}` : t.valor}</span>
                       </div>
                     )}
                   </li>
@@ -898,7 +989,7 @@ export default function SystemPage() {
         </div>
 
         <div className="flex flex-wrap justify-between items-center gap-3 pt-2 border-t border-surface-500/80">
-          <button type="button" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))} disabled={currentStep === 1}
+          <button type="button" onClick={async () => { await handleSave(); setCurrentStep((s) => Math.max(1, s - 1)); }} disabled={currentStep === 1 || saving}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-700/80 border border-surface-500 text-sm text-gray-300 hover:bg-surface-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
             <ChevronLeft className="w-4 h-4" /> Anterior
           </button>
@@ -908,7 +999,7 @@ export default function SystemPage() {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Guardar
             </button>
-            <button type="button" onClick={() => setCurrentStep((s) => Math.min(TOTAL_STEPS, s + 1))} disabled={currentStep === TOTAL_STEPS}
+            <button type="button" onClick={async () => { await handleSave(); setCurrentStep((s) => Math.min(TOTAL_STEPS, s + 1)); }} disabled={currentStep === TOTAL_STEPS || saving}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:shadow-[0_0_24px_-6px_rgba(0,240,255,0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-all">
               Siguiente <ChevronRight className="w-4 h-4" />
             </button>

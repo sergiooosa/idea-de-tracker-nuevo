@@ -40,6 +40,7 @@ export interface ReglaEtiqueta {
   condition: string;
   tag: string;
   source: string;
+  funnelStage?: string;
 }
 
 export interface MetricaPersonalizada {
@@ -102,7 +103,7 @@ export interface EmbudoEtapa {
 
 export interface ChatTrigger {
   trigger: string;
-  accion: string;
+  accion: "cambiar_estado" | "asignar_etiqueta";
   valor: string;
 }
 

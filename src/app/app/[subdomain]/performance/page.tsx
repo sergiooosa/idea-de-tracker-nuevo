@@ -3,6 +3,7 @@
 import { useState, useMemo, Fragment } from 'react';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
+import TagFilter from '@/components/dashboard/TagFilter';
 import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripcionIA';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
@@ -56,8 +57,9 @@ export default function PerformanceVideollamadasPage() {
   const [modalSelectorMeetings, setModalSelectorMeetings] = useState<VideoMeeting[] | null>(null);
   const [modalTranscripcionIA, setModalTranscripcionIA] = useState<VideoMeeting | null>(null);
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo });
+  const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[]) => {
@@ -101,6 +103,11 @@ export default function PerformanceVideollamadasPage() {
           defaultTo={format(defaultTo, 'yyyy-MM-dd')}
         />
       </div>
+      <TagFilter
+        tags={[...new Set(data?.registros?.flatMap((r: ApiVideollamada) => (r.tags ?? '').split(',').map(t => t.trim()).filter(Boolean)) ?? [])]}
+        selected={selectedTags}
+        onChange={setSelectedTags}
+      />
 
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[

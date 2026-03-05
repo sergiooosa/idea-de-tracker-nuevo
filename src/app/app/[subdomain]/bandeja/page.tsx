@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { useApiData } from "@/hooks/useApiData";
-import { Inbox, AlertTriangle, CheckCircle2, XCircle, Mail, Send, Loader2, Phone, User, Calendar, Radio } from "lucide-react";
+import { Inbox, AlertTriangle, CheckCircle2, XCircle, Mail, Send, Loader2, Phone, User, Calendar, Radio, ExternalLink, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import clsx from "clsx";
@@ -33,11 +33,13 @@ const ORIGEN_COLORS: Record<string, string> = {
 };
 
 function extractPayloadDetails(payload: Record<string, unknown>) {
-  const nombre = (payload.nombre_lead ?? payload.leadName ?? payload.nombre ?? payload.name ?? "") as string;
+  const nombre = (payload.nombre_lead ?? payload.leadName ?? payload.nombre ?? payload.name ?? payload.visitor_name ?? "") as string;
   const telefono = (payload.phone ?? payload.telefono ?? payload.phone_raw_format ?? "") as string;
-  const email = (payload.email ?? payload.mail_lead ?? payload.email_lead ?? "") as string;
-  const fecha = (payload.fecha ?? payload.ts ?? payload.datetime ?? "") as string;
-  return { nombre, telefono, email, fecha };
+  const email = (payload.email ?? payload.mail_lead ?? payload.email_lead ?? payload.visitor_email ?? "") as string;
+  const fecha = (payload.fecha ?? payload.ts ?? payload.datetime ?? payload.timestamp ?? payload.created_at ?? payload.occurred_at ?? "") as string;
+  const shareUrl = (payload.share_url ?? payload.recording_url ?? payload.video_url ?? (payload.properties as Record<string, unknown> | undefined)?.share_url ?? "") as string;
+  const transcript = (payload.transcript ?? payload.summary ?? payload.transcription ?? "") as string;
+  return { nombre, telefono, email, fecha, shareUrl, transcript };
 }
 
 function HuerfanoCard({
@@ -148,6 +150,22 @@ function HuerfanoCard({
             </div>
           )}
         </div>
+        {(details.shareUrl || details.transcript) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {details.shareUrl && (
+              <a href={details.shareUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent-cyan hover:underline">
+                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                Ver grabación
+              </a>
+            )}
+            {details.transcript && (
+              <span className="inline-flex items-center gap-1 text-gray-400" title={details.transcript}>
+                <FileText className="w-3.5 h-3.5 shrink-0 text-gray-500" />
+                <span className="truncate max-w-[200px]">{details.transcript.slice(0, 80)}{details.transcript.length > 80 ? '…' : ''}</span>
+              </span>
+            )}
+          </div>
+        )}
 
         {isPendiente && (
           <div className="flex items-center gap-2 pt-2 border-t border-surface-500/50">

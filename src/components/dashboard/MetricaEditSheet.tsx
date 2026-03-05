@@ -18,13 +18,13 @@ const TIPOS_CAMPO = [
 ] as const;
 
 const TIPOS_FORMULA = [
-  { value: "directo", label: "Directo (copiar valor)" },
-  { value: "suma", label: "Suma" },
-  { value: "promedio", label: "Promedio" },
-  { value: "division", label: "División" },
-  { value: "multiplicacion", label: "Multiplicación" },
-  { value: "resta", label: "Resta" },
-  { value: "condicion", label: "Condición (si X entonces Y)" },
+  { value: "directo", label: "Directo (copiar valor)", desc: "Copia el valor tal cual de la fuente" },
+  { value: "suma", label: "Suma de valores", desc: "Suma todos los operandos seleccionados" },
+  { value: "promedio", label: "Promedio de valores", desc: "Calcula el promedio de los operandos" },
+  { value: "division", label: "División (A ÷ B)", desc: "Divide el primer operando entre el segundo" },
+  { value: "multiplicacion", label: "Multiplicación (A × B)", desc: "Multiplica todos los operandos" },
+  { value: "resta", label: "Resta (A − B)", desc: "Resta el segundo operando del primero" },
+  { value: "condicion", label: "Si se cumple condición → A, sino → B", desc: "Evalúa una condición y devuelve un resultado u otro" },
 ] as const;
 
 const OPERADORES = [
@@ -93,6 +93,13 @@ export default function MetricaEditSheet({
   const [valorSiCumple, setValorSiCumple] = useState<string>("");
   const [valorSiNo, setValorSiNo] = useState<string>("");
 
+  const [comparacionMode, setComparacionMode] = useState<"fijo" | "variable">("fijo");
+  const [comparacionFuente, setComparacionFuente] = useState<string[]>([]);
+  const [siCumpleMode, setSiCumpleMode] = useState<"fijo" | "variable">("fijo");
+  const [siCumpleFuente, setSiCumpleFuente] = useState<string[]>([]);
+  const [siNoMode, setSiNoMode] = useState<"fijo" | "variable">("fijo");
+  const [siNoFuente, setSiNoFuente] = useState<string[]>([]);
+
   const [valorFijo, setValorFijo] = useState<string>("");
   const [formato, setFormato] = useState<MetricaConfig["formato"]>("numero");
   const [color, setColor] = useState<string>("green");
@@ -117,9 +124,36 @@ export default function MetricaEditSheet({
             : editingMetric.formula.fuentes ?? [],
         );
         setOperador(editingMetric.formula.operador ?? ">");
-        setValorComparacion(String(editingMetric.formula.valorComparacion ?? ""));
-        setValorSiCumple(String(editingMetric.formula.valorSiCumple ?? ""));
-        setValorSiNo(String(editingMetric.formula.valorSiNo ?? ""));
+        const rawCmp = String(editingMetric.formula.valorComparacion ?? "");
+        if (rawCmp.startsWith("ref:")) {
+          setComparacionMode("variable");
+          setComparacionFuente([rawCmp.slice(4)]);
+          setValorComparacion("");
+        } else {
+          setComparacionMode("fijo");
+          setComparacionFuente([]);
+          setValorComparacion(rawCmp);
+        }
+        const rawSi = String(editingMetric.formula.valorSiCumple ?? "");
+        if (rawSi.startsWith("ref:")) {
+          setSiCumpleMode("variable");
+          setSiCumpleFuente([rawSi.slice(4)]);
+          setValorSiCumple("");
+        } else {
+          setSiCumpleMode("fijo");
+          setSiCumpleFuente([]);
+          setValorSiCumple(rawSi);
+        }
+        const rawNo = String(editingMetric.formula.valorSiNo ?? "");
+        if (rawNo.startsWith("ref:")) {
+          setSiNoMode("variable");
+          setSiNoFuente([rawNo.slice(4)]);
+          setValorSiNo("");
+        } else {
+          setSiNoMode("fijo");
+          setSiNoFuente([]);
+          setValorSiNo(rawNo);
+        }
       }
       setValorFijo(String(editingMetric.valorFijo ?? ""));
       setFormato(editingMetric.formato ?? "numero");
@@ -137,6 +171,12 @@ export default function MetricaEditSheet({
       setValorComparacion("");
       setValorSiCumple("");
       setValorSiNo("");
+      setComparacionMode("fijo");
+      setComparacionFuente([]);
+      setSiCumpleMode("fijo");
+      setSiCumpleFuente([]);
+      setSiNoMode("fijo");
+      setSiNoFuente([]);
       setValorFijo("");
       setFormato("numero");
       setColor("green");
@@ -233,13 +273,25 @@ export default function MetricaEditSheet({
       } else if (formulaTipo === "condicion" && fuente[0]) {
         formula.fuente = fuente[0];
         formula.operador = operador;
-        const cmp = valorComparacion.trim();
-        formula.valorComparacion =
-          cmp === "true" ? true : cmp === "false" ? false : parseFloat(cmp) || 0;
-        formula.valorSiCumple =
-          valorSiCumple.trim() === "" ? 0 : parseFloat(valorSiCumple) || valorSiCumple;
-        formula.valorSiNo =
-          valorSiNo.trim() === "" ? 0 : parseFloat(valorSiNo) || valorSiNo;
+        if (comparacionMode === "variable" && comparacionFuente[0]) {
+          formula.valorComparacion = `ref:${comparacionFuente[0]}`;
+        } else {
+          const cmp = valorComparacion.trim();
+          formula.valorComparacion =
+            cmp === "true" ? true : cmp === "false" ? false : parseFloat(cmp) || 0;
+        }
+        if (siCumpleMode === "variable" && siCumpleFuente[0]) {
+          formula.valorSiCumple = `ref:${siCumpleFuente[0]}`;
+        } else {
+          formula.valorSiCumple =
+            valorSiCumple.trim() === "" ? 0 : parseFloat(valorSiCumple) || valorSiCumple;
+        }
+        if (siNoMode === "variable" && siNoFuente[0]) {
+          formula.valorSiNo = `ref:${siNoFuente[0]}`;
+        } else {
+          formula.valorSiNo =
+            valorSiNo.trim() === "" ? 0 : parseFloat(valorSiNo) || valorSiNo;
+        }
       }
       config = { ...base, tipo: "automatica" as const, formula };
       onSave(config);
@@ -569,35 +621,53 @@ export default function MetricaEditSheet({
                     </option>
                   ))}
                 </select>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {TIPOS_FORMULA.find((t) => t.value === formulaTipo)?.desc}
+                </p>
               </div>
 
-              {(formulaTipo === "directo" ||
-                formulaTipo === "suma" ||
-                formulaTipo === "promedio" ||
-                formulaTipo === "multiplicacion" ||
-                formulaTipo === "division" ||
-                formulaTipo === "resta") && (
-                <div>
-                  <label className="block text-xs font-medium text-accent-cyan mb-1">
-                    {formulaTipo === "directo" ? "Fuente" : "Fuentes"}
-                  </label>
-                  <SelectorFuenteConBusqueda
-                    metricasConfig={metricasConfig}
-                    selected={fuente}
-                    onChange={setFuente}
-                    multiple={formulaTipo !== "directo"}
-                    maxSources={
-                      formulaTipo === "division" || formulaTipo === "resta" ? 2 : 10
-                    }
-                    excludeMetricId={editingMetric?.id}
-                  />
-                </div>
+              {formulaTipo !== "condicion" && (
+                <>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent-cyan/20 text-accent-cyan text-[10px] font-bold shrink-0">1</span>
+                    <span className="text-xs font-medium text-accent-cyan">Selecciona {formulaTipo === "directo" ? "la fuente" : "las fuentes"}</span>
+                  </div>
+
+                  {formulaTipo !== "directo" && fuente.length >= 2 && (
+                    <div className="rounded-lg bg-surface-700/40 border border-surface-500/50 px-3 py-2 text-xs text-gray-400 font-mono text-center">
+                      Resultado = {fuente.length > 0 ? fuente.map((_, i) => `operando${i + 1}`).join(
+                        formulaTipo === "suma" ? " + " :
+                        formulaTipo === "promedio" ? " + " :
+                        formulaTipo === "multiplicacion" ? " × " :
+                        formulaTipo === "division" ? " ÷ " :
+                        " − "
+                      ) : "..."}{formulaTipo === "promedio" && fuente.length > 0 ? ` ÷ ${fuente.length}` : ""}
+                    </div>
+                  )}
+
+                  <div>
+                    <SelectorFuenteConBusqueda
+                      metricasConfig={metricasConfig}
+                      selected={fuente}
+                      onChange={setFuente}
+                      multiple={formulaTipo !== "directo"}
+                      maxSources={
+                        formulaTipo === "division" || formulaTipo === "resta" ? 2 : 10
+                      }
+                      excludeMetricId={editingMetric?.id}
+                    />
+                  </div>
+                </>
               )}
 
               {formulaTipo === "condicion" && (
                 <div className="space-y-3 p-3 rounded-lg bg-surface-700/50 border border-surface-500">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent-cyan/20 text-accent-cyan text-[10px] font-bold shrink-0">1</span>
+                    <span className="text-xs font-medium text-accent-cyan">Define la condición</span>
+                  </div>
                   <div>
-                    <label className="block text-xs font-medium text-accent-cyan mb-1">
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
                       Fuente a comparar
                     </label>
                     <SelectorFuenteConBusqueda
@@ -626,41 +696,133 @@ export default function MetricaEditSheet({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">
-                      Valor de comparación
-                    </label>
-                    <input
-                      type="text"
-                      value={valorComparacion}
-                      onChange={(e) => setValorComparacion(e.target.value)}
-                      placeholder="Número, true o false"
-                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1">
-                        Si cumple
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-gray-400">
+                        Valor de comparación
                       </label>
+                      <div className="flex rounded-md overflow-hidden border border-surface-500">
+                        <button
+                          type="button"
+                          onClick={() => { setComparacionMode("fijo"); setComparacionFuente([]); }}
+                          className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${comparacionMode === "fijo" ? "bg-accent-cyan/20 text-accent-cyan" : "bg-surface-700 text-gray-500 hover:text-gray-300"}`}
+                        >
+                          Valor fijo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setComparacionMode("variable"); setValorComparacion(""); }}
+                          className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${comparacionMode === "variable" ? "bg-accent-purple/20 text-accent-purple" : "bg-surface-700 text-gray-500 hover:text-gray-300"}`}
+                        >
+                          Variable
+                        </button>
+                      </div>
+                    </div>
+                    {comparacionMode === "fijo" ? (
                       <input
                         type="text"
-                        value={valorSiCumple}
-                        onChange={(e) => setValorSiCumple(e.target.value)}
-                        placeholder="Número"
+                        value={valorComparacion}
+                        onChange={(e) => setValorComparacion(e.target.value)}
+                        placeholder="Número, true o false"
                         className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
                       />
+                    ) : (
+                      <SelectorFuenteConBusqueda
+                        metricasConfig={metricasConfig}
+                        selected={comparacionFuente}
+                        onChange={setComparacionFuente}
+                        excludeMetricId={editingMetric?.id}
+                      />
+                    )}
+                  </div>
+
+                  {fuente.length > 0 && (
+                    <div className="rounded-lg bg-surface-800/60 border border-surface-500/50 px-3 py-2 text-xs text-gray-400 font-mono text-center">
+                      Si <span className="text-accent-cyan">fuente</span> {operador} <span className={comparacionMode === "variable" ? "text-accent-purple" : "text-accent-amber"}>{comparacionMode === "variable" ? (comparacionFuente[0] ?? "?") : (valorComparacion || "?")}</span> → resultado A, sino → resultado B
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-accent-green/20 text-accent-green text-[10px] font-bold shrink-0">2</span>
+                    <span className="text-xs font-medium text-accent-green">Define los resultados</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-accent-green">
+                          Resultado si cumple (A)
+                        </label>
+                        <div className="flex rounded-md overflow-hidden border border-surface-500">
+                          <button
+                            type="button"
+                            onClick={() => { setSiCumpleMode("fijo"); setSiCumpleFuente([]); }}
+                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${siCumpleMode === "fijo" ? "bg-accent-cyan/20 text-accent-cyan" : "bg-surface-700 text-gray-500 hover:text-gray-300"}`}
+                          >
+                            Fijo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSiCumpleMode("variable"); setValorSiCumple(""); }}
+                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${siCumpleMode === "variable" ? "bg-accent-purple/20 text-accent-purple" : "bg-surface-700 text-gray-500 hover:text-gray-300"}`}
+                          >
+                            Variable
+                          </button>
+                        </div>
+                      </div>
+                      {siCumpleMode === "fijo" ? (
+                        <input
+                          type="text"
+                          value={valorSiCumple}
+                          onChange={(e) => setValorSiCumple(e.target.value)}
+                          placeholder="Número"
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+                        />
+                      ) : (
+                        <SelectorFuenteConBusqueda
+                          metricasConfig={metricasConfig}
+                          selected={siCumpleFuente}
+                          onChange={setSiCumpleFuente}
+                          excludeMetricId={editingMetric?.id}
+                        />
+                      )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1">
-                        Si no cumple
-                      </label>
-                      <input
-                        type="text"
-                        value={valorSiNo}
-                        onChange={(e) => setValorSiNo(e.target.value)}
-                        placeholder="Número"
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-red-400">
+                          Resultado si no cumple (B)
+                        </label>
+                        <div className="flex rounded-md overflow-hidden border border-surface-500">
+                          <button
+                            type="button"
+                            onClick={() => { setSiNoMode("fijo"); setSiNoFuente([]); }}
+                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${siNoMode === "fijo" ? "bg-accent-cyan/20 text-accent-cyan" : "bg-surface-700 text-gray-500 hover:text-gray-300"}`}
+                          >
+                            Fijo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSiNoMode("variable"); setValorSiNo(""); }}
+                            className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${siNoMode === "variable" ? "bg-accent-purple/20 text-accent-purple" : "bg-surface-700 text-gray-500 hover:text-gray-300"}`}
+                          >
+                            Variable
+                          </button>
+                        </div>
+                      </div>
+                      {siNoMode === "fijo" ? (
+                        <input
+                          type="text"
+                          value={valorSiNo}
+                          onChange={(e) => setValorSiNo(e.target.value)}
+                          placeholder="Número"
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+                        />
+                      ) : (
+                        <SelectorFuenteConBusqueda
+                          metricasConfig={metricasConfig}
+                          selected={siNoFuente}
+                          onChange={setSiNoFuente}
+                          excludeMetricId={editingMetric?.id}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

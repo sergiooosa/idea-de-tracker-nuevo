@@ -150,21 +150,23 @@ function TriggerSection({ triggers }: { triggers: SystemConfig["chat_triggers"] 
 function ApiSection() {
   const examplePayload = JSON.stringify(
     {
-      data: {
-        fecha: "2025-12-15",
-        metricas: {
-          facturacion: 15000000,
-          cash_collected: 8500000,
-          ingresos: 15000000,
+      data: [
+        {
+          fecha: "2025-12-15",
+          metricas: {
+            facturacion: 15000000,
+            cash_collected: 8500000,
+            ingresos: 15000000,
+          },
         },
-      },
+      ],
     },
     null,
     2,
   );
 
   const curlExample = `curl -X POST \\
-  "${API_BASE_URL}/webhooks/external-data/TU-SUBDOMINIO" \\
+  "${API_BASE_URL}/webhooks/external-data/tu-subdominio" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: TU_API_KEY_AQUÍ" \\
   -d '${examplePayload}'`;
@@ -187,13 +189,17 @@ function ApiSection() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm text-gray-300">Endpoint</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2">
           <div className="flex items-center gap-2 rounded-lg bg-[#0d1117] px-3 py-2 border border-surface-500">
             <Badge variant="default" className="shrink-0">POST</Badge>
             <code className="text-sm text-accent-cyan font-mono break-all">
-              {API_BASE_URL}/webhooks/external-data/:locationid
+              {API_BASE_URL}/webhooks/external-data/:subdominio
             </code>
           </div>
+          <p className="text-xs text-gray-500">
+            Reemplaza <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">:subdominio</code> con el subdominio de tu cuenta (el mismo que aparece en la URL de tu panel).
+            El body debe ser <code className="bg-surface-700 px-1 py-0.5 rounded text-gray-300">{"{ data: [{ fecha, metricas }] }"}</code> — un array de objetos con fecha y métricas numéricas.
+          </p>
         </CardContent>
       </Card>
 

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG } from "@/lib/metricas-engine";
+import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import type {
   DashboardKpis,
@@ -41,6 +41,7 @@ export async function getDashboard(
   dateFrom: string,
   dateTo: string,
   closerEmail?: string,
+  filterTags?: string[],
 ): Promise<DashboardResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
@@ -59,7 +60,8 @@ export async function getDashboard(
 
   const fuenteFinanciera = cuentaRow?.configuracion_ui?.fuente_datos_financieros;
   const useExterna = fuenteFinanciera === "api_externa";
-  const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : null;
+  const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
+  const embudoRaw = embudoRawArr.length > 0 ? embudoRawArr : DEFAULT_EMBUDO_CONFIG;
   const { attendedSet, closedSet, effectiveSet, etapas } = buildFunnelSets(embudoRaw);
 
   const fechaFilter = or(
@@ -98,14 +100,22 @@ export async function getDashboard(
       .where(and(...callConditions)),
   ]);
 
-  const asistidas = agendas.filter((a) => attendedSet.has(a.categoria ?? "")).length;
-  const canceladas = agendas.filter((a) => a.categoria === "CANCELADA").length;
-  const cerradas = agendas.filter((a) => closedSet.has(a.categoria ?? "")).length;
-  const efectivas = agendas.filter((a) => effectiveSet.has(a.categoria ?? "")).length;
-  const revenueNativo = agendas
+  let filteredAgendas = agendas;
+  let filteredCalls = calls;
+  if (filterTags && filterTags.length > 0) {
+    const tagSet = new Set(filterTags);
+    filteredAgendas = agendas.filter((a) => Array.isArray(a.tags_internos) && a.tags_internos.some((t) => tagSet.has(t)));
+    filteredCalls = calls.filter((c) => Array.isArray(c.tags_internos) && c.tags_internos.some((t) => tagSet.has(t)));
+  }
+
+  const asistidas = filteredAgendas.filter((a) => attendedSet.has(a.categoria ?? "")).length;
+  const canceladas = filteredAgendas.filter((a) => a.categoria === "CANCELADA").length;
+  const cerradas = filteredAgendas.filter((a) => closedSet.has(a.categoria ?? "")).length;
+  const efectivas = filteredAgendas.filter((a) => effectiveSet.has(a.categoria ?? "")).length;
+  const revenueNativo = filteredAgendas
     .filter((a) => closedSet.has(a.categoria ?? ""))
     .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
-  const cashNativo = agendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
+  const cashNativo = filteredAgendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
 
   let revenue = revenueNativo;
   let cash = cashNativo;
@@ -136,21 +146,21 @@ export async function getDashboard(
     cash = extCash;
   }
 
-  const efectivasCalls = calls.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
+  const efectivasCalls = filteredCalls.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
   const contestadas = efectivasCalls;
 
-  const leadsFromCalls = new Set(calls.map((c) => c.mail_lead).filter(Boolean));
-  const leadsFromAgendas = new Set(agendas.map((a) => a.email_lead).filter(Boolean));
+  const leadsFromCalls = new Set(filteredCalls.map((c) => c.mail_lead).filter(Boolean));
+  const leadsFromAgendas = new Set(filteredAgendas.map((a) => a.email_lead).filter(Boolean));
   const totalLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]).size;
 
-  const speedVals = calls
+  const speedVals = filteredCalls
     .filter((c) => c.speed_to_lead)
     .map((c) => parseFloat(c.speed_to_lead!) || 0)
     .filter((v) => v > 0);
   const speedAvg = speedVals.length > 0 ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length : 0;
 
   const attemptsByLead: Record<string, number> = {};
-  for (const c of calls) {
+  for (const c of filteredCalls) {
     const key = c.mail_lead ?? c.phone ?? String(c.id);
     attemptsByLead[key] = (attemptsByLead[key] ?? 0) + 1;
   }
@@ -160,14 +170,14 @@ export async function getDashboard(
     : 0;
 
   const tasaCierre = asistidas > 0 ? (cerradas / asistidas) * 100 : 0;
-  const tasaAgendamiento = contestadas > 0 ? (agendas.length / contestadas) * 100 : 0;
+  const tasaAgendamiento = contestadas > 0 ? (filteredAgendas.length / contestadas) * 100 : 0;
 
   const kpis: DashboardKpis & Record<string, number> = {
     totalLeads,
-    callsMade: calls.length,
+    callsMade: filteredCalls.length,
     contestadas,
-    answerRate: calls.length > 0 ? contestadas / calls.length : 0,
-    meetingsBooked: agendas.length,
+    answerRate: filteredCalls.length > 0 ? contestadas / filteredCalls.length : 0,
+    meetingsBooked: filteredAgendas.length,
     meetingsAttended: asistidas,
     meetingsCanceled: canceladas,
     meetingsClosed: cerradas,
@@ -180,22 +190,22 @@ export async function getDashboard(
     speedToLeadAvg: speedAvg,
     avgAttempts: attemptsAvg,
     attemptsToFirstContactAvg: attemptsAvg,
-    agendadas: agendas.length,
+    agendadas: filteredAgendas.length,
     asistidas,
     canceladas,
     efectivas,
-    noShows: agendas.filter((a) => (a.categoria ?? "").toLowerCase() === "no_show").length,
+    noShows: filteredAgendas.filter((a) => (a.categoria ?? "").toLowerCase() === "no_show").length,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
   };
 
   // Advisor ranking
-  const advisorMap: Record<string, { calls: typeof calls; agendas: typeof agendas }> = {};
-  for (const c of calls) {
+  const advisorMap: Record<string, { calls: typeof filteredCalls; agendas: typeof filteredAgendas }> = {};
+  for (const c of filteredCalls) {
     const key = c.closer_mail ?? c.nombre_closer ?? "Sin asignar";
     if (!advisorMap[key]) advisorMap[key] = { calls: [], agendas: [] };
     advisorMap[key].calls.push(c);
   }
-  for (const a of agendas) {
+  for (const a of filteredAgendas) {
     const key = a.closer ?? "Sin asignar";
     if (!advisorMap[key]) advisorMap[key] = { calls: [], agendas: [] };
     advisorMap[key].agendas.push(a);
@@ -239,12 +249,12 @@ export async function getDashboard(
 
   // Volume by day
   const volumeMap: Record<string, DashboardVolumeDay> = {};
-  for (const c of calls) {
+  for (const c of filteredCalls) {
     const d = c.ts.toISOString().slice(0, 10);
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].llamadas++;
   }
-  for (const a of agendas) {
+  for (const a of filteredAgendas) {
     const d = a.fecha_reunion?.toISOString().slice(0, 10) ?? a.fecha;
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].citasPresentaciones++;
@@ -254,7 +264,7 @@ export async function getDashboard(
 
   // Objeciones
   const objMap: Record<string, { count: number; quotes: Set<string> }> = {};
-  for (const a of agendas) {
+  for (const a of filteredAgendas) {
     if (!Array.isArray(a.objeciones_ia)) continue;
     for (const obj of a.objeciones_ia) {
       const key = (obj.categoria ?? obj.objecion ?? "").toLowerCase().trim();
@@ -281,7 +291,7 @@ export async function getDashboard(
   }));
 
   const distribucionEmbudo: Record<string, number> = {};
-  for (const a of agendas) {
+  for (const a of filteredAgendas) {
     const cat = a.categoria ?? "sin_categoria";
     distribucionEmbudo[cat] = (distribucionEmbudo[cat] ?? 0) + 1;
   }
@@ -292,6 +302,14 @@ export async function getDashboard(
   }
   for (const c of calls) {
     if (Array.isArray(c.tags_internos)) c.tags_internos.forEach((t) => allTags.add(t));
+  }
+
+  const tagCounts: Record<string, number> = {};
+  for (const a of filteredAgendas) {
+    if (Array.isArray(a.tags_internos)) a.tags_internos.forEach((t) => { tagCounts[t] = (tagCounts[t] ?? 0) + 1; });
+  }
+  for (const c of filteredCalls) {
+    if (Array.isArray(c.tags_internos)) c.tags_internos.forEach((t) => { tagCounts[t] = (tagCounts[t] ?? 0) + 1; });
   }
 
   const rawConfigs: MetricaConfig[] = Array.isArray(cuentaRow?.metricas_config) ? cuentaRow.metricas_config : [];
@@ -359,6 +377,7 @@ export async function getDashboard(
     })),
     distribucionEmbudo,
     tagsDisponibles: [...allTags].sort(),
+    tagCounts,
     metricasPersonalizadas: Array.isArray(cuentaRow?.metricas_personalizadas) ? cuentaRow.metricas_personalizadas : [],
     metricasComputadas,
   };

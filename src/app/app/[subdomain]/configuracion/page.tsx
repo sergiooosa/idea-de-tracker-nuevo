@@ -7,6 +7,7 @@ import { useUserFilter } from "@/contexts/UserFilterContext";
 import { canManageUsers, canManageRoles } from "@/lib/permisos";
 import { PERMISOS_DISPONIBLES, type PermisoId } from "@/lib/permisos";
 import type { RolConfig } from "@/lib/db/schema";
+import { toast } from "sonner";
 
 interface UserRow {
   id: number;
@@ -86,7 +87,8 @@ export default function ConfiguracionPage() {
       if (editingUser) {
         const body: Record<string, unknown> = { id: editingUser.id, nombre: formUser.name, rol: formUser.rol, fathom: formUser.fathom };
         if (formUser.password) body.password = formUser.password;
-        await fetch("/api/data/usuarios", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const putRes = await fetch("/api/data/usuarios", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!putRes.ok) throw new Error("Error al actualizar");
       } else {
         if (!formUser.email || !formUser.password) {
           setError("Email y contraseña son obligatorios");
@@ -120,18 +122,35 @@ export default function ConfiguracionPage() {
   };
 
   const handleDeleteUser = async (id: number) => {
+    const target = users.find((u) => u.id === id);
+    if (target && session?.email && target.email === session.email) {
+      toast.error("No puedes eliminar tu propia cuenta");
+      return;
+    }
     if (!confirm("¿Eliminar este usuario?")) return;
-    await fetch(`/api/data/usuarios?id=${id}`, { method: "DELETE" });
-    loadUsers();
+    try {
+      const res = await fetch(`/api/data/usuarios?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Error al eliminar");
+      toast.success("Usuario eliminado");
+      loadUsers();
+    } catch {
+      toast.error("Error al eliminar el usuario");
+    }
   };
 
   const updateRoleUser = async (userId: number, newRole: string) => {
-    await fetch("/api/data/usuarios", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: userId, rol: newRole }),
-    });
-    loadUsers();
+    try {
+      const res = await fetch("/api/data/usuarios", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, rol: newRole }),
+      });
+      if (!res.ok) throw new Error("Error al actualizar rol");
+      toast.success("Rol actualizado");
+      loadUsers();
+    } catch {
+      toast.error("Error al actualizar el rol");
+    }
   };
 
   const openCreateRol = () => {
@@ -162,27 +181,37 @@ export default function ConfiguracionPage() {
       const newRoles = editingRol
         ? roles.map((r) => (r.id === editingRol.id ? formRol : r))
         : [...roles, formRol];
-      await fetch("/api/data/roles", {
+      const res = await fetch("/api/data/roles", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roles_config: newRoles }),
       });
+      if (!res.ok) throw new Error("Error al guardar rol");
+      toast.success("Rol guardado");
       setModalRol(null);
       loadRoles();
-    } catch { /* ignore */ }
+    } catch {
+      toast.error("Error al guardar el rol");
+    }
     setSaving(false);
   };
 
   const handleDeleteRol = async (id: string) => {
     if (["superadmin", "usuario"].includes(id)) return;
     if (!confirm("¿Eliminar este rol?")) return;
-    const newRoles = roles.filter((r) => r.id !== id);
-    await fetch("/api/data/roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roles_config: newRoles }),
-    });
-    loadRoles();
+    try {
+      const newRoles = roles.filter((r) => r.id !== id);
+      const res = await fetch("/api/data/roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles_config: newRoles }),
+      });
+      if (!res.ok) throw new Error("Error al eliminar rol");
+      toast.success("Rol eliminado");
+      loadRoles();
+    } catch {
+      toast.error("Error al eliminar el rol");
+    }
   };
 
   if (!puedeUsuarios && !puedeRoles) {

@@ -8,7 +8,9 @@ export async function GET(req: Request) {
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
     const closerEmail = searchParams.get("closerEmail") || undefined;
-    const data = await getDashboard(idCuenta, from, to, closerEmail);
+    const tagsParam = searchParams.get("tags") || undefined;
+    const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : undefined;
+    const data = await getDashboard(idCuenta, from, to, closerEmail, tags);
     return NextResponse.json(data);
   });
 }

@@ -3,7 +3,7 @@
  * KPIs por defecto disponibles para fórmulas automáticas.
  */
 
-import type { MetricaConfig, MetricaManualEntry } from "@/lib/db/schema";
+import type { MetricaConfig, MetricaManualEntry, EmbudoEtapa } from "@/lib/db/schema";
 
 export const KPI_DEFAULT_KEYS = [
   "totalLeads",
@@ -77,6 +77,16 @@ export const DEFAULT_METRICAS_CONFIG: MetricaConfig[] = [
   { id: "default-revenue", nombre: "Ingresos", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 10, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "revenue" } },
   { id: "default-cash", nombre: "Efectivo cobrado", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 11, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "cashCollected" } },
   { id: "default-ticket", nombre: "Ticket promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 12, formato: "moneda", color: "blue", formula: { tipo: "directo", fuente: "avgTicket" }, descripcion: "Ingresos ÷ Citas efectivas" },
+];
+
+/** Etapas por defecto del embudo. Se usan si embudo_personalizado está vacío. */
+export const DEFAULT_EMBUDO_CONFIG: EmbudoEtapa[] = [
+  { id: "default-agendada", nombre: "Agendada", color: "#06b6d4", orden: 1, condition: "El lead aceptó agendar una cita o demo. Mostró disposición para una reunión." },
+  { id: "default-asistida", nombre: "Asistida", color: "#8b5cf6", orden: 2, condition: "El lead se presentó a la reunión/cita programada." },
+  { id: "default-ofertada", nombre: "Ofertada", color: "#f97316", orden: 3, condition: "Se le presentó una propuesta comercial concreta al lead con precio y condiciones." },
+  { id: "default-cerrada", nombre: "Cerrada", color: "#22c55e", orden: 4, condition: "El lead aceptó la propuesta y se concretó la venta. Cerrada = venta ganada." },
+  { id: "default-cancelada", nombre: "CANCELADA", color: "#ef4444", orden: 5, condition: "El lead canceló la cita o la reunión antes de asistir." },
+  { id: "default-no-show", nombre: "No_Show", color: "#eab308", orden: 6, condition: "El lead no se presentó a la reunión programada sin avisar." },
 ];
 
 /** Obtener métricas que dependen de esta (para aviso al borrar) */

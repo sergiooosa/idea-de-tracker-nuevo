@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs } from "@/lib/db/schema";
+import { eq, and, gte, lte, sql, or, isNull, isNotNull } from "drizzle-orm";
 import type {
   AsesorKpis,
   AsesorLeadCRM,
@@ -35,11 +35,35 @@ export async function getAsesorData(
     callConditions.push(eq(logLlamadas.closer_mail, advisorEmail));
   }
 
-  const callRows = await db
-    .select()
-    .from(logLlamadas)
-    .where(and(...callConditions))
-    .orderBy(sql`${logLlamadas.ts} DESC`);
+  const fechaFilter = or(
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromTs),
+      lte(resumenesDiariosAgendas.fecha_reunion, toTs),
+    ),
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+  )!;
+  const agendaConditions = [
+    eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
+    fechaFilter,
+  ];
+  if (advisorEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, advisorEmail));
+
+  const [callRows, agendaRows] = await Promise.all([
+    db
+      .select()
+      .from(logLlamadas)
+      .where(and(...callConditions))
+      .orderBy(sql`${logLlamadas.ts} DESC`),
+    db
+      .select()
+      .from(resumenesDiariosAgendas)
+      .where(and(...agendaConditions)),
+  ]);
 
   const idCuentaStr = String(idCuenta);
   const regConditions = [eq(registrosDeLlamada.id_cuenta, idCuentaStr)];
@@ -54,15 +78,22 @@ export async function getAsesorData(
     .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
 
   const contestadas = callRows.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
-  const leadsUnique = new Set(callRows.map((c) => c.mail_lead).filter(Boolean));
+
+  // Leads únicos multicanal: deduplicar por email across calls + agendas
+  const leadsFromCalls = new Set(callRows.map((c) => c.mail_lead).filter(Boolean));
+  const leadsFromAgendas = new Set(agendaRows.map((a) => a.email_lead).filter(Boolean));
+  const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]);
+
+  const reunionesAgendadas = agendaRows.length;
+  const tasaAgendamiento = contestadas > 0 ? (reunionesAgendadas / contestadas) * 100 : 0;
 
   const kpis: AsesorKpis = {
-    leadsAsignados: leadsUnique.size,
+    leadsAsignados: allLeads.size,
     llamadasRealizadas: callRows.length,
     llamadasContestadas: contestadas,
-    reunionesAgendadas: 0,
+    reunionesAgendadas,
     tasaContacto: callRows.length > 0 ? (contestadas / callRows.length) * 100 : 0,
-    tasaAgendamiento: 0,
+    tasaAgendamiento,
   };
 
   const leadMap: Record<string, AsesorLeadCRM> = {};
@@ -98,6 +129,9 @@ export async function getAsesorData(
   const advisorSet = new Set<string>();
   for (const c of callRows) {
     if (c.closer_mail) advisorSet.add(c.closer_mail);
+  }
+  for (const a of agendaRows) {
+    if (a.closer) advisorSet.add(a.closer);
   }
   const advisors: ApiAdvisor[] = [...advisorSet].map((email) => {
     const name = callRows.find((c) => c.closer_mail === email)?.nombre_closer ?? email;

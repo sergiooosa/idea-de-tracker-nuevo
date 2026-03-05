@@ -9,7 +9,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { useUserFilter } from '@/contexts/UserFilterContext';
 import type { AsesorResponse, AsesorLeadCRM } from '@/types';
-import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search } from 'lucide-react';
+import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search, HelpCircle } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
 type CrmCategory = 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
@@ -20,6 +20,17 @@ const CRM_CATEGORIES: { id: CrmCategory; label: string }[] = [
   { id: 'interesados', label: 'Interesados' },
   { id: 'no_interesados', label: 'No interesados' },
 ];
+
+function SectionInfo({ text }: { text: string }) {
+  return (
+    <span className="relative group/info inline-flex ml-1 align-middle">
+      <HelpCircle className="w-3.5 h-3.5 text-gray-500 hover:text-accent-cyan cursor-help transition-colors" />
+      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-60 rounded-lg bg-surface-700 border border-surface-500 shadow-xl px-2.5 py-2 text-[10px] leading-relaxed text-gray-300 opacity-0 group-hover/info:opacity-100 transition-opacity duration-200 whitespace-normal text-left font-normal normal-case tracking-normal">
+        {text}
+      </span>
+    </span>
+  );
+}
 
 function CRMCard({ lead }: { lead: AsesorLeadCRM }) {
   const [showNotas, setShowNotas] = useState(false);
@@ -220,20 +231,24 @@ export default function AsesorPage() {
         ) : (
           <>
             <section>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">KPIs en el período</h2>
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                KPIs en el período
+                <SectionInfo text="Estos KPIs muestran datos del asesor seleccionado en el período de fechas elegido." />
+              </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-                <KPICard label="Leads asignados" value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad.', calculo: 'Distintos mail_lead en el rango.' }} />
-                <KPICard label="Llamadas realizadas" value={kpis.llamadasRealizadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de llamadas en el período.', calculo: 'Eventos en log_llamadas.' }} />
-                <KPICard label="Llamadas contestadas" value={kpis.llamadasContestadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Llamadas con respuesta.', calculo: 'Tipo evento efectiva_*.' }} />
-                <KPICard label="Reuniones agendadas" value={kpis.reunionesAgendadas} color="purple" className={kpiCompact} tooltip={{ significado: 'Reuniones en el período.', calculo: 'Desde agendas.' }} />
-                <KPICard label="Tasa de contacto" value={`${kpis.tasaContacto.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: '% contestadas.', calculo: '(Contestadas / Total) × 100.' }} />
-                <KPICard label="Tasa de agendamiento" value={`${kpis.tasaAgendamiento.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: '% que agendó.', calculo: '(Reuniones / Contestadas) × 100.' }} />
+                <KPICard label="Leads asignados" value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad en llamadas y videollamadas en el rango seleccionado.', calculo: 'Correos distintos (mail_lead) que aparecen en el log de llamadas del período.' }} />
+                <KPICard label="Llamadas realizadas" value={kpis.llamadasRealizadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de eventos registrados en el log de llamadas durante el período.', calculo: 'Cuenta de todas las filas en log_llamadas dentro del rango de fechas.' }} />
+                <KPICard label="Llamadas contestadas" value={kpis.llamadasContestadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Llamadas con respuesta efectiva del lead.', calculo: 'Eventos cuyo tipo comienza con efectiva_* en log_llamadas.' }} />
+                <KPICard label="Reuniones agendadas" value={kpis.reunionesAgendadas} color="purple" className={kpiCompact} tooltip={{ significado: 'Citas registradas en el período seleccionado.', calculo: 'Registros en la tabla de agendas dentro del rango de fechas.' }} />
+                <KPICard label="Tasa de contacto" value={`${kpis.tasaContacto.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas que fueron contestadas respecto al total.', calculo: '(Llamadas contestadas ÷ Total llamadas realizadas) × 100.' }} />
+                <KPICard label="Tasa de agendamiento" value={`${kpis.tasaAgendamiento.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas contestadas que resultaron en una reunión agendada.', calculo: '(Reuniones agendadas ÷ Llamadas contestadas) × 100.' }} />
               </div>
             </section>
 
             <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4 space-y-4">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5 text-accent-cyan" /> Metas de llamadas
+                <SectionInfo text="Meta diaria de llamadas establecida en Sistema → Paso 6." />
               </h2>
               <div className="space-y-2 text-sm text-gray-300">
                 <p>Meta diaria: <strong className="text-accent-cyan">{metaLlamadasDiarias}</strong> llamadas.</p>
@@ -261,6 +276,7 @@ export default function AsesorPage() {
             <section>
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-accent-cyan" /> CRM — Leads por categoría
+                <SectionInfo text="Leads organizados por su estado en el ciclo de ventas. Los estados se asignan por IA o manualmente." />
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
                 {CRM_CATEGORIES.map((cat) => (

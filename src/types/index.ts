@@ -403,6 +403,7 @@ export interface DashboardResponse {
   embudoPersonalizado?: EmbudoEtapaUI[];
   distribucionEmbudo?: Record<string, number>;
   tagsDisponibles?: string[];
+  tagCounts?: Record<string, number>;
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
   metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[];
 }
