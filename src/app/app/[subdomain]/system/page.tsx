@@ -21,7 +21,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getMetricasQueDependenDe } from '@/lib/metricas-engine';
+import { getMetricasQueDependenDe, KPI_DEFAULT_LABELS } from '@/lib/metricas-engine';
 import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
 
@@ -435,6 +435,49 @@ export default function SystemPage() {
                   <p className="text-sm text-gray-400">Manuales (campos), automáticas (fórmulas) o fijas (valor constante). Arrastra para ordenar.</p>
                 </div>
               </div>
+
+              <div className="rounded-xl border border-surface-500 bg-surface-800/50 p-4">
+                <h4 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider mb-3">
+                  Métricas principales (ya en el panel)
+                </h4>
+                <p className="text-[11px] text-gray-500 mb-3">
+                  Estas métricas ya se muestran en el Panel ejecutivo debajo de &quot;KPIs operativos&quot;. Puedes usarlas como fuente al crear métricas automáticas.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {[
+                    'totalLeads',
+                    'callsMade',
+                    'contestadas',
+                    'answerRate',
+                    'meetingsBooked',
+                    'meetingsAttended',
+                    'meetingsCanceled',
+                    'meetingsClosed',
+                    'effectiveAppointments',
+                    'tasaCierre',
+                    'tasaAgendamiento',
+                    'revenue',
+                    'cashCollected',
+                    'avgTicket',
+                    'speedToLeadAvg',
+                    'avgAttempts',
+                    'agendadas',
+                    'asistidas',
+                    'canceladas',
+                    'efectivas',
+                    'noShows',
+                    'ticket',
+                  ].map((key) => (
+                    <div
+                      key={key}
+                      className="rounded-lg bg-surface-700/80 border border-surface-500 px-2 py-1.5 text-xs"
+                    >
+                      <span className="text-white font-medium">{KPI_DEFAULT_LABELS[key] ?? key}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <DndContext
                 sensors={dndSensors}
                 collisionDetection={closestCenter}
