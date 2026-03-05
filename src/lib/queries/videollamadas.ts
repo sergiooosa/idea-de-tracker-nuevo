@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica } from "@/lib/metricas-engine";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, isNull, isNotNull } from "drizzle-orm";
 import type {
   ApiVideollamada,
   VideollamadasAdvisorMetrics,
@@ -51,9 +51,21 @@ export async function getVideollamadas(
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
+  const fechaFilter = or(
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+      lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    ),
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+  )!;
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-    sql`COALESCE(${resumenesDiariosAgendas.fecha_reunion}::date, ${resumenesDiariosAgendas.fecha}) BETWEEN ${dateFrom}::date AND ${dateTo}::date`,
+    fechaFilter,
   ];
   if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
 

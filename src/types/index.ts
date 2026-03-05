@@ -404,7 +404,7 @@ export interface DashboardResponse {
   distribucionEmbudo?: Record<string, number>;
   tagsDisponibles?: string[];
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
-  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string }[];
+  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[];
 }
 
 export interface AsesorLeadCRM {

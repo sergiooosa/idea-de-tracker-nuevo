@@ -42,6 +42,23 @@ const UBICACIONES = [
   { value: "ambos", label: "Ambos" },
 ] as const;
 
+const FORMATOS = [
+  { value: "numero", label: "Número (123)" },
+  { value: "moneda", label: "Moneda ($1,234)" },
+  { value: "porcentaje", label: "Porcentaje (85.0%)" },
+  { value: "tiempo", label: "Tiempo (2.3 min)" },
+  { value: "decimal", label: "Decimal (4.5)" },
+] as const;
+
+const COLORES = [
+  { value: "blue", label: "Azul", css: "bg-blue-500" },
+  { value: "cyan", label: "Cian", css: "bg-cyan-500" },
+  { value: "green", label: "Verde", css: "bg-green-500" },
+  { value: "purple", label: "Morado", css: "bg-purple-500" },
+  { value: "amber", label: "Ámbar", css: "bg-amber-500" },
+  { value: "red", label: "Rojo", css: "bg-red-500" },
+] as const;
+
 interface MetricaEditSheetProps {
   metricasConfig: MetricaConfig[];
   metricasManualData: Record<string, MetricaManualEntry[]>;
@@ -77,6 +94,8 @@ export default function MetricaEditSheet({
   const [valorSiNo, setValorSiNo] = useState<string>("");
 
   const [valorFijo, setValorFijo] = useState<string>("");
+  const [formato, setFormato] = useState<MetricaConfig["formato"]>("numero");
+  const [color, setColor] = useState<string>("green");
 
   const [nuevaEntrada, setNuevaEntrada] = useState<Record<string, string | number | boolean>>({});
   const [entradas, setEntradas] = useState<MetricaManualEntry[]>([]);
@@ -103,6 +122,8 @@ export default function MetricaEditSheet({
         setValorSiNo(String(editingMetric.formula.valorSiNo ?? ""));
       }
       setValorFijo(String(editingMetric.valorFijo ?? ""));
+      setFormato(editingMetric.formato ?? "numero");
+      setColor(editingMetric.color ?? "green");
       setEntradas(metricasManualData[editingMetric.id] ?? []);
     } else {
       setNombre("");
@@ -117,6 +138,8 @@ export default function MetricaEditSheet({
       setValorSiCumple("");
       setValorSiNo("");
       setValorFijo("");
+      setFormato("numero");
+      setColor("green");
       setEntradas([]);
     }
     setNuevaEntrada({});
@@ -173,16 +196,10 @@ export default function MetricaEditSheet({
 
     let config: MetricaConfig;
 
+    const base = { id, nombre: nombre.trim(), descripcion: descripcion.trim() || undefined, ubicacion, orden, formato, color };
+
     if (tipo === "fija") {
-      config = {
-        id,
-        nombre: nombre.trim(),
-        descripcion: descripcion.trim() || undefined,
-        tipo: "fija",
-        ubicacion,
-        orden,
-        valorFijo: valorFijo.trim() || "0",
-      };
+      config = { ...base, tipo: "fija" as const, valorFijo: valorFijo.trim() || "0" };
       onSave(config);
     } else if (tipo === "manual") {
       if (campos.length === 0) {
@@ -200,15 +217,7 @@ export default function MetricaEditSheet({
         setSaving(false);
         return;
       }
-      config = {
-        id,
-        nombre: nombre.trim(),
-        descripcion: descripcion.trim() || undefined,
-        tipo: "manual",
-        ubicacion,
-        orden,
-        campos: validCampos,
-      };
+      config = { ...base, tipo: "manual" as const, campos: validCampos };
       onSave(config, entradas);
     } else {
       const formula: MetricaFormulaConfig = { tipo: formulaTipo };
@@ -232,15 +241,7 @@ export default function MetricaEditSheet({
         formula.valorSiNo =
           valorSiNo.trim() === "" ? 0 : parseFloat(valorSiNo) || valorSiNo;
       }
-      config = {
-        id,
-        nombre: nombre.trim(),
-        descripcion: descripcion.trim() || undefined,
-        tipo: "automatica",
-        ubicacion,
-        orden,
-        formula,
-      };
+      config = { ...base, tipo: "automatica" as const, formula };
       onSave(config);
     }
     setSaving(false);
@@ -316,6 +317,35 @@ export default function MetricaEditSheet({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Formato del valor</label>
+              <select
+                value={formato}
+                onChange={(e) => setFormato(e.target.value as MetricaConfig["formato"])}
+                className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+              >
+                {FORMATOS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Color en el panel</label>
+              <div className="flex gap-1.5 mt-1">
+                {COLORES.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setColor(c.value)}
+                    className={`w-7 h-7 rounded-lg ${c.css} transition-all ${color === c.value ? "ring-2 ring-white ring-offset-1 ring-offset-surface-600 scale-110" : "opacity-50 hover:opacity-80"}`}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
 
           {!editingMetric && (

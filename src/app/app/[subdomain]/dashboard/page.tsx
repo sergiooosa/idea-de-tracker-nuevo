@@ -9,7 +9,7 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse } from '@/types';
 import Link from 'next/link';
-import { Target, X, UserCircle, Trophy, GitBranch, BarChart3, Pencil } from 'lucide-react';
+import { Target, X, UserCircle, Trophy, GitBranch, Pencil } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -77,23 +77,35 @@ export default function DashboardPage() {
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">KPIs operativos</h2>
           <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-            {[
-              { label: 'Leads generados', value: kpis.totalLeads, color: 'blue' },
-              { label: 'Llamadas', value: kpis.callsMade, color: 'cyan' },
-              { label: 'Contestadas', value: kpis.contestadas, color: 'cyan', sub: `Tasa: ${pctFmt(kpis.answerRate)}` },
-              { label: 'Tiempo al lead', value: minFmt(kpis.speedToLeadAvg), color: 'purple' },
-              { label: 'Intentos promedio', value: kpis.avgAttempts.toFixed(1), color: 'amber' },
-              { label: 'Ingresos', value: fm(kpis.revenue), color: 'green' },
-              { label: 'Efectivo cobrado', value: fm(kpis.cashCollected), color: 'green' },
-              { label: 'Ticket promedio', value: fm(kpis.avgTicket), color: 'blue' },
-            ].map(({ label, value, color, sub }) => (
-              <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
-                <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{value}</p>
-                {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
-                <div className="kpi-card-spacer" />
-              </div>
-            ))}
+            {(data?.metricasComputadas ?? [])
+              .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
+              .map((m) => {
+                const color = m.color || 'green';
+                const raw = typeof m.valor === 'number' ? m.valor : parseFloat(String(m.valor)) || 0;
+                let display: string | number = m.valor;
+                switch (m.formato) {
+                  case 'moneda': display = fm(raw); break;
+                  case 'porcentaje': display = pctFmt(raw); break;
+                  case 'tiempo': display = minFmt(raw); break;
+                  case 'decimal': display = raw.toFixed(1); break;
+                  case 'numero': display = typeof m.valor === 'number' ? m.valor : raw; break;
+                }
+                return (
+                  <div key={m.id} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed relative group`}>
+                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
+                    <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{display}</p>
+                    {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
+                    <div className="kpi-card-spacer" />
+                    <Link
+                      href={`/system?step=5&edit=${m.id}`}
+                      className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
+                      title="Editar métrica"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                );
+              })}
           </div>
         </section>
 
@@ -201,51 +213,6 @@ export default function DashboardPage() {
             </div>
           </section>
         </div>
-
-        {((data?.metricasComputadas ?? []).filter(
-          (m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion
-        ).length > 0 || (data?.metricasPersonalizadas ?? []).filter(
-          (m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion
-        ).length > 0) && (
-          <section>
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <BarChart3 className="w-3.5 h-3.5 text-accent-green" />
-              Métricas personalizadas
-            </h2>
-            <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-              {(data?.metricasComputadas ?? []).filter(
-                (m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion
-              ).length > 0
-                ? (data?.metricasComputadas ?? [])
-                    .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
-                    .map((m) => (
-                      <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed relative group">
-                        <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
-                        <p className="text-base font-bold mt-0.5 text-accent-green">{m.valor}</p>
-                        {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
-                        <div className="kpi-card-spacer" />
-                        <Link
-                          href={`/system?step=5&edit=${m.id}`}
-                          className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
-                          title="Editar métrica"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    ))
-                : (data?.metricasPersonalizadas ?? [])
-                    .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
-                    .map((m) => (
-                      <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
-                        <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.name}</p>
-                        <p className="text-base font-bold mt-0.5 text-accent-green">{m.increment}</p>
-                        {m.description && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.description}</p>}
-                        <div className="kpi-card-spacer" />
-                      </div>
-                    ))}
-            </div>
-          </section>
-        )}
 
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ranking por asesor</h2>

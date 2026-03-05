@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica } from "@/lib/metricas-engine";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG } from "@/lib/metricas-engine";
+import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import type {
   DashboardKpis,
   DashboardAdvisorRow,
@@ -62,10 +62,21 @@ export async function getDashboard(
   const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : null;
   const { attendedSet, closedSet, effectiveSet, etapas } = buildFunnelSets(embudoRaw);
 
+  const fechaFilter = or(
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+      lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    ),
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+  )!;
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-    // Usamos COALESCE para cubrir registros donde fecha_reunion es NULL (usamos fecha como fallback)
-    sql`COALESCE(${resumenesDiariosAgendas.fecha_reunion}::date, ${resumenesDiariosAgendas.fecha}) BETWEEN ${dateFrom}::date AND ${dateTo}::date`,
+    fechaFilter,
   ];
   if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
 
@@ -283,11 +294,12 @@ export async function getDashboard(
     if (Array.isArray(c.tags_internos)) c.tags_internos.forEach((t) => allTags.add(t));
   }
 
-  const configs: MetricaConfig[] = Array.isArray(cuentaRow?.metricas_config) ? cuentaRow.metricas_config : [];
+  const rawConfigs: MetricaConfig[] = Array.isArray(cuentaRow?.metricas_config) ? cuentaRow.metricas_config : [];
+  const configs = rawConfigs.length > 0 ? rawConfigs : DEFAULT_METRICAS_CONFIG;
   const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
     ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
     : {};
-  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string }[] = [];
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[] = [];
   const metricasValores: Record<string, string | number> = {};
   const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket"]);
 
@@ -321,14 +333,14 @@ export async function getDashboard(
         valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
       }
       metricasValores[m.id] = typeof valor === "number" ? valor : parseFloat(String(valor)) || 0;
-      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion });
+      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion, formato: m.formato, color: m.color });
       computed.add(m.id);
     }
   }
 
   for (const m of sorted) {
     if (computed.has(m.id)) continue;
-    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion });
+    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, formato: m.formato, color: m.color });
   }
 
   return {

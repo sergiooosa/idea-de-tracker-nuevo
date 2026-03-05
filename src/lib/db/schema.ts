@@ -85,6 +85,8 @@ export interface MetricaConfig {
   campos?: MetricaCampoConfig[];
   formula?: MetricaFormulaConfig;
   valorFijo?: number | string;
+  formato?: "numero" | "moneda" | "porcentaje" | "tiempo" | "decimal";
+  color?: string;
 }
 
 /** Entrada manual: valores por campo */

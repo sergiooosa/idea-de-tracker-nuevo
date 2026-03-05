@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas } from "@/lib/db/schema";
 import type { EmbudoEtapa } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
 
 export interface AcquisitionRow {
   origen: string;
@@ -49,6 +49,19 @@ export async function getAcquisition(
     ? new Set(embudoRaw.filter((e) => e.nombre.toLowerCase().includes("cerrad")).map((e) => e.nombre))
     : new Set(["Cerrada"]);
 
+  const fechaFilter = or(
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+      lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    ),
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+  )!;
+
   const [agendas, calls, chats] = await Promise.all([
     db
       .select()
@@ -56,7 +69,7 @@ export async function getAcquisition(
       .where(
         and(
           eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-          sql`COALESCE(${resumenesDiariosAgendas.fecha_reunion}::date, ${resumenesDiariosAgendas.fecha}) BETWEEN ${dateFrom}::date AND ${dateTo}::date`,
+          fechaFilter,
         ),
       ),
     db
