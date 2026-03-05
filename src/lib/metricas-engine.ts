@@ -57,16 +57,26 @@ export const KPI_DEFAULT_LABELS: Record<string, string> = {
   ticket: "Ticket (videollamadas)",
 };
 
-/** 8 métricas por defecto que se muestran en el dashboard si no hay config */
+/** Métricas por defecto para un CEO / líder comercial. Se usan si metricas_config está vacío. */
 export const DEFAULT_METRICAS_CONFIG: MetricaConfig[] = [
-  { id: "default-leads", nombre: "Leads generados", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 0, formato: "numero", color: "blue", formula: { tipo: "directo", fuente: "totalLeads" } },
-  { id: "default-llamadas", nombre: "Llamadas", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 1, formato: "numero", color: "cyan", formula: { tipo: "directo", fuente: "callsMade" } },
+  // --- Bloque 1: Generación de leads y contacto ---
+  { id: "default-leads", nombre: "Leads generados", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 0, formato: "numero", color: "blue", formula: { tipo: "directo", fuente: "totalLeads" }, descripcion: "Emails únicos entre llamadas y citas" },
+  { id: "default-llamadas", nombre: "Llamadas realizadas", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 1, formato: "numero", color: "cyan", formula: { tipo: "directo", fuente: "callsMade" } },
   { id: "default-contestadas", nombre: "Contestadas", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 2, formato: "numero", color: "cyan", formula: { tipo: "directo", fuente: "contestadas" } },
-  { id: "default-speed", nombre: "Tiempo al lead", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 3, formato: "tiempo", color: "purple", formula: { tipo: "directo", fuente: "speedToLeadAvg" } },
-  { id: "default-intentos", nombre: "Intentos promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 4, formato: "decimal", color: "amber", formula: { tipo: "directo", fuente: "avgAttempts" } },
-  { id: "default-revenue", nombre: "Ingresos", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 5, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "revenue" } },
-  { id: "default-cash", nombre: "Efectivo cobrado", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 6, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "cashCollected" } },
-  { id: "default-ticket", nombre: "Ticket promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 7, formato: "moneda", color: "blue", formula: { tipo: "directo", fuente: "avgTicket" } },
+  { id: "default-tasa-contestacion", nombre: "Tasa de contestación", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 3, formato: "porcentaje", color: "cyan", formula: { tipo: "directo", fuente: "answerRate" } },
+  // --- Bloque 2: Velocidad y esfuerzo ---
+  { id: "default-speed", nombre: "Tiempo al lead", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 4, formato: "tiempo", color: "purple", formula: { tipo: "directo", fuente: "speedToLeadAvg" }, descripcion: "Minutos promedio hasta la primera llamada" },
+  { id: "default-intentos", nombre: "Intentos promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 5, formato: "decimal", color: "amber", formula: { tipo: "directo", fuente: "avgAttempts" }, descripcion: "Llamadas promedio por lead" },
+  // --- Bloque 3: Pipeline de citas ---
+  { id: "default-agendadas", nombre: "Citas agendadas", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 6, formato: "numero", color: "purple", formula: { tipo: "directo", fuente: "meetingsBooked" } },
+  { id: "default-tasa-agendamiento", nombre: "Tasa de agendamiento", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 7, formato: "porcentaje", color: "purple", formula: { tipo: "directo", fuente: "tasaAgendamiento" }, descripcion: "Citas ÷ Contestadas" },
+  { id: "default-no-shows", nombre: "No shows", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 8, formato: "numero", color: "amber", formula: { tipo: "directo", fuente: "noShows" }, descripcion: "Personas que no se presentaron" },
+  // --- Bloque 4: Cierre ---
+  { id: "default-tasa-cierre", nombre: "Tasa de cierre", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 9, formato: "porcentaje", color: "green", formula: { tipo: "directo", fuente: "tasaCierre" }, descripcion: "Cerradas ÷ Asistidas" },
+  // --- Bloque 5: Dinero ---
+  { id: "default-revenue", nombre: "Ingresos", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 10, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "revenue" } },
+  { id: "default-cash", nombre: "Efectivo cobrado", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 11, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "cashCollected" } },
+  { id: "default-ticket", nombre: "Ticket promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 12, formato: "moneda", color: "blue", formula: { tipo: "directo", fuente: "avgTicket" }, descripcion: "Ingresos ÷ Citas efectivas" },
 ];
 
 /** Obtener métricas que dependen de esta (para aviso al borrar) */
