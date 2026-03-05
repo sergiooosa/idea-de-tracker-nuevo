@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas } from "@/lib/db/schema";
-import type { EmbudoEtapa } from "@/lib/db/schema";
+import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
+import { calcMetricaManual, calcMetricaAutomatica } from "@/lib/metricas-engine";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   ApiVideollamada,
@@ -59,7 +60,11 @@ export async function getVideollamadas(
 
   const [[cuentaRow], rows] = await Promise.all([
     db
-      .select({ embudo_personalizado: cuentas.embudo_personalizado })
+      .select({
+        embudo_personalizado: cuentas.embudo_personalizado,
+        metricas_config: cuentas.metricas_config,
+        metricas_manual_data: cuentas.metricas_manual_data,
+      })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
@@ -141,7 +146,54 @@ export async function getVideollamadas(
     advisors.push({ id: name, name });
   }
 
-  return { registros, agg, advisorMetrics, advisors };
+  const configs: MetricaConfig[] = Array.isArray(cuentaRow?.metricas_config) ? cuentaRow.metricas_config : [];
+  const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
+    ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
+    : {};
+  const kpiKeysVideollamadas = new Set(["agendadas", "asistidas", "canceladas", "efectivas", "noShows", "revenue", "cashCollected", "ticket"]);
+  const metricasValores: Record<string, string | number> = {};
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string }[] = [];
+
+  const getDeps = (m: MetricaConfig): string[] => {
+    if (m.tipo !== "automatica" || !m.formula) return [];
+    const f = m.formula;
+    if (f.fuente && !kpiKeysVideollamadas.has(f.fuente)) return [f.fuente];
+    if (f.fuentes) return f.fuentes.filter((k) => !kpiKeysVideollamadas.has(k));
+    return [];
+  };
+
+  const sorted = [...configs]
+    .filter((m) => m.ubicacion === "rendimiento" || m.ubicacion === "ambos")
+    .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+  const computed = new Set<string>();
+  let pass = 0;
+  const maxPasses = sorted.length + 1;
+
+  while (computed.size < sorted.length && pass < maxPasses) {
+    pass++;
+    for (const m of sorted) {
+      if (computed.has(m.id)) continue;
+      const deps = getDeps(m);
+      if (deps.some((d) => !computed.has(d))) continue;
+      let valor: string | number;
+      if (m.tipo === "manual") {
+        const entries = manualData[m.id] ?? [];
+        valor = calcMetricaManual(m, entries, dateFrom, dateTo);
+      } else {
+        valor = calcMetricaAutomatica(m, agg as Record<string, number>, metricasValores, dateFrom, dateTo);
+      }
+      metricasValores[m.id] = typeof valor === "number" ? valor : parseFloat(String(valor)) || 0;
+      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion });
+      computed.add(m.id);
+    }
+  }
+
+  for (const m of sorted) {
+    if (computed.has(m.id)) continue;
+    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion });
+  }
+
+  return { registros, agg, advisorMetrics, advisors, metricasComputadas };
 }
 
 export async function updateVideollamada(

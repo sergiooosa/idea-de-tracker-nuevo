@@ -8,7 +8,7 @@ import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
 import { FileText, Pencil, Sparkles, User, X, ExternalLink } from 'lucide-react';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
-import type { VideollamadasResponse, ApiVideollamada, VideoMeeting, MetricaPersonalizadaUI } from '@/types';
+import type { VideollamadasResponse, ApiVideollamada, VideoMeeting } from '@/types';
 import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
 
@@ -57,10 +57,7 @@ export default function PerformanceVideollamadasPage() {
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
 
   const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo });
-  const { data: sysConfig } = useApiData<{ metricas_personalizadas: MetricaPersonalizadaUI[] }>('/api/data/system-config');
-  const rendimientoMetrics = (sysConfig?.metricas_personalizadas ?? []).filter(
-    (m) => m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos'
-  );
+  const rendimientoMetrics = data?.metricasComputadas ?? [];
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[]) => {
     if (meetingsOfLead.length === 1) setModalTranscripcionIA(meetingsOfLead[0]);
@@ -134,9 +131,9 @@ export default function PerformanceVideollamadasPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
             {rendimientoMetrics.map((m) => (
               <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.name}</p>
-                <p className="text-base font-bold mt-0.5 text-accent-green">{m.increment}</p>
-                {m.description && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.description}</p>}
+                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
+                <p className="text-base font-bold mt-0.5 text-accent-green">{m.valor}</p>
+                {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
                 <div className="kpi-card-spacer" />
               </div>
             ))}

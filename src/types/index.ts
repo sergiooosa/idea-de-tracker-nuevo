@@ -207,6 +207,14 @@ export interface VideollamadasAdvisorMetrics {
   cashCollected: number;
 }
 
+export interface MetricaComputada {
+  id: string;
+  nombre: string;
+  valor: string | number;
+  descripcion?: string;
+  ubicacion?: string;
+}
+
 export interface VideollamadasResponse {
   registros: ApiVideollamada[];
   agg: {
@@ -221,6 +229,7 @@ export interface VideollamadasResponse {
   };
   advisorMetrics: Record<string, VideollamadasAdvisorMetrics>;
   advisors: ApiAdvisor[];
+  metricasComputadas?: MetricaComputada[];
 }
 
 export interface ApiLlamadaLog {
@@ -395,6 +404,7 @@ export interface DashboardResponse {
   distribucionEmbudo?: Record<string, number>;
   tagsDisponibles?: string[];
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
+  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string }[];
 }
 
 export interface AsesorLeadCRM {

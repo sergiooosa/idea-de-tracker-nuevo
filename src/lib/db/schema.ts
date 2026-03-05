@@ -55,6 +55,40 @@ export interface MetricaPersonalizada {
   ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
 }
 
+/** Campo de una métrica manual (texto, número, fecha, boolean) */
+export interface MetricaCampoConfig {
+  id: string;
+  nombre: string;
+  tipo: "texto" | "numero" | "fecha" | "boolean";
+  esClaveFiltro?: boolean;
+}
+
+/** Fórmula de métrica automática */
+export interface MetricaFormulaConfig {
+  tipo: "directo" | "suma" | "promedio" | "division" | "multiplicacion" | "resta" | "condicion";
+  fuente?: string;
+  fuentes?: string[];
+  operador?: ">" | "<" | ">=" | "<=" | "==" | "!=";
+  valorComparacion?: number | string | boolean;
+  valorSiCumple?: number | string;
+  valorSiNo?: number | string;
+}
+
+/** Configuración de métrica (manual o automática) */
+export interface MetricaConfig {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  tipo: "manual" | "automatica";
+  ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
+  orden?: number;
+  campos?: MetricaCampoConfig[];
+  formula?: MetricaFormulaConfig;
+}
+
+/** Entrada manual: valores por campo */
+export type MetricaManualEntry = Record<string, string | number | boolean | null>;
+
 export interface EmbudoEtapa {
   id: string;
   nombre: string;
@@ -98,6 +132,8 @@ export const cuentas = pgTable("cuentas", {
   chat_triggers: jsonb("chat_triggers").$type<ChatTrigger[]>(),
   tipos_eventos_config: jsonb("tipos_eventos_config").$type<TipoEventoConfig[]>(),
   roles_config: jsonb("roles_config").$type<RolConfig[]>(),
+  metricas_config: jsonb("metricas_config").$type<MetricaConfig[]>(),
+  metricas_manual_data: jsonb("metricas_manual_data").$type<Record<string, MetricaManualEntry[]>>(),
 });
 
 /* ------------------------------------------------------------------ */

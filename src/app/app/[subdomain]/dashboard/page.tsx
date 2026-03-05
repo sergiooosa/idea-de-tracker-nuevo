@@ -201,25 +201,40 @@ export default function DashboardPage() {
           </section>
         </div>
 
-        {(data?.metricasPersonalizadas ?? []).filter(
+        {((data?.metricasComputadas ?? []).filter(
           (m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion
-        ).length > 0 && (
+        ).length > 0 || (data?.metricasPersonalizadas ?? []).filter(
+          (m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion
+        ).length > 0) && (
           <section>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <BarChart3 className="w-3.5 h-3.5 text-accent-green" />
               Métricas personalizadas
             </h2>
             <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-              {(data?.metricasPersonalizadas ?? [])
-                .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
-                .map((m) => (
-                  <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
-                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.name}</p>
-                    <p className="text-base font-bold mt-0.5 text-accent-green">{m.increment}</p>
-                    {m.description && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.description}</p>}
-                    <div className="kpi-card-spacer" />
-                  </div>
-                ))}
+              {(data?.metricasComputadas ?? []).filter(
+                (m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion
+              ).length > 0
+                ? (data?.metricasComputadas ?? [])
+                    .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
+                    .map((m) => (
+                      <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
+                        <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
+                        <p className="text-base font-bold mt-0.5 text-accent-green">{m.valor}</p>
+                        {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
+                        <div className="kpi-card-spacer" />
+                      </div>
+                    ))
+                : (data?.metricasPersonalizadas ?? [])
+                    .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
+                    .map((m) => (
+                      <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed">
+                        <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.name}</p>
+                        <p className="text-base font-bold mt-0.5 text-accent-green">{m.increment}</p>
+                        {m.description && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.description}</p>}
+                        <div className="kpi-card-spacer" />
+                      </div>
+                    ))}
             </div>
           </section>
         )}

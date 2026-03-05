@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig } from "@/lib/db/schema";
+import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export interface SystemConfigData {
@@ -9,6 +9,8 @@ export interface SystemConfigData {
   prompt_llamadas: string;
   reglas_etiquetas: ReglaEtiqueta[];
   metricas_personalizadas: MetricaPersonalizada[];
+  metricas_config: MetricaConfig[];
+  metricas_manual_data: Record<string, MetricaManualEntry[]>;
   chat_triggers: ChatTrigger[];
   embudo_personalizado: EmbudoEtapa[];
   tipos_eventos_config: TipoEventoConfig[];
@@ -42,6 +44,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       openai_api_key: cuentas.openai_api_key,
       configuracion_ui: cuentas.configuracion_ui,
       roles_config: cuentas.roles_config,
+      metricas_config: cuentas.metricas_config,
+      metricas_manual_data: cuentas.metricas_manual_data,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -60,6 +64,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       has_openai_key: false,
       fuente_datos_financieros: "nativa",
       roles_config: [],
+      metricas_config: [],
+      metricas_manual_data: {},
     };
   }
 
@@ -76,6 +82,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     has_openai_key: !!r.openai_api_key,
     fuente_datos_financieros: r.configuracion_ui?.fuente_datos_financieros ?? "nativa",
     roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
+    metricas_config: Array.isArray(r.metricas_config) ? r.metricas_config : [],
+    metricas_manual_data: (r.metricas_manual_data && typeof r.metricas_manual_data === "object") ? r.metricas_manual_data as Record<string, MetricaManualEntry[]> : {},
   };
 }
 
@@ -95,6 +103,8 @@ export async function updateSystemConfig(
   if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
   if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
   if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
+  if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
+  if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
 
   if (data.fuente_datos_financieros !== undefined) {
     const [row] = await db
