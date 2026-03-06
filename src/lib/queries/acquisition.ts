@@ -42,11 +42,16 @@ export async function getAcquisition(
     : null;
 
   const attendedSet = embudoRaw && embudoRaw.length > 0
-    ? new Set(embudoRaw.map((e) => e.nombre))
+    ? new Set(embudoRaw.filter((e) => e && typeof e.nombre === "string").map((e) => e.nombre))
     : new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
 
   const closedSet = embudoRaw && embudoRaw.length > 0
-    ? new Set(embudoRaw.filter((e) => e.nombre.toLowerCase().includes("cerrad")).map((e) => e.nombre))
+    ? new Set(
+        embudoRaw
+          .filter((e) => e && typeof e.nombre === "string")
+          .filter((e) => e.nombre.toLowerCase().includes("cerrad"))
+          .map((e) => e.nombre),
+      )
     : new Set(["Cerrada"]);
 
   const fechaFilter = or(
