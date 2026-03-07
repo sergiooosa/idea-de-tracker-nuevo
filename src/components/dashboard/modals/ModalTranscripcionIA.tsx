@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { X, FileText, Sparkles, ExternalLink } from 'lucide-react';
+import { X, FileText, Sparkles, ExternalLink, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import type { VideoMeeting } from '@/types';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
@@ -13,9 +13,11 @@ type Tab = 'transcripcion' | 'ia';
 export default function ModalTranscripcionIA({
   meeting,
   onClose,
+  onEdit,
 }: {
   meeting: VideoMeeting;
   onClose: () => void;
+  onEdit?: (meeting: VideoMeeting) => void;
 }) {
   const [tab, setTab] = useState<Tab>('transcripcion');
 
@@ -35,13 +37,25 @@ export default function ModalTranscripcionIA({
           <h3 className="font-semibold text-white">
             {format(new Date(meeting.datetime), "dd/MM/yyyy 'a las' HH:mm")}
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(meeting)}
+                className="p-2 rounded-lg hover:bg-surface-600 text-accent-amber hover:text-white transition-colors inline-flex items-center gap-1 text-xs"
+                title="Editar registro"
+              >
+                <Pencil className="w-4 h-4" /> Editar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tabs Transcripción | Análisis IA */}

@@ -8,7 +8,7 @@ import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripci
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
 import Link from 'next/link';
-import { FileText, Pencil, Sparkles, User, X, ExternalLink } from 'lucide-react';
+import { Pencil, User, X } from 'lucide-react';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { VideollamadasResponse, ApiVideollamada, VideoMeeting } from '@/types';
 import { BarChart3 } from 'lucide-react';
@@ -56,13 +56,15 @@ export default function PerformanceVideollamadasPage() {
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
   const [modalSelectorMeetings, setModalSelectorMeetings] = useState<VideoMeeting[] | null>(null);
   const [modalTranscripcionIA, setModalTranscripcionIA] = useState<VideoMeeting | null>(null);
+  const [apiMeetingsForModal, setApiMeetingsForModal] = useState<ApiVideollamada[] | null>(null);
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
 
-  const openTranscripcionIA = (meetingsOfLead: VideoMeeting[]) => {
+  const openTranscripcionIA = (meetingsOfLead: VideoMeeting[], apiMeetings?: ApiVideollamada[]) => {
+    if (apiMeetings) setApiMeetingsForModal(apiMeetings);
     if (meetingsOfLead.length === 1) setModalTranscripcionIA(meetingsOfLead[0]);
     else setModalSelectorMeetings(meetingsOfLead);
   };
@@ -79,6 +81,25 @@ export default function PerformanceVideollamadasPage() {
     }
     return map;
   }, [data]);
+
+  type LeadRow = { leadKey: string; name: string; email: string | null; meetings: ApiVideollamada[] };
+  const leadsByAdvisor = useMemo(() => {
+    const out: Record<string, LeadRow[]> = {};
+    for (const [advisorKey, meetings] of Object.entries(meetingsByAdvisor)) {
+      const byLead = new Map<string, LeadRow>();
+      for (const r of meetings) {
+        const leadKey = r.leadEmail ?? r.leadName ?? String(r.id);
+        const existing = byLead.get(leadKey);
+        if (existing) {
+          existing.meetings.push(r);
+        } else {
+          byLead.set(leadKey, { leadKey, name: r.leadName ?? '—', email: r.leadEmail ?? null, meetings: [r] });
+        }
+      }
+      out[advisorKey] = [...byLead.values()].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    return out;
+  }, [meetingsByAdvisor]);
 
   const defaultTo = new Date();
   const defaultFrom = subDays(defaultTo, 7);
@@ -208,41 +229,31 @@ export default function PerformanceVideollamadasPage() {
                             <tr className="bg-surface-800/90">
                               <td colSpan={7} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
-                                  <div className="text-[10px] text-gray-400 mb-1.5">Leads y registros de videollamada de {advisorKey}</div>
+                                  <div className="text-[10px] text-gray-400 mb-1.5">Leads de {advisorKey} (clic en la fila abre reuniones)</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[400px] overflow-y-auto">
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-surface-700">
                                         <tr className="text-left text-gray-400">
-                                          <th className="px-2 py-2 font-medium">Fecha</th>
                                           <th className="px-2 py-2 font-medium">Nombre</th>
                                           <th className="px-2 py-2 font-medium">Correo</th>
-                                          <th className="px-2 py-2 font-medium">Asistió</th>
+                                          <th className="px-2 py-2 font-medium">Reuniones realizadas</th>
                                           <th className="px-2 py-2 font-medium">Resultado</th>
-                                          <th className="px-2 py-2 font-medium">Acciones</th>
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {advisorMeetings.map((m) => {
-                                          const allForLead = advisorMeetings.filter((x) => x.leadEmail === m.leadEmail);
+                                        {(leadsByAdvisor[advisorKey] ?? []).map((lead) => {
+                                          const last = lead.meetings[lead.meetings.length - 1];
+                                          const outcomeLabel = last ? outcomeVideollamadaToSpanish(last.outcome) : '—';
                                           return (
-                                            <tr key={m.id} className="border-t border-surface-500 hover:bg-surface-600/50">
-                                              <td className="px-2 py-2 text-gray-300">{format(new Date(m.datetime), 'dd/MM/yy HH:mm')}</td>
-                                              <td className="px-2 py-2 text-white">{m.leadName}</td>
-                                              <td className="px-2 py-2 text-gray-400">{m.leadEmail ?? '—'}</td>
-                                              <td className="px-2 py-2">{m.attended ? <span className="text-accent-green">Sí</span> : <span className="text-accent-red">No</span>}</td>
-                                              <td className="px-2 py-2 text-gray-300">{outcomeVideollamadaToSpanish(m.outcome)}</td>
-                                              <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex flex-wrap gap-1">
-                                                  <button type="button" onClick={() => setEditingRecord({ id: m.id, nombre_lead: m.leadName, closer: m.closer, estado: m.categoria })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-1"><Pencil className="w-3 h-3" /> Editar</button>
-                                                  <button type="button" onClick={() => openTranscripcionIA(allForLead.map(apiToVideoMeeting))} className="text-accent-cyan text-[10px] inline-flex items-center gap-0.5"><FileText className="w-3 h-3" /> Transcripción</button>
-                                                  <button type="button" onClick={() => openTranscripcionIA(allForLead.map(apiToVideoMeeting))} className="text-accent-purple text-[10px] inline-flex items-center gap-0.5"><Sparkles className="w-3 h-3" /> Análisis IA</button>
-                                                  {m.linkLlamada ? (
-                                                    <a href={m.linkLlamada} target="_blank" rel="noopener noreferrer" className="text-accent-green text-[10px] inline-flex items-center gap-0.5"><ExternalLink className="w-3 h-3" /> Grabación</a>
-                                                  ) : (
-                                                    <span className="text-gray-500 text-[10px] inline-flex items-center gap-0.5"><ExternalLink className="w-3 h-3" /> Sin grabación</span>
-                                                  )}
-                                                </div>
-                                              </td>
+                                            <tr
+                                              key={lead.leadKey}
+                                              className="border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer"
+                                              onClick={() => openTranscripcionIA(lead.meetings.map(apiToVideoMeeting), lead.meetings)}
+                                            >
+                                              <td className="px-2 py-2 text-white">{lead.name}</td>
+                                              <td className="px-2 py-2 text-gray-400">{lead.email ?? '—'}</td>
+                                              <td className="px-2 py-2 text-accent-cyan">{lead.meetings.length}</td>
+                                              <td className="px-2 py-2 text-gray-300">{outcomeLabel}</td>
                                             </tr>
                                           );
                                         })}
@@ -277,9 +288,10 @@ export default function PerformanceVideollamadasPage() {
                   <button
                     type="button"
                     onClick={() => { setModalTranscripcionIA(meeting); setModalSelectorMeetings(null); }}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-surface-700 hover:bg-surface-600 text-gray-200 text-sm"
+                    className="w-full text-left px-3 py-2 rounded-lg bg-surface-700 hover:bg-surface-600 text-gray-200 text-sm flex flex-col gap-0.5"
                   >
-                    {format(new Date(meeting.datetime), "dd/MM/yyyy 'a las' HH:mm")}
+                    <span>{format(new Date(meeting.datetime), "dd/MM/yyyy 'a las' HH:mm")}</span>
+                    <span className="text-[10px] text-gray-400">{outcomeVideollamadaToSpanish(meeting.outcome)}</span>
                   </button>
                 </li>
               ))}
@@ -288,7 +300,18 @@ export default function PerformanceVideollamadasPage() {
         </div>
       )}
       {modalTranscripcionIA && (
-        <ModalTranscripcionIA meeting={modalTranscripcionIA} onClose={() => setModalTranscripcionIA(null)} />
+        <ModalTranscripcionIA
+          meeting={modalTranscripcionIA}
+          onClose={() => { setModalTranscripcionIA(null); setApiMeetingsForModal(null); }}
+          onEdit={apiMeetingsForModal ? (meeting) => {
+            const api = apiMeetingsForModal.find((r) => String(r.id) === meeting.id);
+            if (api) {
+              setModalTranscripcionIA(null);
+              setApiMeetingsForModal(null);
+              setEditingRecord({ id: api.id, nombre_lead: api.leadName, closer: api.closer, estado: api.categoria });
+            }
+          } : undefined}
+        />
       )}
       {editingRecord && (
         <EditRecordSheet
