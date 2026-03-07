@@ -257,8 +257,22 @@ export interface LlamadasAdvisorMetrics {
   tiempoAlLead: number | null;
 }
 
+/** Lead desde registros_de_llamada (una fila por persona en Performance > Llamadas) */
+export interface LlamadaLead {
+  id_registro: number;
+  nombre_lead: string | null;
+  mail_lead: string | null;
+  estado: string | null;
+  phone: string | null;
+  speed_to_lead_min: number | null;
+  closer_mail: string | null;
+  fecha_evento: string | null;
+}
+
 export interface LlamadasResponse {
   registros: ApiLlamadaLog[];
+  /** Leads desde registros_de_llamada (mismo rango y asesor); el listado expandido muestra esto */
+  leads: LlamadaLead[];
   agg: {
     totalLeads: number;
     totalCalls: number;

@@ -667,7 +667,7 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | `/api/data/dashboard` | GET | agendas + log_llamadas | `from`, `to`, `closerEmail?` | Panel ejecutivo |
 | `/api/data/videollamadas` | GET | resumenes_diarios_agendas | `from`, `to`, `closerEmail?` | Performance > Videollamadas |
 | `/api/data/videollamadas` | PUT | resumenes_diarios_agendas | body: id, nombre_lead?, closer?, categoria? | Editar registro (v3.0) |
-| `/api/data/llamadas` | GET | log_llamadas | `from`, `to`, `closerEmail?` | Performance > Llamadas |
+| `/api/data/llamadas` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `closerEmail?` | Performance > Llamadas (devuelve `registros` = logs, `leads` = registros por persona; el listado expandido muestra leads) |
 | `/api/data/llamadas` | PUT | log_llamadas | body: id, nombre_lead?, closer_mail?, estado_resultado? | Editar registro (v3.0) |
 | `/api/data/chats` | GET | chats_logs | `from`, `to`, `closerEmail?` | Performance > Chats |
 | `/api/data/chats` | PUT | chats_logs | body: id, nombre_lead?, estado? | Editar registro (v3.0) |
@@ -709,7 +709,7 @@ Cada archivo en `src/lib/queries/` encapsula la lógica de negocio para un domin
 |---|---|---|
 | `dashboard.ts` | `getDashboard()` | Combina agendas + llamadas, calcula KPIs, ranking por asesor, objeciones, volumen diario |
 | `videollamadas.ts` | `getVideollamadas()` | Mapea `categoria` a estados del UI (attended/qualified/canceled), parsea montos text→number |
-| `llamadas.ts` | `getLlamadas()` | Mapea `tipo_evento` a outcomes (answered/no_answer/voicemail), agrupa por closer |
+| `llamadas.ts` | `getLlamadas()` | Lee `log_llamadas` (registros) y `registros_de_llamada` (leads); mapea tipo_evento a outcomes; agrupa por closer; devuelve ambos para Performance > Llamadas |
 | `chats.ts` | `getChats()`, `updateChat()` | Parsea JSONB, extrae agente; update estado/nombre (v3.0) |
 | `asesor.ts` | `getAsesorData()` | Filtra por `closer_mail` (opcional), builds mini CRM |
 | `huerfanos.ts` | `getHuerfanos()`, `getHuerfanoById()`, `updateHuerfanoEstado()` | Bandeja: lista por estado, PATCH corregir/descartar (v3.0) |
@@ -737,7 +737,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 |---|---|---|
 | `/dashboard` | `dashboard/page.tsx` | `/api/data/dashboard` |
 | `/performance` | `performance/page.tsx` | `/api/data/videollamadas` |
-| `/performance/llamadas` | `performance/llamadas/page.tsx` | `/api/data/llamadas` |
+| `/performance/llamadas` | `performance/llamadas/page.tsx` | `/api/data/llamadas` — listado por **leads** (registros_de_llamada); al expandir asesor se ven personas; clic en la fila abre las **llamadas** (log, sin pdte); si hay &gt;1 llamada no pendiente, selector; botón Editar solo en contestadas; speed to lead null → "1 min" |
 | `/performance/chats` | `performance/chats/page.tsx` | `/api/data/chats` |
 | `/asesor` | `asesor/page.tsx` | `/api/data/asesor` + `/api/data/metas` |
 | `/acquisition` | `acquisition/page.tsx` | `/api/data/acquisition` |

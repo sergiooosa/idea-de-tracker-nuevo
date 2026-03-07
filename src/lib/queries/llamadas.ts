@@ -6,6 +6,7 @@ import type {
   LlamadasAdvisorMetrics,
   LlamadasResponse,
   ApiAdvisor,
+  LlamadaLead,
 } from "@/types";
 
 function mapTipoEvento(tipo: string): ApiLlamadaLog["outcome"] {
@@ -32,11 +33,26 @@ export async function getLlamadas(
   ];
   if (closerEmail) conditions.push(eq(logLlamadas.closer_mail, closerEmail));
 
-  const rows = await db
-    .select()
-    .from(logLlamadas)
-    .where(and(...conditions))
-    .orderBy(sql`${logLlamadas.ts} DESC`);
+  const idCuentaStr = String(idCuenta);
+  const regConditions = [
+    eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+    gte(registrosDeLlamada.fecha_evento, fromTs),
+    lte(registrosDeLlamada.fecha_evento, toTs),
+  ];
+  if (closerEmail) regConditions.push(eq(registrosDeLlamada.closer_mail, closerEmail));
+
+  const [rows, regRows] = await Promise.all([
+    db
+      .select()
+      .from(logLlamadas)
+      .where(and(...conditions))
+      .orderBy(sql`${logLlamadas.ts} DESC`),
+    db
+      .select()
+      .from(registrosDeLlamada)
+      .where(and(...regConditions))
+      .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`),
+  ]);
 
   const registros: ApiLlamadaLog[] = rows.map((r) => ({
     id: r.id,
@@ -111,7 +127,18 @@ export async function getLlamadas(
     advisors.push({ id: key, name, email });
   }
 
-  return { registros, agg, advisorMetrics, advisors };
+  const leads: LlamadaLead[] = regRows.map((r) => ({
+    id_registro: r.id_registro,
+    nombre_lead: r.nombre_lead,
+    mail_lead: r.mail_lead,
+    estado: r.estado,
+    phone: r.phone_raw_format,
+    speed_to_lead_min: r.speed_to_lead ? parseFloat(r.speed_to_lead) || null : null,
+    closer_mail: r.closer_mail,
+    fecha_evento: r.fecha_evento?.toISOString() ?? null,
+  }));
+
+  return { registros, leads, agg, advisorMetrics, advisors };
 }
 
 export async function updateLlamada(
