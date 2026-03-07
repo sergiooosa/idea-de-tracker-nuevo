@@ -233,6 +233,7 @@ export default function AsesorPage() {
             <section>
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
                 KPIs en el período
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase">Beta</span>
                 <SectionInfo text="Estos KPIs muestran datos del asesor seleccionado en el período de fechas elegido." />
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">

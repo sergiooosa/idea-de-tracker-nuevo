@@ -217,7 +217,7 @@ export default function ConfiguracionPage() {
   if (!puedeUsuarios && !puedeRoles) {
     return (
       <>
-        <PageHeader title="Configuración" subtitle="Sin permisos" />
+        <PageHeader title="Configuración" subtitle="Sin permisos" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
         <div className="p-4 text-center text-gray-500">No tienes permiso para acceder a esta sección.</div>
       </>
     );
@@ -225,7 +225,7 @@ export default function ConfiguracionPage() {
 
   return (
     <>
-      <PageHeader title="Configuración" subtitle="Usuarios · Roles · Permisos" />
+      <PageHeader title="Configuración" subtitle="Usuarios · Roles · Permisos" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
       <div className="p-3 md:p-4 max-w-4xl mx-auto space-y-6 text-sm min-w-0 max-w-full overflow-x-hidden">
         {puedeRoles && (
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">

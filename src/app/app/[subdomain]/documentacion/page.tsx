@@ -592,6 +592,7 @@ export default function DocumentacionPage() {
       <PageHeader
         title="Documentación"
         subtitle="Guía de superpoderes de tu panel"
+        action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>}
       />
       <div className="p-3 md:p-6 space-y-6 min-w-0 max-w-full overflow-x-hidden">
         <div className="rounded-2xl bg-gradient-to-br from-accent-purple/10 via-accent-cyan/5 to-transparent border border-surface-500 p-6 md:p-8">

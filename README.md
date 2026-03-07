@@ -14,12 +14,16 @@
 | 📋 **Nav Filtrado por Permisos** | El sidebar solo muestra las rutas para las que el usuario tiene permiso. Redirección a `/dashboard` si accede por URL sin permiso. | Layout, todas las páginas |
 | 🔒 **Protección de APIs** | Cada API route verifica el permiso correspondiente (`withAuthAndPermission`). 403 si no tiene acceso. | Todas las APIs |
 | 👁️ **Toggle "Solo data del asesor"** | Switch en sidebar para usuarios con `ver_todo`. Cuando activo: filtro por asesor seleccionado. Selector desplegable para elegir qué asesor ver (Yo u otros). Si no tiene `ver_todo`, siempre ve solo sus datos. | Dashboard, Performance, Asesor |
-| 📥 **Bandeja de Huérfanos** | Vista `/bandeja`. Lista eventos de `eventos_huerfanos` (tabs: pendiente, resuelto, descartado). Input + "Corregir" llama al Cerebro `POST /webhooks/retry-orphan/:id`. Si la API falla se muestra error con botón "Reintentar". Extrae `share_url` y `transcript` del payload Fathom. | Bandeja, Cerebro |
+| 📥 **Bandeja de Huérfanos** | Vista `/bandeja`. Lista eventos de `eventos_huerfanos` (tabs: pendiente, resuelto, descartado). Input + "Corregir" llama al Cerebro `POST /webhooks/retry-orphan/:id`. Si la API falla se muestra error con botón "Reintentar". Extrae `share_url` y `transcript` del payload (soporta objeto/array Fathom). Botón "Ver grabación" y botón "Ver transcripción" que despliega el texto. | Bandeja, Cerebro |
 | ✏️ **Editor Global (CRUD)** | En Llamadas, Videollamadas y Chats: columna "Acciones" con botón Editar. Sheet lateral para editar estado del embudo, closer asignado y nombre del lead. Mutación directa en BD. | Performance (3 tabs) |
 | 📐 **Constructor de Layouts** | En Métricas Custom (Control del sistema): Select "Ubicación de la tarjeta" (Panel Ejecutivo / Rendimiento / Ambos). Dashboard y Performance renderizan métricas según `ubicacion`. | System, Dashboard, Performance |
 | 🏷️ **Reglas de Etiquetas (UI)** | Selects agrupados: Condición IA (Mención de precio, Enojo, Interés…), Condición Fija (Duración > X, Intentos > Y). Campo "Mover etapa de funnel a" con etapas del embudo. | System paso 4 |
 | 😀 **Triggers por Emoji (UI)** | Emoji Picker en grid; emojis ya usados en otra regla se bloquean. Estado destino = Select con etapas del embudo. | System paso 8 |
 | 📊 **Métricas Personalizadas v2** | Sistema completo: métricas manuales (campos texto/número/fecha/boolean), automáticas (fórmulas con KPIs), fijas (valor constante). Búsqueda por nombre, aviso al borrar si alimenta otras, drag-and-drop para ordenar. Ver Documentación → Métricas. | System paso 5, Dashboard, Performance |
+
+**Avisos Beta:** En Dashboard, Asesor (sección KPIs en el período), Documentación, Configuración, Performance > Chats, Acquisition, System (pasos 5 Métricas custom, 6 Metas, 7 Embudo IA, 10 Fuente financiera) y en el botón "Generar reporte semanal" se muestra un badge "Beta" para indicar que pueden existir ajustes en curso.
+
+**Bandeja:** Extracción robusta de `share_url` y `transcript` aunque vengan como objeto o array (Fathom). Botón "Ver grabación" (enlace) y botón "Ver transcripción" que despliega u oculta el texto completo.
 
 ---
 

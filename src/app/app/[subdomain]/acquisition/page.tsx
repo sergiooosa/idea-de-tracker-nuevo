@@ -33,7 +33,7 @@ export default function AcquisitionPage() {
 
   return (
     <>
-      <PageHeader title="Resumen de adquisición" subtitle="Origen / Canal / Medio" />
+      <PageHeader title="Resumen de adquisición" subtitle="Origen / Canal / Medio" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
       <div className="p-3 md:p-4 space-y-3 min-w-0 max-w-full overflow-x-hidden text-sm">
         <div className="flex flex-wrap gap-2 items-center">
           <DateRangePicker

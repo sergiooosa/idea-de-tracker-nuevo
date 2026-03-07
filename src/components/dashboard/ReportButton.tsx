@@ -11,6 +11,7 @@ export default function ReportButton() {
     >
       <BarChart3 className="w-5 h-5" />
       Generar reporte semanal
+      <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/20 border border-white/40 font-medium uppercase">Beta</span>
     </Link>
   );
 }

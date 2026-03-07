@@ -32,6 +32,51 @@ const ORIGEN_COLORS: Record<string, string> = {
   twilio: "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/30",
 };
 
+/** Extrae una URL válida aunque venga como string, array o objeto (ej. Fathom). */
+function toShareUrl(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string" && (v.startsWith("http://") || v.startsWith("https://"))) return v;
+  if (Array.isArray(v) && v.length > 0) {
+    const first = v[0];
+    if (typeof first === "string" && first.startsWith("http")) return first;
+    if (first && typeof first === "object" && "url" in first) return String((first as { url: string }).url);
+  }
+  if (typeof v === "object" && v !== null) {
+    const o = v as Record<string, unknown>;
+    if (typeof o.url === "string") return o.url;
+    if (typeof o.href === "string") return o.href;
+    if (typeof o.share_url === "string") return o.share_url;
+  }
+  return "";
+}
+
+/** Extrae texto de transcripción aunque venga como array de segmentos u objeto (ej. Fathom). */
+function toTranscriptString(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v.trim();
+  if (Array.isArray(v)) {
+    const parts = v.map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object") {
+        const o = item as Record<string, unknown>;
+        if (typeof o.text === "string") return o.text;
+        if (typeof o.content === "string") return o.content;
+        if (typeof o.transcript === "string") return o.transcript;
+      }
+      return "";
+    }).filter(Boolean);
+    return parts.join("\n");
+  }
+  if (typeof v === "object" && v !== null) {
+    const o = v as Record<string, unknown>;
+    if (typeof o.text === "string") return o.text;
+    if (typeof o.transcript === "string") return o.transcript;
+    if (typeof o.content === "string") return o.content;
+    if (typeof o.summary === "string") return o.summary;
+  }
+  return "";
+}
+
 function extractPayloadDetails(payload: unknown) {
   const p = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
   const nombre = String(p.nombre_lead ?? p.leadName ?? p.nombre ?? p.name ?? p.visitor_name ?? "");
@@ -39,8 +84,8 @@ function extractPayloadDetails(payload: unknown) {
   const email = String(p.email ?? p.mail_lead ?? p.email_lead ?? p.visitor_email ?? "");
   const fecha = String(p.fecha ?? p.ts ?? p.datetime ?? p.timestamp ?? p.created_at ?? p.occurred_at ?? "");
   const props = (p.properties && typeof p.properties === "object") ? p.properties as Record<string, unknown> : {};
-  const shareUrl = String(p.share_url ?? p.recording_url ?? p.video_url ?? props.share_url ?? "");
-  const transcript = String(p.transcript ?? p.summary ?? p.transcription ?? "");
+  const shareUrl = toShareUrl(p.share_url ?? p.recording_url ?? p.video_url ?? props.share_url ?? props.recording_url ?? props.video_url ?? "");
+  const transcript = toTranscriptString(p.transcript ?? p.summary ?? p.transcription ?? props.transcript ?? props.summary ?? props.transcription ?? "");
   return { nombre, telefono, email, fecha, shareUrl, transcript };
 }
 
@@ -53,6 +98,7 @@ function HuerfanoCard({
 }) {
   const [correo, setCorreo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
   const isPendiente = huerfano.estado === "pendiente";
   const details = extractPayloadDetails(huerfano.payload_original);
 
@@ -153,18 +199,34 @@ function HuerfanoCard({
           )}
         </div>
         {(details.shareUrl || details.transcript) && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            {details.shareUrl && (
-              <a href={details.shareUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent-cyan hover:underline">
-                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                Ver grabación
-              </a>
-            )}
-            {details.transcript && (
-              <span className="inline-flex items-center gap-1 text-gray-400" title={details.transcript}>
-                <FileText className="w-3.5 h-3.5 shrink-0 text-gray-500" />
-                <span className="truncate max-w-[200px]">{details.transcript.slice(0, 80)}{details.transcript.length > 80 ? '…' : ''}</span>
-              </span>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {details.shareUrl && (
+                <a
+                  href={details.shareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  Ver grabación
+                </a>
+              )}
+              {details.transcript && (
+                <button
+                  type="button"
+                  onClick={() => setShowTranscript((s) => !s)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-600 text-gray-300 border border-surface-500 hover:bg-surface-500 hover:text-white transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  {showTranscript ? "Ocultar transcripción" : "Ver transcripción"}
+                </button>
+              )}
+            </div>
+            {details.transcript && showTranscript && (
+              <div className="rounded-lg border border-surface-500 bg-surface-700/50 p-3 text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                {details.transcript}
+              </div>
             )}
           </div>
         )}

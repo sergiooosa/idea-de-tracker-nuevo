@@ -53,7 +53,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" />
+        <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-gray-400 text-sm animate-pulse">Cargando panel ejecutivo...</div>
         </div>
@@ -63,7 +63,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" />
+      <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
       <div className="p-3 md:p-4 space-y-3 min-w-0 max-w-full overflow-x-hidden text-sm">
         <section className="flex flex-wrap items-center gap-2">
           <DateRangePicker

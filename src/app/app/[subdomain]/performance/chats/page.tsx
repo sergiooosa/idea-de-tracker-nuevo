@@ -58,6 +58,7 @@ export default function PerformanceChatsPage() {
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
       <div className="flex flex-wrap items-center gap-2 mb-0">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase">Beta</span>
         <span className="text-xs text-gray-400">Rango de fechas:</span>
         <DateRangePicker
           dateFrom={dateFrom}
