@@ -737,7 +737,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 |---|---|---|
 | `/dashboard` | `dashboard/page.tsx` | `/api/data/dashboard` |
 | `/performance` | `performance/page.tsx` | `/api/data/videollamadas` |
-| `/performance/llamadas` | `performance/llamadas/page.tsx` | `/api/data/llamadas` — listado por **leads** (registros_de_llamada); al expandir asesor se ven personas; clic en la fila abre las **llamadas** (log, sin pdte); si hay &gt;1 llamada no pendiente, selector; botón Editar solo en contestadas; speed to lead null → "1 min" |
+| `/performance/llamadas` | `performance/llamadas/page.tsx` | `/api/data/llamadas` — listado por **leads** (registros_de_llamada); columnas: Nombre, Estado, **Llamadas realizadas** (conteo sin pdte), Llamadas (tipo), Speed to lead; clic en la fila abre las **llamadas** (log, sin pdte); si hay &gt;1 llamada no pendiente, selector; botón Editar solo en contestadas; speed to lead null → "1 min" |
 | `/performance/chats` | `performance/chats/page.tsx` | `/api/data/chats` |
 | `/asesor` | `asesor/page.tsx` | `/api/data/asesor` + `/api/data/metas` |
 | `/acquisition` | `acquisition/page.tsx` | `/api/data/acquisition` |

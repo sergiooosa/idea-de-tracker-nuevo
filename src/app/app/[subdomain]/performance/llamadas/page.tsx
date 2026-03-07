@@ -166,6 +166,7 @@ export default function PerformanceLlamadasPage() {
                                         <tr className="text-left text-gray-400">
                                           <th className="px-2 py-2 font-medium">Nombre</th>
                                           <th className="px-2 py-2 font-medium">Estado</th>
+                                          <th className="px-2 py-2 font-medium">Llamadas realizadas</th>
                                           <th className="px-2 py-2 font-medium">Llamadas (tipo)</th>
                                           <th className="px-2 py-2 font-medium">Speed to lead</th>
                                         </tr>
@@ -173,7 +174,7 @@ export default function PerformanceLlamadasPage() {
                                       <tbody>
                                         {advisorLeads.length === 0 ? (
                                           <tr>
-                                            <td colSpan={4} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
+                                            <td colSpan={5} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
                                           </tr>
                                         ) : advisorLeads.map((lead) => (
                                           <tr
@@ -183,6 +184,7 @@ export default function PerformanceLlamadasPage() {
                                           >
                                             <td className="px-2 py-2 text-white">{lead.nombre_lead ?? lead.mail_lead ?? '—'}</td>
                                             <td className="px-2 py-2 text-gray-300">{lead.estado ?? '—'}</td>
+                                            <td className="px-2 py-2 text-accent-cyan font-medium">{getCallsForLead(lead).length}</td>
                                             <td className="px-2 py-2 text-gray-400" title={getResumenLlamadas(lead)}>{getResumenLlamadas(lead)}</td>
                                             <td className="px-2 py-2 text-gray-400">{minFmt(lead.speed_to_lead_min)}</td>
                                           </tr>
