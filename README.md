@@ -897,6 +897,8 @@ El Dockerfile es multi-stage (deps → builder → runner) con `output: "standal
 - Proxy inverso (Traefik/Nginx) que pase el header `Host`
 - PostgreSQL accesible con SSL en producción
 
+**Despliegue en Coolify con Traefik (subdominios comodín):** Si usas Coolify, el campo "Domains" no sirve como catch-all para `*.autokpi.net`. Hay que dejar Domains vacío y usar **Custom Labels** de Traefik con una regla por regex. Guía completa: [docs/COOLIFY-TRAEFIK.md](docs/COOLIFY-TRAEFIK.md).
+
 ---
 
 ## Decisiones Técnicas Importantes
