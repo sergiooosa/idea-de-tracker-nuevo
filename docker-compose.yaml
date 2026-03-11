@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.autokpi-main.rule=Host(`autokpi.net`)"
+      - "traefik.http.routers.autokpi-main.entrypoints=http"
+      - "traefik.http.routers.autokpi-main.service=autokpi-app"
+      - "traefik.http.routers.autokpi-tenants.rule=HostRegexp(`{subdomain:[a-zA-Z0-9-_]+}.autokpi.net`)"
+      - "traefik.http.routers.autokpi-tenants.entrypoints=http"
+      - "traefik.http.routers.autokpi-tenants.service=autokpi-app"
+      - "traefik.http.services.autokpi-app.loadbalancer.server.port=3000"
