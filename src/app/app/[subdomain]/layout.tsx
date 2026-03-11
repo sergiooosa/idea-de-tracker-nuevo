@@ -24,6 +24,7 @@ import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
 import ReportButton from "@/components/dashboard/ReportButton";
 import { UserFilterProvider, useUserFilter } from "@/contexts/UserFilterContext";
+import { LayoutGrid } from "lucide-react";
 import { puedeVerRuta, NAV_PERMISOS } from "@/lib/permisos";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
@@ -176,6 +177,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const { session } = useUserFilter();
 
   const isActive = (path: string) => {
     if (path === "/dashboard") return pathname.endsWith("/dashboard");
@@ -218,6 +220,15 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           <NavFiltered />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
+          {session?.platformAdmin && (
+            <a
+              href="/api/super/exit"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 transition-all w-full"
+            >
+              <LayoutGrid className="w-5 h-5 shrink-0" />
+              Volver al listado
+            </a>
+          )}
           <SoloMisDatosToggle />
           {logoutButton}
         </div>
@@ -248,6 +259,16 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           <NavFilteredMobile onClose={() => setSidebarOpen(false)} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
+          {session?.platformAdmin && (
+            <a
+              href="/api/super/exit"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 transition-all w-full"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <LayoutGrid className="w-5 h-5 shrink-0" />
+              Volver al listado
+            </a>
+          )}
           <SoloMisDatosToggle />
           {logoutButton}
         </div>

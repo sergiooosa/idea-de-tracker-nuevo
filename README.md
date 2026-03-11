@@ -219,6 +219,8 @@ Archivo `.env.local` (nunca se sube al repo):
 | `AUTH_TRUST_HOST` | `true` | Necesario para proxies (Traefik, Coolify, etc.) |
 | `NEXT_PUBLIC_ROOT_DOMAIN` | `autokpi.net` | Dominio raíz para el middleware y cookies |
 | `NEXT_PUBLIC_API_BASE_URL` | `https://autokpi.net` | URL base para webhooks e integraciones (Zapier, Make). Si no se define, usa `AUTH_URL`. |
+| `PLATFORM_ADMIN_EMAIL` | *(opcional)* | Email del usuario plataforma (super admin global). Si se define, quien inicie sesión con este email + la clave siguiente accede al listado de todos los tenants. |
+| `PLATFORM_ADMIN_PASSWORD` | *(opcional)* | Contraseña del usuario plataforma. Debe usarse junto con `PLATFORM_ADMIN_EMAIL`. **No** se guarda en BD; se valida contra esta variable. |
 
 ---
 
@@ -232,7 +234,10 @@ src/
 │   ├── page.tsx                      # Landing page (autokpi.net)
 │   ├── login/
 │   │   ├── page.tsx                  # Página de login
-│   │   └── actions.ts               # Server Action: signIn + fetch subdominio
+│   │   └── actions.ts               # Server Action: signIn + fetch subdominio / platformAdmin
+│   ├── super/
+│   │   ├── page.tsx                  # Listado de tenants (solo usuario plataforma)
+│   │   └── SuperTenantList.tsx        # Lista con búsqueda + botón Iniciar
 │   ├── integraciones/
 │   │   └── page.tsx                  # Documentación API webhooks (pública)
 │   ├── webhooks/
@@ -245,6 +250,9 @@ src/
 │   │   │   ├── [...nextauth]/route.ts  # Handlers Auth.js (GET + POST)
 │   │   │   ├── session-info/route.ts   # GET: session + permisos (v3.0)
 │   │   │   └── logout/route.ts         # POST: cierra sesión
+│   │   ├── super/
+│   │   │   ├── enter/route.ts           # GET: entrar en tenant (usuario plataforma)
+│   │   │   └── exit/route.ts           # GET: volver al listado /super
 │   │   └── data/
 │   │       ├── dashboard/route.ts      # KPIs globales, ranking, objeciones (+ closerEmail)
 │   │       ├── videollamadas/route.ts  # GET/PUT Citas y videollamadas
@@ -399,9 +407,31 @@ Los permisos se resuelven en `auth.config.ts` desde `cuentas.roles_config` segú
 
 1. `login-form.tsx` (Client) envía email + password al Server Action `loginAction`
 2. `loginAction` llama `signIn("credentials", { redirect: false })`
-3. Auth.js ejecuta `authorize()` en `auth.config.ts`: query a `usuarios_dashboard` JOIN `cuentas`
-4. Si OK, la action consulta el `subdominio` y lo retorna al cliente
-5. El cliente hace `window.location.href = "https://[subdominio].autokpi.net/dashboard"`
+3. Auth.js ejecuta `authorize()` en `auth.config.ts`: **primero** se comprueba si el email y la contraseña coinciden con `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` (si están definidos). Si coinciden, se crea una sesión de **usuario plataforma** (sin tenant) y el cliente redirige a `/super`.
+4. Si no es usuario plataforma: query a `usuarios_dashboard` JOIN `cuentas`; si OK, la action consulta el `subdominio` y lo retorna al cliente.
+5. El cliente hace `window.location.href = "https://[subdominio].autokpi.net/dashboard"` o, si es usuario plataforma, `window.location.href = "/super"`.
+
+### Usuario plataforma (super admin global)
+
+Si se definen `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD`, un login con esas credenciales:
+
+- **No** consulta `usuarios_dashboard` ni está asociado a un tenant.
+- Crea una sesión con `platformAdmin: true`, `rol: "superadmin"` y permisos completos.
+- Redirige a **`/super`** (solo accesible en el dominio raíz y solo para esta sesión).
+
+En **`/super`** se muestra un listado de todas las cuentas (`cuentas`) con búsqueda por nombre o subdominio. Cada fila tiene un botón **Iniciar** que:
+
+1. Llama a `GET /api/super/enter?subdominio=xxx`
+2. La API verifica que la sesión sea de usuario plataforma, busca el tenant por subdominio y **reescribe el JWT** con ese `subdominio` e `id_cuenta` (la sesión sigue siendo la misma, pero “dentro” del tenant elegido).
+3. Redirige a `https://[subdominio].autokpi.net/dashboard`.
+
+Desde el panel del tenant, el usuario plataforma tiene los mismos permisos que un superadmin del tenant (ver todo, editar, configurar, gestionar usuarios/roles). En el sidebar aparece **Volver al listado**, que llama a `GET /api/super/exit`, restaura el JWT sin tenant y redirige a `/super`.
+
+| Ruta / API | Uso |
+|---|---|
+| `GET /super` | Listado de tenants (solo usuario plataforma). |
+| `GET /api/super/enter?subdominio=xxx` | Entrar en un tenant; reescribe sesión y redirige al dashboard del tenant. |
+| `GET /api/super/exit` | Salir del tenant actual y volver a `/super`. |
 
 ### Helper para API Routes
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { signIn } from "@/lib/auth";
+import { signIn, auth } from "@/lib/auth";
 import { AuthError } from "next-auth";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
@@ -26,6 +26,11 @@ export async function loginAction(formData: {
       };
     }
     throw error;
+  }
+
+  const session = await auth();
+  if (session?.user?.platformAdmin) {
+    return { platformAdmin: true };
   }
 
   const result = await db

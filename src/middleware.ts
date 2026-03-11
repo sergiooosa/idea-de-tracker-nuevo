@@ -9,9 +9,10 @@ const COOKIE_NAME = isProduction
   : "next-auth.session-token";
 
 type SessionPayload = {
-  subdominio?: string;
+  subdominio?: string | null;
   rol?: string;
-  id_cuenta?: number;
+  id_cuenta?: number | null;
+  platformAdmin?: boolean;
   [key: string]: unknown;
 };
 
@@ -74,8 +75,12 @@ export default async function middleware(req: NextRequest) {
   if (isRoot) {
     if (pathname.startsWith("/api/auth")) return NextResponse.next();
 
+    const session = await getSession(req);
+
     if (pathname === "/login") {
-      const session = await getSession(req);
+      if (session?.platformAdmin) {
+        return NextResponse.redirect(new URL("/super", req.url));
+      }
       if (session?.subdominio) {
         const protocol = req.nextUrl.protocol;
         const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
@@ -88,6 +93,15 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.redirect(
           new URL(`${protocol}//${targetHost}/dashboard`)
         );
+      }
+    }
+
+    if (pathname.startsWith("/super")) {
+      if (!session) {
+        return NextResponse.redirect(new URL("/login", req.url));
+      }
+      if (!session.platformAdmin) {
+        return NextResponse.redirect(new URL("/login", req.url));
       }
     }
 

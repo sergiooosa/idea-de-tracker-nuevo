@@ -26,6 +26,11 @@ export default function LoginForm() {
         return;
       }
 
+      if (result.platformAdmin) {
+        window.location.href = "/super";
+        return;
+      }
+
       if (result.subdominio) {
         const isLocalDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
         const protocol = window.location.protocol;

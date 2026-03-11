@@ -13,5 +13,6 @@ export async function GET() {
     permisos: session.user.permisos,
     permisosArray: session.user.permisosArray ?? [],
     id_cuenta: session.user.id_cuenta,
+    platformAdmin: session.user.platformAdmin ?? false,
   });
 }

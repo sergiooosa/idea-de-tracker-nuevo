@@ -39,6 +39,23 @@ export const authConfig: NextAuthConfig = {
         const email = (credentials.email as string).trim().toLowerCase();
         const password = credentials.password as string;
 
+        // Usuario plataforma (super admin global): credenciales desde env
+        const platformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim().toLowerCase();
+        const platformPassword = process.env.PLATFORM_ADMIN_PASSWORD;
+        if (platformEmail && platformPassword && email === platformEmail && password === platformPassword) {
+          return {
+            id: "platform-admin",
+            id_cuenta: null,
+            email: platformEmail,
+            name: "Administrador Plataforma",
+            rol: "superadmin",
+            subdominio: null,
+            permisos: null,
+            permisosArray: ALL_PERMISOS,
+            platformAdmin: true,
+          };
+        }
+
         try {
           const result = await db
             .select({
@@ -105,21 +122,23 @@ export const authConfig: NextAuthConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id!;
-        token.id_cuenta = (user as any).id_cuenta;
+        token.id_cuenta = (user as any).id_cuenta ?? null;
         token.rol = (user as any).rol;
-        token.subdominio = (user as any).subdominio;
+        token.subdominio = (user as any).subdominio ?? null;
         token.permisos = (user as any).permisos;
         token.permisosArray = (user as any).permisosArray;
+        token.platformAdmin = (user as any).platformAdmin ?? false;
       }
       return token;
     },
     async session({ session, token }) {
       session.user.id = token.id as string;
-      session.user.id_cuenta = token.id_cuenta as number;
+      session.user.id_cuenta = token.id_cuenta as number | null;
       session.user.rol = token.rol as string;
-      session.user.subdominio = token.subdominio as string;
+      session.user.subdominio = token.subdominio as string | null;
       session.user.permisos = token.permisos as Record<string, boolean> | null;
       session.user.permisosArray = (token.permisosArray as string[]) ?? [];
+      session.user.platformAdmin = token.platformAdmin as boolean | undefined;
       return session;
     },
   },

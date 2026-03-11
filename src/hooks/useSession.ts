@@ -9,7 +9,8 @@ export interface SessionInfo {
   rol: string;
   permisos: Record<string, boolean> | null;
   permisosArray: string[];
-  id_cuenta: number;
+  id_cuenta: number | null;
+  platformAdmin?: boolean;
 }
 
 export function useSession() {
