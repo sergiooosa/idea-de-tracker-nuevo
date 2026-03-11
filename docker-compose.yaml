@@ -3,12 +3,26 @@ services:
     build: .
     ports:
       - "3000:3000"
+    networks:
+      - coolify # JOYA 1: Conectamos el contenedor a la red del proxy
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify" # JOYA 2: Le decimos a Traefik qué red usar para enrutar
+      
+      # Reglas del dominio principal
       - "traefik.http.routers.autokpi-main.rule=Host(`autokpi.net`)"
-      - "traefik.http.routers.autokpi-main.entrypoints=http"
+      - "traefik.http.routers.autokpi-main.entrypoints=http,https" # JOYA 3: Escuchar tanto a Cloudflare Flexible como Full
       - "traefik.http.routers.autokpi-main.service=autokpi-app"
+      
+      # Reglas mágicas para los Tenants
       - "traefik.http.routers.autokpi-tenants.rule=HostRegexp(`{subdomain:[a-zA-Z0-9-_]+}.autokpi.net`)"
-      - "traefik.http.routers.autokpi-tenants.entrypoints=http"
+      - "traefik.http.routers.autokpi-tenants.entrypoints=http,https"
       - "traefik.http.routers.autokpi-tenants.service=autokpi-app"
+      
+      # El balanceador hacia tu Next.js
       - "traefik.http.services.autokpi-app.loadbalancer.server.port=3000"
+
+# Declaramos la red externa de Coolify para que Docker no intente crear una nueva
+networks:
+  coolify:
+    external: true
