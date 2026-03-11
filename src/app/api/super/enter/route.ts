@@ -28,18 +28,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  // Buscar por valor exacto (p. ej. "imexico-real-state" o "https://imexico-real-state.autokpi.net")
-  let [cuenta] = await db
+  type CuentaRow = { id_cuenta: number; subdominio: string };
+  const primera = await db
     .select({ id_cuenta: cuentas.id_cuenta, subdominio: cuentas.subdominio })
     .from(cuentas)
     .where(eq(cuentas.subdominio, subdominio))
     .limit(1);
+  let cuenta: CuentaRow | null = primera[0] ?? null;
 
   if (!cuenta) {
     const slug = normalizeSubdominio(subdominio);
     if (slug) {
       const todas = await db.select({ id_cuenta: cuentas.id_cuenta, subdominio: cuentas.subdominio }).from(cuentas);
-      cuenta = todas.find((c) => normalizeSubdominio(c.subdominio) === slug) ?? null;
+      const encontrada = todas.find((c) => normalizeSubdominio(c.subdominio) === slug);
+      cuenta = encontrada ?? null;
     }
   }
 
