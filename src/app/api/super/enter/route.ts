@@ -4,6 +4,7 @@ import { getToken, encode } from "@auth/core/jwt";
 import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { normalizeSubdominio } from "@/lib/subdomain";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 const isProduction = process.env.NODE_ENV === "production";
@@ -27,11 +28,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const [cuenta] = await db
+  // Buscar por valor exacto (p. ej. "imexico-real-state" o "https://imexico-real-state.autokpi.net")
+  let [cuenta] = await db
     .select({ id_cuenta: cuentas.id_cuenta, subdominio: cuentas.subdominio })
     .from(cuentas)
     .where(eq(cuentas.subdominio, subdominio))
     .limit(1);
+
+  if (!cuenta) {
+    const slug = normalizeSubdominio(subdominio);
+    if (slug) {
+      const todas = await db.select({ id_cuenta: cuentas.id_cuenta, subdominio: cuentas.subdominio }).from(cuentas);
+      cuenta = todas.find((c) => normalizeSubdominio(c.subdominio) === slug) ?? null;
+    }
+  }
 
   if (!cuenta) {
     return NextResponse.json(
@@ -39,6 +49,8 @@ export async function GET(req: Request) {
       { status: 404 }
     );
   }
+
+  const subdominioSlug = normalizeSubdominio(cuenta.subdominio) ?? cuenta.subdominio;
 
   const token = await getToken({
     req,
@@ -53,7 +65,7 @@ export async function GET(req: Request) {
 
   const newToken = {
     ...token,
-    subdominio: cuenta.subdominio,
+    subdominio: subdominioSlug,
     id_cuenta: cuenta.id_cuenta,
   };
 
@@ -68,8 +80,8 @@ export async function GET(req: Request) {
   const protocol = req.headers.get("x-forwarded-proto") || (isLocalDev ? "http" : "https");
   const portPart = currentHost.includes(":") ? ":" + currentHost.split(":")[1] : "";
   const host = isLocalDev
-    ? `${subdominio}.localhost${portPart}`
-    : `${subdominio}.${ROOT_DOMAIN}`;
+    ? `${subdominioSlug}.localhost${portPart}`
+    : `${subdominioSlug}.${ROOT_DOMAIN}`;
   const redirectUrl = `${protocol}://${host}/dashboard`;
 
   const res = NextResponse.redirect(redirectUrl);

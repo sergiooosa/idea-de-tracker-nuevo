@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { LogIn, Search } from "lucide-react";
+import { normalizeSubdominio } from "@/lib/subdomain";
 
 type TenantRow = {
   id_cuenta: number;
@@ -20,11 +21,14 @@ export default function SuperTenantList({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return tenants;
-    return tenants.filter(
-      (t) =>
+    return tenants.filter((t) => {
+      const slug = normalizeSubdominio(t.subdominio) ?? t.subdominio;
+      return (
         (t.nombre_cuenta?.toLowerCase().includes(q) ?? false) ||
-        t.subdominio.toLowerCase().includes(q)
-    );
+        t.subdominio.toLowerCase().includes(q) ||
+        slug.toLowerCase().includes(q)
+      );
+    });
   }, [tenants, search]);
 
   return (
@@ -72,31 +76,34 @@ export default function SuperTenantList({
                   </td>
                 </tr>
               ) : (
-                filtered.map((t) => (
-                  <tr
-                    key={t.id_cuenta}
-                    className="border-b border-slate-700/60 hover:bg-slate-800/40 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono text-cyan-400">
-                      {t.subdominio}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {t.nombre_cuenta ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {t.estado_cuenta ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <a
-                        href={`/api/super/enter?subdominio=${encodeURIComponent(t.subdominio)}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 transition-colors"
-                      >
-                        <LogIn className="h-3.5 w-3.5" />
-                        Iniciar
-                      </a>
-                    </td>
-                  </tr>
-                ))
+                filtered.map((t) => {
+                  const slug = normalizeSubdominio(t.subdominio) ?? t.subdominio;
+                  return (
+                    <tr
+                      key={t.id_cuenta}
+                      className="border-b border-slate-700/60 hover:bg-slate-800/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-mono text-cyan-400">
+                        {slug}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {t.nombre_cuenta ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-400">
+                        {t.estado_cuenta ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <a
+                          href={`/api/super/enter?subdominio=${encodeURIComponent(slug)}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 transition-colors"
+                        >
+                          <LogIn className="h-3.5 w-3.5" />
+                          Iniciar
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

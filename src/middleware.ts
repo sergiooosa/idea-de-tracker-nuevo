@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { decode } from "@auth/core/jwt";
+import { normalizeSubdominio } from "@/lib/subdomain";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 const isProduction = process.env.NODE_ENV === "production";
@@ -125,8 +126,8 @@ export default async function middleware(req: NextRequest) {
     );
   }
 
-  // Subdominio del token no coincide con el host
-  if (session.subdominio !== subdomain) {
+  const sessionSubdomainSlug = normalizeSubdominio(session.subdominio);
+  if (sessionSubdomainSlug !== subdomain) {
     return new NextResponse("Acceso no autorizado a este tenant.", {
       status: 403,
     });
