@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, or, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, or, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
   AsesorKpis,
   AsesorLeadCRM,
@@ -67,22 +67,34 @@ export async function getAsesorData(
   ]);
 
   const idCuentaStr = String(idCuenta);
-  const regConditions = [eq(registrosDeLlamada.id_cuenta, idCuentaStr)];
-  if (advisorEmail) {
-    regConditions.push(eq(registrosDeLlamada.closer_mail, advisorEmail));
-  }
-
-  const regRows = await db
-    .select()
-    .from(registrosDeLlamada)
-    .where(and(...regConditions))
-    .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+  const regRows = await (async () => {
+    if (!advisorEmail) {
+      return db
+        .select()
+        .from(registrosDeLlamada)
+        .where(eq(registrosDeLlamada.id_cuenta, idCuentaStr))
+        .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+    }
+    const callRegistroIds = [...new Set(callRows.map((c) => c.id_registro).filter((id): id is number => id != null && id > 0))];
+    const baseCond = eq(registrosDeLlamada.id_cuenta, idCuentaStr);
+    const byCloser = eq(registrosDeLlamada.closer_mail, advisorEmail);
+    const byLinkedCall = callRegistroIds.length > 0 ? inArray(registrosDeLlamada.id_registro, callRegistroIds) : sql`false`;
+    const regConditions = and(baseCond, or(byCloser, byLinkedCall))!;
+    return db
+      .select()
+      .from(registrosDeLlamada)
+      .where(regConditions)
+      .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+  })();
 
   const contestadas = callRows.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
 
-  // Leads únicos multicanal: deduplicar por email across calls + agendas
-  const leadsFromCalls = new Set(callRows.map((c) => c.mail_lead).filter(Boolean));
-  const leadsFromAgendas = new Set(agendaRows.map((a) => a.email_lead).filter(Boolean));
+  const leadKeyFromCall = (c: { mail_lead: string | null; phone: string | null; id: number }) =>
+    (c.mail_lead?.trim() && c.mail_lead) || (c.phone?.trim() && c.phone) || `id:${c.id}`;
+  const leadKeyFromAgenda = (a: { email_lead: string | null; nombre_de_lead?: string | null; id_registro_agenda?: number }) =>
+    (a.email_lead?.trim() && a.email_lead) || (a.nombre_de_lead?.trim() && a.nombre_de_lead) || (a.id_registro_agenda != null && `ag:${a.id_registro_agenda}`) || "";
+  const leadsFromCalls = new Set(callRows.map(leadKeyFromCall).filter(Boolean));
+  const leadsFromAgendas = new Set(agendaRows.map(leadKeyFromAgenda).filter(Boolean));
   const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]);
 
   // Desglose leads por canal

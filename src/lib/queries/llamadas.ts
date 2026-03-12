@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { logLlamadas, registrosDeLlamada } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 import type {
   ApiLlamadaLog,
   LlamadasAdvisorMetrics,
@@ -34,25 +34,31 @@ export async function getLlamadas(
   if (closerEmail) conditions.push(eq(logLlamadas.closer_mail, closerEmail));
 
   const idCuentaStr = String(idCuenta);
-  const regConditions = [
+  const rows = await db
+    .select()
+    .from(logLlamadas)
+    .where(and(...conditions))
+    .orderBy(sql`${logLlamadas.ts} DESC`);
+
+  const baseReg = [
     eq(registrosDeLlamada.id_cuenta, idCuentaStr),
     gte(registrosDeLlamada.fecha_evento, fromTs),
     lte(registrosDeLlamada.fecha_evento, toTs),
   ];
-  if (closerEmail) regConditions.push(eq(registrosDeLlamada.closer_mail, closerEmail));
+  const regRows = closerEmail
+    ? (() => {
+        const linkedIds = [...new Set(rows.map((r) => r.id_registro).filter((id): id is number => id != null && id > 0))];
+        const byCloser = eq(registrosDeLlamada.closer_mail, closerEmail);
+        const byLinked = linkedIds.length > 0 ? inArray(registrosDeLlamada.id_registro, linkedIds) : sql`false`;
+        return db
+          .select()
+          .from(registrosDeLlamada)
+          .where(and(...baseReg, or(byCloser, byLinked))!)
+          .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+      })()
+    : db.select().from(registrosDeLlamada).where(and(...baseReg)).orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
 
-  const [rows, regRows] = await Promise.all([
-    db
-      .select()
-      .from(logLlamadas)
-      .where(and(...conditions))
-      .orderBy(sql`${logLlamadas.ts} DESC`),
-    db
-      .select()
-      .from(registrosDeLlamada)
-      .where(and(...regConditions))
-      .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`),
-  ]);
+  const regRowsResolved = await regRows;
 
   const registros: ApiLlamadaLog[] = rows.map((r) => ({
     id: r.id,
@@ -70,7 +76,9 @@ export async function getLlamadas(
     creativoOrigen: r.creativo_origen,
   }));
 
-  const uniqueLeads = new Set(registros.map((r) => r.leadEmail).filter(Boolean));
+  const leadKey = (r: ApiLlamadaLog) =>
+    (r.leadEmail?.trim() && r.leadEmail) || (r.phone?.trim() && r.phone) || `id:${r.id}`;
+  const uniqueLeads = new Set(registros.map(leadKey));
   const answered = registros.filter((r) => r.outcome === "answered").length;
 
   const speedVals = registros
@@ -127,7 +135,7 @@ export async function getLlamadas(
     advisors.push({ id: key, name, email });
   }
 
-  const leads: LlamadaLead[] = regRows.map((r) => ({
+  const leads: LlamadaLead[] = regRowsResolved.map((r) => ({
     id_registro: r.id_registro,
     nombre_lead: r.nombre_lead,
     mail_lead: r.mail_lead,
