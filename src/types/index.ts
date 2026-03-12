@@ -449,11 +449,15 @@ export interface AsesorBreakdown {
   leadsAsignados: {
     desdeLlamadas: number;
     desdeAgendas: number;
-    /** Leads que aparecen solo en llamadas (no en agendas) */
+    /** Leads desde registros_de_llamada (CRM) */
+    desdeRegistros: number;
+    /** Leads que aparecen solo en llamadas (no en agendas ni registros) */
     soloLlamadas: number;
-    /** Leads que aparecen solo en agendas (no en llamadas) */
+    /** Leads que aparecen solo en agendas (no en llamadas ni registros) */
     soloAgendas: number;
-    /** Leads que aparecen en ambos */
+    /** Leads que aparecen solo en registros (CRM), sin log ni agendas */
+    soloRegistros: number;
+    /** Leads que aparecen en llamadas y agendas */
     enAmbos: number;
   };
   llamadasRealizadas: {

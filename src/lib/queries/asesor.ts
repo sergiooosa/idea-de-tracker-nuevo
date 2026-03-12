@@ -33,7 +33,7 @@ export async function getAsesorData(
     lte(logLlamadas.ts, toTs),
   ];
   if (advisorEmail) {
-    callConditions.push(eq(logLlamadas.closer_mail, advisorEmail));
+    callConditions.push(sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) = LOWER(TRIM(${advisorEmail}))`);
   }
 
   const fechaFilter = or(
@@ -52,7 +52,7 @@ export async function getAsesorData(
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
   ];
-  if (advisorEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, advisorEmail));
+  if (advisorEmail) agendaConditions.push(sql`LOWER(TRIM(COALESCE(${resumenesDiariosAgendas.closer}, ''))) = LOWER(TRIM(${advisorEmail}))`);
 
   const [callRows, agendaRows] = await Promise.all([
     db
@@ -77,7 +77,7 @@ export async function getAsesorData(
     }
     const callRegistroIds = [...new Set(callRows.map((c) => c.id_registro).filter((id): id is number => id != null && id > 0))];
     const baseCond = eq(registrosDeLlamada.id_cuenta, idCuentaStr);
-    const byCloser = eq(registrosDeLlamada.closer_mail, advisorEmail);
+    const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) = LOWER(TRIM(${advisorEmail}))`;
     const byLinkedCall = callRegistroIds.length > 0 ? inArray(registrosDeLlamada.id_registro, callRegistroIds) : sql`false`;
     const regConditions = and(baseCond, or(byCloser, byLinkedCall))!;
     return db
@@ -104,6 +104,7 @@ export async function getAsesorData(
   const soloLlamadas = [...leadsFromCalls].filter((e) => !leadsFromAgendas.has(e)).length;
   const soloAgendas = [...leadsFromAgendas].filter((e) => !leadsFromCalls.has(e)).length;
   const enAmbos = [...leadsFromCalls].filter((e) => leadsFromAgendas.has(e)).length;
+  const soloRegistros = [...leadsFromRegistros].filter((e) => !leadsFromCalls.has(e) && !leadsFromAgendas.has(e)).length;
 
   // Desglose llamadas por tipo_evento
   const porTipo: Record<string, number> = {};
@@ -128,8 +129,10 @@ export async function getAsesorData(
     leadsAsignados: {
       desdeLlamadas: leadsFromCalls.size,
       desdeAgendas: leadsFromAgendas.size,
+      desdeRegistros: leadsFromRegistros.size,
       soloLlamadas,
       soloAgendas,
+      soloRegistros,
       enAmbos,
     },
     llamadasRealizadas: {

@@ -31,7 +31,9 @@ export async function getLlamadas(
     gte(logLlamadas.ts, fromTs),
     lte(logLlamadas.ts, toTs),
   ];
-  if (closerEmail) conditions.push(eq(logLlamadas.closer_mail, closerEmail));
+  if (closerEmail) {
+    conditions.push(sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) = LOWER(TRIM(${closerEmail}))`);
+  }
 
   const idCuentaStr = String(idCuenta);
   const rows = await db
@@ -48,7 +50,7 @@ export async function getLlamadas(
   const regRows = closerEmail
     ? (() => {
         const linkedIds = [...new Set(rows.map((r) => r.id_registro).filter((id): id is number => id != null && id > 0))];
-        const byCloser = eq(registrosDeLlamada.closer_mail, closerEmail);
+        const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) = LOWER(TRIM(${closerEmail}))`;
         const byLinked = linkedIds.length > 0 ? inArray(registrosDeLlamada.id_registro, linkedIds) : sql`false`;
         return db
           .select()
@@ -78,7 +80,11 @@ export async function getLlamadas(
 
   const leadKey = (r: ApiLlamadaLog) =>
     (r.leadEmail?.trim() && r.leadEmail) || (r.phone?.trim() && r.phone) || `id:${r.id}`;
-  const uniqueLeads = new Set(registros.map(leadKey));
+  const regLeadKey = (r: { mail_lead: string | null; phone_raw_format: string | null; id_registro: number }) =>
+    (r.mail_lead?.trim() && r.mail_lead) || (r.phone_raw_format?.trim() && r.phone_raw_format) || `reg:${r.id_registro}`;
+  const uniqueLeadsFromLog = new Set(registros.map(leadKey));
+  const uniqueLeadsFromReg = new Set(regRowsResolved.map(regLeadKey));
+  const uniqueLeads = new Set([...uniqueLeadsFromLog, ...uniqueLeadsFromReg]);
   const answered = registros.filter((r) => r.outcome === "answered").length;
 
   const speedVals = registros

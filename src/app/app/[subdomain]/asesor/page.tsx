@@ -270,9 +270,11 @@ export default function AsesorPage() {
                       <ul className="space-y-2 text-gray-300">
                         <li className="flex justify-between"><span>Desde log de llamadas</span><strong className="text-accent-cyan">{breakdown.leadsAsignados.desdeLlamadas}</strong></li>
                         <li className="flex justify-between"><span>Desde agendas</span><strong className="text-accent-cyan">{breakdown.leadsAsignados.desdeAgendas}</strong></li>
+                        <li className="flex justify-between"><span>Desde registros (CRM)</span><strong className="text-accent-cyan">{breakdown.leadsAsignados.desdeRegistros ?? 0}</strong></li>
                         <li className="border-t border-surface-500 pt-2 mt-2 flex justify-between"><span>Solo llamadas</span><strong>{breakdown.leadsAsignados.soloLlamadas}</strong></li>
                         <li className="flex justify-between"><span>Solo agendas</span><strong>{breakdown.leadsAsignados.soloAgendas}</strong></li>
-                        <li className="flex justify-between"><span>En ambos canales</span><strong>{breakdown.leadsAsignados.enAmbos}</strong></li>
+                        <li className="flex justify-between"><span>Solo registros (CRM)</span><strong>{breakdown.leadsAsignados.soloRegistros ?? 0}</strong></li>
+                        <li className="flex justify-between"><span>En llamadas y agendas</span><strong>{breakdown.leadsAsignados.enAmbos}</strong></li>
                       </ul>
                     )}
                     {expandedKpi === 'llamadasRealizadas' && (
