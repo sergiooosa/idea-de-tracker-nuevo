@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
     const effectiveAdvisor = allAdvisors
       ? undefined
-      : (closerEmail ?? advisorEmail ?? email || undefined);
+      : ((closerEmail ?? advisorEmail ?? email) || undefined);
 
     const data = await getAsesorData(idCuenta, from, to, effectiveAdvisor || undefined);
     const advisorsList = await getAsesoresList(idCuenta);
