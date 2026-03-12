@@ -83,17 +83,20 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.redirect(new URL("/super", req.url));
       }
       if (session?.subdominio) {
-        const protocol = req.nextUrl.protocol;
-        const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
-        const isLocalDev = (req.headers.get("host") ?? "").includes(
-          "localhost"
-        );
-        const targetHost = isLocalDev
-          ? `${session.subdominio}.localhost${port}`
-          : `${session.subdominio}.${ROOT_DOMAIN}`;
-        return NextResponse.redirect(
-          new URL(`${protocol}//${targetHost}/dashboard`)
-        );
+        const slug = normalizeSubdominio(session.subdominio);
+        if (slug) {
+          const protocol = req.nextUrl.protocol;
+          const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
+          const isLocalDev = (req.headers.get("host") ?? "").includes(
+            "localhost"
+          );
+          const targetHost = isLocalDev
+            ? `${slug}.localhost${port}`
+            : `${slug}.${ROOT_DOMAIN}`;
+          return NextResponse.redirect(
+            new URL(`${protocol}//${targetHost}/dashboard`)
+          );
+        }
       }
     }
 

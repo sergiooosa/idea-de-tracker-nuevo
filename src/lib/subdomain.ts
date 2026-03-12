@@ -1,19 +1,31 @@
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
 /**
- * Normaliza un valor de subdominio que puede venir como slug ("imexico-real-state")
- * o como URL completa ("https://imexico-real-state.autokpi.net") y devuelve
- * siempre solo el slug para comparaciones y construcción de URLs.
+ * Normaliza un valor de subdominio que puede venir de la BD en muchos formatos
+ * y devuelve siempre solo el slug para comparaciones y construcción de URLs.
+ *
+ * Acepta por ejemplo:
+ * - "tracker-grupomexa"
+ * - "tracker-grupomexa.autokpi.net"
+ * - "https://tracker-grupomexa.autokpi.net"
+ * - "https//tracker-grupomexa.autokpi.net" (sin dos puntos)
+ * - "http://tracker-grupomexa.autokpi.net"
+ * - "https://tracker-grupomexa.autokpi.net/"
  */
 export function normalizeSubdominio(
   raw: string | null | undefined,
   rootDomain: string = ROOT_DOMAIN
 ): string | null {
   if (!raw || typeof raw !== "string") return null;
-  const s = raw.trim().toLowerCase();
+  let s = raw.trim().toLowerCase();
   if (!s) return null;
+  s = s.replace(/\/+$/, "");
+
   try {
-    if (s.includes("://")) {
+    if (s.includes("//")) {
+      if (!s.includes("://")) {
+        s = s.replace(/^(https?)\/\//, "$1://");
+      }
       const url = new URL(s.startsWith("http") ? s : "https://" + s);
       const host = url.hostname;
       if (host.endsWith("." + rootDomain)) {

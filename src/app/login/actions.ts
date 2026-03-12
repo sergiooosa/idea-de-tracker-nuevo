@@ -4,6 +4,7 @@ import { signIn, auth } from "@/lib/auth";
 import { AuthError } from "next-auth";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
+import { normalizeSubdominio } from "@/lib/subdomain";
 import { eq } from "drizzle-orm";
 
 export async function loginAction(formData: {
@@ -44,5 +45,7 @@ export async function loginAction(formData: {
     return { error: "No se encontró la cuenta asociada." };
   }
 
-  return { subdominio: result[0].subdominio };
+  const subdominioSlug =
+    normalizeSubdominio(result[0].subdominio) ?? result[0].subdominio;
+  return { subdominio: subdominioSlug };
 }

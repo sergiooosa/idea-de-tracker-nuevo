@@ -6,6 +6,7 @@ import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import type { RolConfig } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { PERMISOS_DISPONIBLES } from "@/lib/permisos";
+import { normalizeSubdominio } from "@/lib/subdomain";
 
 const ALL_PERMISOS = PERMISOS_DISPONIBLES.map((p) => p.id);
 
@@ -98,6 +99,8 @@ export const authConfig: NextAuthConfig = {
           }
 
           const permisosArray = resolvePermisos(user.rol, user.roles_config);
+          const subdominioSlug =
+            normalizeSubdominio(user.subdominio) ?? user.subdominio;
 
           return {
             id: String(user.id_evento),
@@ -105,7 +108,7 @@ export const authConfig: NextAuthConfig = {
             email: user.email,
             name: user.nombre,
             rol: user.rol,
-            subdominio: user.subdominio,
+            subdominio: subdominioSlug,
             permisos: user.permisos,
             permisosArray,
           };
