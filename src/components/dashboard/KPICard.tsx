@@ -30,6 +30,7 @@ export default function KPICard({
   color = 'cyan',
   className,
   tooltip,
+  onClick,
 }: {
   label: string;
   value: string | number;
@@ -37,11 +38,17 @@ export default function KPICard({
   color?: Color;
   className?: string;
   tooltip?: { significado: string; calculo: string };
+  onClick?: () => void;
 }) {
   return (
     <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
       className={clsx(
         'rounded-xl pl-3 overflow-hidden transition-shadow hover:shadow-lg min-w-0 kpi-card-fixed',
+        onClick && 'cursor-pointer hover:ring-2 hover:ring-white/20',
         cardFuturisticClass[color],
         className
       )}

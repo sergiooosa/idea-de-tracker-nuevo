@@ -444,8 +444,35 @@ export interface AsesorKpis {
   tasaAgendamiento: number;
 }
 
+/** Desglose por canal/origen para KPIs del panel asesor */
+export interface AsesorBreakdown {
+  leadsAsignados: {
+    desdeLlamadas: number;
+    desdeAgendas: number;
+    /** Leads que aparecen solo en llamadas (no en agendas) */
+    soloLlamadas: number;
+    /** Leads que aparecen solo en agendas (no en llamadas) */
+    soloAgendas: number;
+    /** Leads que aparecen en ambos */
+    enAmbos: number;
+  };
+  llamadasRealizadas: {
+    total: number;
+    porTipo: Record<string, number>;
+  };
+  llamadasContestadas: {
+    total: number;
+  };
+  reunionesAgendadas: {
+    total: number;
+  };
+}
+
 export interface AsesorResponse {
   kpis: AsesorKpis;
   leads: AsesorLeadCRM[];
   advisors: ApiAdvisor[];
+  /** Lista completa de asesores del tenant (para combobox super admin) */
+  advisorsList?: ApiAdvisor[];
+  breakdown?: AsesorBreakdown;
 }

@@ -5,6 +5,7 @@ import type {
   AsesorKpis,
   AsesorLeadCRM,
   AsesorResponse,
+  AsesorBreakdown,
   ApiAdvisor,
 } from "@/types";
 
@@ -84,6 +85,18 @@ export async function getAsesorData(
   const leadsFromAgendas = new Set(agendaRows.map((a) => a.email_lead).filter(Boolean));
   const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]);
 
+  // Desglose leads por canal
+  const soloLlamadas = [...leadsFromCalls].filter((e) => !leadsFromAgendas.has(e)).length;
+  const soloAgendas = [...leadsFromAgendas].filter((e) => !leadsFromCalls.has(e)).length;
+  const enAmbos = [...leadsFromCalls].filter((e) => leadsFromAgendas.has(e)).length;
+
+  // Desglose llamadas por tipo_evento
+  const porTipo: Record<string, number> = {};
+  for (const c of callRows) {
+    const t = c.tipo_evento || "sin_tipo";
+    porTipo[t] = (porTipo[t] ?? 0) + 1;
+  }
+
   const reunionesAgendadas = agendaRows.length;
   const tasaAgendamiento = contestadas > 0 ? (reunionesAgendadas / contestadas) * 100 : 0;
 
@@ -94,6 +107,22 @@ export async function getAsesorData(
     reunionesAgendadas,
     tasaContacto: callRows.length > 0 ? (contestadas / callRows.length) * 100 : 0,
     tasaAgendamiento,
+  };
+
+  const breakdown: AsesorBreakdown = {
+    leadsAsignados: {
+      desdeLlamadas: leadsFromCalls.size,
+      desdeAgendas: leadsFromAgendas.size,
+      soloLlamadas,
+      soloAgendas,
+      enAmbos,
+    },
+    llamadasRealizadas: {
+      total: callRows.length,
+      porTipo,
+    },
+    llamadasContestadas: { total: contestadas },
+    reunionesAgendadas: { total: reunionesAgendadas },
   };
 
   const leadMap: Record<string, AsesorLeadCRM> = {};
@@ -138,7 +167,7 @@ export async function getAsesorData(
     return { id: email, name, email };
   });
 
-  return { kpis, leads, advisors };
+  return { kpis, leads, advisors, breakdown };
 }
 
 /** Lista de asesores (closers) del tenant para el filtro "Solo data del asesor" */

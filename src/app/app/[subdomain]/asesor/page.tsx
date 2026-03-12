@@ -14,9 +14,9 @@ import { format, subDays } from 'date-fns';
 
 type CrmCategory = 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
 
-const CRM_CATEGORIES: { id: CrmCategory; label: string }[] = [
-  { id: 'primera_llamada', label: 'Primera llamada' },
-  { id: 'seguimiento', label: 'Seguimiento' },
+const CRM_CATEGORIES: { id: CrmCategory; label: string; description?: string }[] = [
+  { id: 'primera_llamada', label: 'Primera llamada', description: 'Llamadas telefónicas en curso (pendientes de respuesta).' },
+  { id: 'seguimiento', label: 'Seguimiento', description: 'Han recibido llamadas y aún no han contestado.' },
   { id: 'interesados', label: 'Interesados' },
   { id: 'no_interesados', label: 'No interesados' },
 ];
@@ -162,30 +162,34 @@ function AdvisorCombobox({
 const defaultTo = new Date();
 const defaultFrom = subDays(defaultTo, 7);
 
+type ExpandedKpi = 'leadsAsignados' | 'llamadasRealizadas' | 'llamadasContestadas' | 'reunionesAgendadas' | null;
+
 export default function AsesorPage() {
   const pathname = usePathname();
   const [dateFrom, setDateFrom] = useState(format(defaultFrom, 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(defaultTo, 'yyyy-MM-dd'));
-  const [selectedAdvisorEmail, setSelectedAdvisorEmail] = useState<string>('');
+  const [expandedKpi, setExpandedKpi] = useState<ExpandedKpi>(null);
 
-  const { canViewAll, session, sessionLoading } = useUserFilter();
+  const { canViewAll, session, sessionLoading, asesorSeleccionado, setAsesorSeleccionado, asesores: asesoresContext } = useUserFilter();
 
   const { data: metasData } = useApiData<{ meta_llamadas_diarias: number }>('/api/data/metas');
   const metaLlamadasDiarias = metasData?.meta_llamadas_diarias ?? 50;
 
-  const advisorParam = canViewAll
-    ? (selectedAdvisorEmail || undefined)
-    : (session?.email || undefined);
+  const apiParams = useMemo(() => {
+    const base: Record<string, string> = { from: dateFrom, to: dateTo };
+    if (canViewAll) {
+      if (asesorSeleccionado) base.advisorEmail = asesorSeleccionado;
+      else base.allAdvisors = '1';
+    }
+    return base;
+  }, [dateFrom, dateTo, canViewAll, asesorSeleccionado]);
 
-  const { data, loading } = useApiData<AsesorResponse>('/api/data/asesor', {
-    from: dateFrom,
-    to: dateTo,
-    advisorEmail: advisorParam,
-  });
+  const { data, loading } = useApiData<AsesorResponse>('/api/data/asesor', apiParams);
 
   const kpis = data?.kpis ?? { leadsAsignados: 0, llamadasRealizadas: 0, llamadasContestadas: 0, reunionesAgendadas: 0, tasaContacto: 0, tasaAgendamiento: 0 };
   const leads = data?.leads ?? [];
-  const advisors = data?.advisors ?? [];
+  const breakdown = data?.breakdown;
+  const advisorsList = data?.advisorsList ?? data?.advisors ?? asesoresContext;
 
   const leadsByCategory = useMemo(() => {
     const map: Record<CrmCategory, AsesorLeadCRM[]> = { primera_llamada: [], seguimiento: [], interesados: [], no_interesados: [] };
@@ -203,11 +207,11 @@ export default function AsesorPage() {
         subtitle="Métricas y leads del asesor"
         action={
           <div className="flex items-center gap-2">
-            {!sessionLoading && advisors.length > 0 && (
+            {!sessionLoading && advisorsList.length > 0 && (
               <AdvisorCombobox
-                advisors={advisors}
-                value={canViewAll ? selectedAdvisorEmail : (session?.email ?? '')}
-                onChange={setSelectedAdvisorEmail}
+                advisors={advisorsList}
+                value={canViewAll ? asesorSeleccionado : (session?.email ?? '')}
+                onChange={setAsesorSeleccionado}
                 disabled={!canViewAll}
               />
             )}
@@ -237,14 +241,60 @@ export default function AsesorPage() {
                 <SectionInfo text="Estos KPIs muestran datos del asesor seleccionado en el período de fechas elegido." />
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-                <KPICard label="Leads asignados" value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad en llamadas y videollamadas en el rango seleccionado.', calculo: 'Correos distintos (mail_lead) que aparecen en el log de llamadas del período.' }} />
-                <KPICard label="Llamadas realizadas" value={kpis.llamadasRealizadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de eventos registrados en el log de llamadas durante el período.', calculo: 'Cuenta de todas las filas en log_llamadas dentro del rango de fechas.' }} />
-                <KPICard label="Llamadas contestadas" value={kpis.llamadasContestadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Llamadas con respuesta efectiva del lead.', calculo: 'Eventos cuyo tipo comienza con efectiva_* en log_llamadas.' }} />
-                <KPICard label="Reuniones agendadas" value={kpis.reunionesAgendadas} color="purple" className={kpiCompact} tooltip={{ significado: 'Citas registradas en el período seleccionado.', calculo: 'Registros en la tabla de agendas dentro del rango de fechas.' }} />
+                <KPICard label="Leads asignados" value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad en llamadas y videollamadas en el rango seleccionado.', calculo: 'Correos distintos (mail_lead) que aparecen en el log de llamadas del período.' }} onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined} />
+                <KPICard label="Llamadas realizadas" value={kpis.llamadasRealizadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de eventos registrados en el log de llamadas durante el período.', calculo: 'Cuenta de todas las filas en log_llamadas dentro del rango de fechas.' }} onClick={breakdown ? () => setExpandedKpi('llamadasRealizadas') : undefined} />
+                <KPICard label="Llamadas contestadas" value={kpis.llamadasContestadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Llamadas con respuesta efectiva del lead.', calculo: 'Eventos cuyo tipo comienza con efectiva_* en log_llamadas.' }} onClick={breakdown ? () => setExpandedKpi('llamadasContestadas') : undefined} />
+                <KPICard label="Reuniones agendadas" value={kpis.reunionesAgendadas} color="purple" className={kpiCompact} tooltip={{ significado: 'Citas registradas en el período seleccionado.', calculo: 'Registros en la tabla de agendas dentro del rango de fechas.' }} onClick={breakdown ? () => setExpandedKpi('reunionesAgendadas') : undefined} />
                 <KPICard label="Tasa de contacto" value={`${kpis.tasaContacto.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas que fueron contestadas respecto al total.', calculo: '(Llamadas contestadas ÷ Total llamadas realizadas) × 100.' }} />
                 <KPICard label="Tasa de agendamiento" value={`${kpis.tasaAgendamiento.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas contestadas que resultaron en una reunión agendada.', calculo: '(Reuniones agendadas ÷ Llamadas contestadas) × 100.' }} />
               </div>
             </section>
+
+            {expandedKpi && breakdown && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Desglose por canal">
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setExpandedKpi(null)} />
+                <div className="relative rounded-xl border border-surface-500 bg-surface-800 shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-surface-500">
+                    <h3 className="text-sm font-semibold text-white">
+                      {expandedKpi === 'leadsAsignados' && 'Desglose: Leads asignados'}
+                      {expandedKpi === 'llamadasRealizadas' && 'Desglose: Llamadas realizadas'}
+                      {expandedKpi === 'llamadasContestadas' && 'Desglose: Llamadas contestadas'}
+                      {expandedKpi === 'reunionesAgendadas' && 'Desglose: Reuniones agendadas'}
+                    </h3>
+                    <button type="button" onClick={() => setExpandedKpi(null)} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-600 transition-colors" aria-label="Cerrar">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="p-4 overflow-y-auto space-y-3 text-sm">
+                    {expandedKpi === 'leadsAsignados' && (
+                      <ul className="space-y-2 text-gray-300">
+                        <li className="flex justify-between"><span>Desde log de llamadas</span><strong className="text-accent-cyan">{breakdown.leadsAsignados.desdeLlamadas}</strong></li>
+                        <li className="flex justify-between"><span>Desde agendas</span><strong className="text-accent-cyan">{breakdown.leadsAsignados.desdeAgendas}</strong></li>
+                        <li className="border-t border-surface-500 pt-2 mt-2 flex justify-between"><span>Solo llamadas</span><strong>{breakdown.leadsAsignados.soloLlamadas}</strong></li>
+                        <li className="flex justify-between"><span>Solo agendas</span><strong>{breakdown.leadsAsignados.soloAgendas}</strong></li>
+                        <li className="flex justify-between"><span>En ambos canales</span><strong>{breakdown.leadsAsignados.enAmbos}</strong></li>
+                      </ul>
+                    )}
+                    {expandedKpi === 'llamadasRealizadas' && (
+                      <div>
+                        <p className="text-gray-400 text-xs mb-2">Por tipo de evento:</p>
+                        <ul className="space-y-1.5 text-gray-300">
+                          {Object.entries(breakdown.llamadasRealizadas.porTipo).sort((a, b) => b[1] - a[1]).map(([tipo, count]) => (
+                            <li key={tipo} className="flex justify-between"><span className="truncate mr-2">{tipo}</span><strong className="text-accent-cyan shrink-0">{count}</strong></li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {expandedKpi === 'llamadasContestadas' && (
+                      <p className="text-gray-300">Total de llamadas con respuesta efectiva: <strong className="text-accent-cyan">{breakdown.llamadasContestadas.total}</strong></p>
+                    )}
+                    {expandedKpi === 'reunionesAgendadas' && (
+                      <p className="text-gray-300">Total de reuniones/citas en el período: <strong className="text-accent-cyan">{breakdown.reunionesAgendadas.total}</strong></p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4 space-y-4">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -277,16 +327,19 @@ export default function AsesorPage() {
             <section>
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-accent-cyan" /> CRM — Leads por categoría
-                <SectionInfo text="Leads organizados por su estado en el ciclo de ventas. Los estados se asignan por IA o manualmente." />
+                <SectionInfo text="Primera llamada: llamadas telefónicas en curso. Seguimiento: han recibido llamadas y no han contestado. Interesados/No interesados según estado del lead." />
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
                 {CRM_CATEGORIES.map((cat) => (
                   <div key={cat.id} className="rounded-xl overflow-hidden flex flex-col min-h-[120px] section-futuristic border border-surface-500/80">
-                    <div className="bg-surface-700/90 px-2.5 py-1.5 flex items-center justify-between shrink-0">
-                      <span className="text-[11px] font-medium text-white">{cat.label}</span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-accent-cyan/20 text-accent-cyan text-[10px] font-medium">
-                        {leadsByCategory[cat.id].length}
-                      </span>
+                    <div className="bg-surface-700/90 px-2.5 py-1.5 flex flex-col gap-0.5 shrink-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-white">{cat.label}</span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-accent-cyan/20 text-accent-cyan text-[10px] font-medium">
+                          {leadsByCategory[cat.id].length}
+                        </span>
+                      </div>
+                      {cat.description && <span className="text-[9px] text-gray-500 leading-tight">{cat.description}</span>}
                     </div>
                     <div className="p-1.5 flex-1 overflow-y-auto max-h-[380px] space-y-1">
                       {leadsByCategory[cat.id].length === 0 ? (
