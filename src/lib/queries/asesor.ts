@@ -93,9 +93,12 @@ export async function getAsesorData(
     (c.mail_lead?.trim() && c.mail_lead) || (c.phone?.trim() && c.phone) || `id:${c.id}`;
   const leadKeyFromAgenda = (a: { email_lead: string | null; nombre_de_lead?: string | null; id_registro_agenda?: number }) =>
     (a.email_lead?.trim() && a.email_lead) || (a.nombre_de_lead?.trim() && a.nombre_de_lead) || (a.id_registro_agenda != null && `ag:${a.id_registro_agenda}`) || "";
+  const leadKeyFromReg = (r: { mail_lead: string | null; phone_raw_format: string | null; id_registro: number }) =>
+    (r.mail_lead?.trim() && r.mail_lead) || (r.phone_raw_format?.trim() && r.phone_raw_format) || `reg:${r.id_registro}`;
   const leadsFromCalls = new Set(callRows.map(leadKeyFromCall).filter(Boolean));
   const leadsFromAgendas = new Set(agendaRows.map(leadKeyFromAgenda).filter(Boolean));
-  const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]);
+  const leadsFromRegistros = new Set(regRows.map(leadKeyFromReg).filter(Boolean));
+  const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas, ...leadsFromRegistros]);
 
   // Desglose leads por canal
   const soloLlamadas = [...leadsFromCalls].filter((e) => !leadsFromAgendas.has(e)).length;
