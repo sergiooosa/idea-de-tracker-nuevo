@@ -1,13 +1,22 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
+import { verifySuperCookie, getSuperCookieName } from "@/lib/super-verify";
 import SuperTenantList from "./SuperTenantList";
+import SuperLoginForm from "./SuperLoginForm";
 
 export default async function SuperPage() {
   const session = await auth();
   if (!session?.user?.platformAdmin) {
     redirect("/login");
+  }
+
+  const cookieStore = await cookies();
+  const superCookie = cookieStore.get(getSuperCookieName())?.value;
+  if (!verifySuperCookie(superCookie)) {
+    return <SuperLoginForm />;
   }
 
   const rows = await db
