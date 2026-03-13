@@ -25,6 +25,16 @@
 
 **Bandeja:** Extracción robusta de `share_url` y `transcript` aunque vengan como objeto o array (Fathom). Botón "Ver grabación" (enlace) y botón "Ver transcripción" que despliega u oculta el texto completo.
 
+### Novedades recientes — Performance Llamadas y Bandeja Reasignación
+
+| Cambio | Descripción |
+|--------|-------------|
+| **Performance > Llamadas — Lead** | En cada fila de lead se muestra: nombre, debajo el **teléfono** y el **ID usuario GHL** (`id_user_ghl`) cuando existan. |
+| **Speed to lead** | Si el estado del lead es **PDTE** (pendiente), el Speed to lead se muestra como "—" (aún no se ha llamado). En el resto de casos se usa el valor de BD o 0. |
+| **Tiempo al lead (prom.)** | El promedio se calcula también desde `registros_de_llamada.speed_to_lead` cuando no hay datos en `log_llamadas`, de modo que el KPI refleje los datos existentes. |
+| **Llamadas por asesor — Editar todo** | En cada fila de lead hay botón **Editar**. El sheet permite editar todos los campos del registro (nombre, email, teléfono, estado, closer, ID GHL) y **eliminar** el registro. API: `PUT /api/data/llamadas` con `id_registro` + campos; `DELETE /api/data/llamadas?id_registro=X`. |
+| **Bandeja — Huérfanos de reasignación** | Los eventos con `origen: "reasignacion"` se muestran con una tarjeta específica: Lead (nombre + teléfono), ID usuario GHL, Location, motivo, closer si llegó. Formulario para completar **nombre del closer** y **correo del closer** y botón "Completar y reenviar". PATCH acepta `nombrecloser` y `correocloser` para reasignación y reenvía al Cerebro. |
+
 ---
 
 ## Novedades v2.0 — Marca Blanca Absoluta
@@ -701,14 +711,15 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | `/api/data/dashboard` | GET | agendas + log_llamadas | `from`, `to`, `closerEmail?` | Panel ejecutivo |
 | `/api/data/videollamadas` | GET | resumenes_diarios_agendas | `from`, `to`, `closerEmail?` | Performance > Videollamadas |
 | `/api/data/videollamadas` | PUT | resumenes_diarios_agendas | body: id, nombre_lead?, closer?, categoria? | Editar registro (v3.0) |
-| `/api/data/llamadas` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `closerEmail?` | Performance > Llamadas (devuelve `registros` = logs, `leads` = registros por persona; el listado expandido muestra leads) |
-| `/api/data/llamadas` | PUT | log_llamadas | body: id, nombre_lead?, closer_mail?, estado_resultado? | Editar registro (v3.0) |
+| `/api/data/llamadas` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `closerEmail?` | Performance > Llamadas (devuelve `registros` = logs, `leads` con teléfono e id_user_ghl; agg.speedAvg desde registros si no hay en log) |
+| `/api/data/llamadas` | PUT | log_llamadas / registros_de_llamada | body: id **o** id_registro, nombre_lead?, mail_lead?, phone_raw_format?, closer?, estado?, id_user_ghl? | Editar evento (id) o registro completo (id_registro) |
+| `/api/data/llamadas` | DELETE | registros_de_llamada | `id_registro` | Eliminar registro de llamada (v3.0) |
 | `/api/data/chats` | GET | chats_logs | `from`, `to`, `closerEmail?` | Performance > Chats |
 | `/api/data/chats` | PUT | chats_logs | body: id, nombre_lead?, estado? | Editar registro (v3.0) |
 | `/api/data/weekly-report` | GET | agendas + log_llamadas | `from`, `to` | Reporte semanal |
 | `/api/data/asesor` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `advisorEmail?`, `closerEmail?` | Panel asesor |
 | `/api/data/huerfanos` | GET | eventos_huerfanos | `estado?` | Bandeja: lista huérfanos (v3.0) |
-| `/api/data/huerfanos` | PATCH | eventos_huerfanos | body: id, accion (corregir\|descartar), correo? | Corregir/Descartar + retry Cerebro (v3.0) |
+| `/api/data/huerfanos` | PATCH | eventos_huerfanos | body: id_huerfano, accion (corregir\|descartar), correo_corregido? (fathom/twilio), nombrecloser? + correocloser? (reasignación) | Corregir/Descartar + retry Cerebro; reasignación: completar closer y reenviar |
 | `/api/data/acquisition` | GET | agendas + log_llamadas + chats_logs | `from`, `to` | Adquisición |
 | `/api/data/metas` | GET | metas_cuenta | | System + Asesor |
 | `/api/data/metas` | PUT | metas_cuenta | body JSON | System paso 6 |
@@ -771,7 +782,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 |---|---|---|
 | `/dashboard` | `dashboard/page.tsx` | `/api/data/dashboard` |
 | `/performance` | `performance/page.tsx` | `/api/data/videollamadas` — listado por **leads** (derivados de registros, agrupados por persona); columnas: Nombre, Correo, **Reuniones realizadas**, Resultado; clic en la fila abre reuniones (1 → detalle directo; &gt;1 → selector con fecha y resultado); Editar desde el modal de transcripción/análisis |
-| `/performance/llamadas` | `performance/llamadas/page.tsx` | `/api/data/llamadas` — listado por **leads** (registros_de_llamada); columnas: Nombre, Estado, **Llamadas realizadas** (conteo sin pdte), Llamadas (tipo), Speed to lead; clic en la fila abre las **llamadas** (log, sin pdte); si hay &gt;1 llamada no pendiente, selector; botón Editar solo en contestadas; speed to lead null → "1 min" |
+| `/performance/llamadas` | `performance/llamadas/page.tsx` | `/api/data/llamadas` — listado por **leads** (registros_de_llamada); columnas: Nombre (con teléfono e ID GHL debajo), Estado, Llamadas realizadas, Llamadas (tipo), Speed to lead (— si PDTE), **Editar** en cada fila (edición completa del registro y eliminación); clic en la fila abre las llamadas (log); Tiempo al lead prom. desde registros si no hay en log |
 | `/performance/chats` | `performance/chats/page.tsx` | `/api/data/chats` |
 | `/asesor` | `asesor/page.tsx` | `/api/data/asesor` + `/api/data/metas` |
 | `/acquisition` | `acquisition/page.tsx` | `/api/data/acquisition` |
@@ -794,7 +805,7 @@ Todas las páginas bajo `/app/[subdomain]/` son **Client Components** (`"use cli
 | `PageHeader` | Header con título, subtítulo, botón back y slot de acciones |
 | `ReportButton` | FAB fijo que enlaza a `/weekly-report` |
 | `Lead360Drawer` | Drawer lateral de detalle de lead (placeholder) |
-| `EditRecordSheet` | Sheet lateral para editar estado, closer y nombre del lead (Llamadas/Videollamadas/Chats) (v3.0) |
+| `EditRecordSheet` | Sheet lateral para editar estado, closer y nombre del lead; en Llamadas por registro (id_registro) permite editar también email, teléfono, ID GHL y eliminar el registro (v3.0) |
 | `InsightsChat` | Chatbot "Habla con tus datos" v2 — soporta embudo, tags, triggers |
 | `TagFilter` | 🏷️ Multi-select de etiquetas internas para filtrado client-side |
 | `UserFilterContext` | Contexto para toggle "Solo mis datos" y estado del filtro (v3.0) |

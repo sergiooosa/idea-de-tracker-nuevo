@@ -15,10 +15,12 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   return withAuthAndPermission(req, "ver_bandeja", async (idCuenta) => {
     const body = await req.json();
-    const { id_huerfano, correo_corregido, accion } = body as {
+    const { id_huerfano, correo_corregido, accion, nombrecloser, correocloser } = body as {
       id_huerfano: number;
       correo_corregido?: string;
       accion: "corregir" | "descartar";
+      nombrecloser?: string;
+      correocloser?: string;
     };
 
     if (!id_huerfano) {
@@ -35,16 +37,27 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: true, estado: "descartado" });
     }
 
-    if (!correo_corregido) {
+    const isReasignacion = String(huerfano.origen).toLowerCase() === "reasignacion";
+    if (isReasignacion) {
+      if (!nombrecloser?.trim() || !correocloser?.trim() || !correocloser.includes("@")) {
+        return NextResponse.json(
+          { error: "Reasignación requiere nombrecloser y correocloser válido" },
+          { status: 400 },
+        );
+      }
+    } else if (!correo_corregido?.trim() || !correo_corregido.includes("@")) {
       return NextResponse.json({ error: "correo_corregido requerido" }, { status: 400 });
     }
 
     try {
       const cerebroUrl = `${API_BASE_URL}/webhooks/retry-orphan/${id_huerfano}`;
+      const cerebroBody: Record<string, unknown> = isReasignacion
+        ? { nombrecloser: nombrecloser!.trim(), correocloser: correocloser!.trim() }
+        : { correo: correo_corregido!.trim() };
       const cerebroRes = await fetch(cerebroUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ correo: correo_corregido }),
+        body: JSON.stringify(cerebroBody),
       });
 
       if (!cerebroRes.ok) {

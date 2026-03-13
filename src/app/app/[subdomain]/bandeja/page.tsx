@@ -30,6 +30,7 @@ const ESTADO_TABS: { id: EstadoTab; label: string; icon: typeof Inbox }[] = [
 const ORIGEN_COLORS: Record<string, string> = {
   fathom: "bg-accent-purple/20 text-accent-purple border-accent-purple/30",
   twilio: "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/30",
+  reasignacion: "bg-accent-amber/20 text-accent-amber border-accent-amber/30",
 };
 
 /** Extrae una URL válida aunque venga como string, array o objeto (ej. Fathom). */
@@ -87,6 +88,198 @@ function extractPayloadDetails(payload: unknown) {
   const shareUrl = toShareUrl(p.share_url ?? p.recording_url ?? p.video_url ?? props.share_url ?? props.recording_url ?? props.video_url ?? "");
   const transcript = toTranscriptString(p.transcript ?? p.summary ?? p.transcription ?? props.transcript ?? props.summary ?? props.transcription ?? "");
   return { nombre, telefono, email, fecha, shareUrl, transcript };
+}
+
+/** customData de payload reasignación */
+function getReasignacionCustomData(payload: unknown): Record<string, unknown> {
+  const p = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  const raw = p.customData;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  if (Array.isArray(raw) && raw.length > 0 && raw[0] && typeof raw[0] === "object") return raw[0] as Record<string, unknown>;
+  return {};
+}
+
+function ReasignacionOrphanCard({
+  huerfano,
+  onAction,
+}: {
+  huerfano: HuerfanoData;
+  onAction: () => void;
+}) {
+  const [nombreCloser, setNombreCloser] = useState("");
+  const [correoCloser, setCorreoCloser] = useState("");
+  const [loading, setLoading] = useState(false);
+  const isPendiente = huerfano.estado === "pendiente";
+  const cd = getReasignacionCustomData(huerfano.payload_original);
+  const nombreLead = (cd.nombre as string)?.trim() || "Sin nombre";
+  const telefonoLead = (cd.telefono as string)?.trim() || "—";
+  const idusuario = (cd.idusuario as string) ?? "—";
+  const locationid = (cd.locationid as string) ?? "—";
+  const nombrecloserPayload = (cd.nombrecloser as string)?.trim() || "—";
+  const correocloserPayload = (cd.correocloser as string)?.trim() || "—";
+
+  const handleCorregir = async () => {
+    if (!nombreCloser.trim()) {
+      toast.error("Ingresa el nombre del closer");
+      return;
+    }
+    if (!correoCloser.trim() || !correoCloser.includes("@")) {
+      toast.error("Ingresa un correo válido del closer");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/data/huerfanos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_huerfano: huerfano.id_huerfano,
+          accion: "corregir",
+          nombrecloser: nombreCloser.trim(),
+          correocloser: correoCloser.trim(),
+        }),
+      });
+      if (res.ok) {
+        toast.success("Reasignación corregida y reenviada");
+        onAction();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? "Error al procesar");
+      }
+    } catch {
+      toast.error("Error de red");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDescartar = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/data/huerfanos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_huerfano: huerfano.id_huerfano, accion: "descartar" }),
+      });
+      if (res.ok) {
+        toast.success("Evento descartado");
+        onAction();
+      } else {
+        toast.error("Error al descartar");
+      }
+    } catch {
+      toast.error("Error de red");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const origenClass = ORIGEN_COLORS.reasignacion;
+
+  return (
+    <div className="rounded-xl border border-surface-500 bg-surface-800/80 overflow-hidden transition-all hover:border-surface-400">
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-surface-700/60 border-b border-surface-500/60">
+        <div className="flex items-center gap-2">
+          <span className={clsx("px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase border", origenClass)}>
+            <Radio className="w-3 h-3 inline mr-1" /> Reasignación
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-accent-amber/15 text-accent-amber border border-accent-amber/30 text-[10px] font-medium">
+            {huerfano.motivo}
+          </span>
+        </div>
+        {huerfano.created_at && (
+          <span className="text-[10px] text-gray-500 flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {format(new Date(huerfano.created_at), "dd/MM/yy HH:mm")}
+          </span>
+        )}
+      </div>
+
+      <div className="px-4 py-3 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Lead</span>
+            <span className="text-white">{nombreLead}</span>
+            <span className="text-gray-400">{telefonoLead}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-gray-500">ID usuario (GHL)</span>
+            <span className="text-gray-300">{idusuario}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Location</span>
+            <span className="text-gray-300">{locationid}</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-gray-500">Closer (si llegó)</span>
+            <span className="text-gray-400">{nombrecloserPayload} / {correocloserPayload}</span>
+          </div>
+        </div>
+
+        {isPendiente && (
+          <div className="pt-2 border-t border-surface-500/50 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-gray-500 mb-1">Nombre del closer</label>
+                <input
+                  type="text"
+                  value={nombreCloser}
+                  onChange={(e) => setNombreCloser(e.target.value)}
+                  placeholder="María García"
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2.5 py-1.5 text-xs text-white placeholder-gray-500 outline-none"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 mb-1">Correo del closer</label>
+                <input
+                  type="email"
+                  value={correoCloser}
+                  onChange={(e) => setCorreoCloser(e.target.value)}
+                  placeholder="closer@empresa.com"
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2.5 py-1.5 text-xs text-white placeholder-gray-500 outline-none"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCorregir}
+                disabled={loading || !nombreCloser.trim() || !correoCloser.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:shadow-[0_0_16px_-4px_rgba(0,240,255,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              >
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                Completar y reenviar
+              </button>
+              <button
+                type="button"
+                onClick={handleDescartar}
+                disabled={loading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors border border-transparent hover:border-red-500/30 disabled:opacity-50 shrink-0"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                Descartar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isPendiente && (
+          <div className="flex items-center gap-1.5 pt-1 text-[10px]">
+            {huerfano.estado === "resuelto" ? (
+              <span className="flex items-center gap-1 text-accent-green"><CheckCircle2 className="w-3 h-3" /> Resuelto</span>
+            ) : (
+              <span className="flex items-center gap-1 text-gray-500"><XCircle className="w-3 h-3" /> Descartado</span>
+            )}
+            {huerfano.updated_at && (
+              <span className="text-gray-600 ml-1">· {format(new Date(huerfano.updated_at), "dd/MM/yy HH:mm")}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function HuerfanoCard({
@@ -363,9 +556,13 @@ export default function BandejaPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {items.map((h) => (
-              <HuerfanoCard key={h.id_huerfano} huerfano={h} onAction={refetch} />
-            ))}
+            {items.map((h) =>
+              String(h.origen).toLowerCase() === "reasignacion" ? (
+                <ReasignacionOrphanCard key={h.id_huerfano} huerfano={h} onAction={refetch} />
+              ) : (
+                <HuerfanoCard key={h.id_huerfano} huerfano={h} onAction={refetch} />
+              ),
+            )}
           </div>
         )}
       </div>

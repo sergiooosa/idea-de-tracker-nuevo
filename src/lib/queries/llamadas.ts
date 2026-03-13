@@ -90,7 +90,16 @@ export async function getLlamadas(
   const speedVals = registros
     .filter((r) => r.speedToLeadMinutes != null)
     .map((r) => r.speedToLeadMinutes!);
-  const speedAvg = speedVals.length > 0 ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length : 0;
+  const speedFromReg = regRowsResolved
+    .filter((r) => r.estado?.toUpperCase() !== "PDTE" && r.speed_to_lead != null && String(r.speed_to_lead).trim() !== "")
+    .map((r) => parseFloat(String(r.speed_to_lead)) || 0)
+    .filter((n) => !Number.isNaN(n) && n >= 0);
+  const speedAvg =
+    speedVals.length > 0
+      ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length
+      : speedFromReg.length > 0
+        ? speedFromReg.reduce((s, v) => s + v, 0) / speedFromReg.length
+        : 0;
 
   const attemptsByLead: Record<string, number> = {};
   for (const r of registros) {
@@ -150,6 +159,7 @@ export async function getLlamadas(
     speed_to_lead_min: r.speed_to_lead ? parseFloat(r.speed_to_lead) || null : null,
     closer_mail: r.closer_mail,
     fecha_evento: r.fecha_evento?.toISOString() ?? null,
+    id_user_ghl: r.id_user_ghl ?? null,
   }));
 
   return { registros, leads, agg, advisorMetrics, advisors };
@@ -191,5 +201,77 @@ export async function updateLlamada(
     await db.update(registrosDeLlamada).set(regSet).where(eq(registrosDeLlamada.id_registro, row.id_registro));
   }
 
+  return true;
+}
+
+export type RegistroLlamadaUpdate = {
+  nombre_lead?: string;
+  mail_lead?: string;
+  phone_raw_format?: string;
+  estado?: string;
+  closer_mail?: string;
+  nombre_closer?: string;
+  id_user_ghl?: string;
+};
+
+export async function updateRegistroLlamada(
+  id_registro: number,
+  idCuenta: number,
+  data: RegistroLlamadaUpdate,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id_registro: registrosDeLlamada.id_registro, id_cuenta: registrosDeLlamada.id_cuenta })
+    .from(registrosDeLlamada)
+    .where(eq(registrosDeLlamada.id_registro, id_registro))
+    .limit(1);
+
+  if (!row) return false;
+  const cuentaNum = parseInt(String(row.id_cuenta), 10);
+  if (Number.isNaN(cuentaNum) || cuentaNum !== idCuenta) return false;
+
+  const setClause: Record<string, unknown> = {};
+  if (data.nombre_lead !== undefined) setClause.nombre_lead = data.nombre_lead;
+  if (data.mail_lead !== undefined) setClause.mail_lead = data.mail_lead;
+  if (data.phone_raw_format !== undefined) setClause.phone_raw_format = data.phone_raw_format;
+  if (data.estado !== undefined) setClause.estado = data.estado;
+  if (data.closer_mail !== undefined) {
+    setClause.closer_mail = data.closer_mail;
+    setClause.nombre_closer = data.nombre_closer ?? data.closer_mail;
+  }
+  if (data.nombre_closer !== undefined) setClause.nombre_closer = data.nombre_closer;
+  if (data.id_user_ghl !== undefined) setClause.id_user_ghl = data.id_user_ghl;
+
+  if (Object.keys(setClause).length > 0) {
+    await db.update(registrosDeLlamada).set(setClause).where(eq(registrosDeLlamada.id_registro, id_registro));
+  }
+
+  if (data.closer_mail !== undefined || data.nombre_lead !== undefined || data.estado !== undefined) {
+    const logSet: Record<string, unknown> = {};
+    if (data.nombre_lead !== undefined) logSet.nombre_lead = data.nombre_lead;
+    if (data.closer_mail !== undefined) {
+      logSet.closer_mail = data.closer_mail;
+      logSet.nombre_closer = data.nombre_closer ?? data.closer_mail;
+    }
+    if (data.estado !== undefined) logSet.estado_resultado = data.estado;
+    if (Object.keys(logSet).length > 0) {
+      await db.update(logLlamadas).set(logSet).where(eq(logLlamadas.id_registro, id_registro));
+    }
+  }
+
+  return true;
+}
+
+export async function deleteRegistroLlamada(id_registro: number, idCuenta: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id_registro: registrosDeLlamada.id_registro, id_cuenta: registrosDeLlamada.id_cuenta })
+    .from(registrosDeLlamada)
+    .where(eq(registrosDeLlamada.id_registro, id_registro))
+    .limit(1);
+
+  if (!row) return false;
+  const cuentaNum = parseInt(String(row.id_cuenta), 10);
+  if (Number.isNaN(cuentaNum) || cuentaNum !== idCuenta) return false;
+
+  await db.delete(registrosDeLlamada).where(eq(registrosDeLlamada.id_registro, id_registro));
   return true;
 }

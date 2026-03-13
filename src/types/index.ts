@@ -267,6 +267,7 @@ export interface LlamadaLead {
   speed_to_lead_min: number | null;
   closer_mail: string | null;
   fecha_evento: string | null;
+  id_user_ghl: string | null;
 }
 
 export interface LlamadasResponse {

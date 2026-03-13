@@ -10,10 +10,16 @@ import { toast } from 'sonner';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { LlamadasResponse, ApiLlamadaLog, LlamadaLead } from '@/types';
 
-const minFmt = (m: number | null) => {
-  if (m == null || m === undefined) return '1 min';
+const minFmt = (m: number | null | undefined) => {
+  if (m == null || m === undefined) return '—';
   return m < 1 ? `${Math.round(m * 60)}s` : `${m.toFixed(1)} min`;
 };
+/** Speed to lead: si estado es PDTE no se ha llamado aún → "—"; si no, valor de DB o 0 */
+function speedDisplay(lead: LlamadaLead): string {
+  const esPendiente = lead.estado?.toUpperCase() === 'PDTE';
+  if (esPendiente) return '—';
+  return minFmt(lead.speed_to_lead_min ?? 0);
+}
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const TIPO_PDTE = 'pdte';
@@ -28,9 +34,18 @@ export default function PerformanceLlamadasPage() {
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
   const [modalSelectorCalls, setModalSelectorCalls] = useState<ApiLlamadaLog[] | null>(null);
   const [modalCall, setModalCall] = useState<ApiLlamadaLog | null>(null);
-  const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
+  const [editingRecord, setEditingRecord] = useState<{
+    id?: number;
+    id_registro?: number;
+    nombre_lead?: string | null;
+    mail_lead?: string | null;
+    phone?: string | null;
+    closer?: string | null;
+    estado?: string | null;
+    id_user_ghl?: string | null;
+  } | null>(null);
 
-  const { data, loading } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
+  const { data, loading, refetch } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
 
   /** Leads agrupados por asesor (closer_mail); el listado expandido muestra esto */
   const leadsByAdvisor = useMemo(() => {
@@ -169,12 +184,13 @@ export default function PerformanceLlamadasPage() {
                                           <th className="px-2 py-2 font-medium">Llamadas realizadas</th>
                                           <th className="px-2 py-2 font-medium">Llamadas (tipo)</th>
                                           <th className="px-2 py-2 font-medium">Speed to lead</th>
+                                          <th className="px-2 py-2 font-medium w-16" />
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {advisorLeads.length === 0 ? (
                                           <tr>
-                                            <td colSpan={5} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
+                                            <td colSpan={6} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
                                           </tr>
                                         ) : advisorLeads.map((lead) => (
                                           <tr
@@ -182,11 +198,35 @@ export default function PerformanceLlamadasPage() {
                                             className="border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer"
                                             onClick={() => openLogsForLead(lead)}
                                           >
-                                            <td className="px-2 py-2 text-white">{lead.nombre_lead ?? lead.mail_lead ?? '—'}</td>
+                                            <td className="px-2 py-2 text-white">
+                                              <div className="flex flex-col gap-0.5">
+                                                <span>{lead.nombre_lead ?? lead.mail_lead ?? '—'}</span>
+                                                {lead.phone && <span className="text-[10px] text-gray-400">{lead.phone}</span>}
+                                                {lead.id_user_ghl && <span className="text-[10px] text-gray-500">ID GHL: {lead.id_user_ghl}</span>}
+                                              </div>
+                                            </td>
                                             <td className="px-2 py-2 text-gray-300">{lead.estado ?? '—'}</td>
                                             <td className="px-2 py-2 text-accent-cyan font-medium">{getCallsForLead(lead).length}</td>
                                             <td className="px-2 py-2 text-gray-400" title={getResumenLlamadas(lead)}>{getResumenLlamadas(lead)}</td>
-                                            <td className="px-2 py-2 text-gray-400">{minFmt(lead.speed_to_lead_min)}</td>
+                                            <td className="px-2 py-2 text-gray-400">{speedDisplay(lead)}</td>
+                                            <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                                              <button
+                                                type="button"
+                                                onClick={() => setEditingRecord({
+                                                  id_registro: lead.id_registro,
+                                                  nombre_lead: lead.nombre_lead,
+                                                  mail_lead: lead.mail_lead,
+                                                  phone: lead.phone,
+                                                  closer: lead.closer_mail,
+                                                  estado: lead.estado,
+                                                  id_user_ghl: lead.id_user_ghl,
+                                                })}
+                                                className="p-1.5 rounded-lg text-gray-400 hover:text-accent-cyan hover:bg-accent-cyan/10 border border-transparent hover:border-accent-cyan/30 transition-colors"
+                                                title="Editar registro"
+                                              >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                              </button>
+                                            </td>
                                           </tr>
                                         ))}
                                       </tbody>
@@ -234,7 +274,7 @@ export default function PerformanceLlamadasPage() {
           record={editingRecord}
           advisors={data?.advisors?.map(a => ({ name: a.name, email: a.email })) ?? []}
           onClose={() => setEditingRecord(null)}
-          onSaved={() => { setEditingRecord(null); }}
+          onSaved={() => { setEditingRecord(null); refetch(); }}
         />
       )}
       {modalCall && (
@@ -247,7 +287,7 @@ export default function PerformanceLlamadasPage() {
                 {isAnswered(modalCall) && (
                   <button
                     type="button"
-                    onClick={() => { setEditingRecord({ id: modalCall.id, nombre_lead: modalCall.leadName, closer: modalCall.closerMail, estado: modalCall.tipoEvento }); setModalCall(null); }}
+                    onClick={() => { setEditingRecord({ id: modalCall.id, nombre_lead: modalCall.leadName ?? undefined, closer: modalCall.closerMail ?? undefined, estado: modalCall.tipoEvento ?? undefined }); setModalCall(null); }}
                     className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium bg-accent-amber/20 text-accent-amber border border-accent-amber/30 hover:bg-accent-amber/30"
                   >
                     <Pencil className="w-3.5 h-3.5" /> Editar
