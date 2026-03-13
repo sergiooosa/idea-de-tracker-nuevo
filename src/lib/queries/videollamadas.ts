@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica } from "@/lib/metricas-engine";
-import { eq, and, or, gte, lte, sql, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
   ApiVideollamada,
   VideollamadasAdvisorMetrics,
@@ -46,10 +46,11 @@ export async function getVideollamadas(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
-  closerEmail?: string,
+  closerEmails?: string[],
 ): Promise<VideollamadasResponse> {
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+  const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
   const fechaFilter = or(
     and(
@@ -67,7 +68,7 @@ export async function getVideollamadas(
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
   ];
-  if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
+  if (emails.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, emails));
 
   const [[cuentaRow], rows] = await Promise.all([
     db

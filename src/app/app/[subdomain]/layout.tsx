@@ -41,10 +41,17 @@ const NAV_ITEMS = [
 ];
 
 function SoloMisDatosToggle() {
-  const { soloMisDatos, toggleSoloMisDatos, canViewAll, sessionLoading, asesorSeleccionado, setAsesorSeleccionado, asesores, session } = useUserFilter();
+  const { soloMisDatos, toggleSoloMisDatos, canViewAll, sessionLoading, asesoresSeleccionados, toggleAsesor, asesores, session } = useUserFilter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   if (sessionLoading || !canViewAll) return null;
+
+  const label =
+    asesoresSeleccionados.length === 0
+      ? (session?.email ? `Yo (${session.email})` : "Seleccionar asesor")
+      : asesoresSeleccionados.length === 1
+        ? (asesores.find((a) => (a.email ?? a.id) === asesoresSeleccionados[0])?.name ?? asesoresSeleccionados[0])
+        : `${asesoresSeleccionados.length} asesores`;
 
   return (
     <div className="space-y-1">
@@ -81,35 +88,39 @@ function SoloMisDatosToggle() {
             onClick={() => setDropdownOpen((o) => !o)}
             className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-surface-700/60 border border-surface-500 text-xs text-left"
           >
-            <span className="truncate flex-1">
-              {asesorSeleccionado ? asesores.find((a) => a.email === asesorSeleccionado)?.name ?? asesorSeleccionado : session?.email ?? "Seleccionar asesor"}
-            </span>
+            <span className="truncate flex-1">{label}</span>
             <ChevronDown className="w-4 h-4 shrink-0" />
           </button>
           {dropdownOpen && (
             <>
               <div className="absolute inset-0 -top-1 -bottom-1 z-10" onClick={() => setDropdownOpen(false)} aria-hidden />
-              <ul className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg bg-surface-800 border border-surface-500 shadow-xl z-20 py-1">
+              <ul className="absolute bottom-full left-0 right-0 mb-1 max-h-40 overflow-y-auto rounded-lg bg-surface-800 border border-surface-500 shadow-xl z-20 py-1">
                 <li>
                   <button
                     type="button"
-                    onClick={() => { setAsesorSeleccionado(session?.email ?? ""); setDropdownOpen(false); }}
-                    className={clsx("w-full px-3 py-2 text-left text-xs", (session?.email === asesorSeleccionado || (!asesorSeleccionado && session?.email)) ? "bg-accent-cyan/20 text-accent-cyan" : "text-gray-300 hover:bg-surface-600")}
+                    onClick={() => toggleAsesor(session?.email ?? "")}
+                    className={clsx("w-full px-3 py-2 text-left text-xs flex items-center gap-2", (asesoresSeleccionados.length === 0 || asesoresSeleccionados.includes(session?.email ?? "")) ? "bg-accent-cyan/20 text-accent-cyan" : "text-gray-300 hover:bg-surface-600")}
                   >
+                    <span className={clsx("w-3.5 h-3.5 rounded border shrink-0", (asesoresSeleccionados.length === 0 || asesoresSeleccionados.includes(session?.email ?? "")) ? "bg-accent-cyan border-accent-cyan" : "border-surface-400")} />
                     Yo ({session?.email})
                   </button>
                 </li>
-                {asesores.filter((a) => a.email !== session?.email).map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => { setAsesorSeleccionado(a.email ?? a.id); setDropdownOpen(false); }}
-                      className={clsx("w-full px-3 py-2 text-left text-xs", a.email === asesorSeleccionado ? "bg-accent-cyan/20 text-accent-cyan" : "text-gray-300 hover:bg-surface-600")}
-                    >
-                      {a.name} {a.email && a.email !== a.name ? `(${a.email})` : ""}
-                    </button>
-                  </li>
-                ))}
+                {asesores.filter((a) => (a.email ?? a.id) !== session?.email).map((a) => {
+                  const email = a.email ?? a.id;
+                  const selected = asesoresSeleccionados.includes(email);
+                  return (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAsesor(email)}
+                        className={clsx("w-full px-3 py-2 text-left text-xs flex items-center gap-2", selected ? "bg-accent-cyan/20 text-accent-cyan" : "text-gray-300 hover:bg-surface-600")}
+                      >
+                        <span className={clsx("w-3.5 h-3.5 rounded border shrink-0", selected ? "bg-accent-cyan border-accent-cyan" : "border-surface-400")} />
+                        {a.name} {a.email && a.email !== a.name ? `(${a.email})` : ""}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}

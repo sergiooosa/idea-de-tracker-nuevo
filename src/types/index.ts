@@ -255,6 +255,8 @@ export interface LlamadasAdvisorMetrics {
   contestadas: number;
   pctContestacion: number;
   tiempoAlLead: number | null;
+  /** Número de leads (registros_de_llamada) asignados a este closer en el rango */
+  leadsAsignados: number;
 }
 
 /** Lead desde registros_de_llamada (una fila por persona en Performance > Llamadas) */

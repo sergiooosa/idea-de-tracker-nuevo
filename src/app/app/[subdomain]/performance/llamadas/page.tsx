@@ -140,6 +140,7 @@ export default function PerformanceLlamadasPage() {
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium w-6" />
                     <th className="px-2 py-2 font-medium">Asesor</th>
+                    <th className="px-2 py-2 font-medium">Leads asignados</th>
                     <th className="px-2 py-2 font-medium">Llamadas</th>
                     <th className="px-2 py-2 font-medium">Contestadas</th>
                     <th className="px-2 py-2 font-medium">% contestación</th>
@@ -165,6 +166,7 @@ export default function PerformanceLlamadasPage() {
                                 {metrics?.advisorName ?? advisorKey}
                               </span>
                             </td>
+                            <td className="px-2 py-2 text-gray-300">{metrics?.leadsAsignados ?? 0}</td>
                             <td className="px-2 py-2 text-accent-cyan">{metrics?.llamadas ?? 0}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics?.contestadas ?? 0}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics != null ? pct(metrics.pctContestacion) : '—'}</td>
@@ -172,7 +174,7 @@ export default function PerformanceLlamadasPage() {
                           </tr>
                           {isExpanded && (
                             <tr className="bg-surface-800/90">
-                              <td colSpan={6} className="p-0">
+                              <td colSpan={7} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
                                   <div className="text-[10px] text-gray-400 mb-1.5">Leads (registros) de {metrics?.advisorName ?? advisorKey} — clic en la fila abre las llamadas</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -190,7 +192,7 @@ export default function PerformanceLlamadasPage() {
                                       <tbody>
                                         {advisorLeads.length === 0 ? (
                                           <tr>
-                                            <td colSpan={6} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
+                                            <td colSpan={7} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
                                           </tr>
                                         ) : advisorLeads.map((lead) => (
                                           <tr

@@ -12,12 +12,12 @@ export function useApiData<T>(
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  let effectiveCloserEmail: string | undefined;
+  let effectiveCloserEmails: string[] = [];
   try {
     const ctx = useUserFilter();
-    effectiveCloserEmail = ctx.effectiveCloserEmail;
+    effectiveCloserEmails = ctx.effectiveCloserEmails ?? [];
   } catch {
-    effectiveCloserEmail = undefined;
+    effectiveCloserEmails = [];
   }
 
   const serialized = JSON.stringify(params ?? {});
@@ -37,8 +37,8 @@ export function useApiData<T>(
         if (v != null) sp.set(k, v);
       }
 
-      if (effectiveCloserEmail && !sp.has("closerEmail")) {
-        sp.set("closerEmail", effectiveCloserEmail);
+      if (effectiveCloserEmails.length > 0 && !sp.has("closerEmails")) {
+        sp.set("closerEmails", effectiveCloserEmails.join(","));
       }
 
       const res = await fetch(`${url}?${sp.toString()}`, {
@@ -61,7 +61,7 @@ export function useApiData<T>(
     } finally {
       if (!ctrl.signal.aborted) setLoading(false);
     }
-  }, [url, serialized, effectiveCloserEmail]);
+  }, [url, serialized, effectiveCloserEmails]);
 
   useEffect(() => {
     fetchData();

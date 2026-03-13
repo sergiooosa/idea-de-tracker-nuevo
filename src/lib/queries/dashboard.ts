@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
-import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, or, gte, lte, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
   DashboardKpis,
   DashboardAdvisorRow,
@@ -40,9 +40,10 @@ export async function getDashboard(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
-  closerEmail?: string,
+  closerEmails?: string[],
   filterTags?: string[],
 ): Promise<DashboardResponse> {
+  const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
@@ -80,14 +81,14 @@ export async function getDashboard(
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
   ];
-  if (closerEmail) agendaConditions.push(eq(resumenesDiariosAgendas.closer, closerEmail));
+  if (emails.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, emails));
 
   const callConditions = [
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromDate),
     lte(logLlamadas.ts, toDate),
   ];
-  if (closerEmail) callConditions.push(eq(logLlamadas.closer_mail, closerEmail));
+  if (emails.length > 0) callConditions.push(inArray(logLlamadas.closer_mail, emails));
 
   const [agendas, calls] = await Promise.all([
     db

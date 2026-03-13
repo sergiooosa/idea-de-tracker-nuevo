@@ -35,6 +35,14 @@
 | **Llamadas por asesor — Editar todo** | En cada fila de lead hay botón **Editar**. El sheet permite editar todos los campos del registro (nombre, email, teléfono, estado, closer, ID GHL) y **eliminar** el registro. API: `PUT /api/data/llamadas` con `id_registro` + campos; `DELETE /api/data/llamadas?id_registro=X`. |
 | **Bandeja — Huérfanos de reasignación** | Los eventos con `origen: "reasignacion"` se muestran con una tarjeta específica: Lead (nombre + teléfono), ID usuario GHL, Location, motivo, closer si llegó. Formulario para completar **nombre del closer** y **correo del closer** y botón "Completar y reenviar". PATCH acepta `nombrecloser` y `correocloser` para reasignación y reenvía al Cerebro. |
 
+### Novedades — Leads asignados, filtro asesor multi, Speed to lead
+
+| Cambio | Descripción |
+|--------|-------------|
+| **Performance > Llamadas — Leads asignados** | En la tabla "Llamadas por asesor" se añade la columna **Leads asignados**: número de registros en `registros_de_llamada` asignados a ese closer en el rango. |
+| **Filtro "Solo data del asesor"** | El desplegable de asesores se abre **hacia arriba** (no hacia abajo) para no salir del viewport. **Selección múltiple**: se pueden marcar uno o varios asesores y ver la data agregada de los seleccionados. Parámetro de API: `closerEmails=email1,email2` (todas las rutas de datos aceptan múltiples closers). |
+| **Speed to lead en 0** | Si en BD todos los `speed_to_lead` son 0, el panel muestra 0 correctamente; el origen del dato está en el Cerebro/backend que escribe en `log_llamadas` y `registros_de_llamada`. Ver **docs/PREGUNTAS_BACKEND_SPEED_TO_LEAD.md** con queries de validación y preguntas para el agente de backend. |
+
 ---
 
 ## Novedades v2.0 — Marca Blanca Absoluta
@@ -708,16 +716,16 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | Ruta | Método | Tabla(s) | Params | Página |
 |---|---|---|---|---|
 | `/api/auth/session-info` | GET | *(JWT)* | | Session + permisos para contexto "Solo mis datos" (v3.0) |
-| `/api/data/dashboard` | GET | agendas + log_llamadas | `from`, `to`, `closerEmail?` | Panel ejecutivo |
-| `/api/data/videollamadas` | GET | resumenes_diarios_agendas | `from`, `to`, `closerEmail?` | Performance > Videollamadas |
+| `/api/data/dashboard` | GET | agendas + log_llamadas | `from`, `to`, `closerEmails?` (o `closerEmail?`) | Panel ejecutivo; multi-closer |
+| `/api/data/videollamadas` | GET | resumenes_diarios_agendas | `from`, `to`, `closerEmails?` (o `closerEmail?`) | Performance > Videollamadas; multi-closer |
 | `/api/data/videollamadas` | PUT | resumenes_diarios_agendas | body: id, nombre_lead?, closer?, categoria? | Editar registro (v3.0) |
-| `/api/data/llamadas` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `closerEmail?` | Performance > Llamadas (devuelve `registros` = logs, `leads` con teléfono e id_user_ghl; agg.speedAvg desde registros si no hay en log) |
+| `/api/data/llamadas` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `closerEmails?` (o `closerEmail?`) | Performance > Llamadas; `leadsAsignados` por asesor; multi-closer |
 | `/api/data/llamadas` | PUT | log_llamadas / registros_de_llamada | body: id **o** id_registro, nombre_lead?, mail_lead?, phone_raw_format?, closer?, estado?, id_user_ghl? | Editar evento (id) o registro completo (id_registro) |
 | `/api/data/llamadas` | DELETE | registros_de_llamada | `id_registro` | Eliminar registro de llamada (v3.0) |
-| `/api/data/chats` | GET | chats_logs | `from`, `to`, `closerEmail?` | Performance > Chats |
+| `/api/data/chats` | GET | chats_logs | `from`, `to`, `closerEmails?` (o `closerEmail?`) | Performance > Chats; multi-closer (filtro por agentName) |
 | `/api/data/chats` | PUT | chats_logs | body: id, nombre_lead?, estado? | Editar registro (v3.0) |
 | `/api/data/weekly-report` | GET | agendas + log_llamadas | `from`, `to` | Reporte semanal |
-| `/api/data/asesor` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `advisorEmail?`, `closerEmail?` | Panel asesor |
+| `/api/data/asesor` | GET | log_llamadas + registros_de_llamada | `from`, `to`, `advisorEmail?`, `closerEmails?` (o `closerEmail?`) | Panel asesor; multi-closer |
 | `/api/data/huerfanos` | GET | eventos_huerfanos | `estado?` | Bandeja: lista huérfanos (v3.0) |
 | `/api/data/huerfanos` | PATCH | eventos_huerfanos | body: id_huerfano, accion (corregir\|descartar), correo_corregido? (fathom/twilio), nombrecloser? + correocloser? (reasignación) | Corregir/Descartar + retry Cerebro; reasignación: completar closer y reenviar |
 | `/api/data/acquisition` | GET | agendas + log_llamadas + chats_logs | `from`, `to` | Adquisición |

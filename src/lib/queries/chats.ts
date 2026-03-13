@@ -46,8 +46,9 @@ export async function getChats(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
-  closerEmail?: string,
+  closerEmails?: string[],
 ): Promise<ChatsResponse> {
+  const emailsLower = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
@@ -107,10 +108,11 @@ export async function getChats(
     };
   });
 
-  const filteredChats = closerEmail
-    ? chatsList.filter((c) => c.agentName?.toLowerCase() === closerEmail.toLowerCase())
-    : chatsList;
-  const chatsFinal = closerEmail ? filteredChats : chatsList;
+  const filteredChats =
+    emailsLower.length > 0
+      ? chatsList.filter((c) => emailsLower.includes((c.agentName ?? "").trim().toLowerCase()))
+      : chatsList;
+  const chatsFinal = emailsLower.length > 0 ? filteredChats : chatsList;
 
   const contacted = chatsFinal.filter((c) => c.agentMessages > 0);
   const speedVals = chatsFinal

@@ -7,8 +7,9 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
-    const closerEmail = searchParams.get("closerEmail") || undefined;
-    const data = await getLlamadas(idCuenta, from, to, closerEmail);
+    const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
+    const closerEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
+    const data = await getLlamadas(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined);
     return NextResponse.json(data);
   });
 }

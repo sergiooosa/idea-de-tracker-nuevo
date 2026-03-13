@@ -21,18 +21,21 @@ export async function getLlamadas(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
-  closerEmail?: string,
+  closerEmails?: string[],
 ): Promise<LlamadasResponse> {
   const fromTs = new Date(`${dateFrom}T00:00:00Z`);
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
+  const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
   const conditions = [
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromTs),
     lte(logLlamadas.ts, toTs),
   ];
-  if (closerEmail) {
-    conditions.push(sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) = LOWER(TRIM(${closerEmail}))`);
+  if (emails.length > 0) {
+    conditions.push(
+      sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`,
+    );
   }
 
   const idCuentaStr = String(idCuenta);
@@ -47,18 +50,19 @@ export async function getLlamadas(
     gte(registrosDeLlamada.fecha_evento, fromTs),
     lte(registrosDeLlamada.fecha_evento, toTs),
   ];
-  const regRows = closerEmail
-    ? (() => {
-        const linkedIds = [...new Set(rows.map((r) => r.id_registro).filter((id): id is number => id != null && id > 0))];
-        const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) = LOWER(TRIM(${closerEmail}))`;
-        const byLinked = linkedIds.length > 0 ? inArray(registrosDeLlamada.id_registro, linkedIds) : sql`false`;
-        return db
-          .select()
-          .from(registrosDeLlamada)
-          .where(and(...baseReg, or(byCloser, byLinked))!)
-          .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
-      })()
-    : db.select().from(registrosDeLlamada).where(and(...baseReg)).orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+  const regRows =
+    emails.length > 0
+      ? (() => {
+          const linkedIds = [...new Set(rows.map((r) => r.id_registro).filter((id): id is number => id != null && id > 0))];
+          const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`;
+          const byLinked = linkedIds.length > 0 ? inArray(registrosDeLlamada.id_registro, linkedIds) : sql`false`;
+          return db
+            .select()
+            .from(registrosDeLlamada)
+            .where(and(...baseReg, or(byCloser, byLinked))!)
+            .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+        })()
+      : db.select().from(registrosDeLlamada).where(and(...baseReg)).orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
 
   const regRowsResolved = await regRows;
 
@@ -128,6 +132,13 @@ export async function getLlamadas(
     byAdvisor[key].push(r);
   }
 
+  const leadsCountByAdvisorKey: Record<string, number> = {};
+  for (const r of regRowsResolved) {
+    const k = (r.closer_mail ?? r.nombre_closer ?? "Sin asignar").trim() || "Sin asignar";
+    const kNorm = k.toLowerCase();
+    leadsCountByAdvisorKey[kNorm] = (leadsCountByAdvisorKey[kNorm] ?? 0) + 1;
+  }
+
   const advisorMetrics: Record<string, LlamadasAdvisorMetrics> = {};
   const advisors: ApiAdvisor[] = [];
 
@@ -138,6 +149,8 @@ export async function getLlamadas(
     const speeds = calls
       .filter((c) => c.speedToLeadMinutes != null)
       .map((c) => c.speedToLeadMinutes!);
+    const keyNorm = (key ?? "").trim().toLowerCase();
+    const leadsAsignados = leadsCountByAdvisorKey[keyNorm] ?? 0;
 
     advisorMetrics[key] = {
       advisorName: name,
@@ -146,8 +159,33 @@ export async function getLlamadas(
       contestadas: contest,
       pctContestacion: calls.length > 0 ? (contest / calls.length) * 100 : 0,
       tiempoAlLead: speeds.length > 0 ? speeds.reduce((s, v) => s + v, 0) / speeds.length : null,
+      leadsAsignados,
     };
     advisors.push({ id: key, name, email });
+  }
+
+  for (const keyNorm of Object.keys(leadsCountByAdvisorKey)) {
+    if (Object.keys(advisorMetrics).some((k) => (k ?? "").trim().toLowerCase() === keyNorm)) continue;
+    const firstReg = regRowsResolved.find(
+      (r) => ((r.closer_mail ?? r.nombre_closer ?? "Sin asignar").trim() || "Sin asignar").toLowerCase() === keyNorm,
+    );
+    const displayKey = firstReg
+      ? (firstReg.closer_mail ?? firstReg.nombre_closer ?? "Sin asignar").trim() || "Sin asignar"
+      : keyNorm;
+    advisorMetrics[displayKey] = {
+      advisorName: firstReg?.nombre_closer ?? displayKey,
+      advisorEmail: firstReg?.closer_mail ?? displayKey,
+      llamadas: 0,
+      contestadas: 0,
+      pctContestacion: 0,
+      tiempoAlLead: null,
+      leadsAsignados: leadsCountByAdvisorKey[keyNorm] ?? 0,
+    };
+    advisors.push({
+      id: displayKey,
+      name: firstReg?.nombre_closer ?? displayKey,
+      email: firstReg?.closer_mail ?? displayKey,
+    });
   }
 
   const leads: LlamadaLead[] = regRowsResolved.map((r) => ({

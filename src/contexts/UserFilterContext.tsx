@@ -16,8 +16,15 @@ interface UserFilterContextValue {
   toggleSoloMisDatos: () => void;
   canViewAll: boolean;
   canEdit: boolean;
+  /** Un solo email cuando hay un único seleccionado (legacy/combobox) */
   effectiveCloserEmail: string | undefined;
+  /** Lista de emails seleccionados para el filtro (multi-selección); vacío = por defecto Yo */
+  effectiveCloserEmails: string[];
+  asesoresSeleccionados: string[];
+  toggleAsesor: (email: string) => void;
+  /** Para combobox de una sola elección: primer seleccionado o vacío */
   asesorSeleccionado: string;
+  /** Pone la selección a un solo email (para combobox que no usa multi) */
   setAsesorSeleccionado: (email: string) => void;
   asesores: AsesorOption[];
 }
@@ -25,7 +32,17 @@ interface UserFilterContextValue {
 const UserFilterContext = createContext<UserFilterContextValue | null>(null);
 
 const LS_KEY = "autokpi_solo_mis_datos";
-const LS_ASESOR = "autokpi_asesor_seleccionado";
+const LS_ASESORES = "autokpi_asesores_seleccionados";
+
+function parseStoredAsesores(raw: string | null): string[] {
+  if (!raw?.trim()) return [];
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    return Array.isArray(arr) && arr.every((x) => typeof x === "string") ? arr : [];
+  } catch {
+    return [];
+  }
+}
 
 export function UserFilterProvider({ children }: { children: ReactNode }) {
   const { session, loading: sessionLoading, canViewAll, canEdit } = useSession();
@@ -35,17 +52,31 @@ export function UserFilterProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(LS_KEY) === "true";
   });
 
-  const [asesorSeleccionado, setAsesorSeleccionadoState] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem(LS_ASESOR) ?? "";
+  const [asesoresSeleccionados, setAsesoresSeleccionadosState] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    return parseStoredAsesores(localStorage.getItem(LS_ASESORES));
   });
 
   const [asesores, setAsesores] = useState<AsesorOption[]>([]);
 
-  const setAsesorSeleccionado = useCallback((email: string) => {
-    setAsesorSeleccionadoState(email);
-    if (typeof window !== "undefined") localStorage.setItem(LS_ASESOR, email);
+  const toggleAsesor = useCallback((email: string) => {
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    setAsesoresSeleccionadosState((prev) => {
+      const next = prev.includes(trimmed) ? prev.filter((e) => e !== trimmed) : [...prev, trimmed];
+      if (typeof window !== "undefined") localStorage.setItem(LS_ASESORES, JSON.stringify(next));
+      return next;
+    });
   }, []);
+
+  const setAsesorSeleccionado = useCallback((email: string) => {
+    const trimmed = email.trim();
+    const next = trimmed ? [trimmed] : [];
+    setAsesoresSeleccionadosState(next);
+    if (typeof window !== "undefined") localStorage.setItem(LS_ASESORES, JSON.stringify(next));
+  }, []);
+
+  const asesorSeleccionado = asesoresSeleccionados.length > 0 ? asesoresSeleccionados[0] : "";
 
   useEffect(() => {
     localStorage.setItem(LS_KEY, String(soloMisDatos));
@@ -60,7 +91,7 @@ export function UserFilterProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!canViewAll || sessionLoading) return;
     fetch("/api/data/asesores")
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => (r.ok ? r.json() : []))
       .then(setAsesores)
       .catch(() => setAsesores([]));
   }, [canViewAll, sessionLoading]);
@@ -70,15 +101,19 @@ export function UserFilterProvider({ children }: { children: ReactNode }) {
     setSoloMisDatos((prev) => !prev);
   };
 
+  const effectiveCloserEmails = useMemo(() => {
+    if (!session) return [];
+    if (!canViewAll) return [session.email].filter(Boolean) as string[];
+    if (!soloMisDatos) return [];
+    if (asesoresSeleccionados.length > 0) return asesoresSeleccionados;
+    return [session.email].filter(Boolean) as string[];
+  }, [session, canViewAll, soloMisDatos, asesoresSeleccionados]);
+
   const effectiveCloserEmail = useMemo(() => {
-    if (!session) return undefined;
-    if (!canViewAll) return session.email;
-    if (soloMisDatos) {
-      const email = asesorSeleccionado || session.email;
-      return email || undefined;
-    }
+    if (effectiveCloserEmails.length === 0) return undefined;
+    if (effectiveCloserEmails.length === 1) return effectiveCloserEmails[0];
     return undefined;
-  }, [session, canViewAll, soloMisDatos, asesorSeleccionado]);
+  }, [effectiveCloserEmails]);
 
   const value = useMemo<UserFilterContextValue>(() => ({
     session,
@@ -88,10 +123,13 @@ export function UserFilterProvider({ children }: { children: ReactNode }) {
     canViewAll,
     canEdit,
     effectiveCloserEmail,
+    effectiveCloserEmails,
+    asesoresSeleccionados,
+    toggleAsesor,
     asesorSeleccionado,
     setAsesorSeleccionado,
     asesores,
-  }), [session, sessionLoading, soloMisDatos, canViewAll, canEdit, effectiveCloserEmail, asesorSeleccionado, setAsesorSeleccionado, asesores]);
+  }), [session, sessionLoading, soloMisDatos, canViewAll, canEdit, effectiveCloserEmail, effectiveCloserEmails, asesoresSeleccionados, toggleAsesor, asesorSeleccionado, setAsesorSeleccionado, asesores]);
 
   return (
     <UserFilterContext.Provider value={value}>

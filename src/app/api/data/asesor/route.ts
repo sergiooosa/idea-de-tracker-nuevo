@@ -9,13 +9,14 @@ export async function GET(req: Request) {
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
     const allAdvisors = searchParams.get("allAdvisors") === "1";
     const advisorEmail = searchParams.get("advisorEmail") ?? null;
-    const closerEmail = searchParams.get("closerEmail") || undefined;
+    const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
+    const closerEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
 
-    const effectiveAdvisor = allAdvisors
+    const effectiveEmails = allAdvisors
       ? undefined
-      : ((closerEmail ?? advisorEmail ?? email) || undefined);
+      : (closerEmails?.length ? closerEmails : (advisorEmail || email ? [advisorEmail || email] : undefined));
 
-    const data = await getAsesorData(idCuenta, from, to, effectiveAdvisor || undefined);
+    const data = await getAsesorData(idCuenta, from, to, effectiveEmails ?? undefined);
     const advisorsList = await getAsesoresList(idCuenta);
     return NextResponse.json({ ...data, advisorsList });
   });

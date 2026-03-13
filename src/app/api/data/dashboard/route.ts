@@ -7,10 +7,11 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
-    const closerEmail = searchParams.get("closerEmail") || undefined;
+    const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
+    const closerEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
     const tagsParam = searchParams.get("tags") || undefined;
     const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : undefined;
-    const data = await getDashboard(idCuenta, from, to, closerEmail, tags);
+    const data = await getDashboard(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined, tags);
     return NextResponse.json(data);
   });
 }

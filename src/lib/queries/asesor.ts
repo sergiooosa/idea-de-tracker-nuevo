@@ -22,18 +22,21 @@ export async function getAsesorData(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
-  advisorEmail?: string,
+  advisorEmails?: string[],
 ): Promise<AsesorResponse> {
   const fromTs = new Date(`${dateFrom}T00:00:00Z`);
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
+  const emails = (advisorEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
   const callConditions = [
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromTs),
     lte(logLlamadas.ts, toTs),
   ];
-  if (advisorEmail) {
-    callConditions.push(sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) = LOWER(TRIM(${advisorEmail}))`);
+  if (emails.length > 0) {
+    callConditions.push(
+      sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`,
+    );
   }
 
   const fechaFilter = or(
@@ -52,7 +55,11 @@ export async function getAsesorData(
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
   ];
-  if (advisorEmail) agendaConditions.push(sql`LOWER(TRIM(COALESCE(${resumenesDiariosAgendas.closer}, ''))) = LOWER(TRIM(${advisorEmail}))`);
+  if (emails.length > 0) {
+    agendaConditions.push(
+      sql`LOWER(TRIM(COALESCE(${resumenesDiariosAgendas.closer}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`,
+    );
+  }
 
   const [callRows, agendaRows] = await Promise.all([
     db
@@ -68,7 +75,7 @@ export async function getAsesorData(
 
   const idCuentaStr = String(idCuenta);
   const regRows = await (async () => {
-    if (!advisorEmail) {
+    if (emails.length === 0) {
       return db
         .select()
         .from(registrosDeLlamada)
@@ -77,7 +84,7 @@ export async function getAsesorData(
     }
     const callRegistroIds = [...new Set(callRows.map((c) => c.id_registro).filter((id): id is number => id != null && id > 0))];
     const baseCond = eq(registrosDeLlamada.id_cuenta, idCuentaStr);
-    const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) = LOWER(TRIM(${advisorEmail}))`;
+    const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`;
     const byLinkedCall = callRegistroIds.length > 0 ? inArray(registrosDeLlamada.id_registro, callRegistroIds) : sql`false`;
     const regConditions = and(baseCond, or(byCloser, byLinkedCall))!;
     return db
