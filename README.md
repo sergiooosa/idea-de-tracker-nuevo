@@ -42,6 +42,7 @@
 | **Performance > Llamadas — Leads asignados** | En la tabla "Llamadas por asesor" se añade la columna **Leads asignados**: número de registros en `registros_de_llamada` asignados a ese closer en el rango. |
 | **Filtro "Solo data del asesor"** | El desplegable de asesores se abre **hacia arriba** (no hacia abajo) para no salir del viewport. **Selección múltiple**: se pueden marcar uno o varios asesores y ver la data agregada de los seleccionados. Parámetro de API: `closerEmails=email1,email2` (todas las rutas de datos aceptan múltiples closers). |
 | **Speed to lead en 0** | Si en BD todos los `speed_to_lead` son 0, el panel muestra 0 correctamente; el origen del dato está en el Cerebro/backend que escribe en `log_llamadas` y `registros_de_llamada`. Ver **docs/PREGUNTAS_BACKEND_SPEED_TO_LEAD.md** con queries de validación y preguntas para el agente de backend. |
+| **Dashboard — KPIs operativos** | Si en System (paso 5) las métricas están guardadas pero en Dashboard no aparecían en "KPIs operativos", era porque `metricas_config` puede llegar desde la BD como string JSON en lugar de array. Se añadió `parseMetricasConfig()` en `metricas-engine` y se usa en dashboard, system-config y videollamadas para leer siempre un array válido (array o string parseado). |
 
 ---
 

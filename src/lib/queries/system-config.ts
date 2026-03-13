@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
 import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { parseMetricasConfig } from "@/lib/metricas-engine";
 
 export interface SystemConfigData {
   prompt_ventas: string;
@@ -82,7 +83,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     has_openai_key: !!r.openai_api_key,
     fuente_datos_financieros: r.configuracion_ui?.fuente_datos_financieros ?? "nativa",
     roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
-    metricas_config: Array.isArray(r.metricas_config) ? r.metricas_config : [],
+    metricas_config: parseMetricasConfig(r.metricas_config),
     metricas_manual_data: (r.metricas_manual_data && typeof r.metricas_manual_data === "object") ? r.metricas_manual_data as Record<string, MetricaManualEntry[]> : {},
   };
 }

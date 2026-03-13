@@ -79,6 +79,23 @@ export const DEFAULT_METRICAS_CONFIG: MetricaConfig[] = [
   { id: "default-ticket", nombre: "Ticket promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 12, formato: "moneda", color: "blue", formula: { tipo: "directo", fuente: "avgTicket" }, descripcion: "Ingresos ÷ Citas efectivas" },
 ];
 
+/**
+ * Parsea metricas_config tal como puede venir de la BD: array ya parseado o string JSON.
+ * Algunos drivers/clientes devuelven JSONB como string; sin esto el dashboard y System no verían las métricas guardadas.
+ */
+export function parseMetricasConfig(raw: unknown): MetricaConfig[] {
+  if (Array.isArray(raw)) return raw as MetricaConfig[];
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as MetricaConfig[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 /** Etapas por defecto del embudo. Se usan si embudo_personalizado está vacío. */
 export const DEFAULT_EMBUDO_CONFIG: EmbudoEtapa[] = [
   { id: "default-agendada", nombre: "Agendada", color: "#06b6d4", orden: 1, condition: "El lead aceptó agendar una cita o demo. Mostró disposición para una reunión." },

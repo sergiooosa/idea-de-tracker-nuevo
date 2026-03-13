@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica } from "@/lib/metricas-engine";
+import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
   ApiVideollamada,
@@ -158,7 +158,7 @@ export async function getVideollamadas(
     advisors.push({ id: name, name });
   }
 
-  const configs: MetricaConfig[] = Array.isArray(cuentaRow?.metricas_config) ? cuentaRow.metricas_config : [];
+  const configs: MetricaConfig[] = parseMetricasConfig(cuentaRow?.metricas_config);
   const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
     ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
     : {};

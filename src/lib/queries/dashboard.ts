@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
+import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
   DashboardKpis,
@@ -313,7 +313,7 @@ export async function getDashboard(
     if (Array.isArray(c.tags_internos)) c.tags_internos.forEach((t) => { tagCounts[t] = (tagCounts[t] ?? 0) + 1; });
   }
 
-  const rawConfigs: MetricaConfig[] = Array.isArray(cuentaRow?.metricas_config) ? cuentaRow.metricas_config : [];
+  const rawConfigs = parseMetricasConfig(cuentaRow?.metricas_config);
   const configs = rawConfigs.length > 0 ? rawConfigs : DEFAULT_METRICAS_CONFIG;
   const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
     ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
