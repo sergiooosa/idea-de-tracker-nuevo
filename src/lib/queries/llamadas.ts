@@ -68,6 +68,7 @@ export async function getLlamadas(
 
   const registros: ApiLlamadaLog[] = rows.map((r) => ({
     id: r.id,
+    id_registro: r.id_registro != null && r.id_registro > 0 ? r.id_registro : null,
     datetime: r.ts.toISOString(),
     leadName: r.nombre_lead,
     leadEmail: r.mail_lead,

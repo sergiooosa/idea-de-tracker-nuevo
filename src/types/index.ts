@@ -234,6 +234,8 @@ export interface VideollamadasResponse {
 
 export interface ApiLlamadaLog {
   id: number;
+  /** Enlace a registros_de_llamada; prioridad para asociar historial al lead correcto */
+  id_registro: number | null;
   datetime: string;
   leadName: string | null;
   leadEmail: string | null;

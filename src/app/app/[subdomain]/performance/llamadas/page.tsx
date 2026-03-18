@@ -23,6 +23,13 @@ function speedDisplay(lead: LlamadaLead): string {
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const TIPO_PDTE = 'pdte';
+
+/** Solo dígitos para comparar teléfonos entre formatos (+52… vs 52…) */
+function phoneDigits(p: string | null | undefined): string {
+  if (!p?.trim()) return '';
+  return p.replace(/\D/g, '');
+}
+
 /** Llamadas efectivas (contestadas): muestran botones de acción */
 function isAnswered(c: ApiLlamadaLog) {
   return c.tipoEvento?.startsWith('efectiva_') ?? false;
@@ -59,17 +66,32 @@ export default function PerformanceLlamadasPage() {
     return map;
   }, [data?.leads]);
 
-  /** Para un lead, obtiene sus llamadas (log) excluyendo pdte */
+  /**
+   * Llamadas del lead: por id_registro en log (correcto). Sin id_registro en log (legacy):
+   * mismo teléfono + (mismo email del lead si existe, si no mismo closer).
+   * Nunca por includes(nombre): "Eli" mezclaba Elizabeth, Araceli, etc.
+   */
   const getCallsForLead = (lead: LlamadaLead): ApiLlamadaLog[] => {
     if (!data?.registros) return [];
-    return data.registros
-      .filter((c) => {
-        if (lead.mail_lead && c.leadEmail === lead.mail_lead) return true;
-        if (lead.phone && c.phone === lead.phone) return true;
-        if (lead.nombre_lead && c.leadName && lead.nombre_lead.trim() && c.leadName.toLowerCase().includes(lead.nombre_lead.toLowerCase())) return true;
-        return false;
-      })
-      .filter((c) => c.tipoEvento !== TIPO_PDTE);
+    const leadPhone = phoneDigits(lead.phone);
+    const leadMail = lead.mail_lead?.trim().toLowerCase() ?? '';
+    const leadCloser = lead.closer_mail?.trim().toLowerCase() ?? '';
+
+    return data.registros.filter((c) => {
+      if (c.tipoEvento === TIPO_PDTE) return false;
+
+      const rid = c.id_registro;
+      if (rid != null && rid > 0) {
+        return rid === lead.id_registro;
+      }
+
+      const cPhone = phoneDigits(c.phone);
+      if (!leadPhone || cPhone !== leadPhone) return false;
+      if (leadMail) {
+        return (c.leadEmail?.trim().toLowerCase() ?? '') === leadMail;
+      }
+      return leadCloser !== '' && (c.closerMail?.trim().toLowerCase() ?? '') === leadCloser;
+    });
   };
 
   /** Resumen de tipos de llamada del lead (sin pdte) para mostrar en la fila */
