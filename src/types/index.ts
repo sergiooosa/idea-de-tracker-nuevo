@@ -182,6 +182,9 @@ export interface ApiVideollamada {
   datetime: string;
   leadName: string;
   leadEmail: string | null;
+  /** IDs en GHL / CRM — útiles para búsqueda */
+  idcliente: string | null;
+  ghl_contact_id: string | null;
   closer: string | null;
   categoria: string | null;
   attended: boolean;

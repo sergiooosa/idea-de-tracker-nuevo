@@ -98,6 +98,8 @@ export async function getVideollamadas(
       datetime: r.fecha_reunion?.toISOString() ?? r.fecha,
       leadName: r.nombre_de_lead,
       leadEmail: r.email_lead,
+      idcliente: r.idcliente ?? null,
+      ghl_contact_id: r.ghl_contact_id ?? null,
       closer: r.closer,
       categoria: r.categoria,
       attended: m.attended,

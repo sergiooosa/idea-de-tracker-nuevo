@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Pencil, Sparkles, User, X } from 'lucide-react';
+import { FileText, Pencil, Search, Sparkles, User, X } from 'lucide-react';
+import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { LlamadasResponse, ApiLlamadaLog, LlamadaLead } from '@/types';
@@ -51,6 +52,7 @@ export default function PerformanceLlamadasPage() {
     estado?: string | null;
     id_user_ghl?: string | null;
   } | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
 
   const { data, loading, refetch } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
 
@@ -65,6 +67,33 @@ export default function PerformanceLlamadasPage() {
     }
     return map;
   }, [data?.leads]);
+
+  const leadsByAdvisorFiltered = useMemo(() => {
+    const q = leadSearch.trim();
+    if (!q) return leadsByAdvisor;
+    const out: Record<string, LlamadaLead[]> = {};
+    for (const [k, arr] of Object.entries(leadsByAdvisor)) {
+      const f = arr.filter((l) =>
+        matchesLeadSearch(q, [
+          l.nombre_lead,
+          l.mail_lead,
+          l.phone,
+          l.id_user_ghl,
+          String(l.id_registro),
+          l.closer_mail,
+        ]),
+      );
+      if (f.length) out[k] = f;
+    }
+    return out;
+  }, [leadsByAdvisor, leadSearch]);
+
+  useEffect(() => {
+    const q = leadSearch.trim();
+    if (!q) return;
+    const keys = Object.keys(leadsByAdvisorFiltered);
+    if (keys.length === 1) setExpandedAdvisorId(keys[0]);
+  }, [leadSearch, leadsByAdvisorFiltered]);
 
   /**
    * Llamadas del lead: por id_registro en log (correcto). Sin id_registro en log (legacy):
@@ -140,7 +169,24 @@ export default function PerformanceLlamadasPage() {
           defaultFrom={format(defaultFrom, 'yyyy-MM-dd')}
           defaultTo={format(defaultTo, 'yyyy-MM-dd')}
         />
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+          <input
+            type="search"
+            value={leadSearch}
+            onChange={(e) => setLeadSearch(e.target.value)}
+            placeholder="Buscar lead: nombre, teléfono, email, ID registro, ID GHL…"
+            className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-accent-cyan"
+            aria-label="Buscar leads en llamadas"
+          />
+        </div>
       </div>
+      {leadSearch.trim() && (
+        <p className="text-[10px] text-gray-500">
+          {Object.values(leadsByAdvisorFiltered).reduce((n, a) => n + a.length, 0)} lead(s) coinciden
+          {Object.keys(leadsByAdvisorFiltered).length === 0 ? ' — prueba otro término' : ''}
+        </p>
+      )}
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         <KPICard label="Leads (llamadas)" value={agg.totalLeads} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con al menos una llamada.', calculo: 'Distintos mail_lead en el rango.' }} />
         <KPICard label="Llamadas totales" value={agg.totalCalls} color="cyan" className={kpiCompact} tooltip={{ significado: 'Todas las llamadas en el rango.', calculo: 'Suma de eventos.' }} />
@@ -155,6 +201,8 @@ export default function PerformanceLlamadasPage() {
         <div className="rounded-lg border border-surface-500 overflow-hidden">
           {Object.keys(leadsByAdvisor).length === 0 && Object.keys(data?.advisorMetrics ?? {}).length === 0 ? (
             <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay llamadas en el rango de fechas.</div>
+          ) : leadSearch.trim() && Object.keys(leadsByAdvisorFiltered).length === 0 ? (
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">Ningún lead coincide con «{leadSearch.trim()}».</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -171,11 +219,14 @@ export default function PerformanceLlamadasPage() {
                 </thead>
                 <tbody>
                   {(() => {
-                    const advisorKeys = [...new Set([...Object.keys(leadsByAdvisor), ...Object.keys(data?.advisorMetrics ?? {})])].sort((a, b) => a.localeCompare(b));
+                    const q = leadSearch.trim();
+                    const advisorKeys = q
+                      ? [...Object.keys(leadsByAdvisorFiltered)].sort((a, b) => a.localeCompare(b))
+                      : [...new Set([...Object.keys(leadsByAdvisor), ...Object.keys(data?.advisorMetrics ?? {})])].sort((a, b) => a.localeCompare(b));
                     return advisorKeys.map((advisorKey) => {
                       const isExpanded = expandedAdvisorId === advisorKey;
                       const metrics = data?.advisorMetrics[advisorKey];
-                      const advisorLeads = leadsByAdvisor[advisorKey] ?? [];
+                      const advisorLeads = (q ? leadsByAdvisorFiltered[advisorKey] : leadsByAdvisor[advisorKey]) ?? [];
                       return (
                         <Fragment key={advisorKey}>
                           <tr className="border-t border-surface-500 hover:bg-surface-700/50 cursor-pointer" onClick={() => setExpandedAdvisorId(isExpanded ? null : advisorKey)}>

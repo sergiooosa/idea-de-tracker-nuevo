@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
@@ -8,9 +8,10 @@ import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripci
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
 import Link from 'next/link';
-import { Pencil, User, X } from 'lucide-react';
+import { Pencil, Search, User, X } from 'lucide-react';
+import { matchesLeadSearch } from '@/lib/performance-search';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
-import type { VideollamadasResponse, ApiVideollamada, VideoMeeting } from '@/types';
+import type { VideollamadasResponse, ApiVideollamada, VideoMeeting, VideollamadasAdvisorMetrics } from '@/types';
 import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
 
@@ -59,6 +60,7 @@ export default function PerformanceVideollamadasPage() {
   const [apiMeetingsForModal, setApiMeetingsForModal] = useState<ApiVideollamada[] | null>(null);
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [leadSearch, setLeadSearch] = useState('');
 
   const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
@@ -71,16 +73,49 @@ export default function PerformanceVideollamadasPage() {
 
   const agg = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
 
+  const registrosFiltrados = useMemo(() => {
+    if (!data?.registros) return [];
+    const q = leadSearch.trim();
+    if (!q) return data.registros;
+    return data.registros.filter((r) =>
+      matchesLeadSearch(q, [
+        r.leadName,
+        r.leadEmail,
+        r.idcliente,
+        r.ghl_contact_id,
+        r.tags,
+        r.origen,
+        String(r.id),
+        r.closer,
+        r.resumenIa,
+      ]),
+    );
+  }, [data?.registros, leadSearch]);
+
   const meetingsByAdvisor = useMemo(() => {
-    if (!data) return {} as Record<string, ApiVideollamada[]>;
     const map: Record<string, ApiVideollamada[]> = {};
-    for (const r of data.registros) {
+    for (const r of registrosFiltrados) {
       const key = r.closer ?? 'Sin asignar';
       if (!map[key]) map[key] = [];
       map[key].push(r);
     }
     return map;
-  }, [data]);
+  }, [registrosFiltrados]);
+
+  function metricsFromMeetings(ms: ApiVideollamada[]): VideollamadasAdvisorMetrics {
+    const asist = ms.filter((r) => r.attended).length;
+    const efect = ms.filter((r) => r.attended && r.qualified).length;
+    const fact = ms.reduce((s, r) => s + r.facturacion, 0);
+    const cash = ms.reduce((s, r) => s + r.cashCollected, 0);
+    return {
+      advisorName: ms[0]?.closer ?? '',
+      agendadas: ms.length,
+      asistencias: asist,
+      pctCierre: asist > 0 ? (efect / asist) * 100 : 0,
+      facturacion: fact,
+      cashCollected: cash,
+    };
+  }
 
   type LeadRow = { leadKey: string; name: string; email: string | null; meetings: ApiVideollamada[] };
   const leadsByAdvisor = useMemo(() => {
@@ -100,6 +135,13 @@ export default function PerformanceVideollamadasPage() {
     }
     return out;
   }, [meetingsByAdvisor]);
+
+  useEffect(() => {
+    const q = leadSearch.trim();
+    if (!q) return;
+    const keys = Object.keys(meetingsByAdvisor);
+    if (keys.length === 1) setExpandedAdvisorId(keys[0]);
+  }, [leadSearch, meetingsByAdvisor]);
 
   const defaultTo = new Date();
   const defaultFrom = subDays(defaultTo, 7);
@@ -123,7 +165,24 @@ export default function PerformanceVideollamadasPage() {
           defaultFrom={format(defaultFrom, 'yyyy-MM-dd')}
           defaultTo={format(defaultTo, 'yyyy-MM-dd')}
         />
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+          <input
+            type="search"
+            value={leadSearch}
+            onChange={(e) => setLeadSearch(e.target.value)}
+            placeholder="Buscar: nombre, email, ID contacto, tags, resumen…"
+            className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-accent-purple"
+            aria-label="Buscar en videollamadas"
+          />
+        </div>
       </div>
+      {leadSearch.trim() && (
+        <p className="text-[10px] text-gray-500">
+          Mostrando {registrosFiltrados.length} de {data?.registros?.length ?? 0} reuniones
+          {registrosFiltrados.length === 0 ? ' — prueba otro término' : ''}
+        </p>
+      )}
       <TagFilter
         tags={[...new Set(data?.registros?.flatMap((r: ApiVideollamada) => (r.tags ?? '').split(',').map(t => t.trim()).filter(Boolean)) ?? [])]}
         selected={selectedTags}
@@ -182,8 +241,10 @@ export default function PerformanceVideollamadasPage() {
           Videollamadas por asesor
         </h3>
         <div className="rounded-lg border border-surface-500 overflow-hidden">
-          {Object.keys(meetingsByAdvisor).length === 0 ? (
+          {(data?.registros?.length ?? 0) === 0 ? (
             <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay videollamadas en el rango de fechas.</div>
+          ) : leadSearch.trim() && registrosFiltrados.length === 0 ? (
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">Ninguna reunión coincide con «{leadSearch.trim()}».</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -203,7 +264,9 @@ export default function PerformanceVideollamadasPage() {
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([advisorKey, advisorMeetings]) => {
                       const isExpanded = expandedAdvisorId === advisorKey;
-                      const metrics = data?.advisorMetrics[advisorKey];
+                      const metrics = leadSearch.trim()
+                        ? metricsFromMeetings(advisorMeetings)
+                        : data?.advisorMetrics[advisorKey];
                       return (
                         <Fragment key={advisorKey}>
                           <tr
@@ -250,7 +313,18 @@ export default function PerformanceVideollamadasPage() {
                                               className="border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer"
                                               onClick={() => openTranscripcionIA(lead.meetings.map(apiToVideoMeeting), lead.meetings)}
                                             >
-                                              <td className="px-2 py-2 text-white">{lead.name}</td>
+                                              <td className="px-2 py-2 text-white">
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span>{lead.name}</span>
+                                                  {(lead.meetings[0]?.idcliente || lead.meetings[0]?.ghl_contact_id) && (
+                                                    <span className="text-[10px] text-gray-500">
+                                                      {lead.meetings[0]?.ghl_contact_id && <>GHL: {lead.meetings[0].ghl_contact_id}</>}
+                                                      {lead.meetings[0]?.idcliente && lead.meetings[0]?.ghl_contact_id && ' · '}
+                                                      {lead.meetings[0]?.idcliente && <>ID: {lead.meetings[0].idcliente}</>}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </td>
                                               <td className="px-2 py-2 text-gray-400">{lead.email ?? '—'}</td>
                                               <td className="px-2 py-2 text-accent-cyan">{lead.meetings.length}</td>
                                               <td className="px-2 py-2 text-gray-300">{outcomeLabel}</td>

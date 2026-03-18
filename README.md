@@ -44,6 +44,7 @@
 | **Speed to lead en 0** | Si en BD todos los `speed_to_lead` son 0, el panel muestra 0 correctamente; el origen del dato está en el Cerebro/backend que escribe en `log_llamadas` y `registros_de_llamada`. Ver **docs/PREGUNTAS_BACKEND_SPEED_TO_LEAD.md** con queries de validación y preguntas para el agente de backend. |
 | **Dashboard — KPIs operativos** | Si en System (paso 5) las métricas están guardadas pero en Dashboard no aparecían en "KPIs operativos", era porque `metricas_config` puede llegar desde la BD como string JSON en lugar de array. Se añadió `parseMetricasConfig()` en `metricas-engine` y se usa en dashboard, system-config y videollamadas para leer siempre un array válido (array o string parseado). |
 | **Performance > Llamadas — historial por lead** | El historial ya no usa `includes(nombre)` (p. ej. "Eli" mezclaba Elizabeth, Araceli, etc.). Se filtra por **`log_llamadas.id_registro === id_registro` del lead**; la API expone `id_registro` en cada evento. Logs legacy sin `id_registro`: mismo teléfono (solo dígitos) + email del lead o, si no hay email, mismo closer. |
+| **Performance — buscador** | En **Rendimiento > Llamadas** y **Rendimiento (videollamadas)**: campo de búsqueda por nombre, teléfono (solo dígitos), email, ID registro / GHL (llamadas); nombre, email, ID cliente, contacto GHL, tags, resumen IA (videollamadas). Con un solo asesor coincidente se expande su fila automáticamente. |
 
 ---
 
