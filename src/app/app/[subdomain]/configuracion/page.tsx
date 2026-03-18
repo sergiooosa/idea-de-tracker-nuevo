@@ -16,6 +16,7 @@ interface UserRow {
   rol: string;
   permisos: Record<string, boolean> | null;
   fathom: string | null;
+  id_webhook_fathom?: string | null;
 }
 
 const ROLES_BUILTIN = [
@@ -89,6 +90,12 @@ export default function ConfiguracionPage() {
         if (formUser.password) body.password = formUser.password;
         const putRes = await fetch("/api/data/usuarios", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (!putRes.ok) throw new Error("Error al actualizar");
+        const putData = await putRes.json().catch(() => ({}));
+        if (putData.fathomWarning) {
+          toast.warning("Usuario actualizado, pero Fathom no registró el webhook", { description: putData.fathomWarning });
+        } else {
+          toast.success("Usuario actualizado");
+        }
       } else {
         if (!formUser.email || !formUser.password) {
           setError("Email y contraseña son obligatorios");
@@ -111,6 +118,12 @@ export default function ConfiguracionPage() {
           setError(data.error ?? "Error al crear usuario");
           setSaving(false);
           return;
+        }
+        const created = await res.json().catch(() => ({}));
+        if (created.fathomWarning) {
+          toast.warning("Usuario creado, pero Fathom no registró el webhook", { description: created.fathomWarning });
+        } else {
+          toast.success("Usuario creado");
         }
       }
       setModalUser(null);
@@ -313,6 +326,11 @@ export default function ConfiguracionPage() {
                         {u.rol === "superadmin" && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                       </div>
                       <span className="text-gray-500 text-xs block">{u.email}</span>
+                      {u.fathom?.trim() && (
+                        <span className={`text-[10px] block mt-0.5 ${u.id_webhook_fathom ? "text-accent-green" : "text-amber-400"}`}>
+                          Fathom: {u.id_webhook_fathom ? "webhook registrado" : "API key sin webhook (revisa o edita)"}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <select

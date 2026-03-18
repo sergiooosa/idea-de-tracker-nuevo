@@ -16,8 +16,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email y password son obligatorios" }, { status: 400 });
     }
     try {
-      const user = await createUsuario(idCuenta, body);
-      return NextResponse.json(user, { status: 201 });
+      const { user, fathomWarning } = await createUsuario(idCuenta, body);
+      return NextResponse.json({ ...user, fathomWarning }, { status: 201 });
     } catch (e: any) {
       if (e?.code === "23505") {
         return NextResponse.json({ error: "El email ya está registrado" }, { status: 409 });
@@ -33,8 +33,8 @@ export async function PUT(req: Request) {
     if (!body.id) {
       return NextResponse.json({ error: "Se requiere id del usuario" }, { status: 400 });
     }
-    await updateUsuario(idCuenta, body.id, body);
-    return NextResponse.json({ ok: true });
+    const { fathomWarning } = await updateUsuario(idCuenta, body.id, body);
+    return NextResponse.json({ ok: true, fathomWarning });
   });
 }
 

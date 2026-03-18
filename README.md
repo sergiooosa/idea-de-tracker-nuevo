@@ -45,6 +45,7 @@
 | **Dashboard — KPIs operativos** | Si en System (paso 5) las métricas están guardadas pero en Dashboard no aparecían en "KPIs operativos", era porque `metricas_config` puede llegar desde la BD como string JSON en lugar de array. Se añadió `parseMetricasConfig()` en `metricas-engine` y se usa en dashboard, system-config y videollamadas para leer siempre un array válido (array o string parseado). |
 | **Performance > Llamadas — historial por lead** | El historial ya no usa `includes(nombre)` (p. ej. "Eli" mezclaba Elizabeth, Araceli, etc.). Se filtra por **`log_llamadas.id_registro === id_registro` del lead**; la API expone `id_registro` en cada evento. Logs legacy sin `id_registro`: mismo teléfono (solo dígitos) + email del lead o, si no hay email, mismo closer. |
 | **Performance — buscador** | En **Rendimiento > Llamadas** y **Rendimiento (videollamadas)**: campo de búsqueda por nombre, teléfono (solo dígitos), email, ID registro / GHL (llamadas); nombre, email, ID cliente, contacto GHL, tags, resumen IA (videollamadas). Con un solo asesor coincidente se expande su fila automáticamente. |
+| **Fathom al crear/editar usuario** | Con API key en **Configuración**, el panel registra el webhook en Fathom hacia `{API_BASE_URL}/webhooks/fathom/{id_cuenta}` y guarda `id_webhook_fathom`. Fallo en Fathom → usuario igual + toast de aviso. |
 
 ---
 
@@ -543,7 +544,15 @@ export async function withAuth(
 | `rol` | `text NOT NULL` | `"superadmin"` o `"usuario"` |
 | `permisos` | `jsonb` | `{"system": true, "reportes": false, ...}` |
 | `fathom` | `text` | API key de Fathom |
-| `id_webhook_fathom` | `text` | ID webhook Fathom |
+| `id_webhook_fathom` | `text` | ID del webhook registrado en Fathom (vía panel) |
+
+**Registro automático del webhook Fathom (Configuración → usuarios):** Al **crear** un usuario con API key de Fathom, o al **editar** y cambiar/vaciar la key, el panel:
+
+1. Crea o actualiza la fila en `usuarios_dashboard`.
+2. Si hay key no vacía: `POST https://api.fathom.ai/external/v1/webhooks` con header `X-Api-Key`, cuerpo `destination_url` = `{API_BASE_URL}/webhooks/fathom/{id_cuenta}`, `triggered_for: ["my_recordings"]`, `include_transcript: true`.
+3. Si Fathom responde OK, guarda el `id` devuelto en `id_webhook_fathom`. Si falla (HTTP, red, etc.), **no se revierte** el usuario; queda aviso en toast y en lista (“API key sin webhook”).
+
+Variable de entorno del **servidor del panel**: **`API_BASE_URL`** — base URL del Cerebro donde existe `POST /webhooks/fathom/:idCuenta` (por defecto `https://api.autokpi.net`). Código: `src/lib/fathom-webhook.ts`, `src/lib/queries/usuarios.ts`.
 
 ### `resumenes_diarios_agendas` — Citas y videollamadas (escrita por Cerebro)
 
