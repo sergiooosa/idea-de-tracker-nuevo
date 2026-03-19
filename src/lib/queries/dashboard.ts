@@ -16,6 +16,18 @@ const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada"];
 const DEFAULT_CLOSED = "Cerrada";
 const DEFAULT_EFFECTIVE = ["Cerrada", "Ofertada"];
 
+/**
+ * Normaliza un valor de fecha a string "YYYY-MM-DD".
+ * Algunos drivers (p. ej. PostgreSQL) devuelven columnas date/timestamp como Date;
+ * otros como string. Usar esto evita TypeError en volumeByDay.sort (localeCompare es de string).
+ */
+function toDateString(value: Date | string | null | undefined): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
 function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   if (!embudo || embudo.length === 0) {
     return {
@@ -248,20 +260,25 @@ export async function getDashboard(
     },
   );
 
-  // Volume by day
+  // Volume by day (fechas normalizadas a "YYYY-MM-DD" para evitar 500 si el driver devuelve Date/string)
   const volumeMap: Record<string, DashboardVolumeDay> = {};
   for (const c of filteredCalls) {
-    const d = c.ts.toISOString().slice(0, 10);
+    const d = toDateString(c.ts);
+    if (!d) continue;
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].llamadas++;
   }
   for (const a of filteredAgendas) {
-    const d = a.fecha_reunion?.toISOString().slice(0, 10) ?? a.fecha;
+    const d =
+      toDateString(a.fecha_reunion ?? null) || toDateString(a.fecha as Date | string | null) || "";
+    if (!d) continue;
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].citasPresentaciones++;
     if (closedSet.has(a.categoria ?? "")) volumeMap[d].cierres++;
   }
-  const volumeByDay = Object.values(volumeMap).sort((a, b) => a.date.localeCompare(b.date));
+  const volumeByDay = Object.values(volumeMap).sort((a, b) =>
+    String(a.date).localeCompare(String(b.date)),
+  );
 
   // Objeciones
   const objMap: Record<string, { count: number; quotes: Set<string> }> = {};
