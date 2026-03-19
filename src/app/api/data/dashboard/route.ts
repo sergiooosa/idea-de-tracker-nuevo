@@ -11,7 +11,16 @@ export async function GET(req: Request) {
     const closerEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
     const tagsParam = searchParams.get("tags") || undefined;
     const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : undefined;
-    const data = await getDashboard(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined, tags);
-    return NextResponse.json(data);
+    try {
+      const data = await getDashboard(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined, tags);
+      return NextResponse.json(data);
+    } catch (err) {
+      console.error("[dashboard] Error:", err);
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json(
+        { error: "Error al cargar el panel", debug: message },
+        { status: 500 },
+      );
+    }
   });
 }

@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const toggleObjeciones = () => setShowObjeciones((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showObj', String(next)); return next; });
   const toggleVolumen = () => setShowVolumen((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showVol', String(next)); return next; });
 
-  const { data, loading } = useApiData<DashboardResponse>('/api/data/dashboard', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
+  const { data, loading, error, refetch } = useApiData<DashboardResponse>('/api/data/dashboard', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
 
   const kpis = data?.kpis ?? {
     totalLeads: 0, callsMade: 0, contestadas: 0, answerRate: 0,
@@ -56,6 +56,21 @@ export default function DashboardPage() {
         <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-gray-400 text-sm animate-pulse">Cargando panel ejecutivo...</div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+        <div className="p-4 rounded-xl border border-red-500/50 bg-red-500/10 text-red-200 text-sm space-y-2">
+          <p className="font-medium">Error al cargar el panel</p>
+          <p className="text-gray-300 break-words">{error}</p>
+          <button type="button" onClick={() => refetch()} className="px-3 py-1.5 rounded-lg bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50 hover:bg-accent-cyan/30 text-sm font-medium">
+            Reintentar
+          </button>
         </div>
       </>
     );

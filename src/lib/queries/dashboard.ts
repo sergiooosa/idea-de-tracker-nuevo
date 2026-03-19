@@ -37,12 +37,12 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
       etapas: null,
     };
   }
-  const nombres = embudo.map((e) => e.nombre);
+  const nombres = embudo.map((e) => (e?.nombre != null ? String(e.nombre).trim() : ""));
   return {
     attendedSet: new Set(nombres),
-    closedSet: new Set(nombres.filter((n) => n.toLowerCase().includes("cerrad"))),
+    closedSet: new Set(nombres.filter((n) => (n ?? "").toLowerCase().includes("cerrad"))),
     effectiveSet: new Set(nombres.filter((n) =>
-      n.toLowerCase().includes("cerrad") || n.toLowerCase().includes("ofertad"),
+      (n ?? "").toLowerCase().includes("cerrad") || (n ?? "").toLowerCase().includes("ofertad"),
     )),
     etapas: embudo,
   };
@@ -159,7 +159,7 @@ export async function getDashboard(
     cash = extCash;
   }
 
-  const efectivasCalls = filteredCalls.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
+  const efectivasCalls = filteredCalls.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
   const contestadas = efectivasCalls;
 
   const leadsFromCalls = new Set(filteredCalls.map((c) => c.mail_lead).filter(Boolean));
@@ -226,7 +226,7 @@ export async function getDashboard(
 
   const advisorRanking: DashboardAdvisorRow[] = Object.entries(advisorMap).map(
     ([key, { calls: ac, agendas: aa }]) => {
-      const aContestadas = ac.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
+      const aContestadas = ac.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
       const aLeads = new Set([
         ...ac.map((c) => c.mail_lead).filter(Boolean),
         ...aa.map((a) => a.email_lead).filter(Boolean),
@@ -285,7 +285,7 @@ export async function getDashboard(
   for (const a of filteredAgendas) {
     if (!Array.isArray(a.objeciones_ia)) continue;
     for (const obj of a.objeciones_ia) {
-      const key = (obj.categoria ?? obj.objecion ?? "").toLowerCase().trim();
+      const key = (obj?.categoria ?? obj?.objecion ?? "").toLowerCase().trim();
       if (!key) continue;
       if (!objMap[key]) objMap[key] = { count: 0, quotes: new Set() };
       objMap[key].count++;

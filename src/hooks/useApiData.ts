@@ -50,7 +50,9 @@ export function useApiData<T>(
           window.location.href = "/login";
           return;
         }
-        throw new Error(`Error ${res.status}`);
+        const body = await res.json().catch(() => null) as { error?: string; debug?: string } | null;
+        const message = body?.debug ?? body?.error ?? `Error ${res.status}`;
+        throw new Error(message);
       }
 
       const json = (await res.json()) as T;
