@@ -9,7 +9,7 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse } from '@/types';
 import Link from 'next/link';
-import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon } from 'lucide-react';
+import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -93,6 +93,26 @@ export default function DashboardPage() {
             selected={selectedTags}
             onChange={setSelectedTags}
           />
+        </section>
+
+        <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-accent-cyan" />
+                Acciones rápidas
+              </h2>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Ejecuta tareas operativas sin salir del panel.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/acciones-rapidas/video-recovery"
+              className="inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
+            >
+              Recopilar videollamadas
+            </Link>
+          </div>
         </section>
 
         <section>
