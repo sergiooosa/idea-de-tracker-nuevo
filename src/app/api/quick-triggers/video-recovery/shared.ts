@@ -23,7 +23,7 @@ export function parseIdEvento(idEventoRaw: string): number | null {
 
 export async function forwardVideoRecoveryRequest(
   path: "preview" | "execute",
-  apiKey: string,
+  internalApiKey: string,
   payload: unknown,
 ): Promise<ForwardResult> {
   const maxAttempts = 3;
@@ -37,7 +37,8 @@ export async function forwardVideoRecoveryRequest(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${internalApiKey}`,
+          "X-Api-Key": internalApiKey,
         },
         body: JSON.stringify(payload),
       });

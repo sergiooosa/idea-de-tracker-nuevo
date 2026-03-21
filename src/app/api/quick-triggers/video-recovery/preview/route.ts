@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuthFull } from "@/lib/api-auth";
-import { getVideoRecoveryCredential } from "@/lib/queries/video-recovery";
+import { getCuentaInternalApiKey, getVideoRecoveryCredential } from "@/lib/queries/video-recovery";
 import { forwardVideoRecoveryRequest, parseIdEvento } from "../shared";
 
 interface PreviewBody {
@@ -30,17 +30,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: "Usuario no pertenece al tenant" }, { status: 404 });
     }
 
-    if (!credential.fathom?.trim()) {
+    const internalApiKey = await getCuentaInternalApiKey(ctx.idCuenta);
+    if (!internalApiKey) {
       return NextResponse.json(
         {
           success: false,
-          message: `El usuario ${credential.email} no tiene API key de Fathom configurada`,
+          message: "La cuenta no tiene API key interna activa para autenticar con Cerebro",
         },
         { status: 422 },
       );
     }
 
-    const forwarded = await forwardVideoRecoveryRequest("preview", credential.fathom.trim(), body);
+    const forwarded = await forwardVideoRecoveryRequest("preview", internalApiKey, body);
     return NextResponse.json(forwarded.body, { status: forwarded.status });
   });
 }

@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { usuariosDashboard } from "@/lib/db/schema";
+import { apiKeysCuenta, usuariosDashboard } from "@/lib/db/schema";
 
 export interface VideoRecoveryUserRow {
   id_evento: string;
@@ -13,7 +13,6 @@ interface VideoRecoveryCredentialRow {
   id_cuenta: number | null;
   email: string;
   nombre: string | null;
-  fathom: string | null;
 }
 
 export async function listVideoRecoveryUsers(
@@ -54,12 +53,24 @@ export async function getVideoRecoveryCredential(
       id_cuenta: usuariosDashboard.id_cuenta,
       email: usuariosDashboard.email,
       nombre: usuariosDashboard.nombre,
-      fathom: usuariosDashboard.fathom,
     })
     .from(usuariosDashboard)
     .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), eq(usuariosDashboard.id_evento, idEvento)))
     .limit(1);
 
   return row ?? null;
+}
+
+export async function getCuentaInternalApiKey(idCuenta: number): Promise<string | null> {
+  const [keyRow] = await db
+    .select({
+      token: apiKeysCuenta.token,
+    })
+    .from(apiKeysCuenta)
+    .where(and(eq(apiKeysCuenta.id_cuenta, idCuenta), eq(apiKeysCuenta.activa, true)))
+    .orderBy(desc(apiKeysCuenta.created_at), desc(apiKeysCuenta.id_key))
+    .limit(1);
+
+  return keyRow?.token?.trim() || null;
 }
 
