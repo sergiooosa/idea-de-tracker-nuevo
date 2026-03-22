@@ -126,6 +126,33 @@ export interface MetricsAggregate {
   answerRate: number;
 }
 
+export interface ByChannelStats {
+  llamadas: {
+    leads: number;
+    contactRate: number;
+    bookingRate: number;
+    closingRate: number;
+  };
+  videollamadas: {
+    leads: number;
+    attendanceRate: number;
+    closingRate: number;
+    revenue: number;
+  };
+  chats: {
+    leads: number;
+    conRespuesta: number;
+    tasaRespuesta: number;
+    topOrigen: string | null;
+  };
+}
+
+export interface AcquisitionResponse {
+  rows: AcquisitionRow[];
+  sources: string[];
+  byChannel: ByChannelStats;
+}
+
 export interface AcquisitionRow {
   id: string;
   utm_source?: string;

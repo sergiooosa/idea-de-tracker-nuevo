@@ -18,7 +18,18 @@ interface AcqRow {
   booked: number; attended: number; closed: number; revenue: number;
   contactRate: number; bookingRate: number; attendanceRate: number; closingRate: number;
 }
-interface AcqResponse { rows: AcqRow[]; sources: string[] }
+
+interface ByChannelStats {
+  llamadas: { leads: number; contactRate: number; bookingRate: number; closingRate: number };
+  videollamadas: { leads: number; attendanceRate: number; closingRate: number; revenue: number };
+  chats: { leads: number; conRespuesta: number; tasaRespuesta: number; topOrigen: string | null };
+}
+
+interface AcqResponse {
+  rows: AcqRow[];
+  sources: string[];
+  byChannel: ByChannelStats;
+}
 
 export default function AcquisitionPage() {
   const [dateFrom, setDateFrom] = useState(format(defaultFrom, 'yyyy-MM-dd'));
@@ -28,6 +39,7 @@ export default function AcquisitionPage() {
   const { data, loading } = useApiData<AcqResponse>('/api/data/acquisition', { from: dateFrom, to: dateTo });
   const rows = data?.rows ?? [];
   const sources = data?.sources ?? [];
+  const byChannel = data?.byChannel;
 
   const filtered = filterSource ? rows.filter((r) => r.origen === filterSource) : rows;
 
@@ -49,6 +61,88 @@ export default function AcquisitionPage() {
           </select>
         </div>
 
+        {/* ── Cards por canal ── */}
+        {!loading && byChannel && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Llamadas */}
+            {byChannel.llamadas.leads > 0 && (
+              <div className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-300">
+                  <span>📞</span>
+                  <span>Llamadas</span>
+                </div>
+                <div className="text-2xl font-bold text-accent-cyan">{byChannel.llamadas.leads}</div>
+                <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide">leads</div>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <div className="bg-surface-600/60 rounded px-2 py-1.5 text-center">
+                    <div className="text-sm font-bold text-white">{pct(byChannel.llamadas.contactRate)}</div>
+                    <div className="text-[10px] text-gray-400">contactación</div>
+                  </div>
+                  <div className="bg-surface-600/60 rounded px-2 py-1.5 text-center">
+                    <div className="text-sm font-bold text-accent-purple">{pct(byChannel.llamadas.bookingRate)}</div>
+                    <div className="text-[10px] text-gray-400">agendamiento</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Videollamadas */}
+            {byChannel.videollamadas.leads > 0 && (
+              <div className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-300">
+                  <span>🎥</span>
+                  <span>Videollamadas</span>
+                </div>
+                <div className="text-2xl font-bold text-accent-cyan">{byChannel.videollamadas.leads}</div>
+                <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide">leads únicos</div>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <div className="bg-surface-600/60 rounded px-2 py-1.5 text-center">
+                    <div className="text-sm font-bold text-white">{pct(byChannel.videollamadas.attendanceRate)}</div>
+                    <div className="text-[10px] text-gray-400">asistencia</div>
+                  </div>
+                  <div className="bg-surface-600/60 rounded px-2 py-1.5 text-center">
+                    <div className="text-sm font-bold text-accent-green">{pct(byChannel.videollamadas.closingRate)}</div>
+                    <div className="text-[10px] text-gray-400">cierre</div>
+                  </div>
+                </div>
+                {byChannel.videollamadas.revenue > 0 && (
+                  <div className="text-xs text-accent-green font-semibold pt-0.5">
+                    {fm(byChannel.videollamadas.revenue)} facturado
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Chats */}
+            {byChannel.chats.leads > 0 && (
+              <div className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-300">
+                  <span>💬</span>
+                  <span>Chats</span>
+                </div>
+                <div className="text-2xl font-bold text-accent-cyan">{byChannel.chats.leads}</div>
+                <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide">leads</div>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <div className="bg-surface-600/60 rounded px-2 py-1.5 text-center">
+                    <div className="text-sm font-bold text-white">{byChannel.chats.conRespuesta}</div>
+                    <div className="text-[10px] text-gray-400">con respuesta</div>
+                  </div>
+                  <div className="bg-surface-600/60 rounded px-2 py-1.5 text-center">
+                    <div className="text-sm font-bold text-accent-purple">{pct(byChannel.chats.tasaRespuesta)}</div>
+                    <div className="text-[10px] text-gray-400">tasa resp.</div>
+                  </div>
+                </div>
+                {byChannel.chats.topOrigen && (
+                  <div className="text-xs text-gray-400 pt-0.5">
+                    Canal principal: <span className="text-white font-medium capitalize">{byChannel.chats.topOrigen}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tabla existente (sin cambios) ── */}
         {loading ? (
           <div className="flex items-center justify-center min-h-[200px]"><div className="text-gray-400 text-sm animate-pulse">Cargando datos de adquisición...</div></div>
         ) : filtered.length === 0 ? (

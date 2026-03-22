@@ -18,9 +18,16 @@ export interface AcquisitionRow {
   closingRate: number;
 }
 
+export interface ByChannelStats {
+  llamadas: { leads: number; contactRate: number; bookingRate: number; closingRate: number };
+  videollamadas: { leads: number; attendanceRate: number; closingRate: number; revenue: number };
+  chats: { leads: number; conRespuesta: number; tasaRespuesta: number; topOrigen: string | null };
+}
+
 export interface AcquisitionResponse {
   rows: AcquisitionRow[];
   sources: string[];
+  byChannel: ByChannelStats;
 }
 
 export async function getAcquisition(
@@ -106,6 +113,9 @@ export async function getAcquisition(
       ),
   ]);
 
+  // ----------------------------------------------------------------
+  // TABLA EXISTENTE — lógica original sin cambios
+  // ----------------------------------------------------------------
   const origenMap: Record<string, {
     leadEmails: Set<string>;
     calledEmails: Set<string>;
@@ -184,5 +194,100 @@ export async function getAcquisition(
 
   const sources = [...new Set(rows.map((r) => r.origen))];
 
-  return { rows, sources };
+  // ----------------------------------------------------------------
+  // BY CHANNEL — cálculo independiente por canal, denominadores limpios
+  // ----------------------------------------------------------------
+
+  // CANAL: LLAMADAS (solo log_llamadas + cross-ref emails en agendas)
+  const llamadasLeads = new Set<string>();
+  const llamadasAnswered = new Set<string>();
+  for (const c of calls) {
+    if (c.mail_lead) {
+      llamadasLeads.add(c.mail_lead);
+      if (c.tipo_evento.startsWith("efectiva_")) {
+        llamadasAnswered.add(c.mail_lead);
+      }
+    }
+  }
+  // Cross-ref: leads de llamadas que agendaron videollamada (por email)
+  let llamadasBooked = 0;
+  let llamadasAttended = 0;
+  let llamadasClosed = 0;
+  for (const a of agendas) {
+    if (a.email_lead && llamadasLeads.has(a.email_lead)) {
+      llamadasBooked++;
+      if (attendedSet.has(a.categoria ?? "")) llamadasAttended++;
+      if (closedSet.has(a.categoria ?? "")) llamadasClosed++;
+    }
+  }
+  const llamadasLeadsCount = llamadasLeads.size;
+  const llamadasAnsweredCount = llamadasAnswered.size;
+
+  const llamadasChannel: ByChannelStats["llamadas"] = {
+    leads: llamadasLeadsCount,
+    contactRate: llamadasLeadsCount > 0 ? llamadasAnsweredCount / llamadasLeadsCount : 0,
+    bookingRate: llamadasAnsweredCount > 0 ? llamadasBooked / llamadasAnsweredCount : 0,
+    closingRate: llamadasAttended > 0 ? llamadasClosed / llamadasAttended : 0,
+  };
+
+  // CANAL: VIDEOLLAMADAS (solo resumenes_diarios_agendas)
+  const videollamadasLeads = new Set<string>();
+  let videollamadasBooked = 0;
+  let videollamadasAttended = 0;
+  let videollamadasClosed = 0;
+  let videollamadasRevenue = 0;
+  for (const a of agendas) {
+    if (a.email_lead) videollamadasLeads.add(a.email_lead);
+    videollamadasBooked++;
+    if (attendedSet.has(a.categoria ?? "")) videollamadasAttended++;
+    if (closedSet.has(a.categoria ?? "")) {
+      videollamadasClosed++;
+      videollamadasRevenue += parseFloat(a.facturacion || "0") || 0;
+    }
+  }
+
+  const videollamadasChannel: ByChannelStats["videollamadas"] = {
+    leads: videollamadasLeads.size,
+    attendanceRate: videollamadasBooked > 0 ? videollamadasAttended / videollamadasBooked : 0,
+    closingRate: videollamadasAttended > 0 ? videollamadasClosed / videollamadasAttended : 0,
+    revenue: Math.round(videollamadasRevenue),
+  };
+
+  // CANAL: CHATS (solo chats_logs)
+  const chatsLeads = new Set<string>();
+  const chatsLeadsWithResponse = new Set<string>();
+  const chatsOrigenCount: Record<string, number> = {};
+  for (const ch of chats) {
+    if (ch.id_lead) {
+      chatsLeads.add(ch.id_lead);
+      // "con respuesta" = tiene estado que no sea nulo/vacío
+      if (ch.estado && ch.estado.trim() !== "") {
+        chatsLeadsWithResponse.add(ch.id_lead);
+      }
+    }
+    if (ch.origen) {
+      chatsOrigenCount[ch.origen] = (chatsOrigenCount[ch.origen] ?? 0) + 1;
+    }
+  }
+  const chatsLeadsCount = chatsLeads.size;
+  const chatsConRespuesta = chatsLeadsWithResponse.size;
+  const topOrigen =
+    Object.entries(chatsOrigenCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const chatsChannel: ByChannelStats["chats"] = {
+    leads: chatsLeadsCount,
+    conRespuesta: chatsConRespuesta,
+    tasaRespuesta: chatsLeadsCount > 0 ? chatsConRespuesta / chatsLeadsCount : 0,
+    topOrigen,
+  };
+
+  return {
+    rows,
+    sources,
+    byChannel: {
+      llamadas: llamadasChannel,
+      videollamadas: videollamadasChannel,
+      chats: chatsChannel,
+    },
+  };
 }
