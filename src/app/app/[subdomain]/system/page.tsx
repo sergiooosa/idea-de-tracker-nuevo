@@ -32,7 +32,25 @@ interface MetricRule {
   increment: number; whenMeasured: string; isRecurring: 'recurrente' | 'unica';
   section: string; panel: string; ubicacion?: 'panel_ejecutivo' | 'rendimiento' | 'ambos';
 }
-interface EmbudoEtapa { id: string; nombre: string; color?: string; orden: number; condition?: string }
+interface ReglaAutomatica {
+  evento: 'no_show' | 'cancelada' | 'sin_actividad_dias';
+  valor?: number;
+}
+interface EmbudoEtapa {
+  id: string;
+  nombre: string;
+  color?: string;
+  orden: number;
+  condition?: string;
+  fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];
+  reglas_automaticas?: ReglaAutomatica[];
+}
+interface ChatConfig {
+  tiene_chatbot: boolean;
+  emoji_toma_atencion: string;
+  trigger_mode: 'unico' | 'multiple';
+  trigger_confirmaciones: number;
+}
 interface ChatTrigger { trigger: string; accion: 'cambiar_estado' | 'asignar_etiqueta'; valor: string }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
@@ -41,6 +59,7 @@ interface SystemConfig {
   chat_triggers: ChatTrigger[]; embudo_personalizado: EmbudoEtapa[];
   has_openai_key: boolean; fuente_datos_financieros: 'nativa' | 'api_externa';
   seccion_chats_dashboard?: boolean;
+  chat_config?: ChatConfig;
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -154,6 +173,13 @@ export default function SystemPage() {
   const [embudoEtapas, setEmbudoEtapas] = useState<EmbudoEtapa[]>([]);
   const [chatTriggers, setChatTriggers] = useState<ChatTrigger[]>([]);
   const [emojiSearch, setEmojiSearch] = useState('');
+  const [chatConfig, setChatConfig] = useState<ChatConfig>({
+    tiene_chatbot: false,
+    emoji_toma_atencion: '',
+    trigger_mode: 'unico',
+    trigger_confirmaciones: 2,
+  });
+  const [reglasAbiertasMap, setReglasAbiertasMap] = useState<Record<string, boolean>>({});
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
   const [seccionChatsDashboard, setSeccionChatsDashboard] = useState(true);
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
@@ -183,6 +209,14 @@ export default function SystemPage() {
         setHasOpenaiKey(cfg.has_openai_key ?? false);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
         setSeccionChatsDashboard(cfg.seccion_chats_dashboard !== false);
+        if (cfg.chat_config) {
+          setChatConfig({
+            tiene_chatbot: cfg.chat_config.tiene_chatbot ?? false,
+            emoji_toma_atencion: cfg.chat_config.emoji_toma_atencion ?? '',
+            trigger_mode: cfg.chat_config.trigger_mode ?? 'unico',
+            trigger_confirmaciones: cfg.chat_config.trigger_confirmaciones ?? 2,
+          });
+        }
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
         setMetricasConfig(loadedConfig.length > 0 ? loadedConfig : DEFAULT_METRICAS_CONFIG);
         setMetricasManualData(
@@ -228,6 +262,7 @@ export default function SystemPage() {
         embudo_personalizado: embudoEtapas,
         fuente_datos_financieros: fuenteFinanciera,
         seccion_chats_dashboard: seccionChatsDashboard,
+        chat_config: chatConfig,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -788,8 +823,8 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
                 <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><GitBranch className="w-5 h-5 text-accent-purple" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Embudo IA personalizado <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">Define las etapas de tu embudo de ventas. La IA clasifica los leads según las condiciones que definas. Aplica a llamadas y videollamadas.</span></span></h3>
-                  <p className="text-sm text-gray-400">Define cada etapa de tu embudo y escribe la condición exacta que la IA debe evaluar para clasificar al lead en ese estado.</p>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Embudo unificado <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">Define las etapas de tu embudo de ventas. La IA clasifica llamadas y videollamadas. Los chats se clasifican por triggers de emoji (configura en Paso 8). Todas las fuentes contribuyen al mismo funnel.</span></span></h3>
+                  <p className="text-sm text-gray-400">Define cada etapa, la condición para la IA, las fuentes de datos y reglas automáticas por evento.</p>
                 </div>
               </div>
               {embudoEtapas.length === 0 && (
@@ -798,7 +833,11 @@ export default function SystemPage() {
                 </div>
               )}
               <ul className="space-y-3">
-                {embudoEtapas.map((etapa, i) => (
+                {embudoEtapas.map((etapa, i) => {
+                  const reglasAbiertas = reglasAbiertasMap[etapa.id] ?? false;
+                  const fuentes = etapa.fuentes ?? ['llamadas', 'videollamadas', 'chats'];
+                  const reglas = etapa.reglas_automaticas ?? [];
+                  return (
                   <li key={etapa.id} className="rounded-xl p-4 space-y-3 border-l-4 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500" style={{ borderLeftColor: etapa.color ?? '#8b5cf6' }}>
                     <div className="flex items-center gap-2">
                       <GripVertical className="w-4 h-4 text-gray-600 shrink-0" />
@@ -823,7 +862,7 @@ export default function SystemPage() {
                       </button>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-medium text-accent-cyan mb-1">Condición para la IA</label>
+                      <label className="block text-[11px] font-medium text-accent-cyan mb-1">Condición para la IA <span className="text-gray-500 font-normal">(aplica a llamadas y videollamadas)</span></label>
                       <textarea
                         value={etapa.condition ?? ''}
                         onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.value } : x))}
@@ -831,16 +870,129 @@ export default function SystemPage() {
                         className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-600 min-h-[60px] focus:ring-2 focus:ring-accent-cyan/40 resize-y"
                       />
                     </div>
+                    {/* Fuentes de datos */}
+                    <div className="rounded-lg bg-surface-600/50 border border-surface-500 p-3 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-medium text-gray-300">Fuentes de datos para esta etapa</span>
+                        <span className="relative group">
+                          <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
+                          <span className="absolute bottom-full left-0 mb-2 w-64 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                            Selecciona de qué canales provienen los leads que pueden llegar a esta etapa. Las llamadas y videollamadas las clasifica la IA. Los chats se clasifican por triggers de emoji (configura en Paso 8).
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {(['llamadas', 'videollamadas', 'chats'] as const).map((fuente) => {
+                          const isChecked = fuentes.includes(fuente);
+                          const label = fuente === 'llamadas' ? '📞 Llamadas' : fuente === 'videollamadas' ? '🎥 Videollamadas' : '💬 Chats';
+                          return (
+                            <label key={fuente} className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const newFuentes = e.target.checked
+                                    ? [...fuentes, fuente]
+                                    : fuentes.filter((f) => f !== fuente);
+                                  setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, fuentes: newFuentes } : x));
+                                }}
+                                className="w-3.5 h-3.5 rounded accent-purple-500"
+                              />
+                              <span className="text-xs text-gray-300">{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {/* Reglas automáticas */}
+                    <div className="rounded-lg border border-surface-500 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setReglasAbiertasMap((m) => ({ ...m, [etapa.id]: !reglasAbiertas }))}
+                        className="w-full flex items-center justify-between px-3 py-2 bg-surface-600/50 hover:bg-surface-600 transition-colors text-xs font-medium text-gray-400 hover:text-white"
+                      >
+                        <span className="flex items-center gap-1.5">⚙️ Reglas automáticas (sin IA){reglas.length > 0 && <span className="bg-accent-purple/30 text-accent-purple rounded-full px-1.5 py-0.5 text-[10px]">{reglas.length}</span>}</span>
+                        <span>{reglasAbiertas ? '▲' : '▼'}</span>
+                      </button>
+                      {reglasAbiertas && (
+                        <div className="p-3 space-y-2 bg-surface-700/50">
+                          <p className="text-[10px] text-gray-500">Mueve leads a esta etapa automáticamente cuando ocurre un evento, sin necesitar clasificación de IA.</p>
+                          {reglas.length === 0 && (
+                            <p className="text-[11px] text-gray-600 italic">Sin reglas automáticas configuradas.</p>
+                          )}
+                          {reglas.map((regla, ri) => (
+                            <div key={ri} className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] text-gray-400">Si el lead tiene estado:</span>
+                              <select
+                                value={regla.evento}
+                                onChange={(e) => {
+                                  const newReglas = reglas.map((r, j) => j === ri ? { ...r, evento: e.target.value as ReglaAutomatica['evento'] } : r);
+                                  setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, reglas_automaticas: newReglas } : x));
+                                }}
+                                className="rounded bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
+                                title={regla.evento === 'no_show' ? 'Cuando el lead tenía cita agendada pero no se presentó.' : regla.evento === 'cancelada' ? 'Cuando el lead cancela una cita.' : 'Si el lead no tiene ninguna interacción nueva después de X días.'}
+                              >
+                                <option value="no_show">no_show — no se presentó a la cita</option>
+                                <option value="cancelada">cancelada — canceló la cita</option>
+                                <option value="sin_actividad_dias">sin actividad por X días</option>
+                              </select>
+                              {regla.evento === 'sin_actividad_dias' && (
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={regla.valor ?? 7}
+                                  onChange={(e) => {
+                                    const newReglas = reglas.map((r, j) => j === ri ? { ...r, valor: Number(e.target.value) } : r);
+                                    setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, reglas_automaticas: newReglas } : x));
+                                  }}
+                                  className="w-16 rounded bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
+                                  placeholder="días"
+                                />
+                              )}
+                              <span className="text-[11px] text-accent-cyan">→ mover a esta etapa</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newReglas = reglas.filter((_, j) => j !== ri);
+                                  setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, reglas_automaticas: newReglas } : x));
+                                }}
+                                className="p-1 rounded hover:bg-red-500/20 text-gray-500 hover:text-red-400"
+                                title="Eliminar regla"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newReglas = [...reglas, { evento: 'no_show' as const }];
+                              setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, reglas_automaticas: newReglas } : x));
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] text-accent-purple hover:text-accent-purple/80 mt-1"
+                          >
+                            <Plus className="w-3 h-3" /> Agregar regla
+                          </button>
+                          <div className="rounded bg-surface-800/60 border border-surface-600 px-2 py-1.5 text-[10px] text-gray-500 space-y-0.5 mt-1">
+                            <p>💡 <strong className="text-gray-400">no_show:</strong> Cuando el lead tenía cita agendada pero no se presentó, se mueve automáticamente a esta etapa.</p>
+                            <p>💡 <strong className="text-gray-400">cancelada:</strong> Cuando el lead cancela una cita, se mueve a esta etapa.</p>
+                            <p>💡 <strong className="text-gray-400">sin_actividad_dias:</strong> Si el lead no tiene ninguna interacción nueva después de X días, se mueve a esta etapa. Útil para identificar leads fríos.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
               <button type="button" onClick={addEmbudoEtapa}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30 transition-all">
                 <Plus className="w-4 h-4" /> Añadir etapa
               </button>
               <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 px-3 py-2 text-sm text-gray-400 space-y-1">
-                <p><strong className="text-accent-purple">Cómo funciona:</strong></p>
-                <p>La IA lee la transcripción de cada llamada/videollamada y la compara con las condiciones que escribas aquí. El estado que mejor coincida es el que se asigna al lead.</p>
+                <p><strong className="text-accent-purple">Cómo funciona el embudo unificado:</strong></p>
+                <p>📞 <strong className="text-gray-300">Llamadas y videollamadas:</strong> La IA lee la transcripción y la compara con las condiciones que escribas aquí. El estado que mejor coincida es el que se asigna al lead.</p>
+                <p>💬 <strong className="text-gray-300">Chats:</strong> Se clasifican por triggers de emoji que configuras en el Paso 8. Si el asesor envía el emoji asignado, el lead se mueve a esa etapa automáticamente.</p>
                 <p>Si el nombre de la etapa contiene &quot;cerrad&quot; (ej. &quot;Cerrada MRR&quot;), el sistema lo trata automáticamente como cierre para calcular revenue.</p>
               </div>
             </div>
@@ -855,10 +1007,133 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><MessageSquare className="w-5 h-5 text-accent-amber" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Triggers de chat por emoji <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Cuando un agente de chat envía un mensaje con este emoji, el sistema cambia automáticamente el estado del lead al valor configurado. También puede asignar etiquetas.</span></span></h3>
-                  <p className="text-sm text-gray-400">Configura emojis para automatizar cambios de estado y asignación de etiquetas en chats.</p>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Configuración de chats y Speed to Lead <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Configura cómo se mide el Speed to Lead en chats y automatiza cambios de estado con emojis. Los estados disponibles son las etapas de tu embudo (configura en Paso 7).</span></span></h3>
+                  <p className="text-sm text-gray-400">Speed to Lead, triggers de emoji y configuración de chatbot para el canal de chats.</p>
                 </div>
               </div>
+
+              {/* ── Sección: Speed to Lead ── */}
+              <div className="rounded-xl border border-accent-cyan/30 bg-accent-cyan/5 p-4 space-y-4">
+                <h4 className="text-sm font-semibold text-accent-cyan flex items-center gap-2">⚡ Configuración de Speed to Lead</h4>
+
+                {/* Toggle chatbot */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm text-white font-medium">¿Tu equipo usa un chatbot antes de que atienda el asesor?</span>
+                      <span className="relative group">
+                        <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
+                        <span className="absolute bottom-full left-0 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                          Si tienes un chatbot automático que responde primero, el Speed to Lead real es cuando el asesor humano toma la conversación. Si no tienes chatbot, se mide desde el primer mensaje del lead.
+                        </span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Actívalo si el primer que responde es un bot, no un asesor.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setChatConfig((c) => ({ ...c, tiene_chatbot: !c.tiene_chatbot }))}
+                    className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${chatConfig.tiene_chatbot ? 'bg-accent-cyan' : 'bg-surface-500'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${chatConfig.tiene_chatbot ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                {chatConfig.tiene_chatbot && (
+                  <div className="rounded-lg bg-surface-700/60 border border-surface-500 p-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-xs font-medium text-gray-300">Emoji que usa el asesor para tomar el chat</label>
+                        <span className="relative group">
+                          <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
+                          <span className="absolute bottom-full left-0 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                            Cuando el asesor humano quiera tomar una conversación del chatbot, debe enviar este emoji. El sistema calculará el Speed to Lead desde el primer mensaje del lead hasta este emoji. Ej: ⚡ o 👋
+                          </span>
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={chatConfig.emoji_toma_atencion}
+                        onChange={(e) => setChatConfig((c) => ({ ...c, emoji_toma_atencion: e.target.value }))}
+                        placeholder="ej: ⚡ o 👋"
+                        className="w-32 rounded-lg bg-surface-600 border border-surface-500 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                        maxLength={8}
+                      />
+                      {chatConfig.emoji_toma_atencion && (
+                        <p className="text-[11px] text-gray-500">Emoji activo: <span className="text-2xl">{chatConfig.emoji_toma_atencion}</span></p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modo de conteo de triggers */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-gray-300">Modo de conteo de emojis de estado</span>
+                    <span className="relative group">
+                      <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
+                      <span className="absolute bottom-full left-0 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        Útil cuando quieres que varios miembros del equipo confirmen el estado de un lead antes de moverlo. Ej: si pones 3, el lead cambia de etapa solo cuando 3 asesores envíen el mismo emoji.
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="trigger_mode"
+                        value="unico"
+                        checked={chatConfig.trigger_mode === 'unico'}
+                        onChange={() => setChatConfig((c) => ({ ...c, trigger_mode: 'unico' }))}
+                        className="mt-0.5 accent-purple-500"
+                      />
+                      <div>
+                        <span className="text-sm text-white">Único</span>
+                        <p className="text-[11px] text-gray-500">Con una sola vez que el asesor envíe el emoji, se cambia el estado del lead.</p>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="trigger_mode"
+                        value="multiple"
+                        checked={chatConfig.trigger_mode === 'multiple'}
+                        onChange={() => setChatConfig((c) => ({ ...c, trigger_mode: 'multiple' }))}
+                        className="mt-0.5 accent-purple-500"
+                      />
+                      <div>
+                        <span className="text-sm text-white">Múltiple</span>
+                        <p className="text-[11px] text-gray-500">El asesor debe enviar el emoji N veces para confirmar el estado (para equipos donde múltiples asesores votan).</p>
+                      </div>
+                    </label>
+                    {chatConfig.trigger_mode === 'multiple' && (
+                      <div className="ml-6 flex items-center gap-2">
+                        <label className="text-xs text-gray-400">Número de confirmaciones necesarias:</label>
+                        <input
+                          type="number"
+                          min={2}
+                          max={10}
+                          value={chatConfig.trigger_confirmaciones}
+                          onChange={(e) => setChatConfig((c) => ({ ...c, trigger_confirmaciones: Number(e.target.value) }))}
+                          className="w-16 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Sección: Triggers de emoji ── */}
+              <div className="flex items-center gap-2 pt-2 border-t border-surface-600">
+                <MessageSquare className="w-4 h-4 text-accent-amber" />
+                <h4 className="text-sm font-semibold text-white">Triggers de emoji</h4>
+              </div>
+              <div className="rounded-lg border border-accent-amber/20 bg-accent-amber/5 px-3 py-2.5 text-xs text-gray-400 space-y-1">
+                <p>Los triggers de emoji permiten cambiar el estado de un lead enviando un emoji en el chat.</p>
+                <p>💡 El asesor envía el emoji configurado y el sistema actualiza automáticamente el estado del lead en el panel.</p>
+                <p>Los estados disponibles son las etapas de tu embudo <strong className="text-accent-amber">(configura en Paso 7)</strong>.</p>
+              </div>
+
               {chatTriggers.length === 0 && (
                 <div className="rounded-lg border border-dashed border-surface-500 bg-surface-700/30 px-4 py-6 text-center text-gray-500 text-sm">
                   Sin triggers configurados. Los estados de chat se gestionan solo con IA.

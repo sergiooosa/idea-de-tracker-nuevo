@@ -22,27 +22,69 @@ const chatKpiTooltips = {
   speedToLead: { significado: 'Tiempo promedio desde primer mensaje del lead hasta primera respuesta del agente.', calculo: 'Promedio de (timestamp primer msg agente − timestamp primer msg lead).' },
 };
 
+type Canal = 'todos' | 'WhatsApp' | 'FB' | 'IG' | 'SMS' | 'Custom';
+
+const CANAL_EMOJI: Record<string, string> = {
+  WhatsApp: '📱',
+  FB: '👤',
+  IG: '📸',
+  SMS: '💬',
+  Custom: '⚙️',
+};
+
+const CANAL_LABELS: Canal[] = ['todos', 'WhatsApp', 'FB', 'IG', 'SMS', 'Custom'];
+
+function detectCanal(chat: ApiChatLead): string {
+  if (!chat.messages || chat.messages.length === 0) return 'Custom';
+  const firstMsg = chat.messages[0];
+  const t = (firstMsg?.type ?? '').toLowerCase();
+  if (t.includes('whatsapp') || t === 'wa') return 'WhatsApp';
+  if (t.includes('fb') || t.includes('facebook') || t.includes('messenger')) return 'FB';
+  if (t.includes('ig') || t.includes('instagram')) return 'IG';
+  if (t.includes('sms')) return 'SMS';
+  return 'Custom';
+}
+
 export default function PerformanceChatsPage() {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
   const [modalConversacion, setModalConversacion] = useState<ApiChatLead | null>(null);
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
+  const [canalActivo, setCanalActivo] = useState<Canal>('todos');
 
   const { data, loading } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
 
   const agg = data?.agg ?? { assigned: 0, activos: 0, seguimientosTotal: 0, speedAvg: 0 };
 
-  const chatsByAgent = useMemo(() => {
-    if (!data) return {} as Record<string, ApiChatLead[]>;
-    const map: Record<string, ApiChatLead[]> = {};
+  // Compute canal counts for badges
+  const canalCounts = useMemo(() => {
+    const counts: Record<string, number> = { todos: 0 };
+    if (!data) return counts;
+    counts['todos'] = data.chats.length;
     for (const c of data.chats) {
+      const canal = detectCanal(c);
+      counts[canal] = (counts[canal] ?? 0) + 1;
+    }
+    return counts;
+  }, [data]);
+
+  // Filter chats by canal
+  const filteredChats = useMemo(() => {
+    if (!data) return [];
+    if (canalActivo === 'todos') return data.chats;
+    return data.chats.filter((c) => detectCanal(c) === canalActivo);
+  }, [data, canalActivo]);
+
+  const chatsByAgent = useMemo(() => {
+    const map: Record<string, ApiChatLead[]> = {};
+    for (const c of filteredChats) {
       const key = c.agentName ?? 'Sin asignar';
       if (!map[key]) map[key] = [];
       map[key].push(c);
     }
     return map;
-  }, [data]);
+  }, [filteredChats]);
 
   const defaultTo = new Date();
   const defaultFrom = subDays(defaultTo, 14);
@@ -87,11 +129,49 @@ export default function PerformanceChatsPage() {
         ))}
       </div>
 
+      {/* ── Filtro por canal ── */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400 font-medium">Canal:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {CANAL_LABELS.map((canal) => {
+              const count = canalCounts[canal] ?? 0;
+              const isActive = canalActivo === canal;
+              return (
+                <button
+                  key={canal}
+                  type="button"
+                  onClick={() => setCanalActivo(canal)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+                    isActive
+                      ? 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50'
+                      : 'bg-surface-700 text-gray-400 border-surface-500 hover:border-accent-cyan/30 hover:text-gray-300'
+                  }`}
+                >
+                  {canal !== 'todos' && <span>{CANAL_EMOJI[canal]}</span>}
+                  {canal === 'todos' ? 'Todos' : canal}
+                  {count > 0 && (
+                    <span className={`rounded-full px-1 text-[10px] ${isActive ? 'bg-accent-cyan/30' : 'bg-surface-600'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {canalActivo !== 'todos' && (
+          <p className="text-[11px] text-gray-500">
+            Mostrando {filteredChats.length} chat{filteredChats.length !== 1 ? 's' : ''} del canal {CANAL_EMOJI[canalActivo]} {canalActivo}
+          </p>
+        )}
+      </div>
+
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Chats por agente</h3>
         <div className="rounded-lg border border-surface-500 overflow-hidden">
           {Object.keys(chatsByAgent).length === 0 ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay chats en el rango.</div>
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay chats en el rango{canalActivo !== 'todos' ? ` para el canal ${canalActivo}` : ''}.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -110,7 +190,9 @@ export default function PerformanceChatsPage() {
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([agentKey, agentChats]) => {
                       const isExpanded = expandedAdvisorId === agentKey;
-                      const metrics = data?.advisorMetrics[agentKey];
+                      const agentActivos = agentChats.filter((c) => c.agentMessages > 0).length;
+                      const agentSpeeds = agentChats.filter((c) => c.speedToLeadSeconds != null).map((c) => c.speedToLeadSeconds!);
+                      const agentSpeedAvg = agentSpeeds.length > 0 ? agentSpeeds.reduce((s, v) => s + v, 0) / agentSpeeds.length : null;
                       return (
                         <Fragment key={agentKey}>
                           <tr className="border-t border-surface-500 hover:bg-surface-700/50 cursor-pointer" onClick={() => setExpandedAdvisorId(isExpanded ? null : agentKey)}>
@@ -123,10 +205,10 @@ export default function PerformanceChatsPage() {
                                 {agentKey}
                               </span>
                             </td>
-                            <td className="px-2 py-2 text-accent-cyan">{metrics?.asignados ?? 0}</td>
-                            <td className="px-2 py-2 text-accent-cyan">{metrics?.activos ?? 0}</td>
-                            <td className="px-2 py-2 text-accent-purple">{metrics?.seguimientos ?? 0}</td>
-                            <td className="px-2 py-2 text-gray-300">{minFmt(metrics?.speedToLead ?? null)}</td>
+                            <td className="px-2 py-2 text-accent-cyan">{agentChats.length}</td>
+                            <td className="px-2 py-2 text-accent-cyan">{agentActivos}</td>
+                            <td className="px-2 py-2 text-accent-purple">{agentChats.reduce((s, c) => s + c.totalMessages, 0)}</td>
+                            <td className="px-2 py-2 text-gray-300">{minFmt(agentSpeedAvg)}</td>
                           </tr>
                           {isExpanded && (
                             <tr className="bg-surface-800/90">
@@ -137,6 +219,7 @@ export default function PerformanceChatsPage() {
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-surface-700">
                                         <tr className="text-left text-gray-400">
+                                          <th className="px-2 py-2 font-medium w-8">Canal</th>
                                           <th className="px-2 py-2 font-medium">Lead</th>
                                           <th className="px-2 py-2 font-medium">Fecha</th>
                                           <th className="px-2 py-2 font-medium">Mensajes</th>
@@ -146,21 +229,27 @@ export default function PerformanceChatsPage() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {agentChats.map((chat) => (
-                                          <tr key={chat.id} className="border-t border-surface-500 hover:bg-surface-600/50">
-                                            <td className="px-2 py-2 text-white">{chat.leadName ?? '—'}</td>
-                                            <td className="px-2 py-2 text-gray-400">{chat.datetime ? format(new Date(chat.datetime), 'dd/MM/yy HH:mm') : '—'}</td>
-                                            <td className="px-2 py-2 text-accent-purple">{chat.totalMessages}</td>
-                                            <td className="px-2 py-2 text-gray-400">{minFmt(chat.speedToLeadSeconds)}</td>
-                                            <td className="px-2 py-2 text-gray-300">{chat.estado ?? '—'}</td>
-                                            <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                                              <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-2"><Pencil className="w-3 h-3" /> Editar</button>
-                                              <button type="button" onClick={() => setModalConversacion(chat)} className="text-accent-cyan text-[10px] font-medium hover:underline">
-                                                Ver conversación
-                                              </button>
-                                            </td>
-                                          </tr>
-                                        ))}
+                                        {agentChats.map((chat) => {
+                                          const canal = detectCanal(chat);
+                                          return (
+                                            <tr key={chat.id} className="border-t border-surface-500 hover:bg-surface-600/50">
+                                              <td className="px-2 py-2 text-center" title={canal}>
+                                                <span className="text-base">{CANAL_EMOJI[canal] ?? '⚙️'}</span>
+                                              </td>
+                                              <td className="px-2 py-2 text-white">{chat.leadName ?? '—'}</td>
+                                              <td className="px-2 py-2 text-gray-400">{chat.datetime ? format(new Date(chat.datetime), 'dd/MM/yy HH:mm', { locale: es }) : '—'}</td>
+                                              <td className="px-2 py-2 text-accent-purple">{chat.totalMessages}</td>
+                                              <td className="px-2 py-2 text-gray-400">{minFmt(chat.speedToLeadSeconds)}</td>
+                                              <td className="px-2 py-2 text-gray-300">{chat.estado ?? '—'}</td>
+                                              <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                                                <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-2"><Pencil className="w-3 h-3" /> Editar</button>
+                                                <button type="button" onClick={() => setModalConversacion(chat)} className="text-accent-cyan text-[10px] font-medium hover:underline">
+                                                  Ver conversación
+                                                </button>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>
@@ -192,7 +281,10 @@ export default function PerformanceChatsPage() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalConversacion(null)} aria-hidden />
           <div className="relative w-full max-w-2xl max-h-[85vh] rounded-xl bg-surface-800 border border-surface-500 shadow-xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-surface-500 shrink-0">
-              <h3 className="font-semibold text-white">Conversación · {modalConversacion.leadName ?? 'Lead'}</h3>
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <span>{CANAL_EMOJI[detectCanal(modalConversacion)] ?? '💬'}</span>
+                Conversación · {modalConversacion.leadName ?? 'Lead'}
+              </h3>
               <button type="button" onClick={() => setModalConversacion(null)} className="p-2 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <div className="overflow-y-auto p-4 space-y-2">

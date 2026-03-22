@@ -81,6 +81,7 @@ export async function getDashboard(
       metricas_personalizadas: cuentas.metricas_personalizadas,
       metricas_config: cuentas.metricas_config,
       metricas_manual_data: cuentas.metricas_manual_data,
+      chat_triggers: cuentas.chat_triggers,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -414,6 +415,33 @@ export async function getDashboard(
         lte(chatsLogs.fecha_y_hora_z, toDate),
       ),
     );
+
+  // ----------------------------------------------------------------
+  // Funnel unificado — agregar leads de chats al distribucionEmbudo
+  // ----------------------------------------------------------------
+  {
+    const chatTriggersCfg: Array<{ trigger: string; valor: string }> = Array.isArray(cuentaRow?.chat_triggers)
+      ? (cuentaRow.chat_triggers as Array<{ trigger: string; valor: string }>)
+      : [];
+    for (const chatRow of chatRows) {
+      const msgs: ChatMessage[] = Array.isArray(chatRow.chat) ? (chatRow.chat as ChatMessage[]) : [];
+      let estado: string | null = null;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i]?.role === "agent") {
+          for (const t of chatTriggersCfg) {
+            if ((msgs[i]?.message ?? "").includes(t.trigger)) {
+              estado = t.valor;
+              break;
+            }
+          }
+          if (estado) break;
+        }
+      }
+      if (estado) {
+        distribucionEmbudo[estado] = (distribucionEmbudo[estado] ?? 0) + 1;
+      }
+    }
+  }
 
   const chatKpis: ChatKpis = (() => {
     const totalChats = chatRows.length;

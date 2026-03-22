@@ -14,13 +14,37 @@ function extractAgentName(messages: ChatMessage[]): string | null {
   return agent?.name ?? null;
 }
 
-function computeSpeedToLead(messages: ChatMessage[]): number | null {
+function computeSpeedToLead(
+  messages: ChatMessage[],
+  emojiTomaAtencion?: string,
+  tieneChatbot?: boolean,
+): number | null {
   const firstLead = messages.find((m) => m.role === "lead");
-  const firstAgent = messages.find((m) => m.role === "agent");
-  if (!firstLead?.timestamp || !firstAgent?.timestamp) return null;
+  if (!firstLead?.timestamp) return null;
   const leadTime = new Date(firstLead.timestamp).getTime();
-  const agentTime = new Date(firstAgent.timestamp).getTime();
-  if (isNaN(leadTime) || isNaN(agentTime)) return null;
+  if (isNaN(leadTime)) return null;
+
+  let agentTime: number | null = null;
+
+  if (tieneChatbot && emojiTomaAtencion) {
+    // Con chatbot: buscar primer mensaje de agente que contenga el emoji de toma de atención
+    const takeoverMsg = messages.find(
+      (m) => m.role === "agent" && (m.message ?? "").includes(emojiTomaAtencion),
+    );
+    if (takeoverMsg?.timestamp) {
+      const ts = new Date(takeoverMsg.timestamp).getTime();
+      if (!isNaN(ts)) agentTime = ts;
+    }
+  } else {
+    // Sin chatbot: primer mensaje de agente
+    const firstAgent = messages.find((m) => m.role === "agent");
+    if (firstAgent?.timestamp) {
+      const ts = new Date(firstAgent.timestamp).getTime();
+      if (!isNaN(ts)) agentTime = ts;
+    }
+  }
+
+  if (!agentTime) return null;
   const diffSec = (agentTime - leadTime) / 1000;
   return diffSec > 0 ? diffSec : null;
 }
@@ -54,7 +78,7 @@ export async function getChats(
 
   const [[cuentaRow], rows] = await Promise.all([
     db
-      .select({ chat_triggers: cuentas.chat_triggers })
+      .select({ chat_triggers: cuentas.chat_triggers, configuracion_ui: cuentas.configuracion_ui })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
@@ -75,12 +99,16 @@ export async function getChats(
     ? cuentaRow.chat_triggers
     : [];
 
+  const chatConfig = cuentaRow?.configuracion_ui?.chat_config ?? {};
+  const tieneChatbot = chatConfig.tiene_chatbot ?? false;
+  const emojiTomaAtencion = chatConfig.emoji_toma_atencion ?? undefined;
+
   const chatsList: ApiChatLead[] = rows.map((r) => {
     const msgs: ChatMessage[] = Array.isArray(r.chat) ? r.chat : [];
     const agentMsgs = msgs.filter((m) => m.role === "agent");
     const leadMsgs = msgs.filter((m) => m.role === "lead");
     const agentName = extractAgentName(msgs);
-    const speed = computeSpeedToLead(msgs);
+    const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot);
 
     const { nuevoEstado, triggerUsado } = applyTriggers(msgs, triggers);
 

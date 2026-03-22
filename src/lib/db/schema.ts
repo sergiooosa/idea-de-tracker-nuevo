@@ -18,6 +18,13 @@ import {
 /*  cuentas — tabla maestra de tenants                                */
 /* ------------------------------------------------------------------ */
 
+export interface ChatConfig {
+  tiene_chatbot?: boolean;
+  emoji_toma_atencion?: string;
+  trigger_mode?: "unico" | "multiple";
+  trigger_confirmaciones?: number;
+}
+
 export interface ConfiguracionUI {
   logo_url?: string;
   color_primario?: string;
@@ -34,6 +41,7 @@ export interface ConfiguracionUI {
   columnas_visibles?: Record<string, string[]>;
   kpis_visibles?: Record<string, string[]>;
   fuente_datos_financieros?: "nativa" | "api_externa";
+  chat_config?: ChatConfig;
 }
 
 export interface ReglaEtiqueta {

@@ -4,6 +4,13 @@ import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, Tip
 import { eq } from "drizzle-orm";
 import { parseMetricasConfig } from "@/lib/metricas-engine";
 
+export interface ChatConfigData {
+  tiene_chatbot: boolean;
+  emoji_toma_atencion: string;
+  trigger_mode: "unico" | "multiple";
+  trigger_confirmaciones: number;
+}
+
 export interface SystemConfigData {
   prompt_ventas: string;
   prompt_videollamadas: string;
@@ -19,11 +26,13 @@ export interface SystemConfigData {
   fuente_datos_financieros: "nativa" | "api_externa";
   seccion_chats_dashboard: boolean;
   roles_config: RolConfig[];
+  chat_config: ChatConfigData;
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key">> {
   openai_api_key?: string;
   seccion_chats_dashboard?: boolean;
+  chat_config?: ChatConfigData;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -70,6 +79,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       roles_config: [],
       metricas_config: [],
       metricas_manual_data: {},
+      chat_config: { tiene_chatbot: false, emoji_toma_atencion: "", trigger_mode: "unico", trigger_confirmaciones: 2 },
     };
   }
 
@@ -89,6 +99,12 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
     metricas_config: parseMetricasConfig(r.metricas_config),
     metricas_manual_data: (r.metricas_manual_data && typeof r.metricas_manual_data === "object") ? r.metricas_manual_data as Record<string, MetricaManualEntry[]> : {},
+    chat_config: {
+      tiene_chatbot: r.configuracion_ui?.chat_config?.tiene_chatbot ?? false,
+      emoji_toma_atencion: r.configuracion_ui?.chat_config?.emoji_toma_atencion ?? "",
+      trigger_mode: r.configuracion_ui?.chat_config?.trigger_mode ?? "unico",
+      trigger_confirmaciones: r.configuracion_ui?.chat_config?.trigger_confirmaciones ?? 2,
+    },
   };
 }
 
@@ -111,7 +127,11 @@ export async function updateSystemConfig(
   if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
 
-  if (data.fuente_datos_financieros !== undefined || (data as Record<string, unknown>).seccion_chats_dashboard !== undefined) {
+  if (
+    data.fuente_datos_financieros !== undefined ||
+    (data as Record<string, unknown>).seccion_chats_dashboard !== undefined ||
+    data.chat_config !== undefined
+  ) {
     const [row] = await db
       .select({ configuracion_ui: cuentas.configuracion_ui })
       .from(cuentas)
@@ -126,6 +146,9 @@ export async function updateSystemConfig(
     const dataAny = data as Record<string, unknown>;
     if (dataAny.seccion_chats_dashboard !== undefined) {
       updatedUi.modulos_activos = { ...existingModulos, seccion_chats_dashboard: dataAny.seccion_chats_dashboard as boolean };
+    }
+    if (data.chat_config !== undefined) {
+      updatedUi.chat_config = data.chat_config;
     }
     setClause.configuracion_ui = updatedUi;
   }
