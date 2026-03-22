@@ -44,6 +44,7 @@ interface EmbudoEtapa {
   condition?: string;
   fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];
   reglas_automaticas?: ReglaAutomatica[];
+  es_fallback?: boolean;  // captura leads que no clasifican en ninguna otra etapa
 }
 interface ChatConfig {
   tiene_chatbot: boolean;
@@ -834,9 +835,10 @@ export default function SystemPage() {
               )}
               <ul className="space-y-3">
                 {embudoEtapas.map((etapa, i) => {
-                  const reglasAbiertas = reglasAbiertasMap[etapa.id] ?? false;
-                  const fuentes = etapa.fuentes ?? ['llamadas', 'videollamadas', 'chats'];
+                  // Abiertas por defecto si no hay reglas aún (para descubribilidad)
                   const reglas = etapa.reglas_automaticas ?? [];
+                  const reglasAbiertas = reglasAbiertasMap[etapa.id] ?? (reglas.length === 0);
+                  const fuentes = etapa.fuentes ?? ['llamadas', 'videollamadas', 'chats'];
                   return (
                   <li key={etapa.id} className="rounded-xl p-4 space-y-3 border-l-4 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500" style={{ borderLeftColor: etapa.color ?? '#8b5cf6' }}>
                     <div className="flex items-center gap-2">
@@ -920,14 +922,37 @@ export default function SystemPage() {
                         })}
                       </div>
                     </div>
-                    {/* Reglas automáticas */}
+                    {/* Etapa catch-all */}
+                    <label className="flex items-start gap-2.5 cursor-pointer rounded-lg bg-surface-600/30 border border-surface-500/50 p-3">
+                      <input
+                        type="checkbox"
+                        checked={etapa.es_fallback ?? false}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, es_fallback: e.target.checked } : x))}
+                        className="mt-0.5 accent-accent-amber"
+                      />
+                      <div>
+                        <span className="text-xs font-medium text-gray-300">🪣 Etapa de captura general (catch-all)</span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          Si está activado, los leads que no clasifiquen en ninguna otra etapa del embudo llegan aquí automáticamente.
+                          Útil como etapa de "En seguimiento" o "Sin clasificar" para no perder ningún lead.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Reglas automáticas — abiertas por defecto si no hay reglas aún */}
                     <div className="rounded-lg border border-surface-500 overflow-hidden">
                       <button
                         type="button"
                         onClick={() => setReglasAbiertasMap((m) => ({ ...m, [etapa.id]: !reglasAbiertas }))}
                         className="w-full flex items-center justify-between px-3 py-2 bg-surface-600/50 hover:bg-surface-600 transition-colors text-xs font-medium text-gray-400 hover:text-white"
                       >
-                        <span className="flex items-center gap-1.5">⚙️ Reglas automáticas (sin IA){reglas.length > 0 && <span className="bg-accent-purple/30 text-accent-purple rounded-full px-1.5 py-0.5 text-[10px]">{reglas.length}</span>}</span>
+                        <span className="flex items-center gap-1.5">
+                          ⚙️ Reglas automáticas (sin IA)
+                          {reglas.length > 0
+                            ? <span className="bg-accent-purple/30 text-accent-purple rounded-full px-1.5 py-0.5 text-[10px]">{reglas.length} activa{reglas.length > 1 ? 's' : ''}</span>
+                            : <span className="text-gray-600 text-[10px]">— opcional, sin necesidad de IA</span>
+                          }
+                        </span>
                         <span>{reglasAbiertas ? '▲' : '▼'}</span>
                       </button>
                       {reglasAbiertas && (
