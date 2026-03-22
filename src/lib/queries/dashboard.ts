@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull, inArray } from "drizzle-orm";
@@ -11,6 +11,7 @@ import type {
   DashboardResponse,
   ApiAdvisor,
   ChatKpis,
+  AlertaMeta,
 } from "@/types";
 
 const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada"];
@@ -483,6 +484,38 @@ export async function getDashboard(
     };
   })();
 
+  // ----------------------------------------------------------------
+  // Metas del tenant — calcular alertas de progreso
+  // ----------------------------------------------------------------
+  const metasRows = await db
+    .select()
+    .from(metasCuenta)
+    .where(eq(metasCuenta.id_cuenta, idCuenta))
+    .limit(1);
+  const metasRow = metasRows[0] ?? null;
+
+  const alertasMetas: AlertaMeta[] = [];
+  if (metasRow) {
+    // Calcular número de días y semanas del período
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const dias = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay));
+    const semanas = Math.max(1, dias / 7);
+
+    const addAlerta = (label: string, actual: number, meta: number | null | undefined) => {
+      const metaNum = meta != null ? parseFloat(String(meta)) : 0;
+      if (!metaNum) return;
+      const pct = Math.round((actual / metaNum) * 100);
+      alertasMetas.push({ label, actual: Math.round(actual * 10) / 10, meta: metaNum, cumple: pct >= 100, pct });
+    };
+
+    addAlerta("Llamadas", kpis.callsMade, metasRow.meta_llamadas_diarias ? metasRow.meta_llamadas_diarias * dias : null);
+    addAlerta("Citas agendadas", kpis.meetingsBooked, metasRow.meta_citas_semanales ? parseFloat(String(metasRow.meta_citas_semanales)) * semanas : null);
+    addAlerta("Cierres", kpis.meetingsClosed, metasRow.meta_cierres_semanales ? parseFloat(String(metasRow.meta_cierres_semanales)) * semanas : null);
+    addAlerta("Tasa de cierre (%)", kpis.tasaCierre, metasRow.meta_tasa_cierre ? parseFloat(String(metasRow.meta_tasa_cierre)) * 100 : null);
+    addAlerta("Tasa contestación (%)", kpis.answerRate * 100, metasRow.meta_tasa_contestacion ? parseFloat(String(metasRow.meta_tasa_contestacion)) * 100 : null);
+    addAlerta("Revenue", kpis.revenue, metasRow.meta_revenue_mensual ? parseFloat(String(metasRow.meta_revenue_mensual)) : null);
+  }
+
   return {
     kpis,
     advisorRanking,
@@ -503,5 +536,7 @@ export async function getDashboard(
     metricasPersonalizadas: Array.isArray(cuentaRow?.metricas_personalizadas) ? cuentaRow.metricas_personalizadas : [],
     metricasComputadas,
     chatKpis: chatKpis.total > 0 ? chatKpis : undefined,
+    alertasMetas: alertasMetas.length > 0 ? alertasMetas : undefined,
+    configuracion_ui: cuentaRow?.configuracion_ui as DashboardResponse["configuracion_ui"] ?? undefined,
   };
 }

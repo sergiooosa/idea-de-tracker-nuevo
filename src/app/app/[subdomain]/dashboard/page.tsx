@@ -200,7 +200,64 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {(data?.chatKpis?.total ?? 0) > 0 && (
+        {/* 🎯 Progreso de Metas */}
+        {(data?.alertasMetas?.length ?? 0) > 0 && (
+          <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                🎯 Progreso de Metas
+              </h2>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple/20 text-accent-purple border border-accent-purple/40 font-semibold">
+                {data!.alertasMetas!.filter((a) => a.cumple).length}/{data!.alertasMetas!.length} cumplidas
+              </span>
+            </div>
+            <div className="space-y-2">
+              {data!.alertasMetas!.map((alerta) => {
+                const colorClass = alerta.pct >= 100
+                  ? 'bg-accent-green'
+                  : alerta.pct >= 70
+                    ? 'bg-accent-amber'
+                    : 'bg-accent-red';
+                const textColor = alerta.pct >= 100
+                  ? 'text-accent-green'
+                  : alerta.pct >= 70
+                    ? 'text-accent-amber'
+                    : 'text-accent-red';
+                const barWidth = `${Math.min(100, alerta.pct)}%`;
+                const metaFmt = alerta.label === 'Revenue'
+                  ? fm(alerta.meta)
+                  : alerta.label.includes('%') || alerta.label.includes('tasa')
+                    ? `${alerta.meta.toFixed(1)}%`
+                    : alerta.meta.toLocaleString('es-CO');
+                const actualFmt = alerta.label === 'Revenue'
+                  ? fm(alerta.actual)
+                  : alerta.label.includes('%') || alerta.label.includes('tasa')
+                    ? `${alerta.actual.toFixed(1)}%`
+                    : Math.round(alerta.actual).toLocaleString('es-CO');
+                return (
+                  <div key={alerta.label} className="rounded-lg bg-surface-700/60 p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-300">{alerta.label}</span>
+                      <span className={`text-xs font-bold ${textColor}`}>{alerta.pct}%</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-surface-600 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${colorClass}`}
+                        style={{ width: barWidth }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                      <span>Actual: <span className="text-gray-300 font-medium">{actualFmt}</span></span>
+                      <span>Meta: <span className="text-gray-300 font-medium">{metaFmt}</span></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {(data?.chatKpis?.total ?? 0) > 0 && data?.configuracion_ui?.modulos_activos?.seccion_chats_dashboard !== false && (
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">

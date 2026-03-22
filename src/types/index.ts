@@ -425,6 +425,14 @@ export interface ChatKpis {
   topClosers: Array<{ name: string; count: number }>;
 }
 
+export interface AlertaMeta {
+  label: string;
+  actual: number;
+  meta: number;
+  cumple: boolean;
+  pct: number; // % de cumplimiento
+}
+
 export interface DashboardResponse {
   kpis: DashboardKpis;
   advisorRanking: DashboardAdvisorRow[];
@@ -439,6 +447,14 @@ export interface DashboardResponse {
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
   metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[];
   chatKpis?: ChatKpis;
+  alertasMetas?: AlertaMeta[];
+  configuracion_ui?: {
+    modulos_activos?: {
+      seccion_chats_dashboard?: boolean;
+      [key: string]: boolean | undefined;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface AsesorLeadCRM {

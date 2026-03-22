@@ -17,11 +17,13 @@ export interface SystemConfigData {
   tipos_eventos_config: TipoEventoConfig[];
   has_openai_key: boolean;
   fuente_datos_financieros: "nativa" | "api_externa";
+  seccion_chats_dashboard: boolean;
   roles_config: RolConfig[];
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key">> {
   openai_api_key?: string;
+  seccion_chats_dashboard?: boolean;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -64,6 +66,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       tipos_eventos_config: [],
       has_openai_key: false,
       fuente_datos_financieros: "nativa",
+      seccion_chats_dashboard: true,
       roles_config: [],
       metricas_config: [],
       metricas_manual_data: {},
@@ -82,6 +85,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
     has_openai_key: !!r.openai_api_key,
     fuente_datos_financieros: r.configuracion_ui?.fuente_datos_financieros ?? "nativa",
+    seccion_chats_dashboard: r.configuracion_ui?.modulos_activos?.seccion_chats_dashboard !== false,
     roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
     metricas_config: parseMetricasConfig(r.metricas_config),
     metricas_manual_data: (r.metricas_manual_data && typeof r.metricas_manual_data === "object") ? r.metricas_manual_data as Record<string, MetricaManualEntry[]> : {},
@@ -107,14 +111,23 @@ export async function updateSystemConfig(
   if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
 
-  if (data.fuente_datos_financieros !== undefined) {
+  if (data.fuente_datos_financieros !== undefined || (data as Record<string, unknown>).seccion_chats_dashboard !== undefined) {
     const [row] = await db
       .select({ configuracion_ui: cuentas.configuracion_ui })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1);
     const existing = row?.configuracion_ui ?? {};
-    setClause.configuracion_ui = { ...existing, fuente_datos_financieros: data.fuente_datos_financieros };
+    const existingModulos = existing.modulos_activos ?? {};
+    const updatedUi: typeof existing = { ...existing };
+    if (data.fuente_datos_financieros !== undefined) {
+      updatedUi.fuente_datos_financieros = data.fuente_datos_financieros;
+    }
+    const dataAny = data as Record<string, unknown>;
+    if (dataAny.seccion_chats_dashboard !== undefined) {
+      updatedUi.modulos_activos = { ...existingModulos, seccion_chats_dashboard: dataAny.seccion_chats_dashboard as boolean };
+    }
+    setClause.configuracion_ui = updatedUi;
   }
 
   if (Object.keys(setClause).length > 0) {

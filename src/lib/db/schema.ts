@@ -28,6 +28,7 @@ export interface ConfiguracionUI {
     citas_ghl?: boolean;
     llamadas_twilio?: boolean;
     videollamadas_fathom?: boolean;
+    seccion_chats_dashboard?: boolean;
   };
   nombres_secciones?: Record<string, string>;
   columnas_visibles?: Record<string, string[]>;

@@ -40,6 +40,7 @@ interface SystemConfig {
   metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
   chat_triggers: ChatTrigger[]; embudo_personalizado: EmbudoEtapa[];
   has_openai_key: boolean; fuente_datos_financieros: 'nativa' | 'api_externa';
+  seccion_chats_dashboard?: boolean;
 }
 interface MetasData {
   meta_llamadas_diarias: number; leads_nuevos_dia_1: number;
@@ -141,6 +142,7 @@ export default function SystemPage() {
   const [chatTriggers, setChatTriggers] = useState<ChatTrigger[]>([]);
   const [emojiSearch, setEmojiSearch] = useState('');
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
+  const [seccionChatsDashboard, setSeccionChatsDashboard] = useState(true);
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
@@ -167,6 +169,7 @@ export default function SystemPage() {
         setEmbudoEtapas(loadedEmbudo.length > 0 ? loadedEmbudo : DEFAULT_EMBUDO_CONFIG);
         setHasOpenaiKey(cfg.has_openai_key ?? false);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
+        setSeccionChatsDashboard(cfg.seccion_chats_dashboard !== false);
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
         setMetricasConfig(loadedConfig.length > 0 ? loadedConfig : DEFAULT_METRICAS_CONFIG);
         setMetricasManualData(
@@ -211,6 +214,7 @@ export default function SystemPage() {
         chat_triggers: chatTriggers,
         embudo_personalizado: embudoEtapas,
         fuente_datos_financieros: fuenteFinanciera,
+        seccion_chats_dashboard: seccionChatsDashboard,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -985,6 +989,36 @@ export default function SystemPage() {
               <div className="rounded-lg border border-accent-blue/30 bg-accent-blue/5 px-3 py-2 text-sm text-gray-400">
                 <strong className="text-accent-blue">Nota:</strong> Este cambio afecta cómo se muestran los KPIs de ingresos en el Dashboard.
                 Consulta la sección <em>Documentación</em> en el menú lateral para configurar el webhook.
+              </div>
+
+              {/* Toggle: Sección de Chats en Dashboard */}
+              <div className="rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-surface-600/50">
+                  <div className="rounded-lg p-1.5 bg-accent-cyan/20 border border-accent-cyan/40">
+                    <MessageSquare className="w-4 h-4 text-accent-cyan" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-white">Visibilidad de secciones</h4>
+                    <p className="text-xs text-gray-400">Activa o desactiva secciones del panel ejecutivo.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSeccionChatsDashboard((v) => !v)}
+                  className={`w-full flex items-center justify-between gap-3 rounded-xl p-3 border-2 text-left transition-all ${
+                    seccionChatsDashboard
+                      ? 'border-accent-cyan bg-accent-cyan/10 shadow-[0_0_16px_-6px_rgba(0,240,255,0.25)]'
+                      : 'border-surface-500 bg-surface-700/50 hover:border-surface-400'
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-white">💬 Mostrar sección de Chats en Dashboard</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Muestra un resumen de conversaciones de chat en el panel ejecutivo.</p>
+                  </div>
+                  <div className={`shrink-0 w-10 h-6 rounded-full transition-colors relative ${seccionChatsDashboard ? 'bg-accent-cyan' : 'bg-surface-600'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${seccionChatsDashboard ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </div>
+                </button>
               </div>
             </div>
           )}
