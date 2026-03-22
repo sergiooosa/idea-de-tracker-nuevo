@@ -458,6 +458,10 @@ export interface AlertaMeta {
   meta: number;
   cumple: boolean;
   pct: number; // % de cumplimiento
+  unidad?: string; // e.g. "llamadas", "%", "min", "$"
+  canal: "llamadas" | "videollamadas" | "chats" | "general";
+  invertido?: boolean; // true = menos es mejor (ej. speed to lead)
+  sinDatos?: boolean; // true = hay meta pero actual = 0
 }
 
 export interface DashboardResponse {

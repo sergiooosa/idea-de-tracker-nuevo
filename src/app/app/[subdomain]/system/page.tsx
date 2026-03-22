@@ -43,12 +43,25 @@ interface SystemConfig {
   seccion_chats_dashboard?: boolean;
 }
 interface MetasData {
+  // ── Campos originales ─────────────────────────────────────────
   meta_llamadas_diarias: number; leads_nuevos_dia_1: number;
   leads_nuevos_dia_2: number; leads_nuevos_dia_3: number;
   meta_citas_semanales: number | null; meta_cierres_semanales: number | null;
   meta_revenue_mensual: number | null; meta_cash_collected_mensual: number | null;
   meta_tasa_cierre: number | null; meta_tasa_contestacion: number | null;
   meta_speed_to_lead_min: number | null;
+  // ── Canal: Llamadas ───────────────────────────────────────────
+  meta_llamadas_semanales: number | null;
+  meta_contestacion_llamadas: number | null;
+  meta_speed_llamadas_min: number | null;
+  // ── Canal: Videollamadas ──────────────────────────────────────
+  meta_citas_semanales_video: number | null;
+  meta_cierre_video: number | null;
+  meta_revenue_video: number | null;
+  // ── Canal: Chats ──────────────────────────────────────────────
+  meta_chats_diarios: number | null;
+  meta_chats_contestacion: number | null;
+  meta_speed_chat_min: number | null;
 }
 
 const EMBUDO_COLORS = ['#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ef4444', '#eab308', '#ec4899', '#14b8a6'];
@@ -134,7 +147,7 @@ export default function SystemPage() {
   const [promptLlamadas, setPromptLlamadas] = useState('');
   const [tagRules, setTagRules] = useState<TagRule[]>([]);
   const [metricRules, setMetricRules] = useState<MetricRule[]>([]);
-  const [metas, setMetas] = useState<MetasData>({ meta_llamadas_diarias: 50, leads_nuevos_dia_1: 3, leads_nuevos_dia_2: 4, leads_nuevos_dia_3: 5, meta_citas_semanales: null, meta_cierres_semanales: null, meta_revenue_mensual: null, meta_cash_collected_mensual: null, meta_tasa_cierre: null, meta_tasa_contestacion: null, meta_speed_to_lead_min: null });
+  const [metas, setMetas] = useState<MetasData>({ meta_llamadas_diarias: 50, leads_nuevos_dia_1: 3, leads_nuevos_dia_2: 4, leads_nuevos_dia_3: 5, meta_citas_semanales: null, meta_cierres_semanales: null, meta_revenue_mensual: null, meta_cash_collected_mensual: null, meta_tasa_cierre: null, meta_tasa_contestacion: null, meta_speed_to_lead_min: null, meta_llamadas_semanales: null, meta_contestacion_llamadas: null, meta_speed_llamadas_min: null, meta_citas_semanales_video: null, meta_cierre_video: null, meta_revenue_video: null, meta_chats_diarios: null, meta_chats_contestacion: null, meta_speed_chat_min: null });
 
   const [openaiKey, setOpenaiKey] = useState('');
   const [hasOpenaiKey, setHasOpenaiKey] = useState(false);
@@ -180,7 +193,7 @@ export default function SystemPage() {
       }
       if (metasRes.ok) {
         const m = await metasRes.json();
-        setMetas({ meta_llamadas_diarias: m.meta_llamadas_diarias, leads_nuevos_dia_1: m.leads_nuevos_dia_1, leads_nuevos_dia_2: m.leads_nuevos_dia_2, leads_nuevos_dia_3: m.leads_nuevos_dia_3, meta_citas_semanales: m.meta_citas_semanales ?? null, meta_cierres_semanales: m.meta_cierres_semanales ?? null, meta_revenue_mensual: m.meta_revenue_mensual ?? null, meta_cash_collected_mensual: m.meta_cash_collected_mensual ?? null, meta_tasa_cierre: m.meta_tasa_cierre ?? null, meta_tasa_contestacion: m.meta_tasa_contestacion ?? null, meta_speed_to_lead_min: m.meta_speed_to_lead_min ?? null });
+        setMetas({ meta_llamadas_diarias: m.meta_llamadas_diarias, leads_nuevos_dia_1: m.leads_nuevos_dia_1, leads_nuevos_dia_2: m.leads_nuevos_dia_2, leads_nuevos_dia_3: m.leads_nuevos_dia_3, meta_citas_semanales: m.meta_citas_semanales ?? null, meta_cierres_semanales: m.meta_cierres_semanales ?? null, meta_revenue_mensual: m.meta_revenue_mensual ?? null, meta_cash_collected_mensual: m.meta_cash_collected_mensual ?? null, meta_tasa_cierre: m.meta_tasa_cierre ?? null, meta_tasa_contestacion: m.meta_tasa_contestacion ?? null, meta_speed_to_lead_min: m.meta_speed_to_lead_min ?? null, meta_llamadas_semanales: m.meta_llamadas_semanales ?? null, meta_contestacion_llamadas: m.meta_contestacion_llamadas ?? null, meta_speed_llamadas_min: m.meta_speed_llamadas_min ?? null, meta_citas_semanales_video: m.meta_citas_semanales_video ?? null, meta_cierre_video: m.meta_cierre_video ?? null, meta_revenue_video: m.meta_revenue_video ?? null, meta_chats_diarios: m.meta_chats_diarios ?? null, meta_chats_contestacion: m.meta_chats_contestacion ?? null, meta_speed_chat_min: m.meta_speed_chat_min ?? null });
       }
     } catch { /* silently use defaults */ }
     setLoadingConfig(false);
@@ -614,89 +627,159 @@ export default function SystemPage() {
           )}
 
           {currentStep === 6 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-accent-cyan/30">
                 <div className="rounded-lg p-2 bg-accent-cyan/20 border border-accent-cyan/40"><Target className="w-5 h-5 text-accent-cyan" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Establecer metas</h3>
-                  <p className="text-sm text-gray-400">Define metas por periodo para medir el rendimiento de tu equipo comercial.</p>
+                  <h3 className="text-lg font-semibold text-white">Establecer metas por canal</h3>
+                  <p className="text-sm text-gray-400">Configura metas independientes para cada canal. Solo activa los canales que uses.</p>
                 </div>
               </div>
-              <h4 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider">Metas diarias</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-accent-cyan mb-1">Meta de llamadas diarias</label>
-                  <input type="number" min={1} value={metas.meta_llamadas_diarias} onChange={(e) => setMetas((m) => ({ ...m, meta_llamadas_diarias: Math.max(1, +e.target.value || 1) }))}
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
+
+              {/* ── Distribución de leads (universal) ────────────── */}
+              <div className="rounded-xl border border-surface-500/60 bg-surface-700/40 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">📊</span>
+                  <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Distribución de leads nuevos</h4>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-purple mb-1">Leads nuevos — día 1</label>
-                  <input type="number" min={0} value={metas.leads_nuevos_dia_1} onChange={(e) => setMetas((m) => ({ ...m, leads_nuevos_dia_1: Math.max(0, +e.target.value || 0) }))}
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-purple mb-1">Leads nuevos — día 2</label>
-                  <input type="number" min={0} value={metas.leads_nuevos_dia_2} onChange={(e) => setMetas((m) => ({ ...m, leads_nuevos_dia_2: Math.max(0, +e.target.value || 0) }))}
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-purple mb-1">Leads nuevos — día 3</label>
-                  <input type="number" min={0} value={metas.leads_nuevos_dia_3} onChange={(e) => setMetas((m) => ({ ...m, leads_nuevos_dia_3: Math.max(0, +e.target.value || 0) }))}
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
-                </div>
-              </div>
-              <h4 className="text-xs font-semibold text-accent-green uppercase tracking-wider pt-2">Metas semanales</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-accent-green mb-1">Meta de citas semanales</label>
-                  <input type="number" min={0} value={metas.meta_citas_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_citas_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-green mb-1">Meta de cierres semanales</label>
-                  <input type="number" min={0} value={metas.meta_cierres_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cierres_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
+                <p className="text-[11px] text-gray-500">¿Cuántos leads nuevos se asignan a un asesor según el día en que ingresan? (Para alertas de bandeja.)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-accent-purple mb-1">Leads nuevos — día 1</label>
+                    <input type="number" min={0} value={metas.leads_nuevos_dia_1} onChange={(e) => setMetas((m) => ({ ...m, leads_nuevos_dia_1: Math.max(0, +e.target.value || 0) }))}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-purple mb-1">Leads nuevos — día 2</label>
+                    <input type="number" min={0} value={metas.leads_nuevos_dia_2} onChange={(e) => setMetas((m) => ({ ...m, leads_nuevos_dia_2: Math.max(0, +e.target.value || 0) }))}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-purple mb-1">Leads nuevos — día 3</label>
+                    <input type="number" min={0} value={metas.leads_nuevos_dia_3} onChange={(e) => setMetas((m) => ({ ...m, leads_nuevos_dia_3: Math.max(0, +e.target.value || 0) }))}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                  </div>
                 </div>
               </div>
-              <h4 className="text-xs font-semibold text-accent-amber uppercase tracking-wider pt-2">Metas mensuales</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-accent-amber mb-1">Meta revenue mensual</label>
-                  <input type="number" min={0} value={metas.meta_revenue_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_revenue_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
+
+              {/* ── Canal: Llamadas ───────────────────────────────── */}
+              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">📞</span>
+                  <h4 className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Canal Llamadas</h4>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-amber mb-1">Meta cash collected mensual</label>
-                  <input type="number" min={0} value={metas.meta_cash_collected_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cash_collected_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
+                <p className="text-[11px] text-gray-500">Metas para el equipo de calling (SDRs / closers telefónicos). Deja vacío lo que no aplique.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-blue-300 mb-1">Llamadas diarias por asesor</label>
+                    <input type="number" min={1} value={metas.meta_llamadas_diarias} onChange={(e) => setMetas((m) => ({ ...m, meta_llamadas_diarias: Math.max(1, +e.target.value || 1) }))}
+                      className="w-full rounded-lg bg-surface-600 border border-blue-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-blue-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Total de llamadas que debe hacer cada asesor por día.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-blue-300 mb-1">Llamadas semanales totales (equipo)</label>
+                    <input type="number" min={0} value={metas.meta_llamadas_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_llamadas_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Sin meta"
+                      className="w-full rounded-lg bg-surface-600 border border-blue-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-blue-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Si se define, reemplaza el cálculo diario×días en alertas.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-blue-300 mb-1">Meta % contestación de llamadas</label>
+                    <input type="number" min={0} max={100} step={1} value={metas.meta_contestacion_llamadas ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_contestacion_llamadas: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Ej. 60"
+                      className="w-full rounded-lg bg-surface-600 border border-blue-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-blue-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">% de llamadas que deben ser contestadas. Ej: 60%.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-blue-300 mb-1">Speed to lead máximo (min) 🔻</label>
+                    <input type="number" min={0} step={0.5} value={metas.meta_speed_llamadas_min ?? metas.meta_speed_to_lead_min ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_speed_llamadas_min: e.target.value ? Math.max(0, +e.target.value) : null, meta_speed_to_lead_min: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Ej. 5"
+                      className="w-full rounded-lg bg-surface-600 border border-blue-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-blue-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Tiempo máximo en minutos para contactar un lead. Verde = menor al límite.</p>
+                  </div>
                 </div>
               </div>
-              <h4 className="text-xs font-semibold text-accent-purple uppercase tracking-wider pt-2">Metas de rendimiento</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-accent-purple mb-1">Meta tasa de cierre (%)</label>
-                  <input type="number" min={0} max={100} step={0.1} value={metas.meta_tasa_cierre != null ? (metas.meta_tasa_cierre * 100).toFixed(1) : ''} onChange={(e) => setMetas((m) => ({ ...m, meta_tasa_cierre: e.target.value ? Math.max(0, +e.target.value) / 100 : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+
+              {/* ── Canal: Videollamadas ─────────────────────────── */}
+              <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">🎥</span>
+                  <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Canal Videollamadas</h4>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-purple mb-1">Meta tasa de contestación (%)</label>
-                  <input type="number" min={0} max={100} step={0.1} value={metas.meta_tasa_contestacion != null ? (metas.meta_tasa_contestacion * 100).toFixed(1) : ''} onChange={(e) => setMetas((m) => ({ ...m, meta_tasa_contestacion: e.target.value ? Math.max(0, +e.target.value) / 100 : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                <p className="text-[11px] text-gray-500">Metas para el canal de videollamadas / agendas (closers). Solo configura si usas este canal.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-purple-300 mb-1">Citas semanales agendadas</label>
+                    <input type="number" min={0} value={metas.meta_citas_semanales_video ?? metas.meta_citas_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_citas_semanales_video: e.target.value ? Math.max(0, +e.target.value) : null, meta_citas_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Sin meta"
+                      className="w-full rounded-lg bg-surface-600 border border-purple-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-purple-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Citas agendadas por semana que debe alcanzar el equipo.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-purple-300 mb-1">Cierres semanales</label>
+                    <input type="number" min={0} value={metas.meta_cierres_semanales ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cierres_semanales: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Sin meta"
+                      className="w-full rounded-lg bg-surface-600 border border-purple-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-purple-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Número de ventas cerradas por semana.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-purple-300 mb-1">Meta % cierre (de citas asistidas)</label>
+                    <input type="number" min={0} max={100} step={1} value={metas.meta_cierre_video ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cierre_video: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Ej. 30"
+                      className="w-full rounded-lg bg-surface-600 border border-purple-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-purple-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">% de citas que deben convertirse en venta. Ej: 30%.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-purple-300 mb-1">Revenue mensual ($)</label>
+                    <input type="number" min={0} value={metas.meta_revenue_video ?? metas.meta_revenue_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_revenue_video: e.target.value ? Math.max(0, +e.target.value) : null, meta_revenue_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Sin meta"
+                      className="w-full rounded-lg bg-surface-600 border border-purple-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-purple-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Revenue total mensual a alcanzar por videollamadas.</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-accent-purple mb-1">Meta speed to lead (min)</label>
-                  <input type="number" min={0} step={0.5} value={metas.meta_speed_to_lead_min ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_speed_to_lead_min: e.target.value ? Math.max(0, +e.target.value) : null }))}
-                    placeholder="Sin meta"
-                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Meta cash collected mensual ($)</label>
+                    <input type="number" min={0} value={metas.meta_cash_collected_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_cash_collected_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Sin meta"
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                  </div>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500">Deja vacío un campo si no quieres establecer esa meta. Meta semanal de llamadas = meta diaria × 7.</p>
+
+              {/* ── Canal: Chats ─────────────────────────────────── */}
+              <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">💬</span>
+                  <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wider">Canal Chats</h4>
+                </div>
+                <p className="text-[11px] text-gray-500">Metas para el canal de mensajería / chats. Solo configura si tu equipo gestiona chats activamente.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-green-300 mb-1">Chats diarios atendidos</label>
+                    <input type="number" min={0} value={metas.meta_chats_diarios ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_chats_diarios: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Sin meta"
+                      className="w-full rounded-lg bg-surface-600 border border-green-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-green-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Total de chats que el equipo debe atender por día.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-green-300 mb-1">Meta % chats con respuesta</label>
+                    <input type="number" min={0} max={100} step={1} value={metas.meta_chats_contestacion ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_chats_contestacion: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Ej. 90"
+                      className="w-full rounded-lg bg-surface-600 border border-green-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-green-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">% de chats entrantes que deben recibir respuesta del equipo.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-green-300 mb-1">Speed to lead en chat (min) 🔻</label>
+                    <input type="number" min={0} step={0.5} value={metas.meta_speed_chat_min ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_speed_chat_min: e.target.value ? Math.max(0, +e.target.value) : null }))}
+                      placeholder="Ej. 2"
+                      className="w-full rounded-lg bg-surface-600 border border-green-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-green-500/40" />
+                    <p className="text-[10px] text-gray-600 mt-0.5">Tiempo máximo en minutos para responder un chat. Verde = bajo el límite.</p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-gray-500">🔻 = métrica invertida: menor valor es mejor. Deja vacío cualquier campo que no aplique a tu operación.</p>
             </div>
           )}
 

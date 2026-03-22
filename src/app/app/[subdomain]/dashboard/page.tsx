@@ -200,62 +200,104 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 🎯 Progreso de Metas */}
-        {(data?.alertasMetas?.length ?? 0) > 0 && (
-          <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                🎯 Progreso de Metas
-              </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple/20 text-accent-purple border border-accent-purple/40 font-semibold">
-                {data!.alertasMetas!.filter((a) => a.cumple).length}/{data!.alertasMetas!.length} cumplidas
-              </span>
-            </div>
-            <div className="space-y-2">
-              {data!.alertasMetas!.map((alerta) => {
-                const colorClass = alerta.pct >= 100
-                  ? 'bg-accent-green'
-                  : alerta.pct >= 70
-                    ? 'bg-accent-amber'
-                    : 'bg-accent-red';
-                const textColor = alerta.pct >= 100
-                  ? 'text-accent-green'
-                  : alerta.pct >= 70
-                    ? 'text-accent-amber'
-                    : 'text-accent-red';
-                const barWidth = `${Math.min(100, alerta.pct)}%`;
-                const metaFmt = alerta.label === 'Revenue'
-                  ? fm(alerta.meta)
-                  : alerta.label.includes('%') || alerta.label.includes('tasa')
-                    ? `${alerta.meta.toFixed(1)}%`
-                    : alerta.meta.toLocaleString('es-CO');
-                const actualFmt = alerta.label === 'Revenue'
-                  ? fm(alerta.actual)
-                  : alerta.label.includes('%') || alerta.label.includes('tasa')
-                    ? `${alerta.actual.toFixed(1)}%`
-                    : Math.round(alerta.actual).toLocaleString('es-CO');
+        {/* 🎯 Progreso de Metas por Canal */}
+        {(data?.alertasMetas?.length ?? 0) > 0 && (() => {
+          const alertas = data!.alertasMetas!;
+          const cumplidas = alertas.filter((a) => a.cumple).length;
+          const canales: Array<{ key: "llamadas" | "videollamadas" | "chats" | "general"; label: string; emoji: string; borderColor: string; textColor: string }> = [
+            { key: "llamadas",      label: "Llamadas",      emoji: "📞", borderColor: "border-blue-500/30",   textColor: "text-blue-400" },
+            { key: "videollamadas", label: "Videollamadas", emoji: "🎥", borderColor: "border-purple-500/30", textColor: "text-purple-400" },
+            { key: "chats",         label: "Chats",         emoji: "💬", borderColor: "border-green-500/30",  textColor: "text-green-400" },
+            { key: "general",       label: "General",       emoji: "📊", borderColor: "border-surface-500",   textColor: "text-gray-400" },
+          ];
+          return (
+            <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                  🎯 Progreso de Metas
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple/20 text-accent-purple border border-accent-purple/40 font-semibold">
+                  {cumplidas}/{alertas.length} cumplidas
+                </span>
+              </div>
+              {canales.map(({ key, label, emoji, borderColor, textColor }) => {
+                const grupo = alertas.filter((a) => a.canal === key);
+                if (grupo.length === 0) return null;
                 return (
-                  <div key={alerta.label} className="rounded-lg bg-surface-700/60 p-2.5 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-gray-300">{alerta.label}</span>
-                      <span className={`text-xs font-bold ${textColor}`}>{alerta.pct}%</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-surface-600 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${colorClass}`}
-                        style={{ width: barWidth }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
-                      <span>Actual: <span className="text-gray-300 font-medium">{actualFmt}</span></span>
-                      <span>Meta: <span className="text-gray-300 font-medium">{metaFmt}</span></span>
-                    </div>
+                  <div key={key} className={`rounded-lg border ${borderColor} bg-surface-700/30 p-2.5 space-y-2`}>
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider ${textColor}`}>{emoji} {label}</p>
+                    {grupo.map((alerta) => {
+                      const isRevenue = alerta.unidad === "$";
+                      const isPct = alerta.unidad === "%";
+                      const isMin = alerta.unidad === "min";
+
+                      const fmtVal = (v: number) => {
+                        if (isRevenue) return fm(v);
+                        if (isPct) return `${v.toFixed(1)}%`;
+                        if (isMin) return `${v.toFixed(1)} min`;
+                        return Math.round(v).toLocaleString("es-CO");
+                      };
+
+                      const metaLabel = isMin
+                        ? `≤ ${fmtVal(alerta.meta)}`
+                        : fmtVal(alerta.meta);
+
+                      const unitLabel = alerta.unidad && !isPct && !isRevenue && !isMin
+                        ? ` ${alerta.unidad}`
+                        : "";
+
+                      // Para invertidas: barra verde cuando actual < meta
+                      const effectivePct = alerta.invertido
+                        ? alerta.actual <= 0
+                          ? 0
+                          : Math.min(100, Math.round((alerta.meta / alerta.actual) * 100))
+                        : Math.min(100, alerta.pct);
+
+                      const colorClass = alerta.cumple
+                        ? "bg-accent-green"
+                        : effectivePct >= 70
+                          ? "bg-accent-amber"
+                          : "bg-accent-red";
+                      const textColorPct = alerta.cumple
+                        ? "text-accent-green"
+                        : effectivePct >= 70
+                          ? "text-accent-amber"
+                          : "text-accent-red";
+
+                      return (
+                        <div key={alerta.label} className="rounded-md bg-surface-700/60 p-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-gray-300">{alerta.label}</span>
+                            {alerta.sinDatos
+                              ? <span className="text-[10px] text-gray-500 italic">Sin datos aún</span>
+                              : <span className={`text-xs font-bold ${textColorPct}`}>{alerta.cumple ? "✓ " : ""}{effectivePct}%</span>
+                            }
+                          </div>
+                          {!alerta.sinDatos && (
+                            <div className="w-full h-1.5 rounded-full bg-surface-600 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${colorClass}`}
+                                style={{ width: `${effectivePct}%` }}
+                              />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500">
+                            <span>
+                              {alerta.sinDatos ? "—" : <><span className="text-gray-300 font-medium">{fmtVal(alerta.actual)}</span>{unitLabel}</>}
+                              {" de "}
+                              <span className="text-gray-300 font-medium">{metaLabel}</span>{unitLabel && !isMin ? unitLabel : ""}
+                            </span>
+                            {alerta.invertido && <span className="text-[9px] text-gray-600">🔻 menor = mejor</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
-            </div>
-          </section>
-        )}
+            </section>
+          );
+        })()}
 
         {(data?.chatKpis?.total ?? 0) > 0 && data?.configuracion_ui?.modulos_activos?.seccion_chats_dashboard !== false && (
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">

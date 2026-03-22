@@ -501,19 +501,143 @@ export async function getDashboard(
     const dias = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / msPerDay));
     const semanas = Math.max(1, dias / 7);
 
-    const addAlerta = (label: string, actual: number, meta: number | null | undefined) => {
+    type Canal = "llamadas" | "videollamadas" | "chats" | "general";
+
+    const addAlerta = (
+      label: string,
+      actual: number,
+      meta: number | null | undefined,
+      canal: Canal,
+      unidad?: string,
+      invertido?: boolean,
+    ) => {
       const metaNum = meta != null ? parseFloat(String(meta)) : 0;
       if (!metaNum) return;
-      const pct = Math.round((actual / metaNum) * 100);
-      alertasMetas.push({ label, actual: Math.round(actual * 10) / 10, meta: metaNum, cumple: pct >= 100, pct });
+      // Para métricas invertidas (menos = mejor), el pct se calcula al revés:
+      // si actual <= meta → 100% (cumple). Si actual > meta → % proporcional degradado.
+      let pct: number;
+      if (invertido) {
+        pct = actual <= 0 ? 0 : Math.round((metaNum / actual) * 100);
+      } else {
+        pct = Math.round((actual / metaNum) * 100);
+      }
+      const cumple = invertido ? actual <= metaNum : pct >= 100;
+      const sinDatos = actual === 0 && !invertido;
+      alertasMetas.push({
+        label,
+        actual: Math.round(actual * 10) / 10,
+        meta: metaNum,
+        cumple,
+        pct: Math.min(200, pct), // cap para no distorsionar UI
+        unidad,
+        canal,
+        invertido,
+        sinDatos,
+      });
     };
 
-    addAlerta("Llamadas", kpis.callsMade, metasRow.meta_llamadas_diarias ? metasRow.meta_llamadas_diarias * dias : null);
-    addAlerta("Citas agendadas", kpis.meetingsBooked, metasRow.meta_citas_semanales ? parseFloat(String(metasRow.meta_citas_semanales)) * semanas : null);
-    addAlerta("Cierres", kpis.meetingsClosed, metasRow.meta_cierres_semanales ? parseFloat(String(metasRow.meta_cierres_semanales)) * semanas : null);
-    addAlerta("Tasa de cierre (%)", kpis.tasaCierre, metasRow.meta_tasa_cierre ? parseFloat(String(metasRow.meta_tasa_cierre)) * 100 : null);
-    addAlerta("Tasa contestación (%)", kpis.answerRate * 100, metasRow.meta_tasa_contestacion ? parseFloat(String(metasRow.meta_tasa_contestacion)) * 100 : null);
-    addAlerta("Revenue", kpis.revenue, metasRow.meta_revenue_mensual ? parseFloat(String(metasRow.meta_revenue_mensual)) : null);
+    // ── LLAMADAS ────────────────────────────────────────────────────
+    // Usar meta_llamadas_semanales si existe, sino meta_llamadas_diarias × días (backward compat)
+    const metaLlamadasTotal = metasRow.meta_llamadas_semanales
+      ? parseFloat(String(metasRow.meta_llamadas_semanales)) * semanas
+      : metasRow.meta_llamadas_diarias
+        ? metasRow.meta_llamadas_diarias * dias
+        : null;
+    addAlerta("📞 Llamadas realizadas", kpis.callsMade, metaLlamadasTotal, "llamadas", "llamadas en el período");
+    addAlerta(
+      "📞 % Contestación",
+      kpis.answerRate * 100,
+      metasRow.meta_contestacion_llamadas ? parseFloat(String(metasRow.meta_contestacion_llamadas)) : null,
+      "llamadas",
+      "%",
+    );
+    // Speed to lead de llamadas — invertido (menos min = mejor)
+    const metaSpeedLlamadas = metasRow.meta_speed_llamadas_min
+      ? parseFloat(String(metasRow.meta_speed_llamadas_min))
+      : metasRow.meta_speed_to_lead_min
+        ? parseFloat(String(metasRow.meta_speed_to_lead_min))
+        : null;
+    addAlerta("📞 Speed to lead", kpis.speedToLeadAvg, metaSpeedLlamadas, "llamadas", "min", true);
+
+    // Backward-compat: tasa contestación vieja
+    if (!metasRow.meta_contestacion_llamadas && metasRow.meta_tasa_contestacion) {
+      addAlerta(
+        "📞 Tasa contestación (legacy)",
+        kpis.answerRate * 100,
+        parseFloat(String(metasRow.meta_tasa_contestacion)) * 100,
+        "llamadas",
+        "%",
+      );
+    }
+
+    // ── VIDEOLLAMADAS ───────────────────────────────────────────────
+    // Solo si hay agendas o metas de video configuradas
+    const hasVideoMetas = metasRow.meta_citas_semanales_video || metasRow.meta_citas_semanales || metasRow.meta_cierres_semanales || metasRow.meta_revenue_mensual || metasRow.meta_revenue_video;
+    if (hasVideoMetas) {
+      const metaCitasVideo = metasRow.meta_citas_semanales_video
+        ? parseFloat(String(metasRow.meta_citas_semanales_video)) * semanas
+        : metasRow.meta_citas_semanales
+          ? parseFloat(String(metasRow.meta_citas_semanales)) * semanas
+          : null;
+      addAlerta("🎥 Citas agendadas", kpis.meetingsBooked, metaCitasVideo, "videollamadas", "citas");
+      const metaCierresVideo = metasRow.meta_cierres_semanales
+        ? parseFloat(String(metasRow.meta_cierres_semanales)) * semanas
+        : null;
+      addAlerta("🎥 Cierres", kpis.meetingsClosed, metaCierresVideo, "videollamadas", "cierres");
+      addAlerta(
+        "🎥 % Cierre",
+        kpis.tasaCierre,
+        metasRow.meta_cierre_video ? parseFloat(String(metasRow.meta_cierre_video)) : null,
+        "videollamadas",
+        "%",
+      );
+      // Backward-compat: meta_tasa_cierre vieja → videollamadas
+      if (!metasRow.meta_cierre_video && metasRow.meta_tasa_cierre) {
+        addAlerta(
+          "🎥 Tasa de cierre (legacy)",
+          kpis.tasaCierre,
+          parseFloat(String(metasRow.meta_tasa_cierre)) * 100,
+          "videollamadas",
+          "%",
+        );
+      }
+      const metaRevenue = metasRow.meta_revenue_video
+        ? parseFloat(String(metasRow.meta_revenue_video))
+        : metasRow.meta_revenue_mensual
+          ? parseFloat(String(metasRow.meta_revenue_mensual))
+          : null;
+      addAlerta("🎥 Revenue", kpis.revenue, metaRevenue, "videollamadas", "$");
+    }
+
+    // ── CHATS ───────────────────────────────────────────────────────
+    const hasChatMetas = metasRow.meta_chats_diarios || metasRow.meta_chats_contestacion || metasRow.meta_speed_chat_min;
+    if (hasChatMetas) {
+      const chatTotal = chatKpis?.total ?? 0;
+      addAlerta(
+        "💬 Chats atendidos",
+        chatTotal,
+        metasRow.meta_chats_diarios ? metasRow.meta_chats_diarios * dias : null,
+        "chats",
+        "chats",
+      );
+      addAlerta(
+        "💬 % Con respuesta",
+        chatKpis?.tasaRespuesta ?? 0,
+        metasRow.meta_chats_contestacion ? parseFloat(String(metasRow.meta_chats_contestacion)) : null,
+        "chats",
+        "%",
+      );
+      // Speed chat — invertido
+      const chatSpeedMin = chatKpis?.speedToLeadAvg != null ? chatKpis.speedToLeadAvg / 60 : 0;
+      addAlerta(
+        "💬 Speed to lead chat",
+        chatSpeedMin,
+        metasRow.meta_speed_chat_min ? parseFloat(String(metasRow.meta_speed_chat_min)) : null,
+        "chats",
+        "min",
+        true,
+      );
+    }
   }
 
   return {
