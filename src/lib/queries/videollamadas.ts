@@ -15,14 +15,18 @@ const DEFAULT_ATTENDED_CATS = new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
 function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   if (!cat) return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
   const c = cat.trim();
+  const cl = c.toLowerCase();
 
+  // Embudo personalizado primero — buscar por nombre, name legacy o id (con fallback case-insensitive)
   if (embudo && embudo.length > 0) {
-    // Buscar por nombre O por id — soporta embudo con campo "name" (legacy) o "nombre"
     const match = embudo.find(
       (e) =>
         (e.nombre != null && e.nombre === c) ||
         ((e as any).name != null && (e as any).name === c) ||
-        (e.id != null && e.id === c),
+        (e.id != null && e.id === c) ||
+        // case-insensitive fallback
+        (e.nombre != null && e.nombre.toLowerCase() === cl) ||
+        (e.id != null && e.id.toLowerCase() === cl),
     );
     if (match) {
       const label = match.nombre ?? (match as any).name ?? c;
@@ -37,22 +41,14 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
     }
   }
 
-  switch (c) {
-    case "Cerrada":
-      return { attended: true, qualified: true, canceled: false, outcome: "cerrado" };
-    case "Ofertada":
-      return { attended: true, qualified: true, canceled: false, outcome: "seguimiento" };
-    case "No_Ofertada":
-      return { attended: true, qualified: false, canceled: false, outcome: "seguimiento" };
-    case "no_show":
-      return { attended: false, qualified: false, canceled: false, outcome: "no_show" };
-    case "CANCELADA":
-      return { attended: false, qualified: false, canceled: true, outcome: "cancelada" };
-    case "PDTE":
-      return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
-    default:
-      return { attended: false, qualified: false, canceled: false, outcome: c };
-  }
+  // Comparaciones case-insensitive
+  if (cl === "cerrada" || cl === "closed") return { attended: true, qualified: true, canceled: false, outcome: "cerrado" };
+  if (cl === "ofertada" || cl === "offered") return { attended: true, qualified: true, canceled: false, outcome: "seguimiento" };
+  if (cl === "no_ofertada" || cl === "no ofertada") return { attended: true, qualified: false, canceled: false, outcome: "seguimiento" };
+  if (cl === "no_show" || cl === "noshow") return { attended: false, qualified: false, canceled: false, outcome: "no_show" };
+  if (cl.includes("cancel")) return { attended: false, qualified: false, canceled: true, outcome: "cancelada" };
+  if (cl === "pdte" || cl === "pendiente") return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
+  return { attended: false, qualified: false, canceled: false, outcome: cl };
 }
 
 export async function getVideollamadas(

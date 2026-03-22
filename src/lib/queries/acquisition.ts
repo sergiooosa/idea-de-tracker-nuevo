@@ -260,8 +260,10 @@ export async function getAcquisition(
   for (const ch of chats) {
     if (ch.id_lead) {
       chatsLeads.add(ch.id_lead);
-      // "con respuesta" = tiene estado que no sea nulo/vacío
-      if (ch.estado && ch.estado.trim() !== "") {
+      // "con respuesta" = tiene al menos un mensaje con role="agent" en el JSONB
+      const chatData = ch.chat as any[];
+      const hasAgentMsg = Array.isArray(chatData) && chatData.some((m: any) => m?.role === "agent");
+      if (hasAgentMsg) {
         chatsLeadsWithResponse.add(ch.id_lead);
       }
     }

@@ -14,9 +14,9 @@ import type {
   AlertaMeta,
 } from "@/types";
 
-const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada"];
-const DEFAULT_CLOSED = "Cerrada";
-const DEFAULT_EFFECTIVE = ["Cerrada", "Ofertada"];
+const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada", "cerrada", "ofertada", "no_ofertada"];
+const DEFAULT_CLOSED = ["Cerrada", "cerrada"];
+const DEFAULT_EFFECTIVE = ["Cerrada", "Ofertada", "cerrada", "ofertada"];
 
 /**
  * Normaliza un valor de fecha a string "YYYY-MM-DD".
@@ -34,7 +34,7 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   if (!embudo || embudo.length === 0) {
     return {
       attendedSet: new Set(DEFAULT_ATTENDED),
-      closedSet: new Set([DEFAULT_CLOSED]),
+      closedSet: new Set(DEFAULT_CLOSED),
       effectiveSet: new Set(DEFAULT_EFFECTIVE),
       etapas: null,
     };
@@ -45,19 +45,19 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   const ids = embudo.map((e) => (e?.id ?? "").trim()).filter(Boolean);
   const nombres = embudo.map(getLabel).filter(Boolean);
   // Reconocer tanto por label como por id (el Cerebro puede guardar el id como categoría)
+  // Usar lowercase para comparaciones case-insensitive
   const allKeys = [...new Set([...nombres, ...ids])];
+  const allKeysLower = allKeys.map(k => k.toLowerCase());
   return {
-    attendedSet: new Set(allKeys.filter((k) => {
-      const kl = k.toLowerCase();
-      return !kl.includes("cancel") && !kl.includes("pdte") && k !== "";
+    attendedSet: new Set(allKeysLower.filter((k) => {
+      return !k.includes("cancel") && !k.includes("pdte") && k !== "";
     })),
-    closedSet: new Set(allKeys.filter((k) =>
-      k.toLowerCase().includes("cerrad") || k.toLowerCase().includes("closed"),
+    closedSet: new Set(allKeysLower.filter((k) =>
+      k.includes("cerrad") || k.includes("closed"),
     )),
-    effectiveSet: new Set(allKeys.filter((k) => {
-      const kl = k.toLowerCase();
-      return kl.includes("cerrad") || kl.includes("closed") ||
-             kl.includes("ofertad") || kl.includes("offered");
+    effectiveSet: new Set(allKeysLower.filter((k) => {
+      return k.includes("cerrad") || k.includes("closed") ||
+             k.includes("ofertad") || k.includes("offered");
     })),
     etapas: embudo,
   };
@@ -136,12 +136,14 @@ export async function getDashboard(
     filteredCalls = calls.filter((c) => Array.isArray(c.tags_internos) && c.tags_internos.some((t) => tagSet.has(t)));
   }
 
-  const asistidas = filteredAgendas.filter((a) => attendedSet.has(a.categoria ?? "")).length;
-  const canceladas = filteredAgendas.filter((a) => a.categoria === "CANCELADA").length;
-  const cerradas = filteredAgendas.filter((a) => closedSet.has(a.categoria ?? "")).length;
-  const efectivas = filteredAgendas.filter((a) => effectiveSet.has(a.categoria ?? "")).length;
+  const asistidas = filteredAgendas.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
+  const canceladas = filteredAgendas.filter((a) =>
+    (a.categoria ?? "").toLowerCase().includes("cancel")
+  ).length;
+  const cerradas = filteredAgendas.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
+  const efectivas = filteredAgendas.filter((a) => effectiveSet.has((a.categoria ?? "").toLowerCase().trim())).length;
   const revenueNativo = filteredAgendas
-    .filter((a) => closedSet.has(a.categoria ?? ""))
+    .filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
     .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
   const cashNativo = filteredAgendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
 
@@ -246,10 +248,10 @@ export async function getDashboard(
         ...ac.map((c) => c.mail_lead).filter(Boolean),
         ...aa.map((a) => a.email_lead).filter(Boolean),
       ]).size;
-      const aAsistidas = aa.filter((a) => attendedSet.has(a.categoria ?? "")).length;
+      const aAsistidas = aa.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
       const aRevenue = useExterna
         ? 0
-        : aa.filter((a) => closedSet.has(a.categoria ?? ""))
+        : aa.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
             .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
       const aCash = useExterna
         ? 0
@@ -289,7 +291,7 @@ export async function getDashboard(
     if (!d) continue;
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].citasPresentaciones++;
-    if (closedSet.has(a.categoria ?? "")) volumeMap[d].cierres++;
+    if (closedSet.has((a.categoria ?? "").toLowerCase().trim())) volumeMap[d].cierres++;
   }
   const volumeByDay = Object.values(volumeMap).sort((a, b) =>
     String(a.date).localeCompare(String(b.date)),

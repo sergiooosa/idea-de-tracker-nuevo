@@ -117,6 +117,17 @@ export default function DashboardPage() {
 
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">KPIs operativos</h2>
+          {kpis.revenue === 0 && !data?.configuracion_ui?.fuente_datos_financieros && (
+            <div className="mb-2 px-3 py-2 rounded-lg bg-accent-amber/10 border border-accent-amber/30 text-accent-amber text-[11px] flex items-center gap-2">
+              <span>⚠️</span>
+              <span>
+                Revenue siempre es <strong>$0</strong>? Configura la fuente de datos financieros en{' '}
+                <Link href="/system?step=10" className="underline hover:text-accent-amber/80">
+                  /system → paso 10
+                </Link>
+              </span>
+            </div>
+          )}
           <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
             {(data?.metricasComputadas ?? [])
               .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)

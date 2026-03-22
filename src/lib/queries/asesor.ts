@@ -61,7 +61,14 @@ export async function getAsesorData(
     );
   }
 
-  const [callRows, agendaRows] = await Promise.all([
+  const chatConditions = [
+    eq(chatsLogs.id_cuenta, idCuenta),
+    gte(chatsLogs.fecha_y_hora_z, fromTs),
+    lte(chatsLogs.fecha_y_hora_z, toTs),
+    ...(emails.length > 0 ? [inArray(chatsLogs.notas_extra, emails)] : []),
+  ];
+
+  const [callRows, agendaRows, chatsRows] = await Promise.all([
     db
       .select()
       .from(logLlamadas)
@@ -71,6 +78,10 @@ export async function getAsesorData(
       .select()
       .from(resumenesDiariosAgendas)
       .where(and(...agendaConditions)),
+    db
+      .select()
+      .from(chatsLogs)
+      .where(and(...chatConditions)),
   ]);
 
   const idCuentaStr = String(idCuenta);
@@ -123,6 +134,12 @@ export async function getAsesorData(
   const reunionesAgendadas = agendaRows.length;
   const tasaAgendamiento = contestadas > 0 ? (reunionesAgendadas / contestadas) * 100 : 0;
 
+  const totalChats = chatsRows.length;
+  const chatsConRespuesta = chatsRows.filter((ch) => {
+    const chatData = ch.chat as any[];
+    return Array.isArray(chatData) && chatData.some((m: any) => m?.role === "agent");
+  }).length;
+
   const kpis: AsesorKpis = {
     leadsAsignados: allLeads.size,
     llamadasRealizadas: callRows.length,
@@ -130,6 +147,8 @@ export async function getAsesorData(
     reunionesAgendadas,
     tasaContacto: callRows.length > 0 ? (contestadas / callRows.length) * 100 : 0,
     tasaAgendamiento,
+    totalChats,
+    chatsConRespuesta,
   };
 
   const breakdown: AsesorBreakdown = {

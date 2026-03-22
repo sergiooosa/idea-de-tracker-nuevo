@@ -508,6 +508,10 @@ export interface AsesorKpis {
   reunionesAgendadas: number;
   tasaContacto: number;
   tasaAgendamiento: number;
+  /** Total chats asignados al asesor en el período */
+  totalChats?: number;
+  /** Chats con al menos un mensaje de agente */
+  chatsConRespuesta?: number;
 }
 
 /** Desglose por canal/origen para KPIs del panel asesor */
