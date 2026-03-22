@@ -115,6 +115,7 @@ export interface EmbudoEtapa {
   condition?: string;
   fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];  // canales que alimentan esta etapa
   reglas_automaticas?: ReglaAutomatica[];  // reglas sin IA para mover leads
+  es_fallback?: boolean;  // catch-all para leads sin categoría reconocida
 }
 
 export interface ChatTrigger {

@@ -332,6 +332,32 @@ export async function getDashboard(
     distribucionEmbudo[cat] = (distribucionEmbudo[cat] ?? 0) + 1;
   }
 
+  // Catch-all: leads sin categoría o con categoría no reconocida en el embudo → etapa fallback
+  {
+    const fallbackEtapa = (embudoRaw as EmbudoEtapa[]).find((e) => e.es_fallback === true);
+    if (fallbackEtapa) {
+      const fallbackLabel = fallbackEtapa.nombre ?? fallbackEtapa.id;
+      // Construir set de categorías conocidas en el embudo
+      const catSet = new Set<string>();
+      for (const e of embudoRaw as EmbudoEtapa[]) {
+        if (e.nombre) catSet.add(e.nombre);
+        if (e.id) catSet.add(e.id);
+      }
+      let sinClasificar = 0;
+      for (const a of filteredAgendas) {
+        const cat = (a.categoria ?? "").trim();
+        if (!cat || (!catSet.has(cat) && cat === "sin_categoria")) {
+          sinClasificar++;
+        }
+      }
+      if (sinClasificar > 0) {
+        // Mover los sin_categoria al fallback y eliminar la clave genérica
+        distribucionEmbudo[fallbackLabel] = (distribucionEmbudo[fallbackLabel] ?? 0) + sinClasificar;
+        delete distribucionEmbudo["sin_categoria"];
+      }
+    }
+  }
+
   const allTags = new Set<string>();
   for (const a of agendas) {
     if (Array.isArray(a.tags_internos)) a.tags_internos.forEach((t) => allTags.add(t));
