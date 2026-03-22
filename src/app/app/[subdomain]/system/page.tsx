@@ -25,6 +25,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { getMetricasQueDependenDe, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from '@/lib/metricas-engine';
 import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
+import ChatRecoverySection from '@/features/quick-triggers/chat-recovery/ChatRecoverySection';
 
 interface TagRule { id: string; condition: string; tag: string; source: string; funnelStage?: string }
 interface MetricRule {
@@ -50,6 +51,20 @@ interface ChatConfig {
   tiene_chatbot: boolean;
   emoji_toma_atencion: string;
 }
+interface RolConfigLocal {
+  id: string;
+  nombre: string;
+}
+
+interface MetaPorRolLocal {
+  rol_id: string;
+  rol_nombre: string;
+  meta_llamadas_diarias: number | null;
+  meta_chats_diarios: number | null;
+  meta_cierres_semanales: number | null;
+  meta_contestacion: number | null;
+}
+
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
   reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
@@ -59,6 +74,7 @@ interface SystemConfig {
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfig;
   chat_analisis_hora?: number;
+  roles_config?: RolConfigLocal[];
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -80,6 +96,8 @@ interface MetasData {
   meta_chats_diarios: number | null;
   meta_chats_contestacion: number | null;
   meta_speed_chat_min: number | null;
+  // ── Metas por rol ─────────────────────────────────────────────
+  metas_por_rol?: MetaPorRolLocal[];
 }
 
 const EMBUDO_COLORS = ['#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ef4444', '#eab308', '#ec4899', '#14b8a6'];
@@ -186,6 +204,8 @@ export default function SystemPage() {
   const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija'>('manual');
   const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
+  const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
+  const [metasPorRol, setMetasPorRol] = useState<MetaPorRolLocal[]>([]);
 
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
@@ -215,6 +235,9 @@ export default function SystemPage() {
         if (typeof cfg.chat_analisis_hora === 'number') {
           setChatAnalisisHora(cfg.chat_analisis_hora);
         }
+        if (Array.isArray(cfg.roles_config)) {
+          setRolesConfig(cfg.roles_config);
+        }
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
         setMetricasConfig(loadedConfig.length > 0 ? loadedConfig : DEFAULT_METRICAS_CONFIG);
         setMetricasManualData(
@@ -225,7 +248,10 @@ export default function SystemPage() {
       }
       if (metasRes.ok) {
         const m = await metasRes.json();
-        setMetas({ meta_llamadas_diarias: m.meta_llamadas_diarias, leads_nuevos_dia_1: m.leads_nuevos_dia_1, leads_nuevos_dia_2: m.leads_nuevos_dia_2, leads_nuevos_dia_3: m.leads_nuevos_dia_3, meta_citas_semanales: m.meta_citas_semanales ?? null, meta_cierres_semanales: m.meta_cierres_semanales ?? null, meta_revenue_mensual: m.meta_revenue_mensual ?? null, meta_cash_collected_mensual: m.meta_cash_collected_mensual ?? null, meta_tasa_cierre: m.meta_tasa_cierre ?? null, meta_tasa_contestacion: m.meta_tasa_contestacion ?? null, meta_speed_to_lead_min: m.meta_speed_to_lead_min ?? null, meta_llamadas_semanales: m.meta_llamadas_semanales ?? null, meta_contestacion_llamadas: m.meta_contestacion_llamadas ?? null, meta_speed_llamadas_min: m.meta_speed_llamadas_min ?? null, meta_citas_semanales_video: m.meta_citas_semanales_video ?? null, meta_cierre_video: m.meta_cierre_video ?? null, meta_revenue_video: m.meta_revenue_video ?? null, meta_chats_diarios: m.meta_chats_diarios ?? null, meta_chats_contestacion: m.meta_chats_contestacion ?? null, meta_speed_chat_min: m.meta_speed_chat_min ?? null });
+        setMetas({ meta_llamadas_diarias: m.meta_llamadas_diarias, leads_nuevos_dia_1: m.leads_nuevos_dia_1, leads_nuevos_dia_2: m.leads_nuevos_dia_2, leads_nuevos_dia_3: m.leads_nuevos_dia_3, meta_citas_semanales: m.meta_citas_semanales ?? null, meta_cierres_semanales: m.meta_cierres_semanales ?? null, meta_revenue_mensual: m.meta_revenue_mensual ?? null, meta_cash_collected_mensual: m.meta_cash_collected_mensual ?? null, meta_tasa_cierre: m.meta_tasa_cierre ?? null, meta_tasa_contestacion: m.meta_tasa_contestacion ?? null, meta_speed_to_lead_min: m.meta_speed_to_lead_min ?? null, meta_llamadas_semanales: m.meta_llamadas_semanales ?? null, meta_contestacion_llamadas: m.meta_contestacion_llamadas ?? null, meta_speed_llamadas_min: m.meta_speed_llamadas_min ?? null, meta_citas_semanales_video: m.meta_citas_semanales_video ?? null, meta_cierre_video: m.meta_cierre_video ?? null, meta_revenue_video: m.meta_revenue_video ?? null, meta_chats_diarios: m.meta_chats_diarios ?? null, meta_chats_contestacion: m.meta_chats_contestacion ?? null, meta_speed_chat_min: m.meta_speed_chat_min ?? null, metas_por_rol: Array.isArray(m.metas_por_rol) ? m.metas_por_rol : [] });
+        if (Array.isArray(m.metas_por_rol)) {
+          setMetasPorRol(m.metas_por_rol);
+        }
       }
     } catch { /* silently use defaults */ }
     setLoadingConfig(false);
@@ -289,7 +315,7 @@ export default function SystemPage() {
       const res = await fetch('/api/data/metas', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(metas),
+        body: JSON.stringify({ ...metas, metas_por_rol: metasPorRol }),
       });
       if (!res.ok) throw new Error('Error al guardar metas');
       toast.success('Metas guardadas');
@@ -829,6 +855,95 @@ export default function SystemPage() {
               </div>
 
               <p className="text-[11px] text-gray-500">🔻 = métrica invertida: menor valor es mejor. Deja vacío cualquier campo que no aplique a tu operación.</p>
+
+              {/* ── Metas por Rol ─────────────────────────────────── */}
+              <div className="mt-6 rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🎯</span>
+                  <h4 className="text-sm font-semibold text-white">Metas por Rol</h4>
+                  <span className="relative group ml-1">
+                    <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      Un closer junior puede tener meta de 30 llamadas/día mientras un senior tiene 50. Configura metas específicas por rol para un seguimiento más justo.
+                    </span>
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400">Define metas diferentes según el rol del asesor en tu equipo.</p>
+                {rolesConfig.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-surface-500 bg-surface-700/30 px-4 py-4 text-center text-[11px] text-gray-500">
+                    Configura roles en <strong className="text-gray-400">Sistema → Configuración</strong> para usar esta función.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {rolesConfig.map((rol) => {
+                      const metaRol = metasPorRol.find((m) => m.rol_id === rol.id) ?? {
+                        rol_id: rol.id,
+                        rol_nombre: rol.nombre,
+                        meta_llamadas_diarias: null,
+                        meta_chats_diarios: null,
+                        meta_cierres_semanales: null,
+                        meta_contestacion: null,
+                      };
+                      const updateMeta = (patch: Partial<MetaPorRolLocal>) => {
+                        setMetasPorRol((prev) => {
+                          const exists = prev.find((m) => m.rol_id === rol.id);
+                          if (exists) {
+                            return prev.map((m) => m.rol_id === rol.id ? { ...m, ...patch } : m);
+                          }
+                          return [...prev, { ...metaRol, ...patch }];
+                        });
+                      };
+                      return (
+                        <div key={rol.id} className="rounded-lg border border-surface-500 bg-surface-700/50 p-3 space-y-2">
+                          <p className="text-xs font-semibold text-accent-cyan">{rol.nombre}</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-gray-400 mb-1">Llamadas/día</label>
+                              <input
+                                type="number" min={0}
+                                value={metaRol.meta_llamadas_diarias ?? ''}
+                                onChange={(e) => updateMeta({ meta_llamadas_diarias: e.target.value ? Math.max(0, +e.target.value) : null })}
+                                placeholder="Ej. 30"
+                                className="w-full rounded bg-surface-600 border border-surface-400/30 px-2 py-1 text-xs text-white focus:ring-1 focus:ring-accent-cyan/40"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-400 mb-1">Chats/día</label>
+                              <input
+                                type="number" min={0}
+                                value={metaRol.meta_chats_diarios ?? ''}
+                                onChange={(e) => updateMeta({ meta_chats_diarios: e.target.value ? Math.max(0, +e.target.value) : null })}
+                                placeholder="Ej. 20"
+                                className="w-full rounded bg-surface-600 border border-surface-400/30 px-2 py-1 text-xs text-white focus:ring-1 focus:ring-accent-cyan/40"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-400 mb-1">Cierres/semana</label>
+                              <input
+                                type="number" min={0}
+                                value={metaRol.meta_cierres_semanales ?? ''}
+                                onChange={(e) => updateMeta({ meta_cierres_semanales: e.target.value ? Math.max(0, +e.target.value) : null })}
+                                placeholder="Ej. 5"
+                                className="w-full rounded bg-surface-600 border border-surface-400/30 px-2 py-1 text-xs text-white focus:ring-1 focus:ring-accent-cyan/40"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-400 mb-1">% Contestación</label>
+                              <input
+                                type="number" min={0} max={100}
+                                value={metaRol.meta_contestacion ?? ''}
+                                onChange={(e) => updateMeta({ meta_contestacion: e.target.value ? Math.max(0, +e.target.value) : null })}
+                                placeholder="Ej. 60"
+                                className="w-full rounded bg-surface-600 border border-surface-400/30 px-2 py-1 text-xs text-white focus:ring-1 focus:ring-accent-cyan/40"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1182,6 +1297,10 @@ export default function SystemPage() {
                   <p>Estimado por chat: ~$0.00008 USD (500 tokens entrada + 100 salida)</p>
                   <p className="text-gray-500">Si usas tu propia API Key (Paso 9), los costos van a tu cuenta de OpenAI directamente.</p>
                 </div>
+
+                {/* ── Recuperar chats históricos ── */}
+                <ChatRecoverySection />
+
               </div>
             </div>
           )}
