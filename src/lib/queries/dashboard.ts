@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos } from "@/lib/db/schema";
-import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs } from "@/lib/db/schema";
+import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
@@ -10,6 +10,7 @@ import type {
   DashboardObjecion,
   DashboardResponse,
   ApiAdvisor,
+  ChatKpis,
 } from "@/types";
 
 const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada"];
@@ -392,6 +393,96 @@ export async function getDashboard(
     metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, formato: m.formato, color: m.color });
   }
 
+  // ----------------------------------------------------------------
+  // Chat KPIs — consultar chats_logs en el mismo rango de fechas
+  // ----------------------------------------------------------------
+  const chatRows = await db
+    .select({
+      chatid: chatsLogs.chatid,
+      chat: chatsLogs.chat,
+      notas_extra: chatsLogs.notas_extra,
+      fecha_y_hora_z: chatsLogs.fecha_y_hora_z,
+    })
+    .from(chatsLogs)
+    .where(
+      and(
+        eq(chatsLogs.id_cuenta, idCuenta),
+        gte(chatsLogs.fecha_y_hora_z, fromDate),
+        lte(chatsLogs.fecha_y_hora_z, toDate),
+      ),
+    );
+
+  const chatKpis: ChatKpis = (() => {
+    const totalChats = chatRows.length;
+    if (totalChats === 0) {
+      return {
+        total: 0,
+        leadsUnicos: 0,
+        conRespuesta: 0,
+        tasaRespuesta: 0,
+        speedToLeadAvg: null,
+        distribucionCanales: {},
+        topClosers: [],
+      };
+    }
+
+    const uniqueChatIds = new Set(chatRows.map((r) => r.chatid).filter(Boolean));
+    let chatsConAgente = 0;
+    let speedSum = 0;
+    let speedCount = 0;
+    const distribucionCanales: Record<string, number> = {};
+    const closerCounts: Record<string, number> = {};
+
+    for (const row of chatRows) {
+      const msgs: ChatMessage[] = Array.isArray(row.chat) ? (row.chat as ChatMessage[]) : [];
+
+      // Verificar si hay al menos un mensaje con role="agent"
+      const hasAgent = msgs.some((m) => m.role === "agent");
+      if (hasAgent) chatsConAgente++;
+
+      // Speed to lead: tiempo entre primer msg lead y primer msg agent
+      const firstLeadMsg = msgs.find((m) => m.role === "lead");
+      const firstAgentMsg = msgs.find((m) => m.role === "agent");
+      if (firstLeadMsg?.timestamp && firstAgentMsg?.timestamp) {
+        const leadTs = new Date(firstLeadMsg.timestamp).getTime();
+        const agentTs = new Date(firstAgentMsg.timestamp).getTime();
+        const diffSecs = (agentTs - leadTs) / 1000;
+        if (diffSecs > 0) {
+          speedSum += diffSecs;
+          speedCount++;
+        }
+      }
+
+      // Distribución de canales — tipo del primer mensaje
+      const firstMsg = msgs[0];
+      if (firstMsg?.type) {
+        const channel = firstMsg.type;
+        distribucionCanales[channel] = (distribucionCanales[channel] ?? 0) + 1;
+      }
+
+      // Top closers — de notas_extra
+      const closer = row.notas_extra?.trim();
+      if (closer) {
+        closerCounts[closer] = (closerCounts[closer] ?? 0) + 1;
+      }
+    }
+
+    const topClosers = Object.entries(closerCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      total: totalChats,
+      leadsUnicos: uniqueChatIds.size,
+      conRespuesta: chatsConAgente,
+      tasaRespuesta: totalChats > 0 ? (chatsConAgente / totalChats) * 100 : 0,
+      speedToLeadAvg: speedCount > 0 ? speedSum / speedCount : null,
+      distribucionCanales,
+      topClosers,
+    };
+  })();
+
   return {
     kpis,
     advisorRanking,
@@ -411,5 +502,6 @@ export async function getDashboard(
     tagCounts,
     metricasPersonalizadas: Array.isArray(cuentaRow?.metricas_personalizadas) ? cuentaRow.metricas_personalizadas : [],
     metricasComputadas,
+    chatKpis: chatKpis.total > 0 ? chatKpis : undefined,
   };
 }

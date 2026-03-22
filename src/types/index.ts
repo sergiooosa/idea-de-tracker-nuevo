@@ -415,6 +415,16 @@ export interface MetricaPersonalizadaUI {
   ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
 }
 
+export interface ChatKpis {
+  total: number;
+  leadsUnicos: number;
+  conRespuesta: number;
+  tasaRespuesta: number;
+  speedToLeadAvg: number | null; // segundos
+  distribucionCanales: Record<string, number>;
+  topClosers: Array<{ name: string; count: number }>;
+}
+
 export interface DashboardResponse {
   kpis: DashboardKpis;
   advisorRanking: DashboardAdvisorRow[];
@@ -428,6 +438,7 @@ export interface DashboardResponse {
   tagCounts?: Record<string, number>;
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
   metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[];
+  chatKpis?: ChatKpis;
 }
 
 export interface AsesorLeadCRM {
