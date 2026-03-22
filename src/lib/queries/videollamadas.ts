@@ -17,10 +17,23 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   const c = cat.trim();
 
   if (embudo && embudo.length > 0) {
-    const match = embudo.find((e) => e.nombre === c);
+    // Buscar por nombre O por id — soporta embudo con campo "name" (legacy) o "nombre"
+    const match = embudo.find(
+      (e) =>
+        (e.nombre != null && e.nombre === c) ||
+        ((e as any).name != null && (e as any).name === c) ||
+        (e.id != null && e.id === c),
+    );
     if (match) {
-      const isClosed = c.toLowerCase().includes("cerrad");
-      return { attended: true, qualified: isClosed, canceled: false, outcome: c.toLowerCase() };
+      const label = match.nombre ?? (match as any).name ?? c;
+      const isClosed = label.toLowerCase().includes("cerrad") || label.toLowerCase().includes("closed");
+      const isCanceled = label.toLowerCase().includes("cancel");
+      return {
+        attended: !isCanceled,
+        qualified: isClosed,
+        canceled: isCanceled,
+        outcome: label.toLowerCase(),
+      };
     }
   }
 

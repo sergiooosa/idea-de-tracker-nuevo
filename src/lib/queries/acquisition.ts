@@ -41,17 +41,24 @@ export async function getAcquisition(
     ? cuentaRow.embudo_personalizado
     : null;
 
-  const attendedSet = embudoRaw && embudoRaw.length > 0
-    ? new Set(embudoRaw.filter((e) => e && typeof e.nombre === "string").map((e) => e.nombre))
+  // Soporta campo "nombre" (estándar), "name" (legacy) y "id"
+  const getLabel = (e: EmbudoEtapa) =>
+    ((e?.nombre ?? (e as any)?.name ?? e?.id) || "").trim();
+  const allKeys = embudoRaw && embudoRaw.length > 0
+    ? [...new Set([
+        ...embudoRaw.map(getLabel),
+        ...embudoRaw.map((e) => (e?.id ?? "").trim()),
+      ].filter(Boolean))]
+    : [];
+
+  const attendedSet = allKeys.length > 0
+    ? new Set(allKeys.filter((k) => !k.toLowerCase().includes("cancel") && !k.toLowerCase().includes("pdte")))
     : new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
 
-  const closedSet = embudoRaw && embudoRaw.length > 0
-    ? new Set(
-        embudoRaw
-          .filter((e) => e && typeof e.nombre === "string")
-          .filter((e) => e.nombre.toLowerCase().includes("cerrad"))
-          .map((e) => e.nombre),
-      )
+  const closedSet = allKeys.length > 0
+    ? new Set(allKeys.filter((k) =>
+        k.toLowerCase().includes("cerrad") || k.toLowerCase().includes("closed"),
+      ))
     : new Set(["Cerrada"]);
 
   const fechaFilter = or(

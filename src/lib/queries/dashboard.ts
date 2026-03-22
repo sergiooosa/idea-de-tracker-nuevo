@@ -37,13 +37,26 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
       etapas: null,
     };
   }
-  const nombres = embudo.map((e) => (e?.nombre != null ? String(e.nombre).trim() : ""));
+  // Soporta campo "nombre" (estándar) y "name" (legacy) y también el "id"
+  const getLabel = (e: EmbudoEtapa) =>
+    (e?.nombre ?? (e as any)?.name ?? e?.id ?? "").trim();
+  const ids = embudo.map((e) => (e?.id ?? "").trim()).filter(Boolean);
+  const nombres = embudo.map(getLabel).filter(Boolean);
+  // Reconocer tanto por label como por id (el Cerebro puede guardar el id como categoría)
+  const allKeys = [...new Set([...nombres, ...ids])];
   return {
-    attendedSet: new Set(nombres),
-    closedSet: new Set(nombres.filter((n) => (n ?? "").toLowerCase().includes("cerrad"))),
-    effectiveSet: new Set(nombres.filter((n) =>
-      (n ?? "").toLowerCase().includes("cerrad") || (n ?? "").toLowerCase().includes("ofertad"),
+    attendedSet: new Set(allKeys.filter((k) => {
+      const kl = k.toLowerCase();
+      return !kl.includes("cancel") && !kl.includes("pdte") && k !== "";
+    })),
+    closedSet: new Set(allKeys.filter((k) =>
+      k.toLowerCase().includes("cerrad") || k.toLowerCase().includes("closed"),
     )),
+    effectiveSet: new Set(allKeys.filter((k) => {
+      const kl = k.toLowerCase();
+      return kl.includes("cerrad") || kl.includes("closed") ||
+             kl.includes("ofertad") || kl.includes("offered");
+    })),
     etapas: embudo,
   };
 }
