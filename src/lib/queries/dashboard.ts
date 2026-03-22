@@ -418,11 +418,27 @@ export async function getDashboard(
 
   // ----------------------------------------------------------------
   // Funnel unificado — agregar leads de chats al distribucionEmbudo
+  // Solo suma a etapas que tienen 'chats' en sus fuentes (o sin fuentes = todas)
   // ----------------------------------------------------------------
   {
     const chatTriggersCfg: Array<{ trigger: string; valor: string }> = Array.isArray(cuentaRow?.chat_triggers)
       ? (cuentaRow.chat_triggers as Array<{ trigger: string; valor: string }>)
       : [];
+
+    // Construir mapa: valor del trigger → etapa tiene chats como fuente
+    const etapasConChats = new Set<string>();
+    for (const etapa of embudoRaw as EmbudoEtapa[]) {
+      const fuentes = (etapa as any).fuentes as string[] | undefined;
+      // Si no tiene fuentes definidas → aplica a todos los canales (default)
+      // Si tiene fuentes → solo si incluye 'chats'
+      if (!fuentes || fuentes.length === 0 || fuentes.includes("chats")) {
+        if (etapa.nombre) etapasConChats.add(etapa.nombre);
+        if (etapa.id) etapasConChats.add(etapa.id);
+      }
+    }
+    // Si no hay embudo personalizado, todos los valores de triggers son válidos
+    const sinEmbudo = embudoRawArr.length === 0;
+
     for (const chatRow of chatRows) {
       const msgs: ChatMessage[] = Array.isArray(chatRow.chat) ? (chatRow.chat as ChatMessage[]) : [];
       let estado: string | null = null;
@@ -437,7 +453,8 @@ export async function getDashboard(
           if (estado) break;
         }
       }
-      if (estado) {
+      // Solo sumar si la etapa destino acepta chats como fuente
+      if (estado && (sinEmbudo || etapasConChats.has(estado))) {
         distribucionEmbudo[estado] = (distribucionEmbudo[estado] ?? 0) + 1;
       }
     }

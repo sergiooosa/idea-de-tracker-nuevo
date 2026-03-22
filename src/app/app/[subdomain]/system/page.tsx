@@ -861,15 +861,31 @@ export default function SystemPage() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-accent-cyan mb-1">Condición para la IA <span className="text-gray-500 font-normal">(aplica a llamadas y videollamadas)</span></label>
-                      <textarea
-                        value={etapa.condition ?? ''}
-                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.value } : x))}
-                        placeholder={`Describe cuándo un lead debe clasificarse en esta etapa.\nEj: "El lead mostró interés real, preguntó por precios o pidió una propuesta formal."`}
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-600 min-h-[60px] focus:ring-2 focus:ring-accent-cyan/40 resize-y"
-                      />
-                    </div>
+                    {/* Condición IA — solo visible si la etapa incluye llamadas o videollamadas */}
+                    {(() => {
+                      const fuentesEtapa = etapa.fuentes ?? ['llamadas', 'videollamadas', 'chats'];
+                      const soloChats = fuentesEtapa.length > 0 && !fuentesEtapa.includes('llamadas') && !fuentesEtapa.includes('videollamadas');
+                      if (soloChats) return (
+                        <div className="rounded-lg bg-surface-600/30 border border-surface-500/50 p-3 text-xs text-gray-500 flex items-start gap-2">
+                          <span>💡</span>
+                          <span>Esta etapa solo incluye <strong className="text-gray-400">Chats</strong>. Los chats se clasifican por <strong className="text-gray-400">triggers de emoji</strong> (configura en Paso 8), no por IA. No necesitas definir una condición aquí.</span>
+                        </div>
+                      );
+                      return (
+                        <div>
+                          <label className="block text-[11px] font-medium text-accent-cyan mb-1">
+                            Condición para la IA
+                            <span className="text-gray-500 font-normal ml-1">(clasifica llamadas y videollamadas)</span>
+                          </label>
+                          <textarea
+                            value={etapa.condition ?? ''}
+                            onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.value } : x))}
+                            placeholder={`Describe cuándo un lead debe clasificarse en esta etapa.\nEj: "El lead mostró interés real, preguntó por precios o pidió una propuesta formal."`}
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-600 min-h-[60px] focus:ring-2 focus:ring-accent-cyan/40 resize-y"
+                          />
+                        </div>
+                      );
+                    })()}
                     {/* Fuentes de datos */}
                     <div className="rounded-lg bg-surface-600/50 border border-surface-500 p-3 space-y-2">
                       <div className="flex items-center gap-1.5">

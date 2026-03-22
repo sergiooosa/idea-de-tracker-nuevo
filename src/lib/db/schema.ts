@@ -102,12 +102,19 @@ export interface MetricaConfig {
 /** Entrada manual: valores por campo */
 export type MetricaManualEntry = Record<string, string | number | boolean | null>;
 
+export interface ReglaAutomatica {
+  evento: 'no_show' | 'cancelada' | 'sin_actividad_dias';
+  valor?: number;
+}
+
 export interface EmbudoEtapa {
   id: string;
   nombre: string;
   color?: string;
   orden: number;
   condition?: string;
+  fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];  // canales que alimentan esta etapa
+  reglas_automaticas?: ReglaAutomatica[];  // reglas sin IA para mover leads
 }
 
 export interface ChatTrigger {
