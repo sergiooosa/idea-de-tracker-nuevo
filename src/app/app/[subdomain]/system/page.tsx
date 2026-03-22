@@ -49,18 +49,16 @@ interface EmbudoEtapa {
 interface ChatConfig {
   tiene_chatbot: boolean;
   emoji_toma_atencion: string;
-  trigger_mode: 'unico' | 'multiple';
-  trigger_confirmaciones: number;
 }
-interface ChatTrigger { trigger: string; accion: 'cambiar_estado' | 'asignar_etiqueta'; valor: string }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
   reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
   metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
-  chat_triggers: ChatTrigger[]; embudo_personalizado: EmbudoEtapa[];
+  embudo_personalizado: EmbudoEtapa[];
   has_openai_key: boolean; fuente_datos_financieros: 'nativa' | 'api_externa';
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfig;
+  chat_analisis_hora?: number;
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -172,14 +170,13 @@ export default function SystemPage() {
   const [openaiKey, setOpenaiKey] = useState('');
   const [hasOpenaiKey, setHasOpenaiKey] = useState(false);
   const [embudoEtapas, setEmbudoEtapas] = useState<EmbudoEtapa[]>([]);
-  const [chatTriggers, setChatTriggers] = useState<ChatTrigger[]>([]);
-  const [emojiSearch, setEmojiSearch] = useState('');
   const [chatConfig, setChatConfig] = useState<ChatConfig>({
     tiene_chatbot: false,
     emoji_toma_atencion: '',
-    trigger_mode: 'unico',
-    trigger_confirmaciones: 2,
   });
+  const [chatAnalisisHora, setChatAnalisisHora] = useState<number>(2);
+  const [analizandoChats, setAnalizandoChats] = useState(false);
+  const [analisisResult, setAnalisisResult] = useState<{ processed: number; updated: number; errors: number; costEstimate: string } | null>(null);
   const [reglasAbiertasMap, setReglasAbiertasMap] = useState<Record<string, boolean>>({});
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
   const [seccionChatsDashboard, setSeccionChatsDashboard] = useState(true);
@@ -204,7 +201,6 @@ export default function SystemPage() {
         setPromptLlamadas(cfg.prompt_llamadas);
         setTagRules(cfg.reglas_etiquetas.length > 0 ? cfg.reglas_etiquetas : []);
         setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
-        setChatTriggers(Array.isArray(cfg.chat_triggers) ? cfg.chat_triggers : []);
         const loadedEmbudo = Array.isArray(cfg.embudo_personalizado) ? cfg.embudo_personalizado : [];
         setEmbudoEtapas(loadedEmbudo.length > 0 ? loadedEmbudo : DEFAULT_EMBUDO_CONFIG);
         setHasOpenaiKey(cfg.has_openai_key ?? false);
@@ -214,9 +210,10 @@ export default function SystemPage() {
           setChatConfig({
             tiene_chatbot: cfg.chat_config.tiene_chatbot ?? false,
             emoji_toma_atencion: cfg.chat_config.emoji_toma_atencion ?? '',
-            trigger_mode: cfg.chat_config.trigger_mode ?? 'unico',
-            trigger_confirmaciones: cfg.chat_config.trigger_confirmaciones ?? 2,
           });
+        }
+        if (typeof cfg.chat_analisis_hora === 'number') {
+          setChatAnalisisHora(cfg.chat_analisis_hora);
         }
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
         setMetricasConfig(loadedConfig.length > 0 ? loadedConfig : DEFAULT_METRICAS_CONFIG);
@@ -259,11 +256,11 @@ export default function SystemPage() {
         metricas_personalizadas: metricRules,
         metricas_config: metricasConfig,
         metricas_manual_data: metricasManualData,
-        chat_triggers: chatTriggers,
         embudo_personalizado: embudoEtapas,
         fuente_datos_financieros: fuenteFinanciera,
         seccion_chats_dashboard: seccionChatsDashboard,
         chat_config: chatConfig,
+        chat_analisis_hora: chatAnalisisHora,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -318,8 +315,24 @@ export default function SystemPage() {
   const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '', ubicacion: 'ambos' }]);
   const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1 }]);
   const removeEmbudoEtapa = (id: string) => setEmbudoEtapas((e) => e.filter((x) => x.id !== id).map((x, i) => ({ ...x, orden: i + 1 })));
-  const addChatTrigger = () => setChatTriggers((t) => [...t, { trigger: '', accion: 'cambiar_estado', valor: '' }]);
-  const removeChatTrigger = (idx: number) => setChatTriggers((t) => t.filter((_, i) => i !== idx));
+  const handleAnalizarChats = async () => {
+    setAnalizandoChats(true);
+    setAnalisisResult(null);
+    try {
+      const res = await fetch('/api/data/analizar-chats', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalisisResult(data);
+        toast.success(`Análisis completado: ${data.updated ?? 0} chats clasificados`);
+      } else {
+        toast.error('Error al analizar chats');
+      }
+    } catch {
+      toast.error('Error de conexión al analizar chats');
+    } finally {
+      setAnalizandoChats(false);
+    }
+  };
 
   if (loadingConfig) {
     return (
@@ -824,7 +837,7 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
                 <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><GitBranch className="w-5 h-5 text-accent-purple" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Embudo unificado <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">Define las etapas de tu embudo de ventas. La IA clasifica llamadas y videollamadas. Los chats se clasifican por triggers de emoji (configura en Paso 8). Todas las fuentes contribuyen al mismo funnel.</span></span></h3>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Embudo unificado <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">Define las etapas de tu embudo de ventas. La IA clasifica llamadas, videollamadas y chats de forma automática. Todas las fuentes contribuyen al mismo funnel.</span></span></h3>
                   <p className="text-sm text-gray-400">Define cada etapa, la condición para la IA, las fuentes de datos y reglas automáticas por evento.</p>
                 </div>
               </div>
@@ -870,7 +883,7 @@ export default function SystemPage() {
                       if (soloChats) return (
                         <div className="rounded-lg bg-surface-600/30 border border-surface-500/50 p-3 text-xs text-gray-500 flex items-start gap-2">
                           <span>💡</span>
-                          <span>Esta etapa solo incluye <strong className="text-gray-400">Chats</strong>. Los chats se clasifican por <strong className="text-gray-400">triggers de emoji</strong> (configura en Paso 8), no por IA. No necesitas definir una condición aquí.</span>
+                          <span>Esta etapa solo incluye <strong className="text-gray-400">Chats</strong>. Los chats se clasifican por <strong className="text-gray-400">IA automática</strong> igual que llamadas y videollamadas. No necesitas definir una condición aquí.</span>
                         </div>
                       );
                       return (
@@ -895,7 +908,7 @@ export default function SystemPage() {
                         <span className="relative group">
                           <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
                           <span className="absolute bottom-full left-0 mb-2 w-64 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                            Selecciona de qué canales provienen los leads que pueden llegar a esta etapa. Las llamadas y videollamadas las clasifica la IA. Los chats se clasifican por triggers de emoji (configura en Paso 8).
+                            Selecciona de qué canales provienen los leads que pueden llegar a esta etapa. Todos los canales (llamadas, videollamadas y chats) son clasificados automáticamente por IA.
                           </span>
                         </span>
                       </div>
@@ -1033,23 +1046,19 @@ export default function SystemPage() {
               <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 px-3 py-2 text-sm text-gray-400 space-y-1">
                 <p><strong className="text-accent-purple">Cómo funciona el embudo unificado:</strong></p>
                 <p>📞 <strong className="text-gray-300">Llamadas y videollamadas:</strong> La IA lee la transcripción y la compara con las condiciones que escribas aquí. El estado que mejor coincida es el que se asigna al lead.</p>
-                <p>💬 <strong className="text-gray-300">Chats:</strong> Se clasifican por triggers de emoji que configuras en el Paso 8. Si el asesor envía el emoji asignado, el lead se mueve a esa etapa automáticamente.</p>
+                <p>💬 <strong className="text-gray-300">Chats:</strong> Se clasifican automáticamente por IA igual que llamadas y videollamadas. El análisis ocurre cada noche y clasifica los chats del día anterior.</p>
                 <p>Si el nombre de la etapa contiene &quot;cerrad&quot; (ej. &quot;Cerrada MRR&quot;), el sistema lo trata automáticamente como cierre para calcular revenue.</p>
               </div>
             </div>
           )}
 
-          {currentStep === 8 && (() => {
-            const EMOJI_GRID = ['💰','✅','❌','🔥','⏳','📞','📅','🤝','👍','👎','💡','⭐','🎯','💬','☀️','🚀','💎','🏆','📊','🔔','❤️','💙','💚','💛','💜','🖤','🤍','🧡','💗','💕','😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','🥴','😠','😡','🤬','🥱','😷','🤒','🤕','🤢','🤮','🥺','💪','👏','🙌','🤲','🤝','🙏','✍️','💅','🤳','💄','🦷','👀','🧠','👄','💋','🩸','🦴','👶','🧒','👦','👧','🧑','👱','👨','👩','🧔','🏃','🚶','🧎','🧑‍💻','👨‍💻','👩‍💻','🧑‍💼','👨‍💼','👩‍💼','🧑‍🏫','💼','📱','💻','⌨️','🖥️','🖨️','📸','📹','🎥','📽️','🎬','📺','📻','🎙️','🎧','🎵','🎶','🎹','🥁','🎸','🎺','🎻','🎷','🪗','📧','📨','📩','📤','📥','📦','📫','📪','📬','📭','📮','📝','📃','📄','📑','🗒️','📋','📂','🗂️','🗄️','📎','🖇️','📌','📍','📏','📐','✂️','🗑️','🔒','🔓','🔑','🔐','🔧','🔨','⛏️','🪓','🔩','⚙️','🧰','🪛','🧲','💊','🩹','🩺','🔬','🔭','📡','🛰️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏯','🏰','💒','⛪','🕌','🛕','🕍','⛩️','🕋','⛲','⛺','🏕️','🗻','🌋','🏔️','❓','❗','‼️','⁉️','❕','❔','⭕','🚫','🔴','🟠','🟡','🟢','🔵','🟣','🟤','⚫','⚪','🔶','🔷','🔸','🔹','🔺','🔻','💠','🔘','🔳','🔲','🏁','🚩','🎌','🏴','🏳️','🇦🇷','🇧🇷','🇨🇱','🇨🇴','🇨🇷','🇪🇨','🇪🇸','🇲🇽','🇵🇪','🇺🇸','🇻🇪','🇵🇦','🇩🇴','🇬🇹','🇭🇳','🇳🇮','🇵🇾','🇺🇾','🇧🇴','🇸🇻'];
-            const usedEmojis = new Set(chatTriggers.map((t) => t.trigger));
-            const filteredEmojis = emojiSearch ? EMOJI_GRID.filter((e) => e.includes(emojiSearch)) : EMOJI_GRID;
-            return (
+          {currentStep === 8 && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><MessageSquare className="w-5 h-5 text-accent-amber" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Configuración de chats y Speed to Lead <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Configura cómo se mide el Speed to Lead en chats y automatiza cambios de estado con emojis. Los estados disponibles son las etapas de tu embudo (configura en Paso 7).</span></span></h3>
-                  <p className="text-sm text-gray-400">Speed to Lead, triggers de emoji y configuración de chatbot para el canal de chats.</p>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Chats: Speed to Lead e IA <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Configura cómo se mide el Speed to Lead en chats y cuándo se ejecuta el análisis IA nocturno. La IA clasifica cada chat automáticamente igual que llamadas y videollamadas.</span></span></h3>
+                  <p className="text-sm text-gray-400">Configuración de chatbot, Speed to Lead y análisis IA nocturno para chats.</p>
                 </div>
               </div>
 
@@ -1106,193 +1115,76 @@ export default function SystemPage() {
                     </div>
                   </div>
                 )}
+              </div>
 
-                {/* Modo de conteo de triggers */}
-                <div className="space-y-2">
+              {/* ── Sección: Análisis IA de chats ── */}
+              <div className="rounded-xl border border-accent-purple/30 bg-accent-purple/5 p-4 space-y-4">
+                <h4 className="text-sm font-semibold text-accent-purple flex items-center gap-2">🤖 Análisis automático de chats</h4>
+                <p className="text-sm text-gray-400">
+                  El sistema analiza tus conversaciones de chat cada noche y clasifica automáticamente cada lead en tu embudo,
+                  igual que con llamadas y videollamadas.
+                </p>
+
+                {/* Hora del análisis */}
+                <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-gray-300">Modo de conteo de emojis de estado</span>
+                    <label className="text-xs font-medium text-gray-300">Hora del análisis nocturno</label>
                     <span className="relative group">
                       <HelpCircle className="w-3.5 h-3.5 text-gray-500 cursor-help" />
-                      <span className="absolute bottom-full left-0 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        Útil cuando quieres que varios miembros del equipo confirmen el estado de un lead antes de moverlo. Ej: si pones 3, el lead cambia de etapa solo cuando 3 asesores envíen el mismo emoji.
+                      <span className="absolute bottom-full left-0 mb-2 w-60 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        El sistema analiza los chats del día anterior a esta hora.
                       </span>
                     </span>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="trigger_mode"
-                        value="unico"
-                        checked={chatConfig.trigger_mode === 'unico'}
-                        onChange={() => setChatConfig((c) => ({ ...c, trigger_mode: 'unico' }))}
-                        className="mt-0.5 accent-purple-500"
-                      />
-                      <div>
-                        <span className="text-sm text-white">Único</span>
-                        <p className="text-[11px] text-gray-500">Con una sola vez que el asesor envíe el emoji, se cambia el estado del lead.</p>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="trigger_mode"
-                        value="multiple"
-                        checked={chatConfig.trigger_mode === 'multiple'}
-                        onChange={() => setChatConfig((c) => ({ ...c, trigger_mode: 'multiple' }))}
-                        className="mt-0.5 accent-purple-500"
-                      />
-                      <div>
-                        <span className="text-sm text-white">Múltiple</span>
-                        <p className="text-[11px] text-gray-500">El asesor debe enviar el emoji N veces para confirmar el estado (para equipos donde múltiples asesores votan).</p>
-                      </div>
-                    </label>
-                    {chatConfig.trigger_mode === 'multiple' && (
-                      <div className="ml-6 flex items-center gap-2">
-                        <label className="text-xs text-gray-400">Número de confirmaciones necesarias:</label>
-                        <input
-                          type="number"
-                          min={2}
-                          max={10}
-                          value={chatConfig.trigger_confirmaciones}
-                          onChange={(e) => setChatConfig((c) => ({ ...c, trigger_confirmaciones: Number(e.target.value) }))}
-                          className="w-16 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  <select
+                    value={chatAnalisisHora}
+                    onChange={(e) => setChatAnalisisHora(Number(e.target.value))}
+                    className="w-40 rounded-lg bg-surface-600 border border-surface-500 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>{i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-500">💡 El sistema analiza los chats del día anterior a esta hora.</p>
                 </div>
-              </div>
 
-              {/* ── Sección: Triggers de emoji ── */}
-              <div className="flex items-center gap-2 pt-2 border-t border-surface-600">
-                <MessageSquare className="w-4 h-4 text-accent-amber" />
-                <h4 className="text-sm font-semibold text-white">Triggers de emoji</h4>
-              </div>
-              <div className="rounded-lg border border-accent-amber/20 bg-accent-amber/5 px-3 py-2.5 text-xs text-gray-400 space-y-1">
-                <p>Los triggers de emoji permiten cambiar el estado de un lead enviando un emoji en el chat.</p>
-                <p>💡 El asesor envía el emoji configurado y el sistema actualiza automáticamente el estado del lead en el panel.</p>
-                <p>Los estados disponibles son las etapas de tu embudo <strong className="text-accent-amber">(configura en Paso 7)</strong>.</p>
-              </div>
-
-              {chatTriggers.length === 0 && (
-                <div className="rounded-lg border border-dashed border-surface-500 bg-surface-700/30 px-4 py-6 text-center text-gray-500 text-sm">
-                  Sin triggers configurados. Los estados de chat se gestionan solo con IA.
-                </div>
-              )}
-              <ul className="space-y-3">
-                {chatTriggers.map((t, idx) => (
-                  <li key={idx} className="rounded-xl p-4 space-y-3 bg-surface-700/80 border border-surface-500 border-l-4 border-l-accent-amber/60">
-                    <div className="flex items-center gap-3">
-                      <span className="text-accent-amber text-xs font-medium shrink-0 uppercase">Emoji trigger</span>
-                      <div className="flex-1" />
-                      <button type="button" onClick={() => removeChatTrigger(idx)}
-                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-accent-amber mb-2">Selecciona un emoji</label>
-                      <input
-                        type="text"
-                        value={emojiSearch}
-                        onChange={(e) => setEmojiSearch(e.target.value)}
-                        placeholder="Buscar emoji..."
-                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white mb-2 focus:ring-2 focus:ring-accent-amber/40"
-                      />
-                      <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
-                        {filteredEmojis.map((emoji) => {
-                          const isUsed = usedEmojis.has(emoji) && t.trigger !== emoji;
-                          const isSelected = t.trigger === emoji;
-                          return (
-                            <button
-                              key={emoji}
-                              type="button"
-                              disabled={isUsed}
-                              onClick={() => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, trigger: emoji } : x))}
-                              className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all border ${
-                                isSelected
-                                  ? 'bg-accent-amber/20 border-accent-amber/60 shadow-[0_0_12px_-4px_rgba(255,176,32,0.5)] scale-110'
-                                  : isUsed
-                                    ? 'bg-surface-700 border-surface-500 opacity-30 cursor-not-allowed'
-                                    : 'bg-surface-600 border-surface-500 hover:bg-surface-500 hover:border-accent-amber/30'
-                              }`}
-                              title={isUsed ? 'Ya usado en otra regla' : emoji}
-                            >
-                              {emoji}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {t.trigger && !filteredEmojis.includes(t.trigger) && (
-                        <div className="mt-2 text-xs text-gray-400">Emoji actual: <span className="text-xl">{t.trigger}</span></div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-400 mb-1">Acción</label>
-                        <select
-                          value={t.accion}
-                          onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, accion: e.target.value as 'cambiar_estado' | 'asignar_etiqueta', valor: '' } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                        >
-                          <option value="cambiar_estado">Cambiar estado del lead</option>
-                          <option value="asignar_etiqueta">Asignar etiqueta</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-accent-cyan mb-1">{t.accion === 'asignar_etiqueta' ? 'Etiqueta a asignar' : 'Estado al que cambia el lead'}</label>
-                        {t.accion === 'asignar_etiqueta' ? (
-                          <input
-                            type="text"
-                            value={t.valor}
-                            onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: v } : x)); }}
-                            placeholder="nombre_etiqueta"
-                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
-                          />
-                        ) : embudoEtapas.length > 0 ? (
-                          <select
-                            value={t.valor}
-                            onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
-                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
-                          >
-                            <option value="">Seleccionar estado...</option>
-                            {embudoEtapas.map((e) => (
-                              <option key={e.id} value={e.nombre}>{e.nombre}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={t.valor}
-                            onChange={(e) => setChatTriggers((prev) => prev.map((x, i) => i === idx ? { ...x, valor: e.target.value } : x))}
-                            placeholder="Cerrada"
-                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
-                          />
-                        )}
-                      </div>
-                    </div>
-                    {t.trigger && t.valor && (
-                      <div className="rounded-lg bg-surface-800/60 border border-surface-500/50 px-3 py-2 text-xs text-gray-400 flex items-center gap-2">
-                        <span className="text-2xl">{t.trigger}</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-accent-cyan" />
-                        <span className="text-accent-cyan font-medium">{t.accion === 'asignar_etiqueta' ? `🏷️ ${t.valor}` : t.valor}</span>
-                      </div>
+                {/* Botón analizar ahora */}
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleAnalizarChats}
+                    disabled={analizandoChats}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {analizandoChats ? (
+                      <>
+                        <span className="animate-spin">⏳</span> Analizando chats...
+                      </>
+                    ) : (
+                      <>▶ Analizar chats pendientes ahora</>
                     )}
-                  </li>
-                ))}
-              </ul>
-              <button type="button" onClick={addChatTrigger}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-accent-amber/20 text-accent-amber border border-accent-amber/50 hover:bg-accent-amber/30 transition-all">
-                <Plus className="w-4 h-4" /> Añadir trigger
-              </button>
-              <div className="rounded-lg border border-accent-amber/30 bg-accent-amber/5 px-3 py-2 text-sm text-gray-400">
-                <strong className="text-accent-amber">Ejemplo:</strong> Si configuras <span className="text-2xl mx-0.5">💰</span> → <span className="text-accent-cyan">Cerrada</span>,
-                cuando un asesor envíe 💰 en el chat de WhatsApp, el lead pasa automáticamente a estado &quot;Cerrada&quot; sin usar IA.
+                  </button>
+                  <p className="text-[11px] text-gray-500">ℹ️ Analiza los chats de las últimas 24h que aún no tienen clasificación. Tiempo estimado: ~2 min por cada 100 chats.</p>
+                  {analisisResult && (
+                    <div className="rounded-lg border border-accent-green/30 bg-accent-green/5 px-3 py-2 text-xs text-gray-300 space-y-0.5">
+                      <p className="text-accent-green font-semibold">✅ Análisis completado</p>
+                      <p>Procesados: <strong>{analisisResult.processed}</strong> · Actualizados: <strong>{analisisResult.updated}</strong> · Errores: <strong>{analisisResult.errors}</strong></p>
+                      <p>Costo estimado: <strong className="text-accent-amber">{analisisResult.costEstimate}</strong></p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Estimado de costos */}
+                <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-2.5 text-xs text-gray-400 space-y-1">
+                  <p className="font-semibold text-gray-300">Estimado de costos</p>
+                  <p>💡 Usamos GPT-4o-mini, el modelo más eficiente de OpenAI.</p>
+                  <p>Precio: <span className="text-accent-amber">$0.15/1M tokens entrada · $0.60/1M tokens salida</span></p>
+                  <p>Estimado por chat: ~$0.00008 USD (500 tokens entrada + 100 salida)</p>
+                  <p className="text-gray-500">Si usas tu propia API Key (Paso 9), los costos van a tu cuenta de OpenAI directamente.</p>
+                </div>
               </div>
             </div>
-            );
-          })()}
+          )}
 
           {currentStep === 9 && (
             <div className="space-y-4">

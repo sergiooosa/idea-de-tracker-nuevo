@@ -81,7 +81,7 @@ export async function getDashboard(
       metricas_personalizadas: cuentas.metricas_personalizadas,
       metricas_config: cuentas.metricas_config,
       metricas_manual_data: cuentas.metricas_manual_data,
-      chat_triggers: cuentas.chat_triggers,
+      // chat_triggers ya no se usa para clasificar — la IA escribe chats_logs.estado directamente
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -430,6 +430,7 @@ export async function getDashboard(
     .select({
       chatid: chatsLogs.chatid,
       chat: chatsLogs.chat,
+      estado: chatsLogs.estado,
       notas_extra: chatsLogs.notas_extra,
       fecha_y_hora_z: chatsLogs.fecha_y_hora_z,
     })
@@ -444,14 +445,11 @@ export async function getDashboard(
 
   // ----------------------------------------------------------------
   // Funnel unificado — agregar leads de chats al distribucionEmbudo
+  // Usa chats_logs.estado (escrito por la IA nocturna) directamente.
   // Solo suma a etapas que tienen 'chats' en sus fuentes (o sin fuentes = todas)
   // ----------------------------------------------------------------
   {
-    const chatTriggersCfg: Array<{ trigger: string; valor: string }> = Array.isArray(cuentaRow?.chat_triggers)
-      ? (cuentaRow.chat_triggers as Array<{ trigger: string; valor: string }>)
-      : [];
-
-    // Construir mapa: valor del trigger → etapa tiene chats como fuente
+    // Construir set de etapas que aceptan chats como fuente
     const etapasConChats = new Set<string>();
     for (const etapa of embudoRaw as EmbudoEtapa[]) {
       const fuentes = (etapa as any).fuentes as string[] | undefined;
@@ -462,23 +460,12 @@ export async function getDashboard(
         if (etapa.id) etapasConChats.add(etapa.id);
       }
     }
-    // Si no hay embudo personalizado, todos los valores de triggers son válidos
+    // Si no hay embudo personalizado, todos los estados son válidos
     const sinEmbudo = embudoRawArr.length === 0;
 
     for (const chatRow of chatRows) {
-      const msgs: ChatMessage[] = Array.isArray(chatRow.chat) ? (chatRow.chat as ChatMessage[]) : [];
-      let estado: string | null = null;
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i]?.role === "agent") {
-          for (const t of chatTriggersCfg) {
-            if ((msgs[i]?.message ?? "").includes(t.trigger)) {
-              estado = t.valor;
-              break;
-            }
-          }
-          if (estado) break;
-        }
-      }
+      // La IA escribe el estado directamente en chats_logs.estado
+      const estado = chatRow.estado ?? null;
       // Solo sumar si la etapa destino acepta chats como fuente
       if (estado && (sinEmbudo || etapasConChats.has(estado))) {
         distribucionEmbudo[estado] = (distribucionEmbudo[estado] ?? 0) + 1;

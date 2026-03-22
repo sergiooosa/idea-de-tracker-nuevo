@@ -281,6 +281,9 @@ export const chatsLogs = pgTable("chats_logs", {
   chatid: text("chatid"),
   origen: text("origen"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
+  // ── IA nocturna ──────────────────────────────────────────────────────────
+  ia_categoria: text("ia_categoria"),
+  ia_analizado_at: timestamp("ia_analizado_at", { withTimezone: true }),
 });
 
 /* ------------------------------------------------------------------ */
@@ -317,6 +320,8 @@ export const metasCuenta = pgTable("metas_cuenta", {
   meta_chats_diarios: integer("meta_chats_diarios"),
   meta_chats_contestacion: numeric("meta_chats_contestacion", { precision: 5, scale: 2 }),
   meta_speed_chat_min: numeric("meta_speed_chat_min", { precision: 8, scale: 2 }),
+  // ── IA nocturna — hora del cron de análisis de chats (0-23) ─────────────
+  chat_analisis_hora: integer("chat_analisis_hora").default(2),
   metas_por_asesor: jsonb("metas_por_asesor").$type<MetaPorAsesor[]>(),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

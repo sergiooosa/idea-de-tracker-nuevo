@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { chatsLogs, cuentas } from "@/lib/db/schema";
-import type { ChatMessage, ChatTrigger } from "@/lib/db/schema";
+import type { ChatMessage } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   ApiChatLead,
@@ -49,21 +49,13 @@ function computeSpeedToLead(
   return diffSec > 0 ? diffSec : null;
 }
 
-function applyTriggers(
+// applyTriggers: mantenido SOLO para calcular speed to lead (emoji_toma_atencion).
+// Ya NO se usa para clasificar el estado del chat (ahora lo hace la IA).
+function detectTakeoverEmoji(
   msgs: ChatMessage[],
-  triggers: ChatTrigger[],
-): { nuevoEstado: string | null; triggerUsado: string | null } {
-  if (!triggers.length) return { nuevoEstado: null, triggerUsado: null };
-  const agentMsgs = msgs.filter((m) => m.role === "agent");
-  for (let i = agentMsgs.length - 1; i >= 0; i--) {
-    const text = agentMsgs[i].message ?? "";
-    for (const t of triggers) {
-      if (text.includes(t.trigger)) {
-        return { nuevoEstado: t.valor, triggerUsado: t.trigger };
-      }
-    }
-  }
-  return { nuevoEstado: null, triggerUsado: null };
+  emojiTomaAtencion: string,
+): boolean {
+  return msgs.some((m) => m.role === "agent" && (m.message ?? "").includes(emojiTomaAtencion));
 }
 
 export async function getChats(
@@ -78,7 +70,7 @@ export async function getChats(
 
   const [[cuentaRow], rows] = await Promise.all([
     db
-      .select({ chat_triggers: cuentas.chat_triggers, configuracion_ui: cuentas.configuracion_ui })
+      .select({ configuracion_ui: cuentas.configuracion_ui })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
@@ -95,10 +87,6 @@ export async function getChats(
       .orderBy(sql`${chatsLogs.fecha_y_hora_z} DESC`),
   ]);
 
-  const triggers: ChatTrigger[] = Array.isArray(cuentaRow?.chat_triggers)
-    ? cuentaRow.chat_triggers
-    : [];
-
   const chatConfig = cuentaRow?.configuracion_ui?.chat_config ?? {};
   const tieneChatbot = chatConfig.tiene_chatbot ?? false;
   const emojiTomaAtencion = chatConfig.emoji_toma_atencion ?? undefined;
@@ -110,7 +98,9 @@ export async function getChats(
     const agentName = extractAgentName(msgs);
     const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot);
 
-    const { nuevoEstado, triggerUsado } = applyTriggers(msgs, triggers);
+    // Estado proviene de la IA (chats_logs.estado escrito por analyzeChatsNightly)
+    // Los triggers de emoji ya NO determinan el estado del chat.
+    const estadoFinal = r.estado ?? null;
 
     return {
       id: r.id_evento,
@@ -122,7 +112,7 @@ export async function getChats(
       agentMessages: agentMsgs.length,
       leadMessages: leadMsgs.length,
       speedToLeadSeconds: speed,
-      estado: nuevoEstado ?? r.estado,
+      estado: estadoFinal,
       notasExtra: r.notas_extra,
       messages: msgs.map((m) => ({
         name: m.name,
@@ -132,7 +122,6 @@ export async function getChats(
         timestamp: m.timestamp,
       })),
       tagsInternos: Array.isArray(r.tags_internos) ? r.tags_internos : undefined,
-      triggerAplicado: triggerUsado ?? undefined,
     };
   });
 

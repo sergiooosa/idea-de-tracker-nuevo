@@ -580,6 +580,115 @@ function BYOKSection({ hasKey }: { hasKey: boolean }) {
   );
 }
 
+function CostosIASection() {
+  const [chatsPerMonth, setChatsPerMonth] = useState(500);
+  const [callMinutes, setCallMinutes] = useState(5);
+
+  // GPT-4o-mini: $0.15/1M tokens entrada, $0.60/1M tokens salida
+  // Estimado por chat: 500 tokens entrada + 100 tokens salida
+  const costPerChat = (500 * 0.15 + 100 * 0.60) / 1_000_000;
+  const monthlyChatCost = chatsPerMonth * costPerChat;
+
+  // Whisper: $0.006/min
+  const costPerMinuteWhisper = 0.006;
+  const monthlyCallCost = callMinutes * costPerMinuteWhisper;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent-amber/20 flex items-center justify-center shrink-0 text-xl">
+          💰
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-white">Costos de IA</h3>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Precios actuales de los modelos de IA que usa el sistema. Si usas tu propia API Key (BYOK), estos costos van directamente a tu cuenta de OpenAI.
+          </p>
+        </div>
+      </div>
+
+      {/* Tabla de precios */}
+      <div className="rounded-xl border border-surface-500 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-surface-700/60 text-left">
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-400 uppercase">Modelo</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-400 uppercase">Uso</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-gray-400 uppercase">Precio</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-600">
+            <tr>
+              <td className="px-4 py-2.5 text-white font-medium">GPT-4o-mini</td>
+              <td className="px-4 py-2.5 text-gray-400">Clasificación de llamadas, videollamadas y chats</td>
+              <td className="px-4 py-2.5">
+                <div className="text-accent-amber font-mono text-xs space-y-0.5">
+                  <div>$0.15 / 1M tokens entrada</div>
+                  <div>$0.60 / 1M tokens salida</div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-2.5 text-white font-medium">Whisper-1</td>
+              <td className="px-4 py-2.5 text-gray-400">Transcripción de llamadas telefónicas (Twilio)</td>
+              <td className="px-4 py-2.5 text-accent-amber font-mono text-xs">$0.006 / minuto</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Calculadora */}
+      <div className="rounded-xl border border-accent-cyan/30 bg-accent-cyan/5 p-4 space-y-4">
+        <h4 className="text-sm font-semibold text-accent-cyan">🧮 Calculadora de costos</h4>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-gray-300">¿Cuántos chats por mes?</label>
+            <input
+              type="number"
+              min={0}
+              value={chatsPerMonth}
+              onChange={(e) => setChatsPerMonth(Math.max(0, Number(e.target.value)))}
+              className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+            />
+            <p className="text-[11px] text-gray-500">
+              Costo estimado: <span className="text-accent-amber font-semibold">~${monthlyChatCost.toFixed(4)} USD/mes</span>
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-gray-300">Duración promedio de llamadas (min)</label>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={callMinutes}
+              onChange={(e) => setCallMinutes(Math.max(0, Number(e.target.value)))}
+              className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+            />
+            <p className="text-[11px] text-gray-500">
+              Costo Whisper por llamada: <span className="text-accent-amber font-semibold">~${monthlyCallCost.toFixed(4)} USD</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-surface-700/60 border border-surface-500 px-3 py-2 text-xs text-gray-300 space-y-0.5">
+          <p>📊 <strong className="text-white">Total estimado mensual (chats):</strong> <span className="text-accent-amber">~${monthlyChatCost.toFixed(3)} USD</span></p>
+          <p className="text-gray-500 mt-1">💡 GPT-4o-mini es el modelo más eficiente y económico de OpenAI. Ideal para clasificación masiva.</p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-accent-amber/30 bg-accent-amber/5 px-3 py-2.5 text-sm text-gray-400 space-y-1">
+        <p className="font-semibold text-accent-amber">¿Quién paga estos costos?</p>
+        <ul className="list-disc list-inside text-gray-500 space-y-0.5 text-xs">
+          <li>Sin BYOK: los costos son de la plataforma (incluidos en tu plan).</li>
+          <li>Con BYOK (tu API Key): los costos van directamente a tu cuenta de OpenAI. Tú tienes control total.</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export default function DocumentacionPage() {
   const { data, loading } = useApiData<SystemConfig>("/api/data/system-config");
 
@@ -647,6 +756,10 @@ export default function DocumentacionPage() {
                 <Key className="w-3.5 h-3.5" />
                 OpenAI Key
               </TabsTrigger>
+              <TabsTrigger value="costos" className="flex items-center gap-1.5">
+                <span>💰</span>
+                Costos de IA
+              </TabsTrigger>
             </TabsList>
 
             <Separator className="my-4" />
@@ -673,6 +786,10 @@ export default function DocumentacionPage() {
 
             <TabsContent value="byok">
               <BYOKSection hasKey={hasOpenAIKey} />
+            </TabsContent>
+
+            <TabsContent value="costos">
+              <CostosIASection />
             </TabsContent>
           </Tabs>
         )}

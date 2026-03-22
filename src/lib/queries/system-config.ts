@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { cuentas } from "@/lib/db/schema";
+import { cuentas, metasCuenta } from "@/lib/db/schema";
 import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseMetricasConfig } from "@/lib/metricas-engine";
@@ -7,8 +7,9 @@ import { parseMetricasConfig } from "@/lib/metricas-engine";
 export interface ChatConfigData {
   tiene_chatbot: boolean;
   emoji_toma_atencion: string;
-  trigger_mode: "unico" | "multiple";
-  trigger_confirmaciones: number;
+  // Legacy fields kept for backward compatibility (no longer shown in UI)
+  trigger_mode?: "unico" | "multiple";
+  trigger_confirmaciones?: number;
 }
 
 export interface SystemConfigData {
@@ -19,7 +20,6 @@ export interface SystemConfigData {
   metricas_personalizadas: MetricaPersonalizada[];
   metricas_config: MetricaConfig[];
   metricas_manual_data: Record<string, MetricaManualEntry[]>;
-  chat_triggers: ChatTrigger[];
   embudo_personalizado: EmbudoEtapa[];
   tipos_eventos_config: TipoEventoConfig[];
   has_openai_key: boolean;
@@ -27,6 +27,7 @@ export interface SystemConfigData {
   seccion_chats_dashboard: boolean;
   roles_config: RolConfig[];
   chat_config: ChatConfigData;
+  chat_analisis_hora: number;
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key">> {
@@ -43,25 +44,33 @@ const DEFAULT_PROMPT_LLAMADAS =
   "Evalúa la llamada telefónica según: 1) Saludo y presentación, 2) Calificación del lead (interés, autoridad, necesidad), 3) Manejo de objeciones, 4) Cierre o siguiente paso (agendar, callback). Asigna puntaje 1-10 por criterio.";
 
 export async function getSystemConfig(idCuenta: number): Promise<SystemConfigData> {
-  const rows = await db
-    .select({
-      prompt_ventas: cuentas.prompt_ventas,
-      prompt_videollamadas: cuentas.prompt_videollamadas,
-      prompt_llamadas: cuentas.prompt_llamadas,
-      reglas_etiquetas: cuentas.reglas_etiquetas,
-      metricas_personalizadas: cuentas.metricas_personalizadas,
-      chat_triggers: cuentas.chat_triggers,
-      embudo_personalizado: cuentas.embudo_personalizado,
-      tipos_eventos_config: cuentas.tipos_eventos_config,
-      openai_api_key: cuentas.openai_api_key,
-      configuracion_ui: cuentas.configuracion_ui,
-      roles_config: cuentas.roles_config,
-      metricas_config: cuentas.metricas_config,
-      metricas_manual_data: cuentas.metricas_manual_data,
-    })
-    .from(cuentas)
-    .where(eq(cuentas.id_cuenta, idCuenta))
-    .limit(1);
+  const [rows, metasRows] = await Promise.all([
+    db
+      .select({
+        prompt_ventas: cuentas.prompt_ventas,
+        prompt_videollamadas: cuentas.prompt_videollamadas,
+        prompt_llamadas: cuentas.prompt_llamadas,
+        reglas_etiquetas: cuentas.reglas_etiquetas,
+        metricas_personalizadas: cuentas.metricas_personalizadas,
+        embudo_personalizado: cuentas.embudo_personalizado,
+        tipos_eventos_config: cuentas.tipos_eventos_config,
+        openai_api_key: cuentas.openai_api_key,
+        configuracion_ui: cuentas.configuracion_ui,
+        roles_config: cuentas.roles_config,
+        metricas_config: cuentas.metricas_config,
+        metricas_manual_data: cuentas.metricas_manual_data,
+      })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1),
+    db
+      .select({ chat_analisis_hora: metasCuenta.chat_analisis_hora })
+      .from(metasCuenta)
+      .where(eq(metasCuenta.id_cuenta, idCuenta))
+      .limit(1),
+  ]);
+
+  const chatAnalisisHora = metasRows[0]?.chat_analisis_hora ?? 2;
 
   if (rows.length === 0) {
     return {
@@ -70,7 +79,6 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       prompt_llamadas: DEFAULT_PROMPT_LLAMADAS,
       reglas_etiquetas: [],
       metricas_personalizadas: [],
-      chat_triggers: [],
       embudo_personalizado: [],
       tipos_eventos_config: [],
       has_openai_key: false,
@@ -79,7 +87,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       roles_config: [],
       metricas_config: [],
       metricas_manual_data: {},
-      chat_config: { tiene_chatbot: false, emoji_toma_atencion: "", trigger_mode: "unico", trigger_confirmaciones: 2 },
+      chat_config: { tiene_chatbot: false, emoji_toma_atencion: "" },
+      chat_analisis_hora: chatAnalisisHora,
     };
   }
 
@@ -90,7 +99,6 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     prompt_llamadas: r.prompt_llamadas ?? DEFAULT_PROMPT_LLAMADAS,
     reglas_etiquetas: Array.isArray(r.reglas_etiquetas) ? r.reglas_etiquetas : [],
     metricas_personalizadas: Array.isArray(r.metricas_personalizadas) ? r.metricas_personalizadas : [],
-    chat_triggers: Array.isArray(r.chat_triggers) ? r.chat_triggers : [],
     embudo_personalizado: Array.isArray(r.embudo_personalizado) ? r.embudo_personalizado : [],
     tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
     has_openai_key: !!r.openai_api_key,
@@ -102,9 +110,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     chat_config: {
       tiene_chatbot: r.configuracion_ui?.chat_config?.tiene_chatbot ?? false,
       emoji_toma_atencion: r.configuracion_ui?.chat_config?.emoji_toma_atencion ?? "",
-      trigger_mode: r.configuracion_ui?.chat_config?.trigger_mode ?? "unico",
-      trigger_confirmaciones: r.configuracion_ui?.chat_config?.trigger_confirmaciones ?? 2,
     },
+    chat_analisis_hora: chatAnalisisHora,
   };
 }
 
@@ -119,13 +126,27 @@ export async function updateSystemConfig(
   if (data.prompt_llamadas !== undefined) setClause.prompt_llamadas = data.prompt_llamadas;
   if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
   if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
-  if (data.chat_triggers !== undefined) setClause.chat_triggers = data.chat_triggers;
   if (data.embudo_personalizado !== undefined) setClause.embudo_personalizado = data.embudo_personalizado;
   if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
   if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
   if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
   if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
+
+  // Handle chat_analisis_hora — update metas_cuenta table
+  const dataAnyTop = data as Record<string, unknown>;
+  if (dataAnyTop.chat_analisis_hora !== undefined) {
+    const hora = Number(dataAnyTop.chat_analisis_hora);
+    if (!isNaN(hora) && hora >= 0 && hora <= 23) {
+      await db
+        .insert(metasCuenta)
+        .values({ id_cuenta: idCuenta, chat_analisis_hora: hora })
+        .onConflictDoUpdate({
+          target: metasCuenta.id_cuenta,
+          set: { chat_analisis_hora: hora },
+        });
+    }
+  }
 
   if (
     data.fuente_datos_financieros !== undefined ||
