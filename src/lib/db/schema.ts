@@ -296,6 +296,15 @@ export interface MetaPorAsesor {
   meta_cierres_semanales?: number;
 }
 
+export interface MetaPorRol {
+  rol_id: string;
+  rol_nombre: string;
+  meta_llamadas_diarias?: number | null;
+  meta_chats_diarios?: number | null;
+  meta_cierres_semanales?: number | null;
+  meta_contestacion?: number | null;
+}
+
 export const metasCuenta = pgTable("metas_cuenta", {
   id_meta: serial("id_meta").primaryKey(),
   id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta),
@@ -323,6 +332,7 @@ export const metasCuenta = pgTable("metas_cuenta", {
   // ── IA nocturna — hora del cron de análisis de chats (0-23) ─────────────
   chat_analisis_hora: integer("chat_analisis_hora").default(2),
   metas_por_asesor: jsonb("metas_por_asesor").$type<MetaPorAsesor[]>(),
+  metas_por_rol: jsonb("metas_por_rol").$type<MetaPorRol[]>().default([]),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -384,4 +394,22 @@ export const eventosHuerfanos = pgTable("eventos_huerfanos", {
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
   index("idx_huerfanos_cuenta_estado").on(table.id_cuenta, table.estado),
+]);
+
+/* ------------------------------------------------------------------ */
+/*  comisiones_config — configuración de comisiones por closer         */
+/* ------------------------------------------------------------------ */
+
+export const comisionesConfig = pgTable("comisiones_config", {
+  id: serial("id").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  closer_email: text("closer_email").notNull(),
+  closer_nombre: text("closer_nombre"),
+  tipo: text("tipo").notNull().default("porcentaje"), // 'porcentaje' | 'monto_fijo'
+  valor: numeric("valor", { precision: 10, scale: 4 }).notNull().default("0"),
+  aplica_sobre: text("aplica_sobre").default("cash_collected"), // 'cash_collected' | 'facturacion'
+  activo: boolean("activo").default(true),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_comisiones_id_cuenta").on(table.id_cuenta),
 ]);

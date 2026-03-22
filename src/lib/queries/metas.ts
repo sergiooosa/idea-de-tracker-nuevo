@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
 import { metasCuenta } from "@/lib/db/schema";
+import type { MetaPorRol } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
+
+export type { MetaPorRol };
 
 export interface MetasData {
   // ── Campos originales (backward-compatible) ────────────────────
@@ -16,6 +19,8 @@ export interface MetasData {
   meta_tasa_contestacion: number | null;
   meta_speed_to_lead_min: number | null;
   metas_por_asesor: { email: string; meta_llamadas_diarias?: number; meta_cierres_semanales?: number }[];
+  // ── Metas por rol ──────────────────────────────────────────────
+  metas_por_rol: MetaPorRol[];
   // ── Canal: Llamadas ────────────────────────────────────────────
   meta_llamadas_semanales: number | null;
   meta_contestacion_llamadas: number | null;
@@ -43,6 +48,7 @@ const DEFAULTS: MetasData = {
   meta_tasa_contestacion: null,
   meta_speed_to_lead_min: null,
   metas_por_asesor: [],
+  metas_por_rol: [],
   meta_llamadas_semanales: null,
   meta_contestacion_llamadas: null,
   meta_speed_llamadas_min: null,
@@ -80,6 +86,7 @@ export async function getMetas(idCuenta: number): Promise<MetasData> {
     meta_tasa_contestacion: toNum(r.meta_tasa_contestacion),
     meta_speed_to_lead_min: toNum(r.meta_speed_to_lead_min),
     metas_por_asesor: Array.isArray(r.metas_por_asesor) ? r.metas_por_asesor : [],
+    metas_por_rol: Array.isArray(r.metas_por_rol) ? r.metas_por_rol : [],
     // ── Nuevos campos por canal ──────────────────────────────────
     meta_llamadas_semanales: r.meta_llamadas_semanales ?? null,
     meta_contestacion_llamadas: toNum(r.meta_contestacion_llamadas),
@@ -113,6 +120,7 @@ export async function upsertMetas(idCuenta: number, data: Partial<MetasData>): P
       meta_tasa_contestacion: numOrNull(data.meta_tasa_contestacion),
       meta_speed_to_lead_min: numOrNull(data.meta_speed_to_lead_min),
       metas_por_asesor: data.metas_por_asesor ?? [],
+      metas_por_rol: data.metas_por_rol ?? [],
       // ── Nuevos campos por canal ──────────────────────────────────
       meta_llamadas_semanales: data.meta_llamadas_semanales ?? null,
       meta_contestacion_llamadas: numOrNull(data.meta_contestacion_llamadas),
@@ -140,6 +148,7 @@ export async function upsertMetas(idCuenta: number, data: Partial<MetasData>): P
         meta_tasa_contestacion: sql`EXCLUDED.meta_tasa_contestacion`,
         meta_speed_to_lead_min: sql`EXCLUDED.meta_speed_to_lead_min`,
         metas_por_asesor: sql`EXCLUDED.metas_por_asesor`,
+        metas_por_rol: sql`EXCLUDED.metas_por_rol`,
         meta_llamadas_semanales: sql`EXCLUDED.meta_llamadas_semanales`,
         meta_contestacion_llamadas: sql`EXCLUDED.meta_contestacion_llamadas`,
         meta_speed_llamadas_min: sql`EXCLUDED.meta_speed_llamadas_min`,

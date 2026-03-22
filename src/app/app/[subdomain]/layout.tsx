@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  BadgeDollarSign,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { path: "/dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
   { path: "/performance", label: "Rendimiento", icon: BarChart3 },
   { path: "/asesor", label: "Panel asesor", icon: UserCheck },
+  { path: "/comisiones", label: "Comisiones", icon: BadgeDollarSign },
   { path: "/bandeja", label: "Bandeja", icon: Inbox },
   { path: "/acquisition", label: "Resumen adquisición", icon: TrendingUp },
   { path: "/system", label: "Control del sistema", icon: Target },

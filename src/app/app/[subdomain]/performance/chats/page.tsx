@@ -18,6 +18,7 @@ const minFmt = (s: number | null) => {
 const chatKpiTooltips = {
   asignados: { significado: 'Cantidad de conversaciones de chat en el rango.', calculo: 'Conteo de registros en chats_logs.' },
   activos: { significado: 'Chats donde el agente respondió al menos una vez.', calculo: 'Chats con al menos un mensaje de role "agent".' },
+  contactados: { significado: 'Chats donde un asesor respondió al menos una vez.', calculo: 'Conteo de chats con agentMessages > 0 en el período.' },
   seguimientos: { significado: 'Total de mensajes en todas las conversaciones.', calculo: 'Suma de todos los mensajes del JSONB.' },
   speedToLead: { significado: 'Tiempo promedio desde primer mensaje del lead hasta primera respuesta del agente.', calculo: 'Promedio de (timestamp primer msg agente − timestamp primer msg lead).' },
 };
@@ -111,10 +112,11 @@ export default function PerformanceChatsPage() {
         />
       </div>
 
-      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[
           { label: 'Chats asignados', value: agg.assigned, color: 'cyan', tip: chatKpiTooltips.asignados },
           { label: 'Chats activos', value: agg.activos, color: 'cyan', tip: chatKpiTooltips.activos },
+          { label: 'Contactados', value: agg.activos, color: 'cyan', tip: chatKpiTooltips.contactados },
           { label: 'Mensajes totales', value: agg.seguimientosTotal, color: 'purple', tip: chatKpiTooltips.seguimientos },
           { label: 'Speed to lead prom.', value: minFmt(agg.speedAvg), color: 'purple', tip: chatKpiTooltips.speedToLead },
         ].map(({ label, value, color, tip }) => (
