@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import {
   format,
   startOfMonth,
@@ -54,6 +55,7 @@ export default function DateRangePicker({
   defaultFrom?: string;
   defaultTo?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [tempFrom, setTempFrom] = useState<string>(dateFrom);
   const [tempTo, setTempTo] = useState<string>(dateTo);
@@ -187,21 +189,21 @@ export default function DateRangePicker({
           onClick={() => setQuickRange(0)}
           className="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-surface-600 text-gray-300 hover:text-white"
         >
-          Hoy
+          {t.comun.hoy}
         </button>
         <button
           type="button"
           onClick={() => setQuickRange(7)}
           className="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-surface-600 text-gray-300 hover:text-white"
         >
-          Últimos 7 días
+          7 {t.comun.dia}s
         </button>
         <button
           type="button"
           onClick={() => setQuickRange(30)}
           className="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-surface-600 text-gray-300 hover:text-white"
         >
-          30 días
+          30 {t.comun.dia}s
         </button>
       </div>
       <div className="flex items-center gap-2 rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5">

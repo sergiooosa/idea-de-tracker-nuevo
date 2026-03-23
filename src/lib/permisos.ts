@@ -36,7 +36,7 @@ export const NAV_PERMISOS: Record<string, PermisoId> = {
   "/configuracion": "ver_configuracion",
   "/documentacion": "ver_documentacion",
   "/comisiones": "ver_comisiones",
-  "/ads": "ver_ads",
+  // "/ads": "ver_ads",  // visible para todos — solo se activa si hay ads configurados
 };
 
 /** Permisos que dan acceso al toggle "Solo data del asesor" (ver datos de todos) */

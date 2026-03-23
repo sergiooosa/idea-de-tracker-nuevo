@@ -1162,17 +1162,35 @@ export default function SystemPage() {
                         </div>
                       );
                       return (
-                        <div>
-                          <label className="block text-[11px] font-medium text-accent-cyan mb-1">
-                            Condición para la IA
-                            <span className="text-gray-500 font-normal ml-1">(clasifica llamadas y videollamadas)</span>
-                          </label>
-                          <textarea
-                            value={etapa.condition ?? ''}
-                            onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.value } : x))}
-                            placeholder={`Describe cuándo un lead debe clasificarse en esta etapa.\nEj: "El lead mostró interés real, preguntó por precios o pidió una propuesta formal."`}
-                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-600 min-h-[60px] focus:ring-2 focus:ring-accent-cyan/40 resize-y"
-                          />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-medium text-accent-cyan flex items-center gap-1.5">
+                              Condición para la IA
+                              <span className="text-gray-500 font-normal">(opcional)</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-gray-400">
+                              <input
+                                type="checkbox"
+                                checked={!!etapa.condition}
+                                onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.checked ? ' ' : '' } : x))}
+                                className="accent-accent-cyan"
+                              />
+                              Usar condición IA
+                            </label>
+                          </div>
+                          {!!etapa.condition && (
+                            <textarea
+                              value={etapa.condition}
+                              onChange={(e) => setEmbudoEtapas((prev) => prev.map((x) => x.id === etapa.id ? { ...x, condition: e.target.value } : x))}
+                              placeholder={`Describe cuándo un lead debe clasificarse en esta etapa.\nEj: "El lead mostró interés real, preguntó por precios o pidió una propuesta formal."`}
+                              className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-600 min-h-[60px] focus:ring-2 focus:ring-accent-cyan/40 resize-y"
+                            />
+                          )}
+                          {!etapa.condition && (
+                            <p className="text-[10px] text-gray-600 italic">
+                              Sin condición IA — la etapa se puede asignar manualmente o por reglas automáticas.
+                            </p>
+                          )}
                         </div>
                       );
                     })()}
