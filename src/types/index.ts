@@ -319,6 +319,7 @@ export interface LlamadasResponse {
   };
   advisorMetrics: Record<string, LlamadasAdvisorMetrics>;
   advisors: ApiAdvisor[];
+  fuente_llamadas?: "twilio" | "ghl";
 }
 
 export interface ApiChatMessage {
@@ -486,6 +487,7 @@ export interface DashboardResponse {
     };
     [key: string]: unknown;
   };
+  fuente_llamadas?: "twilio" | "ghl";
 }
 
 export interface AsesorLeadCRM {
@@ -549,4 +551,5 @@ export interface AsesorResponse {
   /** Lista completa de asesores del tenant (para combobox super admin) */
   advisorsList?: ApiAdvisor[];
   breakdown?: AsesorBreakdown;
+  fuente_llamadas?: "twilio" | "ghl";
 }

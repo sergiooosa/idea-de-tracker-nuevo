@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
@@ -37,6 +38,7 @@ function isAnswered(c: ApiLlamadaLog) {
 }
 
 export default function PerformanceLlamadasPage() {
+  const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
@@ -158,8 +160,17 @@ export default function PerformanceLlamadasPage() {
     );
   }
 
+  const isGHL = data?.fuente_llamadas === 'ghl';
+
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
+      {isGHL && (
+        <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+          <p className="font-semibold">📞 Este cliente usa GHL para llamadas — Análisis IA no disponible</p>
+          <p>Las llamadas se registran con métricas básicas: contestadas / no contestadas.</p>
+          <p className="text-amber-500/70">Cuando GHL agregue transcripción automática, podrás activar el análisis IA.</p>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 mb-0">
         <span className="text-xs text-gray-400">Rango de fechas (actividad):</span>
         <DateRangePicker
@@ -197,10 +208,10 @@ export default function PerformanceLlamadasPage() {
       </div>
 
       <section>
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Llamadas por asesor</h3>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t.performance.llamadas.titulo}</h3>
         <div className="rounded-lg border border-surface-500 overflow-hidden">
           {Object.keys(leadsByAdvisor).length === 0 && Object.keys(data?.advisorMetrics ?? {}).length === 0 ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay llamadas en el rango de fechas.</div>
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">{t.performance.llamadas.noData}</div>
           ) : leadSearch.trim() && Object.keys(leadsByAdvisorFiltered).length === 0 ? (
             <div className="px-3 py-4 text-center text-gray-500 text-xs">Ningún lead coincide con «{leadSearch.trim()}».</div>
           ) : (
@@ -209,12 +220,12 @@ export default function PerformanceLlamadasPage() {
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium w-6" />
-                    <th className="px-2 py-2 font-medium">Asesor</th>
-                    <th className="px-2 py-2 font-medium">Leads asignados</th>
-                    <th className="px-2 py-2 font-medium">Llamadas</th>
-                    <th className="px-2 py-2 font-medium">Contestadas</th>
-                    <th className="px-2 py-2 font-medium">% contestación</th>
-                    <th className="px-2 py-2 font-medium">Tiempo al lead</th>
+                    <th className="px-2 py-2 font-medium">{t.performance.llamadas.lead}</th>
+                    <th className="px-2 py-2 font-medium">{t.asesor.kpis.leadsAsignados}</th>
+                    <th className="px-2 py-2 font-medium">{t.performance.llamadas.titulo}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.contestadas}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.tasaContacto}</th>
+                    <th className="px-2 py-2 font-medium">{t.performance.llamadas.speedToLead}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -270,8 +281,8 @@ export default function PerformanceLlamadasPage() {
                                         ) : advisorLeads.map((lead) => (
                                           <tr
                                             key={lead.id_registro}
-                                            className="border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer"
-                                            onClick={() => openLogsForLead(lead)}
+                                            className={`border-t border-surface-500 ${isGHL ? '' : 'hover:bg-surface-600/50 cursor-pointer'}`}
+                                            onClick={() => { if (!isGHL) openLogsForLead(lead); }}
                                           >
                                             <td className="px-2 py-2 text-white">
                                               <div className="flex flex-col gap-0.5">

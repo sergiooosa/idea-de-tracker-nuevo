@@ -42,6 +42,7 @@ export interface ConfiguracionUI {
   kpis_visibles?: Record<string, string[]>;
   fuente_datos_financieros?: "nativa" | "api_externa";
   chat_config?: ChatConfig;
+  idioma?: "es" | "en";
 }
 
 export interface ReglaEtiqueta {
@@ -155,6 +156,7 @@ export const cuentas = pgTable("cuentas", {
   roles_config: jsonb("roles_config").$type<RolConfig[]>(),
   metricas_config: jsonb("metricas_config").$type<MetricaConfig[]>(),
   metricas_manual_data: jsonb("metricas_manual_data").$type<Record<string, MetricaManualEntry[]>>(),
+  fuente_llamadas: text("fuente_llamadas").default("twilio"),
 });
 
 /* ------------------------------------------------------------------ */

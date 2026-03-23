@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, Fragment } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
@@ -47,6 +48,7 @@ function detectCanal(chat: ApiChatLead): string {
 }
 
 export default function PerformanceChatsPage() {
+  const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export default function PerformanceChatsPage() {
       {/* ── Filtro por canal ── */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-400 font-medium">Canal:</span>
+          <span className="text-xs text-gray-400 font-medium">{t.performance.chats.canal}:</span>
           <div className="flex flex-wrap gap-1.5">
             {CANAL_LABELS.map((canal) => {
               const count = canalCounts[canal] ?? 0;
@@ -151,7 +153,7 @@ export default function PerformanceChatsPage() {
                   }`}
                 >
                   {canal !== 'todos' && <span>{CANAL_EMOJI[canal]}</span>}
-                  {canal === 'todos' ? 'Todos' : canal}
+                  {canal === 'todos' ? t.performance.chats.todos : canal}
                   {count > 0 && (
                     <span className={`rounded-full px-1 text-[10px] ${isActive ? 'bg-accent-cyan/30' : 'bg-surface-600'}`}>
                       {count}
@@ -170,10 +172,10 @@ export default function PerformanceChatsPage() {
       </div>
 
       <section>
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Chats por agente</h3>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t.performance.chats.titulo}</h3>
         <div className="rounded-lg border border-surface-500 overflow-hidden">
           {Object.keys(chatsByAgent).length === 0 ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay chats en el rango{canalActivo !== 'todos' ? ` para el canal ${canalActivo}` : ''}.</div>
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">{t.performance.chats.noData}{canalActivo !== 'todos' ? ` (${canalActivo})` : ''}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">

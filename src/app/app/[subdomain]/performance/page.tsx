@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
@@ -53,6 +54,7 @@ function apiToVideoMeeting(r: ApiVideollamada): VideoMeeting {
 }
 
 export default function PerformanceVideollamadasPage() {
+  const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
@@ -239,11 +241,11 @@ export default function PerformanceVideollamadasPage() {
 
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-          Videollamadas por asesor
+          {t.performance.videollamadas.titulo}
         </h3>
         <div className="rounded-lg border border-surface-500 overflow-hidden">
           {(data?.registros?.length ?? 0) === 0 ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay videollamadas en el rango de fechas.</div>
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">{t.performance.videollamadas.noData}</div>
           ) : leadSearch.trim() && registrosFiltrados.length === 0 ? (
             <div className="px-3 py-4 text-center text-gray-500 text-xs">Ninguna reunión coincide con «{leadSearch.trim()}».</div>
           ) : (
@@ -252,12 +254,12 @@ export default function PerformanceVideollamadasPage() {
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium w-6" />
-                    <th className="px-2 py-2 font-medium">Asesor</th>
-                    <th className="px-2 py-2 font-medium">Agendadas</th>
-                    <th className="px-2 py-2 font-medium">Asistencias</th>
-                    <th className="px-2 py-2 font-medium">% cierre</th>
-                    <th className="px-2 py-2 font-medium">Facturación</th>
-                    <th className="px-2 py-2 font-medium">Cash collected</th>
+                    <th className="px-2 py-2 font-medium">{t.performance.videollamadas.closer}</th>
+                    <th className="px-2 py-2 font-medium">{t.performance.videollamadas.reunion}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.asistidas}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.tasaCierre}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.ingresos}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.efectivoCobrado}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -81,6 +81,7 @@ export async function getDashboard(
       metricas_personalizadas: cuentas.metricas_personalizadas,
       metricas_config: cuentas.metricas_config,
       metricas_manual_data: cuentas.metricas_manual_data,
+      fuente_llamadas: cuentas.fuente_llamadas,
       // chat_triggers ya no se usa para clasificar — la IA escribe chats_logs.estado directamente
     })
     .from(cuentas)
@@ -722,5 +723,6 @@ export async function getDashboard(
     chatKpis: chatKpis.total > 0 ? chatKpis : undefined,
     alertasMetas: alertasMetas.length > 0 ? alertasMetas : undefined,
     configuracion_ui: cuentaRow?.configuracion_ui as DashboardResponse["configuracion_ui"] ?? undefined,
+    fuente_llamadas: (cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio") as "twilio" | "ghl",
   };
 }

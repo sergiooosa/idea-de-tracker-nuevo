@@ -3,6 +3,8 @@
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useT } from '@/contexts/LocaleContext';
+import type { Locale } from '@/lib/i18n';
 import PageHeader from '@/components/dashboard/PageHeader';
 import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle } from 'lucide-react';
 import {
@@ -75,6 +77,7 @@ interface SystemConfig {
   chat_config?: ChatConfig;
   chat_analisis_hora?: number;
   roles_config?: RolConfigLocal[];
+  idioma?: 'es' | 'en';
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -170,6 +173,7 @@ function SortableMetricaCard({
 }
 
 export default function SystemPage() {
+  const t = useT();
   const searchParams = useSearchParams();
   const stepParam = searchParams.get('step');
   const TOTAL_STEPS = 10;
@@ -177,6 +181,7 @@ export default function SystemPage() {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [saving, setSaving] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [currentIdioma, setCurrentIdioma] = useState<Locale>('es');
 
   const [promptEmpresa, setPromptEmpresa] = useState('');
   const [promptEvaluacion, setPromptEvaluacion] = useState('');
@@ -198,6 +203,7 @@ export default function SystemPage() {
   const [reglasAbiertasMap, setReglasAbiertasMap] = useState<Record<string, boolean>>({});
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
   const [seccionChatsDashboard, setSeccionChatsDashboard] = useState(true);
+  const [fuenteLlamadas, setFuenteLlamadas] = useState<'twilio' | 'ghl'>('twilio');
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
@@ -226,6 +232,8 @@ export default function SystemPage() {
         setHasOpenaiKey(cfg.has_openai_key ?? false);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
         setSeccionChatsDashboard(cfg.seccion_chats_dashboard !== false);
+        if (cfg.idioma === 'en' || cfg.idioma === 'es') setCurrentIdioma(cfg.idioma);
+        setFuenteLlamadas((cfg as unknown as { fuente_llamadas?: string }).fuente_llamadas === 'ghl' ? 'ghl' : 'twilio');
         if (cfg.chat_config) {
           setChatConfig({
             tiene_chatbot: cfg.chat_config.tiene_chatbot ?? false,
@@ -287,6 +295,7 @@ export default function SystemPage() {
         seccion_chats_dashboard: seccionChatsDashboard,
         chat_config: chatConfig,
         chat_analisis_hora: chatAnalisisHora,
+        fuente_llamadas: fuenteLlamadas,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -331,6 +340,21 @@ export default function SystemPage() {
   const handleSave = async () => {
     if (currentStep === 6) await saveMetas();
     else await saveConfig();
+  };
+
+  const saveIdioma = async (lang: Locale) => {
+    try {
+      const res = await fetch('/api/data/system-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idioma: lang }),
+      });
+      if (!res.ok) throw new Error('Error al guardar idioma');
+      setCurrentIdioma(lang);
+      toast.success(lang === 'es' ? 'Idioma: Español' : 'Language: English');
+    } catch {
+      toast.error('Error al guardar el idioma');
+    }
   };
 
   const dndSensors = useSensors(
@@ -410,6 +434,32 @@ export default function SystemPage() {
         <div className="rounded-xl p-4 min-h-[280px] section-futuristic border border-surface-500/80 shadow-[0_0_28px_-8px_rgba(0,240,255,0.06)]">
           {currentStep === 1 && (
             <div className="space-y-4">
+              {/* Selector de idioma */}
+              <div className="rounded-xl border border-surface-500 bg-surface-700/50 p-4">
+                <h4 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+                  🌐 {t.sistema.idioma.titulo}
+                </h4>
+                <p className="text-xs text-gray-400 mb-3">
+                  {t.sistema.idioma.descripcion}
+                </p>
+                <div className="flex gap-3">
+                  {(['es', 'en'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => saveIdioma(lang)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                        currentIdioma === lang
+                          ? 'bg-accent-cyan/20 border-accent-cyan text-accent-cyan'
+                          : 'bg-surface-600 border-surface-500 text-gray-400 hover:border-gray-400'
+                      }`}
+                    >
+                      {lang === 'es' ? `🇪🇸 ${t.sistema.idioma.es}` : `🇺🇸 ${t.sistema.idioma.en}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 pb-2 border-b border-accent-blue/30">
                 <div className="rounded-lg p-2 bg-accent-blue/20 border border-accent-blue/40"><Building2 className="w-5 h-5 text-accent-blue" /></div>
                 <div>
@@ -445,14 +495,50 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-cyan/30">
                 <div className="rounded-lg p-2 bg-accent-cyan/20 border border-accent-cyan/40"><Phone className="w-5 h-5 text-accent-cyan" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Evaluación de llamadas telefónicas</h3>
-                  <p className="text-sm text-gray-400">Prompt con el que la IA evaluará cada llamada.</p>
+                  <h3 className="text-lg font-semibold text-white">Llamadas telefónicas</h3>
+                  <p className="text-sm text-gray-400">Configura el origen de llamadas y el prompt de evaluación IA.</p>
                 </div>
               </div>
-              <textarea value={promptLlamadas} onChange={(e) => setPromptLlamadas(e.target.value)}
-                className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
-                placeholder="Evalúa la llamada telefónica según..." />
-              <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
+
+              {/* ── Origen de llamadas ─────────────────────────────────── */}
+              <div className="rounded-xl p-4 bg-surface-700/60 border border-surface-500 space-y-3">
+                <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">📞 Origen de llamadas telefónicas</p>
+                <p className="text-xs text-gray-400">¿Cómo realizan las llamadas telefónicas tus asesores?</p>
+                <div className="space-y-2">
+                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'twilio' ? 'border-accent-cyan/60 bg-accent-cyan/10' : 'border-surface-500 hover:border-surface-400'}`}>
+                    <input type="radio" name="fuente_llamadas" value="twilio" checked={fuenteLlamadas === 'twilio'} onChange={() => setFuenteLlamadas('twilio')} className="mt-0.5 accent-cyan-400" />
+                    <div>
+                      <p className="text-sm font-medium text-white">Twilio <span className="text-[10px] text-green-400 font-semibold">(recomendado)</span></p>
+                      <p className="text-[11px] text-green-400 mt-0.5">✅ IA disponible: transcripción automática + análisis de llamadas</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman usando Twilio. El sistema transcribe y analiza cada llamada con IA.</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'ghl' ? 'border-amber-500/60 bg-amber-500/10' : 'border-surface-500 hover:border-surface-400'}`}>
+                    <input type="radio" name="fuente_llamadas" value="ghl" checked={fuenteLlamadas === 'ghl'} onChange={() => setFuenteLlamadas('ghl')} className="mt-0.5 accent-amber-400" />
+                    <div>
+                      <p className="text-sm font-medium text-white">GoHighLevel (GHL)</p>
+                      <p className="text-[11px] text-amber-400 mt-0.5">⚠️ IA no disponible: solo se registran métricas básicas</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman directamente desde GHL. No hay transcripción ni análisis IA de llamadas. Solo se registra si la llamada fue contestada o no. (GHL planea agregar transcripción automática en el futuro — cuando esté disponible podrás cambiar a Twilio)</p>
+                    </div>
+                  </label>
+                </div>
+                {fuenteLlamadas === 'ghl' && (
+                  <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+                    <p className="font-semibold">⚠️ Con GHL como origen: el prompt de llamadas, análisis IA y transcripciones no están disponibles.</p>
+                    <p>Las métricas de llamadas mostrarán: total realizadas, contestadas y no contestadas.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Prompt de evaluación (solo Twilio) ────────────────── */}
+              {fuenteLlamadas === 'twilio' && (
+                <>
+                  <textarea value={promptLlamadas} onChange={(e) => setPromptLlamadas(e.target.value)}
+                    className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
+                    placeholder="Evalúa la llamada telefónica según..." />
+                  <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
+                </>
+              )}
             </div>
           )}
 

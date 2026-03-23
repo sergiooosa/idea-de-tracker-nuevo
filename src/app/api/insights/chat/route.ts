@@ -20,7 +20,7 @@ const fm = (n: number) =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${n.toLocaleString("es-CO")}`;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildSystemPrompt(nombreCuenta: string, from: string, to: string, data: any): string {
+function buildSystemPrompt(nombreCuenta: string, from: string, to: string, data: any, fuenteLlamadas?: string): string {
   const { kpis, advisorRanking, objeciones, chatKpis } = data;
 
   const sortedAdvisors = [...(advisorRanking ?? [])].sort(
@@ -51,6 +51,10 @@ function buildSystemPrompt(nombreCuenta: string, from: string, to: string, data:
         : `${kpis.speedToLeadAvg.toFixed(1)} min`
       : "N/D";
 
+  const llamadasNote = fuenteLlamadas === "ghl"
+    ? "\nNOTA IMPORTANTE: Las llamadas de este cliente son vía GHL sin transcripción — solo hay métricas básicas de llamadas (totales, contestadas, no contestadas). No hay análisis IA de llamadas ni transcripciones disponibles."
+    : "";
+
   return `Eres el asistente de análisis de ventas de AutoKPI para ${nombreCuenta}.
 Aquí están los datos del período ${from} al ${to}:
 
@@ -62,7 +66,7 @@ TOP ASESORES:
 ${top3Advisors || "Sin datos de asesores"}
 OBJECIONES FRECUENTES:
 ${top5Objeciones || "Sin objeciones registradas"}
-
+${llamadasNote}
 Responde en español, de forma concisa y directa. Si preguntan sobre datos que no tienes, dilo honestamente. No inventes números.`;
 }
 
@@ -85,7 +89,7 @@ export async function POST(req: Request) {
       const [dashData, cuenta] = await Promise.all([
         getDashboard(idCuenta, from, to),
         db
-          .select({ nombre_cuenta: cuentas.nombre_cuenta, openai_api_key: cuentas.openai_api_key })
+          .select({ nombre_cuenta: cuentas.nombre_cuenta, openai_api_key: cuentas.openai_api_key, fuente_llamadas: cuentas.fuente_llamadas })
           .from(cuentas)
           .where(eq(cuentas.id_cuenta, idCuenta))
           .limit(1)
@@ -93,6 +97,7 @@ export async function POST(req: Request) {
       ]);
 
       const nombreCuenta = cuenta?.nombre_cuenta ?? `Cuenta #${idCuenta}`;
+      const fuenteLlamadas = cuenta?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
 
       // Resolver API key: prioridad al tenant, fallback a servidor
       const apiKey = cuenta?.openai_api_key?.trim() || process.env.OPENAI_API_KEY;
@@ -103,7 +108,7 @@ export async function POST(req: Request) {
         );
       }
 
-      const systemPrompt = buildSystemPrompt(nombreCuenta, from, to, dashData);
+      const systemPrompt = buildSystemPrompt(nombreCuenta, from, to, dashData, fuenteLlamadas);
 
       // Construir historial para OpenAI (solo user/assistant)
       const chatHistory = messages

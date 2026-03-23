@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs } from "@/lib/db/schema";
+import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs, cuentas } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, isNull, isNotNull, inArray } from "drizzle-orm";
 import type {
   AsesorKpis,
@@ -68,7 +68,7 @@ export async function getAsesorData(
     ...(emails.length > 0 ? [inArray(chatsLogs.notas_extra, emails)] : []),
   ];
 
-  const [callRows, agendaRows, chatsRows] = await Promise.all([
+  const [callRows, agendaRows, chatsRows, cuentaRow] = await Promise.all([
     db
       .select()
       .from(logLlamadas)
@@ -82,7 +82,15 @@ export async function getAsesorData(
       .select()
       .from(chatsLogs)
       .where(and(...chatConditions)),
+    db
+      .select({ fuente_llamadas: cuentas.fuente_llamadas })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1)
+      .then((r) => r[0] ?? null),
   ]);
+
+  const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
 
   const idCuentaStr = String(idCuenta);
   const regRows = await (async () => {
@@ -211,7 +219,7 @@ export async function getAsesorData(
     return { id: email, name, email };
   });
 
-  return { kpis, leads, advisors, breakdown };
+  return { kpis, leads, advisors, breakdown, fuente_llamadas: fuenteLlamadas };
 }
 
 /** Lista de asesores (closers) del tenant para el filtro "Solo data del asesor" */

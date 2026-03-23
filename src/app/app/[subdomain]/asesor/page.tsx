@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import PageHeader from '@/components/dashboard/PageHeader';
@@ -165,6 +166,7 @@ const defaultFrom = subDays(defaultTo, 7);
 type ExpandedKpi = 'leadsAsignados' | 'llamadasRealizadas' | 'llamadasContestadas' | 'reunionesAgendadas' | null;
 
 export default function AsesorPage() {
+  const t = useT();
   const pathname = usePathname();
   const [dateFrom, setDateFrom] = useState(format(defaultFrom, 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(defaultTo, 'yyyy-MM-dd'));
@@ -203,7 +205,7 @@ export default function AsesorPage() {
   return (
     <>
       <PageHeader
-        title="Panel asesor"
+        title={t.asesor.titulo}
         subtitle="Métricas y leads del asesor"
         action={
           <div className="flex items-center gap-2">
@@ -241,16 +243,16 @@ export default function AsesorPage() {
                 <SectionInfo text="Estos KPIs muestran datos del asesor seleccionado en el período de fechas elegido." />
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-                <KPICard label="Leads asignados" value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad en llamadas y videollamadas en el rango seleccionado.', calculo: 'Correos distintos (mail_lead) que aparecen en el log de llamadas del período.' }} onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined} />
-                <KPICard label="Llamadas realizadas" value={kpis.llamadasRealizadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de eventos registrados en el log de llamadas durante el período.', calculo: 'Cuenta de todas las filas en log_llamadas dentro del rango de fechas.' }} onClick={breakdown ? () => setExpandedKpi('llamadasRealizadas') : undefined} />
-                <KPICard label="Llamadas contestadas" value={kpis.llamadasContestadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Llamadas con respuesta efectiva del lead.', calculo: 'Eventos cuyo tipo comienza con efectiva_* en log_llamadas.' }} onClick={breakdown ? () => setExpandedKpi('llamadasContestadas') : undefined} />
-                <KPICard label="Reuniones agendadas" value={kpis.reunionesAgendadas} color="purple" className={kpiCompact} tooltip={{ significado: 'Citas registradas en el período seleccionado.', calculo: 'Registros en la tabla de agendas dentro del rango de fechas.' }} onClick={breakdown ? () => setExpandedKpi('reunionesAgendadas') : undefined} />
-                <KPICard label="Tasa de contacto" value={`${kpis.tasaContacto.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas que fueron contestadas respecto al total.', calculo: '(Llamadas contestadas ÷ Total llamadas realizadas) × 100.' }} />
-                <KPICard label="Tasa de agendamiento" value={`${kpis.tasaAgendamiento.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas contestadas que resultaron en una reunión agendada.', calculo: '(Reuniones agendadas ÷ Llamadas contestadas) × 100.' }} />
+                <KPICard label={t.asesor.kpis.leadsAsignados} value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad en llamadas y videollamadas en el rango seleccionado.', calculo: 'Correos distintos (mail_lead) que aparecen en el log de llamadas del período.' }} onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined} />
+                <KPICard label={t.asesor.kpis.llamadasRealizadas} value={kpis.llamadasRealizadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de eventos registrados en el log de llamadas durante el período.', calculo: 'Cuenta de todas las filas en log_llamadas dentro del rango de fechas.' }} onClick={breakdown ? () => setExpandedKpi('llamadasRealizadas') : undefined} />
+                <KPICard label={t.asesor.kpis.llamadasContestadas} value={kpis.llamadasContestadas} color="cyan" className={kpiCompact} tooltip={{ significado: 'Llamadas con respuesta efectiva del lead.', calculo: 'Eventos cuyo tipo comienza con efectiva_* en log_llamadas.' }} onClick={breakdown ? () => setExpandedKpi('llamadasContestadas') : undefined} />
+                <KPICard label={t.asesor.kpis.reunionesAgendadas} value={kpis.reunionesAgendadas} color="purple" className={kpiCompact} tooltip={{ significado: 'Citas registradas en el período seleccionado.', calculo: 'Registros en la tabla de agendas dentro del rango de fechas.' }} onClick={breakdown ? () => setExpandedKpi('reunionesAgendadas') : undefined} />
+                <KPICard label={t.asesor.kpis.tasaContacto} value={`${kpis.tasaContacto.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas que fueron contestadas respecto al total.', calculo: '(Llamadas contestadas ÷ Total llamadas realizadas) × 100.' }} />
+                <KPICard label={t.asesor.kpis.tasaAgendamiento} value={`${kpis.tasaAgendamiento.toFixed(1)}%`} color="green" className={kpiCompact} tooltip={{ significado: 'Porcentaje de llamadas contestadas que resultaron en una reunión agendada.', calculo: '(Reuniones agendadas ÷ Llamadas contestadas) × 100.' }} />
                 {(kpis.totalChats ?? 0) > 0 && (
                   <>
-                    <KPICard label="Chats asignados" value={kpis.totalChats ?? 0} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de chats asignados al asesor en el período.', calculo: 'Registros en chats_logs dentro del rango de fechas.' }} />
-                    <KPICard label="Chats contactados" value={kpis.chatsConRespuesta ?? 0} color="cyan" className={kpiCompact} tooltip={{ significado: 'Chats donde el asesor respondió al menos una vez.', calculo: 'Chats con al menos un mensaje de role "agent".' }} />
+                    <KPICard label={t.asesor.kpis.chatsAsignados} value={kpis.totalChats ?? 0} color="cyan" className={kpiCompact} tooltip={{ significado: 'Total de chats asignados al asesor en el período.', calculo: 'Registros en chats_logs dentro del rango de fechas.' }} />
+                    <KPICard label={t.asesor.kpis.chatsContactados} value={kpis.chatsConRespuesta ?? 0} color="cyan" className={kpiCompact} tooltip={{ significado: 'Chats donde el asesor respondió al menos una vez.', calculo: 'Chats con al menos un mensaje de role "agent".' }} />
                   </>
                 )}
               </div>

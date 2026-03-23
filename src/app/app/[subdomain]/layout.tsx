@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { LocaleProvider, useT } from "@/contexts/LocaleContext";
+import type { Locale } from "@/lib/i18n";
 import {
   LayoutDashboard,
   BarChart3,
@@ -30,16 +32,18 @@ import { puedeVerRuta, NAV_PERMISOS } from "@/lib/permisos";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
-const NAV_ITEMS = [
-  { path: "/dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
-  { path: "/performance", label: "Rendimiento", icon: BarChart3 },
-  { path: "/asesor", label: "Panel asesor", icon: UserCheck },
-  { path: "/comisiones", label: "Comisiones", icon: BadgeDollarSign },
-  { path: "/bandeja", label: "Bandeja", icon: Inbox },
-  { path: "/acquisition", label: "Resumen adquisición", icon: TrendingUp },
-  { path: "/system", label: "Control del sistema", icon: Target },
-  { path: "/documentacion", label: "Documentación", icon: BookOpen },
-  { path: "/configuracion", label: "Configuración", icon: UserCog },
+type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "sistema" | "documentacion" | "configuracion";
+
+const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType }[] = [
+  { path: "/dashboard", navKey: "dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
+  { path: "/performance", navKey: "performance", label: "Rendimiento", icon: BarChart3 },
+  { path: "/asesor", navKey: "asesor", label: "Panel asesor", icon: UserCheck },
+  { path: "/comisiones", navKey: "comisiones", label: "Comisiones", icon: BadgeDollarSign },
+  { path: "/bandeja", navKey: "bandeja", label: "Bandeja", icon: Inbox },
+  { path: "/acquisition", navKey: "adquisicion", label: "Resumen adquisición", icon: TrendingUp },
+  { path: "/system", navKey: "sistema", label: "Control del sistema", icon: Target },
+  { path: "/documentacion", navKey: "documentacion", label: "Documentación", icon: BookOpen },
+  { path: "/configuracion", navKey: "configuracion", label: "Configuración", icon: UserCog },
 ];
 
 function SoloMisDatosToggle() {
@@ -135,6 +139,7 @@ function SoloMisDatosToggle() {
 function NavFiltered({ onLinkClick }: { onLinkClick?: () => void }) {
   const pathname = usePathname();
   const { session, sessionLoading } = useUserFilter();
+  const t = useT();
   const permisos = session?.permisosArray ?? [];
   const navFiltered = useMemo(() => {
     if (sessionLoading) return NAV_ITEMS;
@@ -148,8 +153,8 @@ function NavFiltered({ onLinkClick }: { onLinkClick?: () => void }) {
 
   return (
     <>
-      {navFiltered.map(({ path, label, icon: Icon }) => (
-        <Link key={`${path}-${label}`} href={path} onClick={onLinkClick}
+      {navFiltered.map(({ path, navKey, label, icon: Icon }) => (
+        <Link key={`${path}-${navKey}`} href={path} onClick={onLinkClick}
           className={clsx(
             "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
             isActive(path)
@@ -157,7 +162,7 @@ function NavFiltered({ onLinkClick }: { onLinkClick?: () => void }) {
               : "text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent"
           )}>
           <Icon className="w-5 h-5 shrink-0" />
-          {label}
+          {t.nav[navKey] ?? label}
         </Link>
       ))}
     </>
@@ -190,7 +195,15 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [locale, setLocale] = useState<Locale | null>(null);
   const { session } = useUserFilter();
+
+  useEffect(() => {
+    fetch("/api/data/locale")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.idioma) setLocale(d.idioma as Locale); })
+      .catch(() => { /* fallback to default (es) */ });
+  }, []);
 
   const isActive = (path: string) => {
     if (path === "/dashboard") return pathname.endsWith("/dashboard");
@@ -219,6 +232,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   );
 
   return (
+    <LocaleProvider locale={locale}>
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg)]" style={{ background: "var(--bg)", backgroundImage: "var(--bg-gradient)" }}>
       <aside className="hidden md:flex md:flex-col w-56 bg-surface-800/95 backdrop-blur-sm border-r border-surface-500 shrink-0 shadow-[2px_0_24px_-8px_rgba(0,240,255,0.12)]">
         <div className="p-4 border-b border-surface-500/80">
@@ -305,6 +319,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
       {insightsOpen && <InsightsChat onClose={() => setInsightsOpen(false)} />}
       <ReportButton />
     </div>
+    </LocaleProvider>
   );
 }
 

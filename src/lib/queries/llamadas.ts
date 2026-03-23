@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada } from "@/lib/db/schema";
+import { logLlamadas, registrosDeLlamada, cuentas } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 import type {
   ApiLlamadaLog,
@@ -39,11 +39,22 @@ export async function getLlamadas(
   }
 
   const idCuentaStr = String(idCuenta);
-  const rows = await db
-    .select()
-    .from(logLlamadas)
-    .where(and(...conditions))
-    .orderBy(sql`${logLlamadas.ts} DESC`);
+
+  const [rows, cuentaRow] = await Promise.all([
+    db
+      .select()
+      .from(logLlamadas)
+      .where(and(...conditions))
+      .orderBy(sql`${logLlamadas.ts} DESC`),
+    db
+      .select({ fuente_llamadas: cuentas.fuente_llamadas })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1)
+      .then((r) => r[0] ?? null),
+  ]);
+
+  const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
 
   const baseReg = [
     eq(registrosDeLlamada.id_cuenta, idCuentaStr),
@@ -201,7 +212,7 @@ export async function getLlamadas(
     id_user_ghl: r.id_user_ghl ?? null,
   }));
 
-  return { registros, leads, agg, advisorMetrics, advisors };
+  return { registros, leads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas };
 }
 
 export async function updateLlamada(

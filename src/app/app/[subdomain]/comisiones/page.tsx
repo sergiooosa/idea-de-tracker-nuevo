@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import PageHeader from '@/components/dashboard/PageHeader';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { format, subDays } from 'date-fns';
@@ -114,6 +115,7 @@ const fm = (n: number) =>
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function ComisionesPage() {
+  const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 29), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [data, setData] = useState<ComisionesResponse | null>(null);
@@ -293,7 +295,7 @@ export default function ComisionesPage() {
 
   return (
     <div className="p-3 md:p-4 space-y-4 text-sm min-w-0 max-w-full overflow-x-hidden">
-      <PageHeader title="Comisiones" />
+      <PageHeader title={t.comisiones.titulo} />
 
       {/* Filtro de fechas */}
       <div className="flex flex-wrap items-center gap-2">
@@ -434,7 +436,7 @@ export default function ComisionesPage() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan/20 border border-accent-cyan/40 text-accent-cyan text-xs font-medium hover:bg-accent-cyan/30 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Agregar comisión
+            {t.comisiones.agregar}
           </button>
         </div>
 

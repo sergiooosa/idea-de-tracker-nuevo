@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
+import { useT } from '@/contexts/LocaleContext';
 import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -25,6 +26,7 @@ const defaultDateFrom = subDays(defaultDateTo, 7);
 const OBJECTION_PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6'];
 
 export default function DashboardPage() {
+  const t = useT();
   const [dateFrom, setDateFrom] = useState(format(defaultDateFrom, 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(defaultDateTo, 'yyyy-MM-dd'));
   const [modalObjeciones, setModalObjeciones] = useState(false);
@@ -53,7 +55,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+        <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-gray-400 text-sm animate-pulse">Cargando panel ejecutivo...</div>
         </div>
@@ -64,7 +66,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+        <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
         <div className="p-4 rounded-xl border border-red-500/50 bg-red-500/10 text-red-200 text-sm space-y-2">
           <p className="font-medium">Error al cargar el panel</p>
           <p className="text-gray-300 break-words">{error}</p>
@@ -78,7 +80,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Panel ejecutivo" subtitle="Vista ejecutiva · Todo en 1" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+      <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
       <div className="p-3 md:p-4 space-y-3 min-w-0 max-w-full overflow-x-hidden text-sm">
         <section className="flex flex-wrap items-center gap-2">
           <DateRangePicker
@@ -194,10 +196,10 @@ export default function DashboardPage() {
             ) : (
               <>
                 {[
-                  { label: 'Agendadas', value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${kpis.tasaAgendamiento.toFixed(1)}%` },
-                  { label: 'Asistidas', value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
-                  { label: 'Canceladas', value: kpis.meetingsCanceled, color: 'red' },
-                  { label: 'Cerradas', value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${kpis.tasaCierre.toFixed(1)}%` },
+                  { label: t.dashboard.kpis.agendadas, value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${kpis.tasaAgendamiento.toFixed(1)}%` },
+                  { label: t.dashboard.kpis.asistidas, value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
+                  { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
+                  { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${kpis.tasaCierre.toFixed(1)}%` },
                 ].map(({ label, value, color, sub }) => (
                   <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
                     <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
@@ -225,7 +227,7 @@ export default function DashboardPage() {
             <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                  🎯 Progreso de Metas
+                  🎯 {t.dashboard.progresoMetas}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple/20 text-accent-purple border border-accent-purple/40 font-semibold">
                   {cumplidas}/{alertas.length} cumplidas
@@ -314,7 +316,7 @@ export default function DashboardPage() {
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                💬 Resumen de Chats
+                💬 {t.dashboard.resumenChats}
               </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 font-semibold">
                 {data!.chatKpis!.total} chats
@@ -325,19 +327,19 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {[
                 {
-                  label: 'Total chats',
+                  label: t.dashboard.kpis.totalChats,
                   value: data!.chatKpis!.total,
                   color: 'cyan',
                   sub: undefined,
                 },
                 {
-                  label: 'Leads únicos',
+                  label: t.dashboard.kpis.leadsUnicos,
                   value: data!.chatKpis!.leadsUnicos,
                   color: 'purple',
                   sub: undefined,
                 },
                 {
-                  label: 'Con respuesta asesor',
+                  label: t.dashboard.kpis.conRespuesta,
                   value: data!.chatKpis!.conRespuesta,
                   color: 'green',
                   sub: `${data!.chatKpis!.tasaRespuesta.toFixed(1)}% tasa resp.`,

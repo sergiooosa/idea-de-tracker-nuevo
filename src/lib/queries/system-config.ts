@@ -16,6 +16,7 @@ export interface SystemConfigData {
   prompt_ventas: string;
   prompt_videollamadas: string;
   prompt_llamadas: string;
+  fuente_llamadas: "twilio" | "ghl";
   reglas_etiquetas: ReglaEtiqueta[];
   metricas_personalizadas: MetricaPersonalizada[];
   metricas_config: MetricaConfig[];
@@ -28,12 +29,15 @@ export interface SystemConfigData {
   roles_config: RolConfig[];
   chat_config: ChatConfigData;
   chat_analisis_hora: number;
+  idioma: "es" | "en";
 }
 
-export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key">> {
+export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
+  fuente_llamadas?: "twilio" | "ghl";
   openai_api_key?: string;
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfigData;
+  idioma?: "es" | "en";
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -59,6 +63,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         roles_config: cuentas.roles_config,
         metricas_config: cuentas.metricas_config,
         metricas_manual_data: cuentas.metricas_manual_data,
+        fuente_llamadas: cuentas.fuente_llamadas,
       })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
@@ -89,6 +94,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       metricas_manual_data: {},
       chat_config: { tiene_chatbot: false, emoji_toma_atencion: "" },
       chat_analisis_hora: chatAnalisisHora,
+      fuente_llamadas: "twilio" as const,
+      idioma: "es" as const,
     };
   }
 
@@ -112,6 +119,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       emoji_toma_atencion: r.configuracion_ui?.chat_config?.emoji_toma_atencion ?? "",
     },
     chat_analisis_hora: chatAnalisisHora,
+    fuente_llamadas: (r.fuente_llamadas === "ghl" ? "ghl" : "twilio") as "twilio" | "ghl",
+    idioma: (r.configuracion_ui?.idioma === "en" ? "en" : "es") as "es" | "en",
   };
 }
 
@@ -124,6 +133,7 @@ export async function updateSystemConfig(
   if (data.prompt_ventas !== undefined) setClause.prompt_ventas = data.prompt_ventas;
   if (data.prompt_videollamadas !== undefined) setClause.prompt_videollamadas = data.prompt_videollamadas;
   if (data.prompt_llamadas !== undefined) setClause.prompt_llamadas = data.prompt_llamadas;
+  if (data.fuente_llamadas !== undefined) setClause.fuente_llamadas = data.fuente_llamadas;
   if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
   if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
   if (data.embudo_personalizado !== undefined) setClause.embudo_personalizado = data.embudo_personalizado;
@@ -151,7 +161,8 @@ export async function updateSystemConfig(
   if (
     data.fuente_datos_financieros !== undefined ||
     (data as Record<string, unknown>).seccion_chats_dashboard !== undefined ||
-    data.chat_config !== undefined
+    data.chat_config !== undefined ||
+    data.idioma !== undefined
   ) {
     const [row] = await db
       .select({ configuracion_ui: cuentas.configuracion_ui })
@@ -170,6 +181,9 @@ export async function updateSystemConfig(
     }
     if (data.chat_config !== undefined) {
       updatedUi.chat_config = data.chat_config;
+    }
+    if (data.idioma !== undefined) {
+      updatedUi.idioma = data.idioma;
     }
     setClause.configuracion_ui = updatedUi;
   }
