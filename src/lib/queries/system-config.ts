@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas, metasCuenta } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry } from "@/lib/db/schema";
+import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseMetricasConfig } from "@/lib/metricas-engine";
 
@@ -26,6 +26,7 @@ export interface SystemConfigData {
   has_openai_key: boolean;
   fuente_datos_financieros: "nativa" | "api_externa";
   seccion_chats_dashboard: boolean;
+  configuracion_ads: ConfiguracionAds;
   roles_config: RolConfig[];
   chat_config: ChatConfigData;
   chat_analisis_hora: number;
@@ -38,6 +39,7 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfigData;
   idioma?: "es" | "en";
+  configuracion_ads?: ConfiguracionAds;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -64,6 +66,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         metricas_config: cuentas.metricas_config,
         metricas_manual_data: cuentas.metricas_manual_data,
         fuente_llamadas: cuentas.fuente_llamadas,
+        configuracion_ads: cuentas.configuracion_ads,
       })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
@@ -96,6 +99,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       chat_analisis_hora: chatAnalisisHora,
       fuente_llamadas: "twilio" as const,
       idioma: "es" as const,
+      configuracion_ads: {},
     };
   }
 
@@ -121,6 +125,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     chat_analisis_hora: chatAnalisisHora,
     fuente_llamadas: (r.fuente_llamadas === "ghl" ? "ghl" : "twilio") as "twilio" | "ghl",
     idioma: (r.configuracion_ui?.idioma === "en" ? "en" : "es") as "es" | "en",
+    configuracion_ads: (r.configuracion_ads && typeof r.configuracion_ads === "object") ? r.configuracion_ads as ConfiguracionAds : {},
   };
 }
 
@@ -142,6 +147,7 @@ export async function updateSystemConfig(
   if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
   if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
+  if (data.configuracion_ads !== undefined) setClause.configuracion_ads = data.configuracion_ads;
 
   // Handle chat_analisis_hora — update metas_cuenta table
   const dataAnyTop = data as Record<string, unknown>;

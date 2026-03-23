@@ -22,6 +22,7 @@ import {
   EyeOff,
   ChevronDown,
   BadgeDollarSign,
+  BarChart2,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -32,7 +33,7 @@ import { puedeVerRuta, NAV_PERMISOS } from "@/lib/permisos";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
-type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "sistema" | "documentacion" | "configuracion";
+type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "sistema" | "documentacion" | "configuracion";
 
 const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType }[] = [
   { path: "/dashboard", navKey: "dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
@@ -41,6 +42,7 @@ const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.Elem
   { path: "/comisiones", navKey: "comisiones", label: "Comisiones", icon: BadgeDollarSign },
   { path: "/bandeja", navKey: "bandeja", label: "Bandeja", icon: Inbox },
   { path: "/acquisition", navKey: "adquisicion", label: "Resumen adquisición", icon: TrendingUp },
+  { path: "/ads", navKey: "ads", label: "Ads & Inversión", icon: BarChart2 },
   { path: "/system", navKey: "sistema", label: "Control del sistema", icon: Target },
   { path: "/documentacion", navKey: "documentacion", label: "Documentación", icon: BookOpen },
   { path: "/configuracion", navKey: "configuracion", label: "Configuración", icon: UserCog },

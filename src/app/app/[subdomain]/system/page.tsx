@@ -67,6 +67,32 @@ interface MetaPorRolLocal {
   meta_contestacion: number | null;
 }
 
+interface AdsPlataformaMeta {
+  activo: boolean;
+  ad_account_id: string;
+  access_token: string;
+  cron_hora: number;
+}
+interface AdsPlataformaGoogle {
+  activo: boolean;
+  customer_id: string;
+  developer_token: string;
+  client_id: string;
+  client_secret: string;
+  refresh_token: string;
+  cron_hora: number;
+}
+interface AdsPlataformaTikTok {
+  activo: boolean;
+  advertiser_id: string;
+  access_token: string;
+  cron_hora: number;
+}
+interface ConfiguracionAdsLocal {
+  meta?: AdsPlataformaMeta;
+  google?: AdsPlataformaGoogle;
+  tiktok?: AdsPlataformaTikTok;
+}
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
   reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
@@ -78,6 +104,7 @@ interface SystemConfig {
   chat_analisis_hora?: number;
   roles_config?: RolConfigLocal[];
   idioma?: 'es' | 'en';
+  configuracion_ads?: ConfiguracionAdsLocal;
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -176,7 +203,7 @@ export default function SystemPage() {
   const t = useT();
   const searchParams = useSearchParams();
   const stepParam = searchParams.get('step');
-  const TOTAL_STEPS = 10;
+  const TOTAL_STEPS = 11;
   const initialStep = Math.min(TOTAL_STEPS, Math.max(1, Number(stepParam) || 1));
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [saving, setSaving] = useState(false);
@@ -213,6 +240,27 @@ export default function SystemPage() {
   const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
   const [metasPorRol, setMetasPorRol] = useState<MetaPorRolLocal[]>([]);
 
+  // Ads config state
+  const [metaAdsActivo, setMetaAdsActivo] = useState(false);
+  const [metaAdAccountId, setMetaAdAccountId] = useState('');
+  const [metaAccessToken, setMetaAccessToken] = useState('');
+  const [metaCronHora, setMetaCronHora] = useState(6);
+  const [metaVerificando, setMetaVerificando] = useState(false);
+  const [metaVerificado, setMetaVerificado] = useState<null | boolean>(null);
+
+  const [googleAdsActivo, setGoogleAdsActivo] = useState(false);
+  const [googleCustomerId, setGoogleCustomerId] = useState('');
+  const [googleDeveloperToken, setGoogleDeveloperToken] = useState('');
+  const [googleClientId, setGoogleClientId] = useState('');
+  const [googleClientSecret, setGoogleClientSecret] = useState('');
+  const [googleRefreshToken, setGoogleRefreshToken] = useState('');
+  const [googleCronHora, setGoogleCronHora] = useState(6);
+
+  const [tiktokAdsActivo, setTiktokAdsActivo] = useState(false);
+  const [tiktokAdvertiserId, setTiktokAdvertiserId] = useState('');
+  const [tiktokAccessToken, setTiktokAccessToken] = useState('');
+  const [tiktokCronHora, setTiktokCronHora] = useState(6);
+
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
     try {
@@ -245,6 +293,31 @@ export default function SystemPage() {
         }
         if (Array.isArray(cfg.roles_config)) {
           setRolesConfig(cfg.roles_config);
+        }
+        // Load ads config
+        if (cfg.configuracion_ads) {
+          const adsConf = cfg.configuracion_ads;
+          if (adsConf.meta) {
+            setMetaAdsActivo(adsConf.meta.activo ?? false);
+            setMetaAdAccountId(adsConf.meta.ad_account_id ?? '');
+            setMetaAccessToken(adsConf.meta.access_token ?? '');
+            setMetaCronHora(adsConf.meta.cron_hora ?? 6);
+          }
+          if (adsConf.google) {
+            setGoogleAdsActivo(adsConf.google.activo ?? false);
+            setGoogleCustomerId(adsConf.google.customer_id ?? '');
+            setGoogleDeveloperToken(adsConf.google.developer_token ?? '');
+            setGoogleClientId(adsConf.google.client_id ?? '');
+            setGoogleClientSecret(adsConf.google.client_secret ?? '');
+            setGoogleRefreshToken(adsConf.google.refresh_token ?? '');
+            setGoogleCronHora(adsConf.google.cron_hora ?? 6);
+          }
+          if (adsConf.tiktok) {
+            setTiktokAdsActivo(adsConf.tiktok.activo ?? false);
+            setTiktokAdvertiserId(adsConf.tiktok.advertiser_id ?? '');
+            setTiktokAccessToken(adsConf.tiktok.access_token ?? '');
+            setTiktokCronHora(adsConf.tiktok.cron_hora ?? 6);
+          }
         }
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
         setMetricasConfig(loadedConfig.length > 0 ? loadedConfig : DEFAULT_METRICAS_CONFIG);
@@ -409,6 +482,7 @@ export default function SystemPage() {
             { id: 8, title: 'Chat Triggers', icon: MessageSquare, color: 'amber' },
             { id: 9, title: 'OpenAI Key', icon: Key, color: 'green' },
             { id: 10, title: 'Fuente financiera', icon: Database, color: 'blue' },
+            { id: 11, title: 'Integraciones de Ads', icon: BarChart3, color: 'purple' },
           ].map((s) => {
             const Icon = s.icon;
             const active = currentStep === s.id;
@@ -419,7 +493,7 @@ export default function SystemPage() {
               amber: active ? 'bg-accent-amber text-black border-accent-amber shadow-[0_0_16px_-4px_rgba(255,176,32,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-amber hover:border-accent-amber/50',
               green: active ? 'bg-accent-green text-black border-accent-green shadow-[0_0_16px_-4px_rgba(0,230,118,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-green hover:border-accent-green/50',
             };
-            const isBetaStep = [5, 6, 7, 10].includes(s.id);
+            const isBetaStep = [5, 6, 7, 10, 11].includes(s.id);
             return (
               <button key={s.id} type="button" onClick={() => setCurrentStep(s.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${colorClasses[s.color]}`}>
@@ -1516,6 +1590,209 @@ export default function SystemPage() {
                   </div>
                 </button>
               </div>
+            </div>
+          )}
+
+          {currentStep === 11 && (
+            <div className="space-y-5">
+              <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
+                <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><BarChart3 className="w-5 h-5 text-accent-purple" /></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">📊 Integraciones de Ads</h3>
+                  <p className="text-sm text-gray-400">Conecta tus plataformas de publicidad para ver el retorno de inversión real de cada campaña.</p>
+                </div>
+              </div>
+
+              {/* Meta Ads */}
+              <div className="rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📘</span>
+                    <span className="text-sm font-semibold text-white">Meta Ads</span>
+                  </div>
+                  <button type="button" onClick={() => setMetaAdsActivo(v => !v)}
+                    className={`w-10 h-6 rounded-full transition-colors relative ${metaAdsActivo ? 'bg-accent-blue' : 'bg-surface-600'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${metaAdsActivo ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {metaAdsActivo && (
+                  <div className="space-y-3 pt-2 border-t border-surface-600">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Ad Account ID
+                        <span className="ml-1 text-accent-cyan">💡 Lo encuentras en Meta Business Suite → Configuración → Cuentas de anuncios</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-blue"
+                        placeholder="act_123456789" value={metaAdAccountId} onChange={e => setMetaAdAccountId(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Access Token
+                        <span className="ml-1 text-accent-cyan">💡 Genera un token en developers.facebook.com con permisos ads_read</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-blue"
+                        type="password" placeholder="EAAxxxxx..." value={metaAccessToken} onChange={e => setMetaAccessToken(e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button type="button"
+                        onClick={async () => {
+                          setMetaVerificando(true); setMetaVerificado(null);
+                          try {
+                            const url = `https://graph.facebook.com/v19.0/act_${metaAdAccountId}?access_token=${metaAccessToken}`;
+                            const res = await fetch(url);
+                            setMetaVerificado(res.ok);
+                          } catch { setMetaVerificado(false); }
+                          setMetaVerificando(false);
+                        }}
+                        disabled={!metaAdAccountId || !metaAccessToken || metaVerificando}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/20 border border-accent-blue/40 text-accent-blue text-xs font-medium hover:bg-accent-blue/30 disabled:opacity-50 transition-all">
+                        {metaVerificando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '🔍'} Verificar conexión
+                      </button>
+                      {metaVerificado === true && <span className="text-xs text-accent-green">✅ Conexión verificada</span>}
+                      {metaVerificado === false && <span className="text-xs text-red-400">❌ Error de conexión</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Hora de sincronización diaria</label>
+                      <select className="bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-blue"
+                        value={metaCronHora} onChange={e => setMetaCronHora(Number(e.target.value))}>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Google Ads */}
+              <div className="rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🔍</span>
+                    <span className="text-sm font-semibold text-white">Google Ads</span>
+                  </div>
+                  <button type="button" onClick={() => setGoogleAdsActivo(v => !v)}
+                    className={`w-10 h-6 rounded-full transition-colors relative ${googleAdsActivo ? 'bg-accent-green' : 'bg-surface-600'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${googleAdsActivo ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {googleAdsActivo && (
+                  <div className="space-y-3 pt-2 border-t border-surface-600">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Customer ID
+                        <span className="ml-1 text-accent-cyan">💡 El número de 10 dígitos de tu cuenta en ads.google.com</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green"
+                        placeholder="123-456-7890" value={googleCustomerId} onChange={e => setGoogleCustomerId(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Developer Token</label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green"
+                        type="password" placeholder="AbCdEfXxXx..." value={googleDeveloperToken} onChange={e => setGoogleDeveloperToken(e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Client ID</label>
+                        <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green"
+                          placeholder="xxxxx.apps.googleusercontent.com" value={googleClientId} onChange={e => setGoogleClientId(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Client Secret</label>
+                        <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green"
+                          type="password" placeholder="GOCSPX-xxxxx" value={googleClientSecret} onChange={e => setGoogleClientSecret(e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Refresh Token</label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green"
+                        type="password" placeholder="1//xxxxx" value={googleRefreshToken} onChange={e => setGoogleRefreshToken(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Hora de sincronización</label>
+                      <select className="bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green"
+                        value={googleCronHora} onChange={e => setGoogleCronHora(Number(e.target.value))}>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* TikTok Ads */}
+              <div className="rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🎵</span>
+                    <span className="text-sm font-semibold text-white">TikTok Ads</span>
+                  </div>
+                  <button type="button" onClick={() => setTiktokAdsActivo(v => !v)}
+                    className={`w-10 h-6 rounded-full transition-colors relative ${tiktokAdsActivo ? 'bg-accent-purple' : 'bg-surface-600'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${tiktokAdsActivo ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {tiktokAdsActivo && (
+                  <div className="space-y-3 pt-2 border-t border-surface-600">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Advertiser ID
+                        <span className="ml-1 text-accent-cyan">💡 Lo encuentras en TikTok Ads Manager → Configuración</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-purple"
+                        placeholder="7xxxxxxxxxxxxxxxxx" value={tiktokAdvertiserId} onChange={e => setTiktokAdvertiserId(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Access Token</label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-purple"
+                        type="password" placeholder="xxxxx" value={tiktokAccessToken} onChange={e => setTiktokAccessToken(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Hora de sincronización</label>
+                      <select className="bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-purple"
+                        value={tiktokCronHora} onChange={e => setTiktokCronHora(Number(e.target.value))}>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const adsConfig: ConfiguracionAdsLocal = {};
+                    if (metaAdsActivo || metaAdAccountId || metaAccessToken) {
+                      adsConfig.meta = { activo: metaAdsActivo, ad_account_id: metaAdAccountId, access_token: metaAccessToken, cron_hora: metaCronHora };
+                    }
+                    if (googleAdsActivo || googleCustomerId) {
+                      adsConfig.google = { activo: googleAdsActivo, customer_id: googleCustomerId, developer_token: googleDeveloperToken, client_id: googleClientId, client_secret: googleClientSecret, refresh_token: googleRefreshToken, cron_hora: googleCronHora };
+                    }
+                    if (tiktokAdsActivo || tiktokAdvertiserId) {
+                      adsConfig.tiktok = { activo: tiktokAdsActivo, advertiser_id: tiktokAdvertiserId, access_token: tiktokAccessToken, cron_hora: tiktokCronHora };
+                    }
+                    const res = await fetch('/api/data/system-config', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ configuracion_ads: adsConfig }),
+                    });
+                    if (res.ok) {
+                      toast.success('Configuración de Ads guardada');
+                    } else {
+                      toast.error('Error al guardar');
+                    }
+                  } catch {
+                    toast.error('Error al guardar');
+                  }
+                  setSaving(false);
+                }}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent-purple text-white text-sm font-semibold hover:shadow-[0_0_20px_-6px_rgba(178,75,243,0.5)] transition-all disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Guardar configuración de Ads
+              </button>
             </div>
           )}
         </div>

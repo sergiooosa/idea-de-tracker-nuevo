@@ -199,11 +199,11 @@ export default function PerformanceLlamadasPage() {
         </p>
       )}
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-        <KPICard label="Leads (llamadas)" value={agg.totalLeads} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con al menos una llamada.', calculo: 'Distintos mail_lead en el rango.' }} />
-        <KPICard label="Llamadas totales" value={agg.totalCalls} color="cyan" className={kpiCompact} tooltip={{ significado: 'Todas las llamadas en el rango.', calculo: 'Suma de eventos.' }} />
-        <KPICard label="Tiempo al lead (prom.)" value={minFmt(agg.speedAvg)} color="purple" className={kpiCompact} tooltip={{ significado: 'Tiempo promedio en contactar al lead.', calculo: 'Promedio de speed_to_lead.' }} />
-        <KPICard label="Intentos promedio" value={agg.attemptsAvg.toFixed(1)} color="amber" className={kpiCompact} tooltip={{ significado: 'Intentos promedios por lead.', calculo: 'Total llamadas / leads únicos.' }} />
-        <KPICard label="Intentos a primer contacto" value={agg.firstContactAttempts.toFixed(1)} color="purple" className={kpiCompact} tooltip={{ significado: 'Llamadas hasta que el lead contesta.', calculo: 'Promedio de intentos por lead.' }} />
+        <KPICard label={t.performance.llamadas.kpis.leads} value={agg.totalLeads} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con al menos una llamada.', calculo: 'Distintos mail_lead en el rango.' }} />
+        <KPICard label={t.performance.llamadas.kpis.total} value={agg.totalCalls} color="cyan" className={kpiCompact} tooltip={{ significado: 'Todas las llamadas en el rango.', calculo: 'Suma de eventos.' }} />
+        <KPICard label={t.performance.llamadas.kpis.tiempoLead} value={minFmt(agg.speedAvg)} color="purple" className={kpiCompact} tooltip={{ significado: 'Tiempo promedio en contactar al lead.', calculo: 'Promedio de speed_to_lead.' }} />
+        <KPICard label={t.performance.llamadas.kpis.intentosProm} value={agg.attemptsAvg.toFixed(1)} color="amber" className={kpiCompact} tooltip={{ significado: 'Intentos promedios por lead.', calculo: 'Total llamadas / leads únicos.' }} />
+        <KPICard label={t.performance.llamadas.kpis.intentosPrimerContacto} value={agg.firstContactAttempts.toFixed(1)} color="purple" className={kpiCompact} tooltip={{ significado: 'Llamadas hasta que el lead contesta.', calculo: 'Promedio de intentos por lead.' }} />
         <KPICard label="Tasa de contestación" value={pct(agg.answerRate * 100)} color="green" className={kpiCompact} tooltip={{ significado: '% de llamadas contestadas.', calculo: '(Contestadas / Total) × 100.' }} />
       </div>
 

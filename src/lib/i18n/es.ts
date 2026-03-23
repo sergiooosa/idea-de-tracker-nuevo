@@ -8,6 +8,7 @@ export const es = {
     asesor: "Panel asesor",
     bandeja: "Bandeja",
     adquisicion: "Resumen adquisición",
+    ads: "Ads & Inversión",
     comisiones: "Comisiones",
     reporte: "Reporte semanal",
     sistema: "Control del sistema",
@@ -54,6 +55,15 @@ export const es = {
       resultado: "Resultado",
       reunion: "Reunión",
       noData: "No hay videollamadas en este período",
+      kpis: {
+        agendadas: "Agendadas",
+        asistidas: "Asistidas",
+        canceladas: "Canceladas",
+        noShows: "No Shows",
+        ingresos: "Ingresos",
+        efectivoCobrado: "Efectivo cobrado",
+        ticketPromedio: "Ticket promedio",
+      },
     },
     llamadas: {
       titulo: "Llamadas",
@@ -66,6 +76,13 @@ export const es = {
       historial: "Historial",
       noData: "No hay llamadas en este período",
       fuenteGhl: "Este cliente usa GHL para llamadas — Análisis IA no disponible",
+      kpis: {
+        leads: "Leads (llamadas)",
+        total: "Llamadas totales",
+        tiempoLead: "Tiempo al lead (prom.)",
+        intentosProm: "Intentos promedio",
+        intentosPrimerContacto: "Intentos a primer contacto",
+      },
     },
     chats: {
       titulo: "Chats",
@@ -77,6 +94,13 @@ export const es = {
       acciones: "Acciones",
       noData: "No hay chats en este período",
       todos: "Todos",
+      kpis: {
+        asignados: "Chats asignados",
+        activos: "Chats activos",
+        contactados: "Contactados",
+        mensajes: "Mensajes totales",
+        speedToLead: "Speed to lead prom.",
+      },
     },
   },
   asesor: {
@@ -178,3 +202,5 @@ export const es = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Translations = any;
+
+// Extensión performance — strings que faltaron en el commit inicial

@@ -20,6 +20,7 @@ export const PERMISOS_DISPONIBLES = [
   { id: "gestionar_usuarios", label: "Gestionar usuarios" },
   { id: "gestionar_roles", label: "Gestionar roles" },
   { id: "ver_comisiones", label: "Ver Comisiones" },
+  { id: "ver_ads", label: "Ver Ads & Inversión" },
 ] as const;
 
 export type PermisoId = (typeof PERMISOS_DISPONIBLES)[number]["id"];
@@ -35,6 +36,7 @@ export const NAV_PERMISOS: Record<string, PermisoId> = {
   "/configuracion": "ver_configuracion",
   "/documentacion": "ver_documentacion",
   "/comisiones": "ver_comisiones",
+  "/ads": "ver_ads",
 };
 
 /** Permisos que dan acceso al toggle "Solo data del asesor" (ver datos de todos) */

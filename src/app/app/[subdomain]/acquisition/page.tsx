@@ -8,6 +8,8 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 
+const fmAds = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const fm = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`;
 
@@ -32,6 +34,18 @@ interface AcqResponse {
   byChannel: ByChannelStats;
 }
 
+interface AdsRow {
+  plataforma: string;
+  campana: string;
+  gasto: number;
+  leads: number;
+  cpl: number;
+}
+interface AdsResponse {
+  hasAds: boolean;
+  porCampana: AdsRow[];
+}
+
 export default function AcquisitionPage() {
   const t = useT();
   const [dateFrom, setDateFrom] = useState(format(defaultFrom, 'yyyy-MM-dd'));
@@ -39,6 +53,7 @@ export default function AcquisitionPage() {
   const [filterSource, setFilterSource] = useState('');
 
   const { data, loading } = useApiData<AcqResponse>('/api/data/acquisition', { from: dateFrom, to: dateTo });
+  const { data: adsData } = useApiData<AdsResponse>('/api/data/ads', { from: dateFrom, to: dateTo });
   const rows = data?.rows ?? [];
   const sources = data?.sources ?? [];
   const byChannel = data?.byChannel;
@@ -141,6 +156,37 @@ export default function AcquisitionPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Inversión por Origen (Ads) ── */}
+        {adsData?.hasAds && adsData.porCampana && adsData.porCampana.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">💰 Inversión por Origen</h2>
+            <div className="rounded-lg border border-surface-500 overflow-hidden">
+              <table className="w-full text-xs text-gray-300">
+                <thead className="bg-surface-800 text-gray-500 text-[10px] uppercase tracking-wider">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Campaña / Origen</th>
+                    <th className="px-3 py-2 text-left">Plataforma</th>
+                    <th className="px-3 py-2 text-right">Inversión</th>
+                    <th className="px-3 py-2 text-right">Leads</th>
+                    <th className="px-3 py-2 text-right">CPL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adsData.porCampana.map((c, i) => (
+                    <tr key={`ads-${i}`} className="border-t border-surface-600 hover:bg-surface-700/50">
+                      <td className="px-3 py-2 text-white max-w-[180px] truncate">{c.campana}</td>
+                      <td className="px-3 py-2 capitalize text-gray-400">{c.plataforma}</td>
+                      <td className="px-3 py-2 text-right font-medium text-accent-cyan">{fmAds(c.gasto)}</td>
+                      <td className="px-3 py-2 text-right">{c.leads}</td>
+                      <td className="px-3 py-2 text-right">{c.cpl > 0 ? fmAds(c.cpl) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

@@ -10,6 +10,7 @@ export const en: Translations = {
     asesor: "Advisor Panel",
     bandeja: "Inbox",
     adquisicion: "Acquisition",
+    ads: "Ads & Investment",
     comisiones: "Commissions",
     reporte: "Weekly Report",
     sistema: "System",
@@ -56,6 +57,15 @@ export const en: Translations = {
       resultado: "Result",
       reunion: "Meeting",
       noData: "No video calls in this period",
+      kpis: {
+        agendadas: "Scheduled",
+        asistidas: "Attended",
+        canceladas: "Canceled",
+        noShows: "No Shows",
+        ingresos: "Revenue",
+        efectivoCobrado: "Cash collected",
+        ticketPromedio: "Average ticket",
+      },
     },
     llamadas: {
       titulo: "Phone Calls",
@@ -68,6 +78,13 @@ export const en: Translations = {
       historial: "History",
       noData: "No calls in this period",
       fuenteGhl: "This client uses GHL for calls — AI analysis not available",
+      kpis: {
+        leads: "Leads (calls)",
+        total: "Total calls",
+        tiempoLead: "Time to lead (avg)",
+        intentosProm: "Avg attempts",
+        intentosPrimerContacto: "Attempts to first contact",
+      },
     },
     chats: {
       titulo: "Chats",
@@ -79,6 +96,13 @@ export const en: Translations = {
       acciones: "Actions",
       noData: "No chats in this period",
       todos: "All",
+      kpis: {
+        asignados: "Assigned chats",
+        activos: "Active chats",
+        contactados: "Contacted",
+        mensajes: "Total messages",
+        speedToLead: "Speed to lead avg",
+      },
     },
   },
   asesor: {

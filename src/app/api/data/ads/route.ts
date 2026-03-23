@@ -1,0 +1,159 @@
+import { NextResponse } from "next/server";
+import { withAuthAndAnyPermission } from "@/lib/api-auth";
+import { db } from "@/lib/db";
+import { cuentas } from "@/lib/db/schema";
+import type { ConfiguracionAds } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+
+export async function GET(req: Request) {
+  return withAuthAndAnyPermission(req, ["ver_dashboard", "ver_acquisition", "ver_rendimiento"], async (idCuenta) => {
+    const { searchParams } = new URL(req.url);
+    const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
+    const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
+
+    // Get ads config
+    const [row] = await db
+      .select({ configuracion_ads: cuentas.configuracion_ads })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+
+    const cfg = (row?.configuracion_ads ?? {}) as ConfiguracionAds;
+    const plataformas: ('meta' | 'google' | 'tiktok')[] = [];
+    if (cfg.meta?.activo) plataformas.push('meta');
+    if (cfg.google?.activo) plataformas.push('google');
+    if (cfg.tiktok?.activo) plataformas.push('tiktok');
+
+    const hasAds = plataformas.length > 0;
+
+    if (!hasAds) {
+      return NextResponse.json({
+        hasAds: false,
+        plataformas: [],
+        resumen: { gastoTotal: 0, leads: 0, cierres: 0, cpl: 0, costoPorCierre: 0, roas: 0 },
+        porPlataforma: [],
+        porCampana: [],
+      });
+    }
+
+    // Aggregate ads data per platform
+    const adsRows = await db.execute(sql`
+      SELECT
+        plataforma,
+        SUM(gasto_total_ad) AS gasto,
+        SUM(impresiones_totales) AS impresiones,
+        SUM(clicks_unicos) AS clicks,
+        AVG(ctr) AS ctr,
+        AVG(cpm) AS cpm,
+        AVG(cpc) AS cpc,
+        SUM(agendamientos) AS agendamientos
+      FROM resumenes_diarios_ads
+      WHERE id_cuenta = ${idCuenta}
+        AND fecha BETWEEN ${from}::date AND ${to}::date
+      GROUP BY plataforma
+    `);
+
+    // Campaign-level data
+    const campanaRows = await db.execute(sql`
+      SELECT
+        campana,
+        plataforma,
+        SUM(gasto_total_ad) AS gasto
+      FROM resumenes_diarios_ads
+      WHERE id_cuenta = ${idCuenta}
+        AND fecha BETWEEN ${from}::date AND ${to}::date
+        AND campana IS NOT NULL
+      GROUP BY campana, plataforma
+      ORDER BY gasto DESC
+    `);
+
+    // Total leads and closures in the period from resumenes_diarios_agendas
+    const agendasStats = await db.execute(sql`
+      SELECT
+        COUNT(*) AS total_leads,
+        COUNT(*) FILTER (WHERE categoria ILIKE '%cerr%' OR categoria ILIKE '%close%') AS cierres,
+        SUM(CASE 
+          WHEN facturacion ~ '^[0-9]+\.?[0-9]*$' THEN facturacion::numeric 
+          ELSE 0 
+        END) AS revenue
+      FROM resumenes_diarios_agendas
+      WHERE id_cuenta = ${idCuenta}
+        AND fecha BETWEEN ${from}::date AND ${to}::date
+    `);
+
+    // Campaign-leads matching by origen ILIKE campana
+    const campanaLeadsRows = await db.execute(sql`
+      SELECT
+        a.campana,
+        a.plataforma,
+        SUM(a.gasto_total_ad) AS gasto,
+        COUNT(DISTINCT ag.email_lead) AS leads,
+        COUNT(DISTINCT ag.email_lead) FILTER (WHERE ag.categoria ILIKE '%cerr%' OR ag.categoria ILIKE '%close%') AS cierres
+      FROM resumenes_diarios_ads a
+      LEFT JOIN resumenes_diarios_agendas ag
+        ON ag.id_cuenta = a.id_cuenta
+        AND ag.fecha BETWEEN ${from}::date AND ${to}::date
+        AND ag.origen ILIKE ('%' || a.campana || '%')
+      WHERE a.id_cuenta = ${idCuenta}
+        AND a.fecha BETWEEN ${from}::date AND ${to}::date
+        AND a.campana IS NOT NULL
+      GROUP BY a.campana, a.plataforma
+      ORDER BY gasto DESC
+      LIMIT 50
+    `);
+
+    const stats = agendasStats.rows[0] as {
+      total_leads: string | number;
+      cierres: string | number;
+      revenue: string | number;
+    };
+
+    const totalLeads = Number(stats?.total_leads ?? 0);
+    const totalCierres = Number(stats?.cierres ?? 0);
+    const totalRevenue = Number(stats?.revenue ?? 0);
+
+    const porPlataforma = (adsRows.rows as Array<Record<string, unknown>>).map((r) => ({
+      plataforma: String(r.plataforma ?? 'meta'),
+      gasto: Number(r.gasto ?? 0),
+      impresiones: Number(r.impresiones ?? 0),
+      clicks: Number(r.clicks ?? 0),
+      ctr: Number(r.ctr ?? 0),
+      cpm: Number(r.cpm ?? 0),
+      cpc: Number(r.cpc ?? 0),
+      agendamientos: Number(r.agendamientos ?? 0),
+    }));
+
+    const gastoTotal = porPlataforma.reduce((s, p) => s + p.gasto, 0);
+
+    const porCampana = (campanaLeadsRows.rows as Array<Record<string, unknown>>).map((r) => {
+      const gasto = Number(r.gasto ?? 0);
+      const leads = Number(r.leads ?? 0);
+      const cierres = Number(r.cierres ?? 0);
+      return {
+        campana: String(r.campana ?? ''),
+        plataforma: String(r.plataforma ?? 'meta'),
+        gasto,
+        leads,
+        cierres,
+        cpl: leads > 0 ? gasto / leads : 0,
+        costoPorCierre: cierres > 0 ? gasto / cierres : 0,
+      };
+    });
+
+    return NextResponse.json({
+      hasAds: true,
+      plataformas,
+      resumen: {
+        gastoTotal,
+        leads: totalLeads,
+        cierres: totalCierres,
+        cpl: totalLeads > 0 ? gastoTotal / totalLeads : 0,
+        costoPorCierre: totalCierres > 0 ? gastoTotal / totalCierres : 0,
+        roas: gastoTotal > 0 ? totalRevenue / gastoTotal : 0,
+      },
+      porPlataforma,
+      porCampana,
+    });
+  });
+}

@@ -116,11 +116,11 @@ export default function PerformanceChatsPage() {
 
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[
-          { label: 'Chats asignados', value: agg.assigned, color: 'cyan', tip: chatKpiTooltips.asignados },
-          { label: 'Chats activos', value: agg.activos, color: 'cyan', tip: chatKpiTooltips.activos },
-          { label: 'Contactados', value: agg.activos, color: 'cyan', tip: chatKpiTooltips.contactados },
-          { label: 'Mensajes totales', value: agg.seguimientosTotal, color: 'purple', tip: chatKpiTooltips.seguimientos },
-          { label: 'Speed to lead prom.', value: minFmt(agg.speedAvg), color: 'purple', tip: chatKpiTooltips.speedToLead },
+          { label: t.performance.chats.kpis.asignados, value: agg.assigned, color: 'cyan', tip: chatKpiTooltips.asignados },
+          { label: t.performance.chats.kpis.activos, value: agg.activos, color: 'cyan', tip: chatKpiTooltips.activos },
+          { label: t.performance.chats.kpis.contactados, value: agg.activos, color: 'cyan', tip: chatKpiTooltips.contactados },
+          { label: t.performance.chats.kpis.mensajes, value: agg.seguimientosTotal, color: 'purple', tip: chatKpiTooltips.seguimientos },
+          { label: t.performance.chats.kpis.speedToLead, value: minFmt(agg.speedAvg), color: 'purple', tip: chatKpiTooltips.speedToLead },
         ].map(({ label, value, color, tip }) => (
           <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
             <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">

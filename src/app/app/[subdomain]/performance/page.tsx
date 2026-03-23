@@ -194,13 +194,13 @@ export default function PerformanceVideollamadasPage() {
 
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[
-          { label: 'Agendadas', value: agg.agendadas, color: 'purple', tip: kpiTooltips.agendadas },
-          { label: 'Asistidas', value: agg.asistidas, color: 'cyan', tip: kpiTooltips.asistidas },
-          { label: 'Canceladas', value: agg.canceladas, color: 'red', tip: kpiTooltips.canceladas },
-          { label: 'No Shows', value: agg.noShows, color: 'amber', tip: kpiTooltips.noShows },
-          { label: 'Ingresos', value: fm(agg.revenue), color: 'green', tip: kpiTooltips.revenue },
-          { label: 'Efectivo cobrado', value: fm(agg.cashCollected), color: 'green', tip: kpiTooltips.cashCollected },
-          { label: 'Ticket promedio', value: fm(agg.ticket), color: 'blue', tip: kpiTooltips.ticket },
+          { label: t.performance.videollamadas.kpis.agendadas, value: agg.agendadas, color: 'purple', tip: kpiTooltips.agendadas },
+          { label: t.performance.videollamadas.kpis.asistidas, value: agg.asistidas, color: 'cyan', tip: kpiTooltips.asistidas },
+          { label: t.performance.videollamadas.kpis.canceladas, value: agg.canceladas, color: 'red', tip: kpiTooltips.canceladas },
+          { label: t.performance.videollamadas.kpis.noShows, value: agg.noShows, color: 'amber', tip: kpiTooltips.noShows },
+          { label: t.performance.videollamadas.kpis.ingresos, value: fm(agg.revenue), color: 'green', tip: kpiTooltips.revenue },
+          { label: t.performance.videollamadas.kpis.efectivoCobrado, value: fm(agg.cashCollected), color: 'green', tip: kpiTooltips.cashCollected },
+          { label: t.performance.videollamadas.kpis.ticketPromedio, value: fm(agg.ticket), color: 'blue', tip: kpiTooltips.ticket },
         ].map(({ label, value, color, tip }) => (
           <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
             <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">

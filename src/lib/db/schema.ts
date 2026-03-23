@@ -137,6 +137,30 @@ export interface RolConfig {
   permisos: string[];
 }
 
+export interface ConfiguracionAds {
+  meta?: {
+    activo: boolean;
+    ad_account_id: string;
+    access_token: string;
+    cron_hora: number;
+  };
+  google?: {
+    activo: boolean;
+    customer_id: string;
+    developer_token: string;
+    client_id: string;
+    client_secret: string;
+    refresh_token: string;
+    cron_hora: number;
+  };
+  tiktok?: {
+    activo: boolean;
+    advertiser_id: string;
+    access_token: string;
+    cron_hora: number;
+  };
+}
+
 export const cuentas = pgTable("cuentas", {
   id_cuenta: serial("id_cuenta").primaryKey(),
   nombre_cuenta: varchar("nombre_cuenta"),
@@ -157,6 +181,7 @@ export const cuentas = pgTable("cuentas", {
   metricas_config: jsonb("metricas_config").$type<MetricaConfig[]>(),
   metricas_manual_data: jsonb("metricas_manual_data").$type<Record<string, MetricaManualEntry[]>>(),
   fuente_llamadas: text("fuente_llamadas").default("twilio"),
+  configuracion_ads: jsonb("configuracion_ads").$type<ConfiguracionAds>(),
 });
 
 /* ------------------------------------------------------------------ */
