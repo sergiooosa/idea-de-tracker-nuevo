@@ -294,6 +294,7 @@ export interface MetaPorAsesor {
   email: string;
   meta_llamadas_diarias?: number;
   meta_cierres_semanales?: number;
+  meta_revenue_mensual?: number;
 }
 
 export interface MetaPorRol {
@@ -400,6 +401,11 @@ export const eventosHuerfanos = pgTable("eventos_huerfanos", {
 /*  comisiones_config — configuración de comisiones por closer         */
 /* ------------------------------------------------------------------ */
 
+export interface TramoEscalada {
+  meta_pct: number;      // % de meta a partir del cual aplica este tramo
+  comision_pct: number;  // % de comisión para este tramo
+}
+
 export const comisionesConfig = pgTable("comisiones_config", {
   id: serial("id").primaryKey(),
   id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
@@ -410,6 +416,12 @@ export const comisionesConfig = pgTable("comisiones_config", {
   aplica_sobre: text("aplica_sobre").default("cash_collected"), // 'cash_collected' | 'facturacion'
   activo: boolean("activo").default(true),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  // Tipo de comisión: 'individual' | 'global' | 'equipo' | 'escalada'
+  tipo_comision: text("tipo_comision").notNull().default("individual"),
+  // Para tipo='equipo': array de emails de asesores bajo su cargo
+  asesores_equipo: jsonb("asesores_equipo").$type<string[]>().default([]),
+  // Para tipo='escalada': array de tramos {meta_pct, comision_pct}
+  tramos_escalada: jsonb("tramos_escalada").$type<TramoEscalada[]>().default([]),
 }, (table) => [
   index("idx_comisiones_id_cuenta").on(table.id_cuenta),
 ]);
