@@ -56,24 +56,38 @@ export async function getLlamadas(
 
   const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
 
+  // Los registros a mostrar son los que tuvieron al menos una llamada en el rango de fechas
+  // (se usa log_llamadas.ts como fecha de actividad, no fecha_evento del lead)
+  const idsConLlamadaEnRango = [...new Set(rows.map((r) => r.id_registro).filter((id): id is number => id != null && id > 0))];
+
   const baseReg = [
     eq(registrosDeLlamada.id_cuenta, idCuentaStr),
-    gte(registrosDeLlamada.fecha_evento, fromTs),
-    lte(registrosDeLlamada.fecha_evento, toTs),
   ];
+
   const regRows =
-    emails.length > 0
+    idsConLlamadaEnRango.length > 0
       ? (() => {
-          const linkedIds = [...new Set(rows.map((r) => r.id_registro).filter((id): id is number => id != null && id > 0))];
-          const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`;
-          const byLinked = linkedIds.length > 0 ? inArray(registrosDeLlamada.id_registro, linkedIds) : sql`false`;
+          if (emails.length > 0) {
+            const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`;
+            const byLinked = inArray(registrosDeLlamada.id_registro, idsConLlamadaEnRango);
+            return db
+              .select()
+              .from(registrosDeLlamada)
+              .where(and(...baseReg, or(byCloser, byLinked))!)
+              .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+          }
           return db
             .select()
             .from(registrosDeLlamada)
-            .where(and(...baseReg, or(byCloser, byLinked))!)
+            .where(and(...baseReg, inArray(registrosDeLlamada.id_registro, idsConLlamadaEnRango)))
             .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
         })()
-      : db.select().from(registrosDeLlamada).where(and(...baseReg)).orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+      : // Sin llamadas en el rango — devolver vacío
+        db
+          .select()
+          .from(registrosDeLlamada)
+          .where(and(...baseReg, sql`false`))
+          .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
 
   const regRowsResolved = await regRows;
 
