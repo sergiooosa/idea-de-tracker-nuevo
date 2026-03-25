@@ -201,8 +201,8 @@ export async function getDashboard(
     ? Object.values(attemptsByLead).reduce((s, v) => s + v, 0) / leadKeysArr.length
     : 0;
 
-  const tasaCierre = asistidas > 0 ? (cerradas / asistidas) * 100 : 0;
-  const tasaAgendamiento = contestadas > 0 ? (filteredAgendas.length / contestadas) * 100 : 0;
+  const tasaCierre = asistidas > 0 ? cerradas / asistidas : 0;
+  const tasaAgendamiento = contestadas > 0 ? filteredAgendas.length / contestadas : 0;
 
   const kpis: DashboardKpis & Record<string, number> = {
     totalLeads,

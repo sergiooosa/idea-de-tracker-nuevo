@@ -196,10 +196,10 @@ export default function DashboardPage() {
             ) : (
               <>
                 {[
-                  { label: t.dashboard.kpis.agendadas, value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${kpis.tasaAgendamiento.toFixed(1)}%` },
+                  { label: t.dashboard.kpis.agendadas, value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${pctFmt(kpis.tasaAgendamiento)}` },
                   { label: t.dashboard.kpis.asistidas, value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
                   { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
-                  { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${kpis.tasaCierre.toFixed(1)}%` },
+                  { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
                 ].map(({ label, value, color, sub }) => (
                   <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
                     <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
