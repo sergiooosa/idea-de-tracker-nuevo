@@ -76,6 +76,11 @@ export default async function middleware(req: NextRequest) {
   if (isRoot) {
     if (pathname.startsWith("/api/auth")) return NextResponse.next();
 
+    // /demo → público en dominio raíz también
+    if (pathname === "/demo" || pathname.startsWith("/demo/")) {
+      return NextResponse.next();
+    }
+
     const session = await getSession(req);
 
     if (pathname === "/login") {
@@ -116,6 +121,11 @@ export default async function middleware(req: NextRequest) {
   // Todas las rutas /api/* pasan directo sin reescribir
   if (pathname.startsWith("/api")) return NextResponse.next();
 
+  // Ruta /demo → pública, sin auth
+  if (pathname === "/demo" || pathname.startsWith("/demo/")) {
+    return NextResponse.next();
+  }
+
   const session = await getSession(req);
 
   // Sin sesión → redirigir al login central
@@ -141,6 +151,12 @@ export default async function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // /demo no se reescribe — la ruta vive en /app/demo directamente
+  // (ya fue permitida sin auth arriba, pero si llega aquí por otra razón, la dejamos pasar)
+  if (pathname === "/demo" || pathname.startsWith("/demo/")) {
+    return NextResponse.next();
   }
 
   // Rewrite interno: testv1.autokpi.net/dashboard → /app/testv1/dashboard
