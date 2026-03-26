@@ -51,9 +51,7 @@ function buildSystemPrompt(nombreCuenta: string, from: string, to: string, data:
         : `${kpis.speedToLeadAvg.toFixed(1)} min`
       : "N/D";
 
-  const llamadasNote = fuenteLlamadas === "ghl"
-    ? "\nNOTA IMPORTANTE: Las llamadas de este cliente son vía GHL sin transcripción — solo hay métricas básicas de llamadas (totales, contestadas, no contestadas). No hay análisis IA de llamadas ni transcripciones disponibles."
-    : "";
+  const llamadasNote = "";
 
   return `Eres el asistente de análisis de ventas de AutoKPI para ${nombreCuenta}.
 Aquí están los datos del período ${from} al ${to}:
