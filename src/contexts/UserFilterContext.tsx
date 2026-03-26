@@ -9,7 +9,7 @@ export interface AsesorOption {
   email?: string;
 }
 
-interface UserFilterContextValue {
+export interface UserFilterContextValue {
   session: SessionInfo | null;
   sessionLoading: boolean;
   soloMisDatos: boolean;
@@ -29,7 +29,7 @@ interface UserFilterContextValue {
   asesores: AsesorOption[];
 }
 
-const UserFilterContext = createContext<UserFilterContextValue | null>(null);
+export const UserFilterContext = createContext<UserFilterContextValue | null>(null);
 
 const LS_KEY = "autokpi_solo_mis_datos";
 const LS_ASESORES = "autokpi_asesores_seleccionados";

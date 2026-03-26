@@ -1,14 +1,26 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { DEMO_GENERATORS } from "@/lib/demo-data";
 import { useUserFilter } from "@/contexts/UserFilterContext";
 
 export function useApiData<T>(
   url: string,
   params?: Record<string, string | undefined>,
 ) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+  const isDemo = pathname?.startsWith("/demo") ?? false;
+
+  const [data, setData] = useState<T | null>(() => {
+    if (isDemo) {
+      const path = url.split("?")[0];
+      const gen = DEMO_GENERATORS[path];
+      return gen ? (gen() as T) : null;
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(!isDemo);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -23,6 +35,14 @@ export function useApiData<T>(
   const serialized = JSON.stringify(params ?? {});
 
   const fetchData = useCallback(async () => {
+    // En modo demo: regenerar datos falsos sin fetch
+    if (isDemo) {
+      const path = url.split("?")[0];
+      const gen = DEMO_GENERATORS[path];
+      if (gen) setData(gen() as T);
+      return;
+    }
+
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -66,9 +86,10 @@ export function useApiData<T>(
   }, [url, serialized, effectiveCloserEmails]);
 
   useEffect(() => {
+    if (isDemo) return; // datos ya generados en useState init
     fetchData();
     return () => abortRef.current?.abort();
-  }, [fetchData]);
+  }, [fetchData, isDemo]);
 
   return { data, loading, error, refetch: fetchData };
 }
