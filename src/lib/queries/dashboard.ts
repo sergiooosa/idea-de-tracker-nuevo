@@ -202,7 +202,7 @@ export async function getDashboard(
     : 0;
 
   const tasaCierre = asistidas > 0 ? cerradas / asistidas : 0;
-  const tasaAgendamiento = contestadas > 0 ? filteredAgendas.length / contestadas : 0;
+  const tasaAgendamiento = totalLeads > 0 ? filteredAgendas.length / totalLeads : 0;
 
   const kpis: DashboardKpis & Record<string, number> = {
     totalLeads,
@@ -274,7 +274,7 @@ export async function getDashboard(
         revenue: aRevenue,
         cashCollected: aCash,
         contactRate: ac.length > 0 ? aContestadas / ac.length : 0,
-        bookingRate: aContestadas > 0 ? aa.length / aContestadas : 0,
+        bookingRate: aLeads > 0 ? aa.length / aLeads : 0,
       };
     },
   );
