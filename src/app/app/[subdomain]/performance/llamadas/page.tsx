@@ -160,17 +160,8 @@ export default function PerformanceLlamadasPage() {
     );
   }
 
-  const isGHL = data?.fuente_llamadas === 'ghl';
-
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
-      {isGHL && (
-        <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
-          <p className="font-semibold">📞 Este cliente usa GHL para llamadas — Análisis IA no disponible</p>
-          <p>Las llamadas se registran con métricas básicas: contestadas / no contestadas.</p>
-          <p className="text-amber-500/70">Cuando GHL agregue transcripción automática, podrás activar el análisis IA.</p>
-        </div>
-      )}
       <div className="flex flex-wrap items-center gap-2 mb-0">
         <span className="text-xs text-gray-400">Rango de fechas (actividad):</span>
         <DateRangePicker
@@ -281,8 +272,8 @@ export default function PerformanceLlamadasPage() {
                                         ) : advisorLeads.map((lead) => (
                                           <tr
                                             key={lead.id_registro}
-                                            className={`border-t border-surface-500 ${isGHL ? '' : 'hover:bg-surface-600/50 cursor-pointer'}`}
-                                            onClick={() => { if (!isGHL) openLogsForLead(lead); }}
+                                            className="border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer"
+                                            onClick={() => openLogsForLead(lead)}
                                           >
                                             <td className="px-2 py-2 text-white">
                                               <div className="flex flex-col gap-0.5">
