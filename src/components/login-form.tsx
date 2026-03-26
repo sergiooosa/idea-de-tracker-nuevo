@@ -2,15 +2,27 @@
 
 import { useState } from "react";
 import { loginAction } from "@/app/login/actions";
+import type { AccountOption } from "@/app/login/actions";
 import Image from "next/image";
+import { Building2 } from "lucide-react";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
 
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
+
+  const buildUrl = (subdominio: string) => {
+    const isLocalDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const protocol = window.location.protocol;
+    const port = window.location.port ? `:${window.location.port}` : "";
+    return isLocalDev
+      ? `${protocol}//${subdominio}.localhost${port}/dashboard`
+      : `${protocol}//${subdominio}.${rootDomain}/dashboard`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,22 +43,74 @@ export default function LoginForm() {
         return;
       }
 
+      if ("accounts" in result && result.accounts) {
+        setAccounts(result.accounts);
+        setLoading(false);
+        return;
+      }
+
       if (result.subdominio) {
-        const isLocalDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const protocol = window.location.protocol;
-        const port = window.location.port ? `:${window.location.port}` : "";
-
-        const targetUrl = isLocalDev
-          ? `${protocol}//${result.subdominio}.localhost${port}/dashboard`
-          : `${protocol}//${result.subdominio}.${rootDomain}/dashboard`;
-
-        window.location.href = targetUrl;
+        window.location.href = buildUrl(result.subdominio);
       }
     } catch {
       setError("Ocurrió un error inesperado. Intenta de nuevo.");
       setLoading(false);
     }
   };
+
+  // Account selector screen
+  if (accounts) {
+    return (
+      <div className="w-full max-w-md">
+        <div className="rounded-2xl border border-white/10 bg-slate-900/60 shadow-2xl overflow-hidden">
+          <div className="p-8 pb-6 flex flex-col items-center gap-4">
+            <div className="h-14 w-14 rounded-xl bg-white p-1 flex items-center justify-center">
+              <Image
+                src="https://i.postimg.cc/pXJdGQmv/Gemini-Generated-Image-4vedz84vedz84ved.png"
+                alt="AutoKPI"
+                width={56}
+                height={56}
+                className="scale-110 object-contain"
+              />
+            </div>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-white">Selecciona tu cuenta</h1>
+              <p className="text-sm text-slate-400 mt-1">
+                Tienes acceso a {accounts.length} cuentas
+              </p>
+            </div>
+          </div>
+          <div className="px-8 pb-8 space-y-3">
+            {accounts.map((acc) => (
+              <button
+                key={acc.id_cuenta}
+                type="button"
+                onClick={() => { window.location.href = buildUrl(acc.subdominio); }}
+                className="w-full flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-left hover:border-blue-500/50 hover:bg-slate-700 transition-all group"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 group-hover:bg-blue-500/30 transition-colors">
+                  <Building2 className="w-5 h-5 text-blue-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-white truncate">
+                    {acc.nombre_cuenta ?? acc.subdominio}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">{acc.subdominio}.{rootDomain}</p>
+                </div>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setAccounts(null)}
+              className="w-full mt-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              ← Volver al login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md">

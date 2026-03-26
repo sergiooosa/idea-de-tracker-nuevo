@@ -7,6 +7,12 @@ import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import { normalizeSubdominio } from "@/lib/subdomain";
 import { eq } from "drizzle-orm";
 
+export interface AccountOption {
+  id_cuenta: number;
+  nombre_cuenta: string | null;
+  subdominio: string;
+}
+
 export async function loginAction(formData: {
   email: string;
   password: string;
@@ -34,18 +40,32 @@ export async function loginAction(formData: {
     return { platformAdmin: true };
   }
 
-  const result = await db
-    .select({ subdominio: cuentas.subdominio })
+  const results = await db
+    .select({
+      id_cuenta: cuentas.id_cuenta,
+      nombre_cuenta: cuentas.nombre_empresa,
+      subdominio: cuentas.subdominio,
+    })
     .from(usuariosDashboard)
     .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
-    .where(eq(usuariosDashboard.email, email))
-    .limit(1);
+    .where(eq(usuariosDashboard.email, email));
 
-  if (result.length === 0) {
+  if (results.length === 0) {
     return { error: "No se encontró la cuenta asociada." };
   }
 
-  const subdominioSlug =
-    normalizeSubdominio(result[0].subdominio) ?? result[0].subdominio;
-  return { subdominio: subdominioSlug };
+  if (results.length === 1) {
+    const subdominioSlug =
+      normalizeSubdominio(results[0].subdominio) ?? results[0].subdominio;
+    return { subdominio: subdominioSlug };
+  }
+
+  // Multiple accounts — let user choose
+  const accounts: AccountOption[] = results.map((r) => ({
+    id_cuenta: r.id_cuenta,
+    nombre_cuenta: r.nombre_cuenta ?? null,
+    subdominio: normalizeSubdominio(r.subdominio) ?? r.subdominio,
+  }));
+
+  return { accounts };
 }
