@@ -667,20 +667,40 @@ export default function SystemPage() {
                         <input type="text" value={r.tag} onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, tag: v } : x)); }} placeholder="nombre_etiqueta"
                           className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
                       </div>
+                      <div className="w-36">
+                        <label className="block text-[11px] font-medium text-gray-400 mb-1">Acción</label>
+                        <select
+                          value={(r as unknown as { accion?: string }).accion ?? 'asignar_etiqueta'}
+                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, accion: e.target.value } : x))}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                        >
+                          <option value="asignar_etiqueta">Asignar etiqueta</option>
+                          <option value="cambiar_estado">Cambiar estado</option>
+                          <option value="etapa_cambiada">Etapa cambiada</option>
+                        </select>
+                      </div>
                       <div className="w-32">
                         <label className="block text-[11px] font-medium text-gray-400 mb-1">Fuente</label>
-                        <select value={r.source} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, source: e.target.value } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                          <option value="call">Llamada</option><option value="chat">Chat</option><option value="meeting">Meeting</option>
+                        <select
+                          value={(r as unknown as { fuente?: string }).fuente ?? r.source ?? 'todas'}
+                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, fuente: e.target.value, source: e.target.value } : x))}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                        >
+                          <option value="todas">Todas</option>
+                          <option value="llamadas">Llamadas</option>
+                          <option value="videollamadas">Videollamadas</option>
+                          <option value="chats">Chats</option>
                         </select>
                       </div>
                     </div>
                     {embudoEtapas.length > 0 && (
                       <div>
-                        <label className="block text-[11px] font-medium text-accent-purple mb-1">Mover etapa de funnel a (opcional)</label>
+                        <label className="block text-[11px] font-medium text-accent-purple mb-1">
+                          {(r as unknown as { accion?: string }).accion === 'etapa_cambiada' ? 'Etapa del embudo' : 'Mover etapa de funnel a (opcional)'}
+                        </label>
                         <select
                           value={r.funnelStage ?? ''}
-                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, funnelStage: e.target.value || undefined } : x))}
+                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, funnelStage: e.target.value || undefined, valor: e.target.value || undefined } : x))}
                           className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
                         >
                           <option value="">No mover etapa</option>
