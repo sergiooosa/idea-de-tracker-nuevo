@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
-import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2 } from "lucide-react";
+import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download } from "lucide-react";
 import { useUserFilter } from "@/contexts/UserFilterContext";
 import { canManageUsers, canManageRoles } from "@/lib/permisos";
 import { PERMISOS_DISPONIBLES, type PermisoId } from "@/lib/permisos";
@@ -38,6 +38,12 @@ export default function ConfiguracionPage() {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [formUser, setFormUser] = useState({ name: "", email: "", password: "", fathom: "", rol: "usuario" });
   const [error, setError] = useState("");
+
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ creados: number; errores: Array<{ email: string; error: string }> } | null>(null);
+  const bulkFileRef = useRef<HTMLInputElement>(null);
 
   const [modalRol, setModalRol] = useState<"create" | "edit" | null>(null);
   const [editingRol, setEditingRol] = useState<RolConfig | null>(null);
@@ -178,6 +184,24 @@ export default function ConfiguracionPage() {
     setModalRol("edit");
   };
 
+  const handleBulkUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkFile) return;
+    setBulkLoading(true);
+    setBulkResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", bulkFile);
+      const res = await fetch("/api/data/usuarios/bulk", { method: "POST", body: fd });
+      const data = await res.json();
+      setBulkResult(data);
+      if (data.creados > 0) loadUsers();
+    } catch {
+      toast.error("Error al procesar el archivo");
+    }
+    setBulkLoading(false);
+  };
+
   const togglePermisoRol = (permisoId: PermisoId) => {
     setFormRol((prev) => ({
       ...prev,
@@ -300,13 +324,29 @@ export default function ConfiguracionPage() {
                   {users.length}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={openCreateUser}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 transition-colors"
-              >
-                <UserPlus className="w-4 h-4" /> Añadir usuario
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href="/api/data/usuarios/template"
+                  download
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-700 border border-surface-500 text-gray-300 text-xs font-medium hover:bg-surface-600 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Plantilla
+                </a>
+                <button
+                  type="button"
+                  onClick={() => { setShowBulkModal(true); setBulkResult(null); setBulkFile(null); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-700 border border-surface-500 text-gray-300 text-xs font-medium hover:bg-surface-600 transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" /> Carga masiva
+                </button>
+                <button
+                  type="button"
+                  onClick={openCreateUser}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" /> Añadir usuario
+                </button>
+              </div>
             </div>
             {loading ? (
               <div className="flex justify-center py-8">
@@ -552,6 +592,76 @@ export default function ConfiguracionPage() {
                   className="flex-1 px-3 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50"
                 >
                   {saving ? "Guardando..." : editingRol ? "Guardar" : "Crear rol"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showBulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setShowBulkModal(false); setBulkResult(null); }} aria-hidden />
+          <div className="relative w-full max-w-md rounded-xl bg-surface-800 border border-surface-500 shadow-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-surface-500">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-accent-cyan" /> Carga masiva de usuarios
+              </h3>
+              <button type="button" onClick={() => { setShowBulkModal(false); setBulkResult(null); }} className="p-1.5 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form className="p-4 space-y-4" onSubmit={handleBulkUpload}>
+              <p className="text-xs text-gray-400">
+                Sube un CSV con columnas: <code className="bg-surface-700 px-1 rounded">nombre, email, password, rol, fathom_api_key</code>.<br />
+                Máximo 100 usuarios por lote.
+              </p>
+              <a
+                href="/api/data/usuarios/template"
+                download
+                className="flex items-center gap-1.5 text-xs text-accent-cyan hover:underline"
+              >
+                <Download className="w-3.5 h-3.5" /> Descargar plantilla CSV
+              </a>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Archivo CSV</label>
+                <input
+                  ref={bulkFileRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => setBulkFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-accent-cyan/20 file:text-accent-cyan hover:file:bg-accent-cyan/30"
+                />
+              </div>
+              {bulkResult && (
+                <div className="rounded-lg border border-surface-500 bg-surface-700/60 p-3 space-y-2 text-xs">
+                  <p className="text-accent-green font-medium">✅ {bulkResult.creados} usuario{bulkResult.creados !== 1 ? "s" : ""} creado{bulkResult.creados !== 1 ? "s" : ""}</p>
+                  {bulkResult.errores.length > 0 && (
+                    <div>
+                      <p className="text-red-400 font-medium mb-1">⚠️ {bulkResult.errores.length} error{bulkResult.errores.length !== 1 ? "es" : ""}:</p>
+                      <ul className="space-y-1 max-h-32 overflow-y-auto">
+                        {bulkResult.errores.map((err, i) => (
+                          <li key={i} className="text-gray-400"><span className="text-gray-300">{err.email}</span>: {err.error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowBulkModal(false); setBulkResult(null); }}
+                  className="flex-1 px-3 py-2 rounded-lg bg-surface-600 text-gray-300 text-sm font-medium hover:bg-surface-500"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkLoading || !bulkFile}
+                  className="flex-1 px-3 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {bulkLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Procesando...</> : "Subir CSV"}
                 </button>
               </div>
             </form>
