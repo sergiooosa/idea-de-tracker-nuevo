@@ -8,7 +8,8 @@ import { useApiData } from '@/hooks/useApiData';
 import type { ChatsResponse, ApiChatLead } from '@/types';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Pencil, User, X } from 'lucide-react';
+import { Pencil, User, X, Plus } from 'lucide-react';
+import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 
 const minFmt = (s: number | null) => {
@@ -55,8 +56,9 @@ export default function PerformanceChatsPage() {
   const [modalConversacion, setModalConversacion] = useState<ApiChatLead | null>(null);
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
   const [canalActivo, setCanalActivo] = useState<Canal>('todos');
+  const [showNuevoModal, setShowNuevoModal] = useState(false);
 
-  const { data, loading } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
+  const { data, loading, refetch } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
 
   const agg = data?.agg ?? { assigned: 0, activos: 0, seguimientosTotal: 0, speedAvg: 0 };
 
@@ -103,6 +105,13 @@ export default function PerformanceChatsPage() {
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
       <div className="flex flex-wrap items-center gap-2 mb-0">
+        <button
+          type="button"
+          onClick={() => setShowNuevoModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" /> Nueva entrada
+        </button>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase">Beta</span>
         <span className="text-xs text-gray-400">Rango de fechas:</span>
         <DateRangePicker
@@ -311,6 +320,12 @@ export default function PerformanceChatsPage() {
           </div>
         </div>
       )}
+      <NuevoRegistroModal
+        open={showNuevoModal}
+        onClose={() => setShowNuevoModal(false)}
+        onSuccess={() => refetch()}
+        tipo="chat"
+      />
     </div>
   );
 }

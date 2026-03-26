@@ -6,7 +6,8 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Pencil, Search, Sparkles, User, X } from 'lucide-react';
+import { FileText, Pencil, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
@@ -55,6 +56,7 @@ export default function PerformanceLlamadasPage() {
     id_user_ghl?: string | null;
   } | null>(null);
   const [leadSearch, setLeadSearch] = useState('');
+  const [showNuevoModal, setShowNuevoModal] = useState(false);
 
   const { data, loading, refetch } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
 
@@ -163,6 +165,13 @@ export default function PerformanceLlamadasPage() {
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
       <div className="flex flex-wrap items-center gap-2 mb-0">
+        <button
+          type="button"
+          onClick={() => setShowNuevoModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" /> Nueva entrada
+        </button>
         <span className="text-xs text-gray-400">Rango de fechas (actividad):</span>
         <DateRangePicker
           dateFrom={dateFrom}
@@ -393,6 +402,12 @@ export default function PerformanceLlamadasPage() {
           </div>
         </div>
       )}
+      <NuevoRegistroModal
+        open={showNuevoModal}
+        onClose={() => setShowNuevoModal(false)}
+        onSuccess={() => refetch()}
+        tipo="llamada"
+      />
     </div>
   );
 }

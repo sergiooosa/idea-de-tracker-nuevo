@@ -9,7 +9,8 @@ import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripci
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
 import Link from 'next/link';
-import { Pencil, Search, User, X } from 'lucide-react';
+import { Pencil, Search, User, X, Plus } from 'lucide-react';
+import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { VideollamadasResponse, ApiVideollamada, VideoMeeting, VideollamadasAdvisorMetrics } from '@/types';
@@ -64,8 +65,9 @@ export default function PerformanceVideollamadasPage() {
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [leadSearch, setLeadSearch] = useState('');
+  const [showNuevoModal, setShowNuevoModal] = useState(false);
 
-  const { data, loading } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
+  const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[], apiMeetings?: ApiVideollamada[]) => {
@@ -160,6 +162,13 @@ export default function PerformanceVideollamadasPage() {
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
       <div className="flex flex-wrap items-center gap-2 mb-0">
+        <button
+          type="button"
+          onClick={() => setShowNuevoModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" /> Nueva entrada
+        </button>
         <span className="text-xs text-gray-400">Rango de fechas (actividad):</span>
         <DateRangePicker
           dateFrom={dateFrom}
@@ -399,6 +408,12 @@ export default function PerformanceVideollamadasPage() {
           onSaved={() => setEditingRecord(null)}
         />
       )}
+      <NuevoRegistroModal
+        open={showNuevoModal}
+        onClose={() => setShowNuevoModal(false)}
+        onSuccess={() => refetch()}
+        tipo="videollamada"
+      />
     </div>
   );
 }

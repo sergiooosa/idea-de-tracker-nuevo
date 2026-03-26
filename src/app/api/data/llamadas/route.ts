@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { withAuthAndPermission } from "@/lib/api-auth";
 import { getLlamadas, updateLlamada, updateRegistroLlamada, deleteRegistroLlamada } from "@/lib/queries/llamadas";
+import { db } from "@/lib/db";
+import { logLlamadas } from "@/lib/db/schema";
 
 export async function GET(req: Request) {
   return withAuthAndPermission(req, "ver_rendimiento", async (idCuenta) => {
@@ -35,6 +37,24 @@ export async function PUT(req: Request) {
     const ok = await updateLlamada(id, idCuenta, { nombre_lead, closer, estado });
     if (!ok) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     return NextResponse.json({ ok: true });
+  });
+}
+
+export async function POST(req: Request) {
+  return withAuthAndPermission(req, "editar_registros", async (idCuenta) => {
+    const body = await req.json();
+    const { nombre_lead, mail_lead, phone, closer_mail, nombre_closer, tipo_evento, ts } = body;
+    const [row] = await db.insert(logLlamadas).values({
+      id_cuenta: idCuenta,
+      nombre_lead: nombre_lead ?? null,
+      mail_lead: mail_lead ?? null,
+      phone: phone ?? null,
+      closer_mail: closer_mail ?? null,
+      nombre_closer: nombre_closer ?? null,
+      tipo_evento: tipo_evento ?? "efectiva_manual",
+      ts: ts ? new Date(ts) : new Date(),
+    }).returning({ id: logLlamadas.id });
+    return NextResponse.json({ ok: true, id: row?.id });
   });
 }
 
