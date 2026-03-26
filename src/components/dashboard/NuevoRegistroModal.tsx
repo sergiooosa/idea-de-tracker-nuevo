@@ -88,7 +88,7 @@ export default function NuevoRegistroModal({
           mail_lead: emailLead || null,
           phone: phone || null,
           closer_mail: asesor || null,
-          nombre_closer: asesores.find((a) => a.email === asesor)?.nombre ?? asesor || null,
+          nombre_closer: (asesores.find((a) => a.email === asesor)?.nombre ?? asesor) || null,
           tipo_evento: tipoEvento,
         };
       } else if (tipo === "videollamada") {

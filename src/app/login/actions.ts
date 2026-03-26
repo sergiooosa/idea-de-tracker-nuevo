@@ -43,7 +43,7 @@ export async function loginAction(formData: {
   const results = await db
     .select({
       id_cuenta: cuentas.id_cuenta,
-      nombre_cuenta: cuentas.nombre_empresa,
+      nombre_cuenta: cuentas.nombre_cuenta,
       subdominio: cuentas.subdominio,
     })
     .from(usuariosDashboard)
