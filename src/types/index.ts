@@ -335,6 +335,7 @@ export interface ApiChatLead {
   leadName: string | null;
   leadId: string | null;
   agentName: string | null;
+  asesorAsignado: string | null;
   datetime: string;
   totalMessages: number;
   agentMessages: number;

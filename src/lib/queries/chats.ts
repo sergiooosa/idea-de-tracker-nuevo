@@ -107,6 +107,7 @@ export async function getChats(
       leadName: r.nombre_lead,
       leadId: r.id_lead,
       agentName,
+      asesorAsignado: r.asesor_asignado ?? agentName ?? null,
       datetime: r.fecha_y_hora_z?.toISOString() ?? "",
       totalMessages: msgs.length,
       agentMessages: agentMsgs.length,

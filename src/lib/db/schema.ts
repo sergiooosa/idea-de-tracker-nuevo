@@ -47,9 +47,15 @@ export interface ConfiguracionUI {
 
 export interface ReglaEtiqueta {
   id: string;
-  condition: string;
-  tag: string;
-  source: string;
+  nombre: string;
+  condicion: string;
+  accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada";
+  valor: string;
+  fuente?: "chats" | "videollamadas" | "llamadas" | "todas";
+  // Legacy fields (kept for backward compatibility)
+  condition?: string;
+  tag?: string;
+  source?: string;
   funnelStage?: string;
 }
 
@@ -307,6 +313,7 @@ export const chatsLogs = pgTable("chats_logs", {
   id_lead: text("id_lead"),
   chatid: text("chatid"),
   origen: text("origen"),
+  asesor_asignado: text("asesor_asignado"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
   // ── IA nocturna ──────────────────────────────────────────────────────────
   ia_categoria: text("ia_categoria"),
@@ -433,6 +440,12 @@ export interface TramoEscalada {
   comision_pct: number;  // % de comisión para este tramo
 }
 
+export interface SocioSplit {
+  email: string;
+  nombre?: string;
+  pct: number; // Porcentaje de la comisión que le corresponde a este socio
+}
+
 export const comisionesConfig = pgTable("comisiones_config", {
   id: serial("id").primaryKey(),
   id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
@@ -449,6 +462,13 @@ export const comisionesConfig = pgTable("comisiones_config", {
   asesores_equipo: jsonb("asesores_equipo").$type<string[]>().default([]),
   // Para tipo='escalada': array de tramos {meta_pct, comision_pct}
   tramos_escalada: jsonb("tramos_escalada").$type<TramoEscalada[]>().default([]),
+  // Campos extendidos
+  subtipo: text("subtipo").default("estandar"), // 'estandar' | 'proyecto' | 'division'
+  nombre_proyecto: text("nombre_proyecto"),
+  pct_division: numeric("pct_division", { precision: 10, scale: 4 }).default("100"),
+  forma_pago: text("forma_pago").default("transferencia"),
+  socios_split: jsonb("socios_split").$type<SocioSplit[]>().default([]),
+  notas: text("notas"),
 }, (table) => [
   index("idx_comisiones_id_cuenta").on(table.id_cuenta),
 ]);
