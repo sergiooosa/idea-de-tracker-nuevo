@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { withAuthAndPermission, withAuthAndAnyPermission } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, TramoEscalada } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
+import type { SocioSplit } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 // ── Tipos del response ─────────────────────────────────────────────────────────
+interface SocioSplitCalculado extends SocioSplit {
+  comision_asignada: number;
+}
+
 interface ComisionResultado {
   id: number;
   closer_email: string;
@@ -16,10 +21,19 @@ interface ComisionResultado {
   activo: boolean;
   asesores_equipo: string[];
   tramos_escalada: TramoEscalada[];
+  // Campos extendidos
+  subtipo: string | null;
+  nombre_proyecto: string | null;
+  pct_division: number;
+  forma_pago: string | null;
+  socios_split: SocioSplit[];
+  notas: string | null;
   // Resultados del período
   cierres: number;
   revenue_base: number;
   comision_calculada: number;
+  comision_neta: number; // tras pct_division
+  splits_calculados?: SocioSplitCalculado[];
   // Solo escalada
   meta_revenue?: number;
   pct_meta_alcanzado?: number;
@@ -34,7 +48,7 @@ function calcFromRows(
     facturacion: string | null;
     cash_collected: string | null;
   }>,
-  filterEmails: string[] | null, // null = todos (global)
+  filterEmails: string[] | null,
 ): { cierres: number; cash_collected: number; facturacion: number } {
   const result = { cierres: 0, cash_collected: 0, facturacion: 0 };
   for (const row of rows) {
@@ -56,20 +70,17 @@ export async function GET(req: Request) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    // Lista de configuraciones activas
     const configs = await db
       .select()
       .from(comisionesConfig)
       .where(and(eq(comisionesConfig.id_cuenta, idCuenta), eq(comisionesConfig.activo, true)));
 
-    // Si hay filtro de fechas, calcular cierres reales del período
     let resultados: ComisionResultado[] = [];
 
     if (from && to) {
       const fromDate = new Date(`${from}T00:00:00Z`);
       const toDate = new Date(`${to}T23:59:59.999Z`);
 
-      // Traer todas las agendas del período para esta cuenta
       const agendaRows = await db
         .select({
           closer: resumenesDiariosAgendas.closer,
@@ -89,7 +100,6 @@ export async function GET(req: Request) {
           ),
         );
 
-      // Traer metas de la cuenta (para escalada)
       const [metaRow] = await db
         .select()
         .from(metasCuenta)
@@ -100,36 +110,20 @@ export async function GET(req: Request) {
         const tipoComision = (cfg.tipo_comision ?? "individual") as "individual" | "global" | "equipo" | "escalada";
         const asesoresEquipo = (cfg.asesores_equipo as string[] | null) ?? [];
         const tramosEscalada = (cfg.tramos_escalada as TramoEscalada[] | null) ?? [];
+        const sociosSplit = (cfg.socios_split as SocioSplit[] | null) ?? [];
+        const pctDivision = parseFloat(String(cfg.pct_division ?? 100)) || 100;
         const emailKey = cfg.closer_email.trim().toLowerCase();
         const aplica_sobre = cfg.aplica_sobre ?? "cash_collected";
 
         let data: { cierres: number; cash_collected: number; facturacion: number };
 
         if (tipoComision === "global") {
-          // Todos los cierres del equipo
-          data = calcFromRows(agendaRows.map(r => ({
-            closer: r.closer,
-            categoria: r.categoria,
-            facturacion: r.facturacion,
-            cash_collected: r.cash_collected,
-          })), null);
+          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), null);
         } else if (tipoComision === "equipo") {
-          // Cierres de asesores específicos
           const emailsEquipo = asesoresEquipo.map((e) => e.trim().toLowerCase());
-          data = calcFromRows(agendaRows.map(r => ({
-            closer: r.closer,
-            categoria: r.categoria,
-            facturacion: r.facturacion,
-            cash_collected: r.cash_collected,
-          })), emailsEquipo);
+          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), emailsEquipo);
         } else {
-          // individual o escalada: cierres propios
-          data = calcFromRows(agendaRows.map(r => ({
-            closer: r.closer,
-            categoria: r.categoria,
-            facturacion: r.facturacion,
-            cash_collected: r.cash_collected,
-          })), [emailKey]);
+          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), [emailKey]);
         }
 
         const revenueBase = aplica_sobre === "facturacion" ? data.facturacion : data.cash_collected;
@@ -141,33 +135,30 @@ export async function GET(req: Request) {
         let tramoAplicado: TramoEscalada | undefined;
 
         if (tipoComision === "escalada") {
-          // Buscar meta personal del asesor
-          const metasAsesor = (metaRow?.metas_por_asesor ?? []) as Array<{
-            email: string;
-            meta_revenue_mensual?: number;
-          }>;
-          const metaPersonal = metasAsesor.find(
-            (m) => m.email.trim().toLowerCase() === emailKey,
-          );
-          metaRevenue =
-            metaPersonal?.meta_revenue_mensual ??
-            (metaRow?.meta_revenue_mensual ? parseFloat(String(metaRow.meta_revenue_mensual)) : 0);
-
+          const metasAsesor = (metaRow?.metas_por_asesor ?? []) as Array<{ email: string; meta_revenue_mensual?: number }>;
+          const metaPersonal = metasAsesor.find((m) => m.email.trim().toLowerCase() === emailKey);
+          metaRevenue = metaPersonal?.meta_revenue_mensual ?? (metaRow?.meta_revenue_mensual ? parseFloat(String(metaRow.meta_revenue_mensual)) : 0);
           pctMetaAlcanzado = metaRevenue > 0 ? (revenueBase / metaRevenue) * 100 : 0;
-
-          // Encontrar el tramo más alto que aplique
-          const tramo = [...tramosEscalada]
-            .sort((a, b) => b.meta_pct - a.meta_pct)
-            .find((t) => pctMetaAlcanzado! >= t.meta_pct);
-
+          const tramo = [...tramosEscalada].sort((a, b) => b.meta_pct - a.meta_pct).find((t) => pctMetaAlcanzado! >= t.meta_pct);
           tramoAplicado = tramo;
           const comisionPct = tramo?.comision_pct ?? 0;
           comisionCalculada = (revenueBase * comisionPct) / 100;
         } else if (cfg.tipo === "porcentaje") {
           comisionCalculada = (revenueBase * valorNum) / 100;
         } else {
-          // monto_fijo por cierre
           comisionCalculada = data.cierres * valorNum;
+        }
+
+        // Aplicar pct_division
+        const comisionNeta = Math.round((comisionCalculada * pctDivision) / 100 * 100) / 100;
+
+        // Calcular splits si hay socios
+        let splitsCalculados: SocioSplitCalculado[] | undefined;
+        if (sociosSplit.length > 0) {
+          splitsCalculados = sociosSplit.map((s) => ({
+            ...s,
+            comision_asignada: Math.round((comisionNeta * s.pct) / 100 * 100) / 100,
+          }));
         }
 
         const resultado: ComisionResultado = {
@@ -181,9 +172,16 @@ export async function GET(req: Request) {
           activo: cfg.activo ?? true,
           asesores_equipo: asesoresEquipo,
           tramos_escalada: tramosEscalada,
+          subtipo: cfg.subtipo ?? "estandar",
+          nombre_proyecto: cfg.nombre_proyecto ?? null,
+          pct_division: pctDivision,
+          forma_pago: cfg.forma_pago ?? "transferencia",
+          socios_split: sociosSplit,
+          notas: cfg.notas ?? null,
           cierres: data.cierres,
           revenue_base: revenueBase,
           comision_calculada: Math.round(comisionCalculada * 100) / 100,
+          comision_neta: comisionNeta,
         };
 
         if (tipoComision === "escalada") {
@@ -191,6 +189,8 @@ export async function GET(req: Request) {
           resultado.pct_meta_alcanzado = Math.round((pctMetaAlcanzado ?? 0) * 10) / 10;
           resultado.tramo_aplicado = tramoAplicado;
         }
+
+        if (splitsCalculados) resultado.splits_calculados = splitsCalculados;
 
         return resultado;
       });
@@ -213,20 +213,15 @@ export async function POST(req: Request) {
       tipo_comision?: string;
       asesores_equipo?: string[];
       tramos_escalada?: TramoEscalada[];
+      subtipo?: string;
+      nombre_proyecto?: string;
+      pct_division?: number;
+      forma_pago?: string;
+      socios_split?: SocioSplit[];
+      notas?: string;
     };
 
-    const {
-      id,
-      closer_email,
-      closer_nombre,
-      tipo,
-      valor,
-      aplica_sobre,
-      activo,
-      tipo_comision,
-      asesores_equipo,
-      tramos_escalada,
-    } = body;
+    const { id, closer_email, closer_nombre, tipo, valor, aplica_sobre, activo, tipo_comision, asesores_equipo, tramos_escalada, subtipo, nombre_proyecto, pct_division, forma_pago, socios_split, notas } = body;
 
     if (!closer_email) {
       return NextResponse.json({ error: "closer_email es requerido" }, { status: 400 });
@@ -242,22 +237,19 @@ export async function POST(req: Request) {
       tipo_comision: tipo_comision ?? "individual",
       asesores_equipo: asesores_equipo ?? [],
       tramos_escalada: tramos_escalada ?? [],
+      subtipo: subtipo ?? "estandar",
+      nombre_proyecto: nombre_proyecto ?? null,
+      pct_division: String(pct_division ?? 100),
+      forma_pago: forma_pago ?? "transferencia",
+      socios_split: socios_split ?? [],
+      notas: notas ?? null,
     };
 
     if (id) {
-      await db
-        .update(comisionesConfig)
-        .set(updateData)
-        .where(and(eq(comisionesConfig.id, id), eq(comisionesConfig.id_cuenta, idCuenta)));
+      await db.update(comisionesConfig).set(updateData).where(and(eq(comisionesConfig.id, id), eq(comisionesConfig.id_cuenta, idCuenta)));
       return NextResponse.json({ ok: true, action: "updated" });
     } else {
-      const [inserted] = await db
-        .insert(comisionesConfig)
-        .values({
-          id_cuenta: idCuenta,
-          ...updateData,
-        })
-        .returning({ id: comisionesConfig.id });
+      const [inserted] = await db.insert(comisionesConfig).values({ id_cuenta: idCuenta, ...updateData }).returning({ id: comisionesConfig.id });
       return NextResponse.json({ ok: true, action: "created", id: inserted?.id });
     }
   });
@@ -268,9 +260,7 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
-    await db
-      .delete(comisionesConfig)
-      .where(and(eq(comisionesConfig.id, parseInt(id, 10)), eq(comisionesConfig.id_cuenta, idCuenta)));
+    await db.delete(comisionesConfig).where(and(eq(comisionesConfig.id, parseInt(id, 10)), eq(comisionesConfig.id_cuenta, idCuenta)));
     return NextResponse.json({ ok: true });
   });
 }

@@ -7,7 +7,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { format, subDays } from 'date-fns';
 import { BadgeDollarSign, Plus, Trash2, Pencil, X, Loader2, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import type { TramoEscalada } from '@/lib/db/schema';
+import type { TramoEscalada, SocioSplit } from '@/lib/db/schema';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -67,6 +67,13 @@ interface FormState {
   aplica_sobre: AplicaSobre;
   asesores_equipo: string[];
   tramos_escalada: TramoEscalada[];
+  // Extended fields
+  subtipo: string;
+  nombre_proyecto: string;
+  pct_division: string;
+  forma_pago: string;
+  socios_split: SocioSplit[];
+  notas: string;
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -80,6 +87,12 @@ const EMPTY_FORM: FormState = {
   aplica_sobre: 'cash_collected',
   asesores_equipo: [],
   tramos_escalada: [{ meta_pct: 0, comision_pct: 3 }],
+  subtipo: 'estandar',
+  nombre_proyecto: '',
+  pct_division: '100',
+  forma_pago: 'transferencia',
+  socios_split: [],
+  notas: '',
 };
 
 const TIPO_COMISION_INFO: Record<TipoComision, { label: string; color: string; desc: string; tooltip: string }> = {
@@ -166,6 +179,7 @@ export default function ComisionesPage() {
 
   const handleOpenEdit = (cfg: ComisionConfig) => {
     setEditingId(cfg.id);
+    const cfgExt = cfg as ComisionConfig & { subtipo?: string; nombre_proyecto?: string; pct_division?: string; forma_pago?: string; socios_split?: SocioSplit[]; notas?: string };
     setForm({
       tipo_comision: cfg.tipo_comision ?? 'individual',
       closer_email: cfg.closer_email,
@@ -175,6 +189,12 @@ export default function ComisionesPage() {
       aplica_sobre: (cfg.aplica_sobre as AplicaSobre) ?? 'cash_collected',
       asesores_equipo: cfg.asesores_equipo ?? [],
       tramos_escalada: cfg.tramos_escalada?.length ? cfg.tramos_escalada : [{ meta_pct: 0, comision_pct: 3 }],
+      subtipo: cfgExt.subtipo ?? 'estandar',
+      nombre_proyecto: cfgExt.nombre_proyecto ?? '',
+      pct_division: cfgExt.pct_division ?? '100',
+      forma_pago: cfgExt.forma_pago ?? 'transferencia',
+      socios_split: cfgExt.socios_split ?? [],
+      notas: cfgExt.notas ?? '',
     });
     setShowForm(true);
   };
@@ -219,6 +239,12 @@ export default function ComisionesPage() {
         tipo_comision: form.tipo_comision,
         asesores_equipo: form.asesores_equipo,
         tramos_escalada: form.tramos_escalada,
+        subtipo: form.subtipo || 'estandar',
+        nombre_proyecto: form.nombre_proyecto || null,
+        pct_division: parseFloat(form.pct_division) || 100,
+        forma_pago: form.forma_pago || 'transferencia',
+        socios_split: form.socios_split ?? [],
+        notas: form.notas || null,
       };
 
       // Para global: usar un email especial si es nuevo
@@ -397,7 +423,21 @@ export default function ComisionesPage() {
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-white">{r.cierres}</td>
                       <td className="px-3 py-2 text-right text-gray-300">{fm(r.revenue_base)}</td>
-                      <td className="px-3 py-2 text-right font-bold text-accent-green">{fm(r.comision_calculada)}</td>
+                      <td className="px-3 py-2 text-right font-bold text-accent-green">
+                        {fm(r.comision_calculada)}
+                        {(r as ComisionResultado & { pct_division?: number; comision_neta?: number; splits_calculados?: Array<SocioSplit & { comision_asignada: number }> }).pct_division != null && (r as ComisionResultado & { pct_division?: number }).pct_division !== 100 && (
+                          <div className="text-[10px] text-accent-amber">
+                            Neta ({(r as ComisionResultado & { pct_division?: number }).pct_division}%): {fm((r as ComisionResultado & { comision_neta?: number }).comision_neta ?? r.comision_calculada)}
+                          </div>
+                        )}
+                        {((r as ComisionResultado & { splits_calculados?: Array<SocioSplit & { comision_asignada: number }> }).splits_calculados ?? []).length > 0 && (
+                          <div className="text-[10px] text-accent-purple mt-0.5">
+                            {((r as ComisionResultado & { splits_calculados?: Array<SocioSplit & { comision_asignada: number }> }).splits_calculados ?? []).map((s, i) => (
+                              <div key={i}>{s.nombre ?? s.email}: {fm(s.comision_asignada)}</div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -790,6 +830,73 @@ export default function ComisionesPage() {
                   </select>
                 </div>
               )}
+            </div>
+
+            {/* ── Campos extendidos ── */}
+            <div className="px-4 pb-4 space-y-3 border-t border-surface-600 pt-3">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Campos adicionales (opcional)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">Subtipo</label>
+                  <select
+                    value={form.subtipo}
+                    onChange={(e) => setForm(f => ({ ...f, subtipo: e.target.value }))}
+                    className="w-full rounded-lg bg-surface-600 border border-surface-400/30 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                  >
+                    <option value="estandar">Estándar</option>
+                    <option value="proyecto">Proyecto</option>
+                    <option value="division">División</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">Forma de pago</label>
+                  <select
+                    value={form.forma_pago}
+                    onChange={(e) => setForm(f => ({ ...f, forma_pago: e.target.value }))}
+                    className="w-full rounded-lg bg-surface-600 border border-surface-400/30 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                  >
+                    <option value="transferencia">Transferencia</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="crypto">Crypto</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">% sobre comisión total (división)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    step={0.01}
+                    value={form.pct_division}
+                    onChange={(e) => setForm(f => ({ ...f, pct_division: e.target.value }))}
+                    placeholder="100"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-400/30 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-400 mb-1">Nombre proyecto</label>
+                  <input
+                    type="text"
+                    value={form.nombre_proyecto}
+                    onChange={(e) => setForm(f => ({ ...f, nombre_proyecto: e.target.value }))}
+                    placeholder="Ej: Proyecto Alpha"
+                    className="w-full rounded-lg bg-surface-600 border border-surface-400/30 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-400 mb-1">Notas</label>
+                <textarea
+                  value={form.notas}
+                  onChange={(e) => setForm(f => ({ ...f, notas: e.target.value }))}
+                  placeholder="Notas internas..."
+                  rows={2}
+                  className="w-full rounded-lg bg-surface-600 border border-surface-400/30 px-3 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40 resize-none"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-surface-500">
