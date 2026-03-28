@@ -582,37 +582,27 @@ export default function SystemPage() {
                   <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'twilio' ? 'border-accent-cyan/60 bg-accent-cyan/10' : 'border-surface-500 hover:border-surface-400'}`}>
                     <input type="radio" name="fuente_llamadas" value="twilio" checked={fuenteLlamadas === 'twilio'} onChange={() => setFuenteLlamadas('twilio')} className="mt-0.5 accent-cyan-400" />
                     <div>
-                      <p className="text-sm font-medium text-white">Twilio <span className="text-[10px] text-green-400 font-semibold">(recomendado)</span></p>
+                      <p className="text-sm font-medium text-white">Twilio</p>
                       <p className="text-[11px] text-green-400 mt-0.5">✅ IA disponible: transcripción automática + análisis de llamadas</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman usando Twilio. El sistema transcribe y analiza cada llamada con IA.</p>
                     </div>
                   </label>
-                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'ghl' ? 'border-amber-500/60 bg-amber-500/10' : 'border-surface-500 hover:border-surface-400'}`}>
-                    <input type="radio" name="fuente_llamadas" value="ghl" checked={fuenteLlamadas === 'ghl'} onChange={() => setFuenteLlamadas('ghl')} className="mt-0.5 accent-amber-400" />
+                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'ghl' ? 'border-accent-cyan/60 bg-accent-cyan/10' : 'border-surface-500 hover:border-surface-400'}`}>
+                    <input type="radio" name="fuente_llamadas" value="ghl" checked={fuenteLlamadas === 'ghl'} onChange={() => setFuenteLlamadas('ghl')} className="mt-0.5 accent-cyan-400" />
                     <div>
                       <p className="text-sm font-medium text-white">GoHighLevel (GHL)</p>
-                      <p className="text-[11px] text-amber-400 mt-0.5">⚠️ IA no disponible: solo se registran métricas básicas</p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman directamente desde GHL. No hay transcripción ni análisis IA de llamadas. Solo se registra si la llamada fue contestada o no. (GHL planea agregar transcripción automática en el futuro — cuando esté disponible podrás cambiar a Twilio)</p>
+                      <p className="text-[11px] text-green-400 mt-0.5">✅ IA disponible cuando el webhook incluye transcripción</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman desde GHL. Si el webhook trae transcripción, el sistema la analiza con IA igual que Twilio.</p>
                     </div>
                   </label>
                 </div>
-                {fuenteLlamadas === 'ghl' && (
-                  <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
-                    <p className="font-semibold">⚠️ Con GHL como origen: el prompt de llamadas, análisis IA y transcripciones no están disponibles.</p>
-                    <p>Las métricas de llamadas mostrarán: total realizadas, contestadas y no contestadas.</p>
-                  </div>
-                )}
               </div>
 
-              {/* ── Prompt de evaluación (solo Twilio) ────────────────── */}
-              {fuenteLlamadas === 'twilio' && (
-                <>
-                  <textarea value={promptLlamadas} onChange={(e) => setPromptLlamadas(e.target.value)}
-                    className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
-                    placeholder="Evalúa la llamada telefónica según..." />
-                  <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
-                </>
-              )}
+              {/* ── Prompt de evaluación ────────────────── */}
+              <textarea value={promptLlamadas} onChange={(e) => setPromptLlamadas(e.target.value)}
+                className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
+                placeholder="Evalúa la llamada telefónica según..." />
+              <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
             </div>
           )}
 
