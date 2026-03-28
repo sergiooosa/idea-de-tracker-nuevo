@@ -504,6 +504,7 @@ export interface AsesorLeadCRM {
   name: string;
   email: string | null;
   phone: string | null;
+  ghlContactId: string | null;
   estado: string | null;
   categoria: 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
   intentosContacto: number;

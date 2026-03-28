@@ -10,7 +10,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { useUserFilter } from '@/contexts/UserFilterContext';
 import type { AsesorResponse, AsesorLeadCRM } from '@/types';
-import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search, HelpCircle } from 'lucide-react';
+import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search, HelpCircle, ExternalLink } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
 type CrmCategory = 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
@@ -46,6 +46,32 @@ function CRMCard({ lead }: { lead: AsesorLeadCRM }) {
         <span className="text-gray-500">·</span>
         <span className="text-gray-400">{lead.speedToLead}</span>
       </div>
+      {(lead.phone || lead.ghlContactId) && (
+        <div className="flex items-center gap-2 mt-1">
+          {lead.phone && (
+            <a
+              href={`tel:${lead.phone}`}
+              className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-accent-cyan transition-colors"
+              title={`Llamar: ${lead.phone}`}
+            >
+              <Phone className="w-3 h-3 shrink-0" />
+              <span className="font-mono truncate max-w-[110px]">{lead.phone}</span>
+            </a>
+          )}
+          {lead.ghlContactId && (
+            <a
+              href={`https://app.gohighlevel.com/contacts/${lead.ghlContactId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors ml-auto"
+              title="Ver en GHL"
+            >
+              <ExternalLink className="w-3 h-3 shrink-0" />
+              <span>GHL</span>
+            </a>
+          )}
+        </div>
+      )}
       <button
         type="button"
         onClick={() => setShowNotas(!showNotas)}

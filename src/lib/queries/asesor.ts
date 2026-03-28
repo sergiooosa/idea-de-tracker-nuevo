@@ -177,6 +177,14 @@ export async function getAsesorData(
     reunionesAgendadas: { total: reunionesAgendadas },
   };
 
+  // Mapear contact_id_ghl desde log_llamadas para cada id_registro
+  const ghlContactMap: Record<number, string> = {};
+  for (const c of callRows) {
+    if (c.id_registro && c.contact_id_ghl) {
+      ghlContactMap[c.id_registro] = c.contact_id_ghl;
+    }
+  }
+
   const leadMap: Record<string, AsesorLeadCRM> = {};
   for (const r of regRows) {
     const key = r.mail_lead ?? String(r.id_registro);
@@ -196,6 +204,7 @@ export async function getAsesorData(
       name: r.nombre_lead ?? key,
       email: r.mail_lead ?? null,
       phone: r.phone_raw_format ?? null,
+      ghlContactId: ghlContactMap[r.id_registro] ?? null,
       estado: r.estado,
       categoria: getCrmCategoria(r.estado),
       intentosContacto: r.intentos_contacto ?? 0,
