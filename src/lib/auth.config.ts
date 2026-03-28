@@ -33,12 +33,14 @@ export const authConfig: NextAuthConfig = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        subdominio_override: { label: "Subdominio Override", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
         const email = (credentials.email as string).trim().toLowerCase();
         const password = credentials.password as string;
+        const subdominioOverride = (credentials.subdominio_override as string | undefined)?.trim() || null;
 
         // Usuario plataforma (super admin global): credenciales desde env
         const platformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim().toLowerCase();
@@ -99,8 +101,12 @@ export const authConfig: NextAuthConfig = {
           }
 
           const permisosArray = resolvePermisos(user.rol, user.roles_config);
-          const subdominioSlug =
-            normalizeSubdominio(user.subdominio) ?? user.subdominio;
+
+          // Si el usuario tiene múltiples cuentas y se especificó un subdominio,
+          // usarlo en vez del que retornó el .limit(1)
+          const subdominioFinal = subdominioOverride
+            ? normalizeSubdominio(subdominioOverride) ?? subdominioOverride
+            : (normalizeSubdominio(user.subdominio) ?? user.subdominio);
 
           return {
             id: String(user.id_evento),
@@ -108,7 +114,7 @@ export const authConfig: NextAuthConfig = {
             email: user.email,
             name: user.nombre,
             rol: user.rol,
-            subdominio: subdominioSlug,
+            subdominio: subdominioFinal,
             permisos: user.permisos,
             permisosArray,
           };

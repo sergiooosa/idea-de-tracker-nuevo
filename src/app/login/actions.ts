@@ -16,6 +16,7 @@ export interface AccountOption {
 export async function loginAction(formData: {
   email: string;
   password: string;
+  subdominio_override?: string;
 }) {
   const email = formData.email.trim().toLowerCase();
 
@@ -23,6 +24,7 @@ export async function loginAction(formData: {
     await signIn("credentials", {
       email,
       password: formData.password,
+      subdominio_override: formData.subdominio_override ?? "",
       redirect: false,
     });
   } catch (error) {
@@ -38,6 +40,12 @@ export async function loginAction(formData: {
   const session = await auth();
   if (session?.user?.platformAdmin) {
     return { platformAdmin: true };
+  }
+
+  // Si ya viene con subdominio_override, el JWT ya tiene el correcto
+  if (formData.subdominio_override) {
+    const slug = normalizeSubdominio(formData.subdominio_override) ?? formData.subdominio_override;
+    return { subdominio: slug };
   }
 
   const results = await db

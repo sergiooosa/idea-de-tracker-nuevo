@@ -141,9 +141,12 @@ export default async function middleware(req: NextRequest) {
 
   const sessionSubdomainSlug = normalizeSubdominio(session.subdominio);
   if (sessionSubdomainSlug !== subdomain) {
-    return new NextResponse("Acceso no autorizado a este tenant.", {
-      status: 403,
-    });
+    // Sesión válida pero para otro tenant → redirigir al login sin mensaje de error
+    const protocol = req.nextUrl.protocol;
+    const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
+    const isLocalDev = (req.headers.get("host") ?? "").includes("localhost");
+    const loginHost = isLocalDev ? `localhost${port}` : ROOT_DOMAIN;
+    return NextResponse.redirect(new URL(`${protocol}//${loginHost}/login`));
   }
 
   // Raíz del subdominio → /dashboard

@@ -13,6 +13,7 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
 
+  const [accountLoading, setAccountLoading] = useState<number | null>(null);
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
   const buildUrl = (subdominio: string) => {
@@ -85,11 +86,35 @@ export default function LoginForm() {
               <button
                 key={acc.id_cuenta}
                 type="button"
-                onClick={() => { window.location.href = buildUrl(acc.subdominio); }}
-                className="w-full flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-left hover:border-blue-500/50 hover:bg-slate-700 transition-all group"
+                disabled={accountLoading !== null}
+                onClick={async () => {
+                  setAccountLoading(acc.id_cuenta);
+                  try {
+                    const result = await loginAction({
+                      email,
+                      password,
+                      subdominio_override: acc.subdominio,
+                    });
+                    if ("error" in result && result.error) {
+                      setError(result.error);
+                      setAccounts(null);
+                      setAccountLoading(null);
+                      return;
+                    }
+                    window.location.href = buildUrl(acc.subdominio);
+                  } catch {
+                    setError("Error al seleccionar la cuenta. Intenta de nuevo.");
+                    setAccounts(null);
+                    setAccountLoading(null);
+                  }
+                }}
+                className="w-full flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-left hover:border-blue-500/50 hover:bg-slate-700 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 group-hover:bg-blue-500/30 transition-colors">
-                  <Building2 className="w-5 h-5 text-blue-400" />
+                  {accountLoading === acc.id_cuenta
+                    ? <span className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    : <Building2 className="w-5 h-5 text-blue-400" />
+                  }
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white truncate">
