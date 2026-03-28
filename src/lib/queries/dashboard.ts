@@ -604,7 +604,26 @@ export async function getDashboard(
       : metasRow.meta_llamadas_diarias
         ? metasRow.meta_llamadas_diarias * dias
         : null;
+
+    // Historial diario de metas de llamadas — para mostrar qué días se cumplió
+    const metaDiariaLlamadas = metasRow.meta_llamadas_diarias
+      ? parseFloat(String(metasRow.meta_llamadas_diarias))
+      : null;
+    const historialLlamadas = metaDiariaLlamadas
+      ? volumeByDay.map((d) => ({
+          fecha: String(d.date),
+          actual: d.llamadas,
+          meta: metaDiariaLlamadas,
+          cumple: d.llamadas >= metaDiariaLlamadas,
+        }))
+      : undefined;
+
+    const metaLlamadasAlerta = alertasMetas.length; // índice donde se insertará
     addAlerta("📞 Llamadas realizadas", kpis.callsMade, metaLlamadasTotal, "llamadas", "llamadas en el período");
+    // Inyectar historial en la alerta recién creada
+    if (historialLlamadas && alertasMetas[metaLlamadasAlerta]) {
+      alertasMetas[metaLlamadasAlerta]!.historialDiario = historialLlamadas;
+    }
     addAlerta(
       "📞 % Contestación",
       kpis.answerRate * 100,

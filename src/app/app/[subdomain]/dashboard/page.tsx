@@ -302,6 +302,31 @@ export default function DashboardPage() {
                             </span>
                             {alerta.invertido && <span className="text-[9px] text-gray-600">🔻 menor = mejor</span>}
                           </div>
+                          {alerta.historialDiario && alerta.historialDiario.length > 1 && (
+                            <div className="mt-1.5 space-y-0.5">
+                              <p className="text-[9px] text-gray-600 uppercase tracking-wider mb-1">Cumplimiento diario</p>
+                              <div className="flex flex-wrap gap-1">
+                                {alerta.historialDiario.map((d) => (
+                                  <div
+                                    key={d.fecha}
+                                    title={`${d.fecha}: ${d.actual} / ${d.meta} llamadas`}
+                                    className={`w-5 h-5 rounded-sm flex items-center justify-center text-[8px] font-bold cursor-default ${
+                                      d.actual === 0
+                                        ? "bg-surface-600 text-gray-600"
+                                        : d.cumple
+                                          ? "bg-accent-green/25 text-accent-green"
+                                          : "bg-accent-red/25 text-accent-red"
+                                    }`}
+                                  >
+                                    {d.fecha.slice(8)} {/* día del mes */}
+                                  </div>
+                                ))}
+                              </div>
+                              <p className="text-[9px] text-gray-600">
+                                {alerta.historialDiario.filter((d) => d.cumple).length} de {alerta.historialDiario.length} días cumplidos
+                              </p>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

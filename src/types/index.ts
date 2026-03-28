@@ -454,6 +454,13 @@ export interface ChatKpis {
   topClosers: Array<{ name: string; count: number }>;
 }
 
+export interface MetaDiariaHistorial {
+  fecha: string; // "YYYY-MM-DD"
+  actual: number;
+  meta: number;
+  cumple: boolean;
+}
+
 export interface AlertaMeta {
   label: string;
   actual: number;
@@ -464,6 +471,7 @@ export interface AlertaMeta {
   canal: "llamadas" | "videollamadas" | "chats" | "general";
   invertido?: boolean; // true = menos es mejor (ej. speed to lead)
   sinDatos?: boolean; // true = hay meta pero actual = 0
+  historialDiario?: MetaDiariaHistorial[]; // días del rango con cumplimiento
 }
 
 export interface DashboardResponse {

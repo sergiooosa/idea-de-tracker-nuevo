@@ -66,22 +66,13 @@ export async function getLlamadas(
 
   const regRows =
     idsConLlamadaEnRango.length > 0
-      ? (() => {
-          if (emails.length > 0) {
-            const byCloser = sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`;
-            const byLinked = inArray(registrosDeLlamada.id_registro, idsConLlamadaEnRango);
-            return db
-              .select()
-              .from(registrosDeLlamada)
-              .where(and(...baseReg, or(byCloser, byLinked))!)
-              .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
-          }
-          return db
-            .select()
-            .from(registrosDeLlamada)
-            .where(and(...baseReg, inArray(registrosDeLlamada.id_registro, idsConLlamadaEnRango)))
-            .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
-        })()
+      ? // Siempre filtrar por IDs con llamadas en el rango — nunca traer
+        // registros extra por byCloser (causaría inflado de asesores sin actividad en el rango)
+        db
+          .select()
+          .from(registrosDeLlamada)
+          .where(and(...baseReg, inArray(registrosDeLlamada.id_registro, idsConLlamadaEnRango)))
+          .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`)
       : // Sin llamadas en el rango — devolver vacío
         db
           .select()
@@ -151,17 +142,26 @@ export async function getLlamadas(
     answerRate: registros.length > 0 ? answered / registros.length : 0,
   };
 
+  // Normalizar key de asesor: email en minúsculas tiene prioridad sobre nombre
+  // para evitar duplicados cuando el mismo asesor tiene registros con/sin email
+  function normalizeAdvisorKey(mail?: string | null, name?: string | null): string {
+    const emailNorm = mail?.trim().toLowerCase();
+    if (emailNorm) return emailNorm;
+    const nameNorm = name?.trim().toLowerCase();
+    if (nameNorm) return nameNorm;
+    return "sin asignar";
+  }
+
   const byAdvisor: Record<string, ApiLlamadaLog[]> = {};
   for (const r of registros) {
-    const key = r.closerMail ?? r.closerName ?? "Sin asignar";
+    const key = normalizeAdvisorKey(r.closerMail, r.closerName);
     if (!byAdvisor[key]) byAdvisor[key] = [];
     byAdvisor[key].push(r);
   }
 
   const leadsCountByAdvisorKey: Record<string, number> = {};
   for (const r of regRowsResolved) {
-    const k = (r.closer_mail ?? r.nombre_closer ?? "Sin asignar").trim() || "Sin asignar";
-    const kNorm = k.toLowerCase();
+    const kNorm = normalizeAdvisorKey(r.closer_mail, r.nombre_closer);
     leadsCountByAdvisorKey[kNorm] = (leadsCountByAdvisorKey[kNorm] ?? 0) + 1;
   }
 
@@ -169,14 +169,15 @@ export async function getLlamadas(
   const advisors: ApiAdvisor[] = [];
 
   for (const [key, calls] of Object.entries(byAdvisor)) {
-    const name = calls[0]?.closerName ?? key;
-    const email = calls[0]?.closerMail ?? key;
+    // Preferir email real sobre el key normalizado para mostrar en UI
+    const name = calls.find((c) => c.closerName)?.closerName ?? key;
+    const email = calls.find((c) => c.closerMail)?.closerMail ?? key;
     const contest = calls.filter((c) => c.outcome === "answered").length;
     const speeds = calls
       .filter((c) => c.speedToLeadMinutes != null)
       .map((c) => c.speedToLeadMinutes!);
-    const keyNorm = (key ?? "").trim().toLowerCase();
-    const leadsAsignados = leadsCountByAdvisorKey[keyNorm] ?? 0;
+    // key ya viene normalizado (lowercase email o name)
+    const leadsAsignados = leadsCountByAdvisorKey[key] ?? 0;
 
     advisorMetrics[key] = {
       advisorName: name,
@@ -191,16 +192,15 @@ export async function getLlamadas(
   }
 
   for (const keyNorm of Object.keys(leadsCountByAdvisorKey)) {
-    if (Object.keys(advisorMetrics).some((k) => (k ?? "").trim().toLowerCase() === keyNorm)) continue;
+    if (advisorMetrics[keyNorm]) continue; // ya existe (key ya es normalizado)
     const firstReg = regRowsResolved.find(
-      (r) => ((r.closer_mail ?? r.nombre_closer ?? "Sin asignar").trim() || "Sin asignar").toLowerCase() === keyNorm,
+      (r) => normalizeAdvisorKey(r.closer_mail, r.nombre_closer) === keyNorm,
     );
-    const displayKey = firstReg
-      ? (firstReg.closer_mail ?? firstReg.nombre_closer ?? "Sin asignar").trim() || "Sin asignar"
-      : keyNorm;
-    advisorMetrics[displayKey] = {
-      advisorName: firstReg?.nombre_closer ?? displayKey,
-      advisorEmail: firstReg?.closer_mail ?? displayKey,
+    const displayName = firstReg?.nombre_closer ?? keyNorm;
+    const displayEmail = firstReg?.closer_mail ?? keyNorm;
+    advisorMetrics[keyNorm] = {
+      advisorName: displayName,
+      advisorEmail: displayEmail,
       llamadas: 0,
       contestadas: 0,
       pctContestacion: 0,
@@ -208,9 +208,9 @@ export async function getLlamadas(
       leadsAsignados: leadsCountByAdvisorKey[keyNorm] ?? 0,
     };
     advisors.push({
-      id: displayKey,
-      name: firstReg?.nombre_closer ?? displayKey,
-      email: firstReg?.closer_mail ?? displayKey,
+      id: keyNorm,
+      name: displayName,
+      email: displayEmail,
     });
   }
 
