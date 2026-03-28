@@ -5,6 +5,8 @@ const isProduction = process.env.NODE_ENV === "production";
 const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 const cookieDomain = isProduction ? `.${rootDomain}` : undefined;
 
+// SameSite=none + Secure permite que la cookie funcione dentro de iframes
+// (ej. embebido en GHL). En dev no aplicamos none porque requiere HTTPS.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   cookies: {
@@ -14,7 +16,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         : `next-auth.session-token`,
       options: {
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: isProduction ? "none" : "lax",
         path: "/",
         secure: isProduction,
         domain: cookieDomain,
