@@ -184,8 +184,11 @@ export async function getDashboard(
   const efectivasCalls = filteredCalls.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
   const contestadas = efectivasCalls;
 
-  const leadsFromCalls = new Set(filteredCalls.map((c) => c.mail_lead).filter(Boolean));
-  const leadsFromAgendas = new Set(filteredAgendas.map((a) => a.email_lead).filter(Boolean));
+  // Usar email OR phone OR id para no perder leads sin email (igual que panel asesor)
+  const normLeadKey = (mail: string | null | undefined, phone: string | null | undefined, id: string | number) =>
+    mail?.trim().toLowerCase() || phone?.trim() || String(id);
+  const leadsFromCalls = new Set(filteredCalls.map((c) => normLeadKey(c.mail_lead, c.phone, c.id)));
+  const leadsFromAgendas = new Set(filteredAgendas.map((a) => normLeadKey(a.email_lead, null, a.id_registro_agenda)));
   const totalLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]).size;
 
   const speedVals = filteredCalls
@@ -498,16 +501,42 @@ export async function getDashboard(
     const distribucionCanales: Record<string, number> = {};
     const closerCounts: Record<string, number> = {};
 
+    const chatConfig = cuentaRow?.configuracion_ui?.chat_config ?? {};
+    const tieneChatbot = chatConfig.tiene_chatbot ?? false;
+    const emojiTomaAtencion = (chatConfig.emoji_toma_atencion ?? "").trim();
+
     for (const row of chatRows) {
       const msgs: ChatMessage[] = Array.isArray(row.chat) ? (row.chat as ChatMessage[]) : [];
 
-      // Verificar si hay al menos un mensaje con role="agent"
-      const hasAgent = msgs.some((m) => m.role === "agent");
+      // Si hay bot, "contactado" = hay mensaje de agente DESPUÉS del emoji de toma de atención
+      // Si no hay bot, "contactado" = cualquier mensaje de agente
+      let hasAgent: boolean;
+      if (tieneChatbot && emojiTomaAtencion) {
+        const emojiIdx = msgs.findIndex(
+          (m) => m.role === "agent" && (m.message ?? "").includes(emojiTomaAtencion)
+        );
+        // Hay agente humano después del emoji del bot
+        hasAgent = emojiIdx >= 0
+          ? msgs.slice(emojiIdx + 1).some((m) => m.role === "agent")
+          : msgs.some((m) => m.role === "agent");
+      } else {
+        hasAgent = msgs.some((m) => m.role === "agent");
+      }
       if (hasAgent) chatsConAgente++;
 
-      // Speed to lead: tiempo entre primer msg lead y primer msg agent
+      // Speed to lead: tiempo entre primer msg lead y primer msg agent (humano si hay bot)
       const firstLeadMsg = msgs.find((m) => m.role === "lead");
-      const firstAgentMsg = msgs.find((m) => m.role === "agent");
+      let firstAgentMsg: ChatMessage | undefined;
+      if (tieneChatbot && emojiTomaAtencion) {
+        const emojiIdx = msgs.findIndex(
+          (m) => m.role === "agent" && (m.message ?? "").includes(emojiTomaAtencion)
+        );
+        firstAgentMsg = emojiIdx >= 0
+          ? msgs.slice(emojiIdx + 1).find((m) => m.role === "agent")
+          : msgs.find((m) => m.role === "agent");
+      } else {
+        firstAgentMsg = msgs.find((m) => m.role === "agent");
+      }
       if (firstLeadMsg?.timestamp && firstAgentMsg?.timestamp) {
         const leadTs = new Date(firstLeadMsg.timestamp).getTime();
         const agentTs = new Date(firstAgentMsg.timestamp).getTime();

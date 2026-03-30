@@ -203,6 +203,12 @@ export default function AsesorPage() {
   const { data: metasData } = useApiData<{ meta_llamadas_diarias: number }>('/api/data/metas');
   const metaLlamadasDiarias = metasData?.meta_llamadas_diarias ?? 50;
 
+  // Meta del período = meta diaria × días seleccionados
+  const diasPeriodo = Math.max(1, Math.round(
+    (new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (1000 * 60 * 60 * 24)
+  ) + 1);
+  const metaLlamadasPeriodo = metaLlamadasDiarias * diasPeriodo;
+
   const apiParams = useMemo(() => {
     const base: Record<string, string> = { from: dateFrom, to: dateTo };
     if (canViewAll) {
@@ -338,22 +344,22 @@ export default function AsesorPage() {
                 <SectionInfo text="Meta diaria de llamadas establecida en Sistema → Paso 6." />
               </h2>
               <div className="space-y-2 text-sm text-gray-300">
-                <p>Meta diaria: <strong className="text-accent-cyan">{metaLlamadasDiarias}</strong> llamadas.</p>
+                <p>Meta diaria: <strong className="text-accent-cyan">{metaLlamadasDiarias}</strong> llamadas · Meta del período ({diasPeriodo}d): <strong className="text-accent-cyan">{metaLlamadasPeriodo}</strong></p>
                 <p className="text-[11px] text-gray-500">Para cambiar estas metas: menú lateral → <Link href={systemPath} className="font-semibold text-accent-cyan hover:underline">Configuración del sistema</Link>.</p>
               </div>
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-gray-400">Progreso actual</span>
-                  <span className={kpis.llamadasRealizadas >= metaLlamadasDiarias ? 'text-accent-green font-medium' : 'text-accent-amber font-medium'}>
-                    {kpis.llamadasRealizadas} / {metaLlamadasDiarias}
+                  <span className={kpis.llamadasRealizadas >= metaLlamadasPeriodo ? 'text-accent-green font-medium' : 'text-accent-amber font-medium'}>
+                    {kpis.llamadasRealizadas} / {metaLlamadasPeriodo}
                   </span>
                 </div>
                 <div className="h-3 rounded-full bg-surface-600 overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
-                      width: `${Math.min(100, metaLlamadasDiarias > 0 ? (kpis.llamadasRealizadas / metaLlamadasDiarias) * 100 : 0)}%`,
-                      backgroundColor: kpis.llamadasRealizadas >= metaLlamadasDiarias ? 'var(--accent-green)' : 'var(--accent-amber)',
+                      width: `${Math.min(100, metaLlamadasPeriodo > 0 ? (kpis.llamadasRealizadas / metaLlamadasPeriodo) * 100 : 0)}%`,
+                      backgroundColor: kpis.llamadasRealizadas >= metaLlamadasPeriodo ? 'var(--accent-green)' : 'var(--accent-amber)',
                     }}
                   />
                 </div>
