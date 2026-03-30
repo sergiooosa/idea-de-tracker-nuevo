@@ -231,6 +231,7 @@ export default function SystemPage() {
   const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
   const [seccionChatsDashboard, setSeccionChatsDashboard] = useState(true);
   const [fuenteLlamadas, setFuenteLlamadas] = useState<'twilio' | 'ghl'>('twilio');
+  const [ghlLocationId, setGhlLocationId] = useState<string>('');
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
@@ -282,6 +283,7 @@ export default function SystemPage() {
         setSeccionChatsDashboard(cfg.seccion_chats_dashboard !== false);
         if (cfg.idioma === 'en' || cfg.idioma === 'es') setCurrentIdioma(cfg.idioma);
         setFuenteLlamadas((cfg as unknown as { fuente_llamadas?: string }).fuente_llamadas === 'ghl' ? 'ghl' : 'twilio');
+        setGhlLocationId((cfg as unknown as { ghl_location_id?: string }).ghl_location_id ?? '');
         if (cfg.chat_config) {
           setChatConfig({
             tiene_chatbot: cfg.chat_config.tiene_chatbot ?? false,
@@ -369,6 +371,7 @@ export default function SystemPage() {
         chat_config: chatConfig,
         chat_analisis_hora: chatAnalisisHora,
         fuente_llamadas: fuenteLlamadas,
+        ghl_location_id: ghlLocationId.trim() || null,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -596,6 +599,20 @@ export default function SystemPage() {
                     </div>
                   </label>
                 </div>
+              </div>
+
+              {/* ── GHL Location ID ────────────────── */}
+              <div className="rounded-xl p-4 bg-surface-700/60 border border-surface-500 space-y-2">
+                <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">🔗 GHL Location ID</p>
+                <p className="text-xs text-gray-400">Necesario para generar links directos a contactos desde el panel asesor.</p>
+                <input
+                  type="text"
+                  value={ghlLocationId}
+                  onChange={(e) => setGhlLocationId(e.target.value)}
+                  placeholder="ej: 26Syf1QF0jxwjYm5UVSa"
+                  className="w-full rounded-lg bg-surface-700/80 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 font-mono focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
+                />
+                <p className="text-[11px] text-gray-500">Lo encuentras en GHL → Settings → Business Info → Location ID.</p>
               </div>
 
               {/* ── Prompt de evaluación ────────────────── */}

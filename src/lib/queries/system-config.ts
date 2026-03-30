@@ -17,6 +17,7 @@ export interface SystemConfigData {
   prompt_videollamadas: string;
   prompt_llamadas: string;
   fuente_llamadas: "twilio" | "ghl";
+  ghl_location_id: string | null;
   reglas_etiquetas: ReglaEtiqueta[];
   metricas_personalizadas: MetricaPersonalizada[];
   metricas_config: MetricaConfig[];
@@ -35,6 +36,7 @@ export interface SystemConfigData {
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
   fuente_llamadas?: "twilio" | "ghl";
+  ghl_location_id?: string | null;
   openai_api_key?: string;
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfigData;
@@ -66,6 +68,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         metricas_config: cuentas.metricas_config,
         metricas_manual_data: cuentas.metricas_manual_data,
         fuente_llamadas: cuentas.fuente_llamadas,
+        ghl_location_id: cuentas.ghl_location_id,
         configuracion_ads: cuentas.configuracion_ads,
       })
       .from(cuentas)
@@ -98,6 +101,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       chat_config: { tiene_chatbot: false, emoji_toma_atencion: "" },
       chat_analisis_hora: chatAnalisisHora,
       fuente_llamadas: "twilio" as const,
+      ghl_location_id: null,
       idioma: "es" as const,
       configuracion_ads: {},
     };
@@ -124,6 +128,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     },
     chat_analisis_hora: chatAnalisisHora,
     fuente_llamadas: (r.fuente_llamadas === "ghl" ? "ghl" : "twilio") as "twilio" | "ghl",
+    ghl_location_id: r.ghl_location_id ?? null,
     idioma: (r.configuracion_ui?.idioma === "en" ? "en" : "es") as "es" | "en",
     configuracion_ads: (r.configuracion_ads && typeof r.configuracion_ads === "object") ? r.configuracion_ads as ConfiguracionAds : {},
   };
@@ -139,6 +144,7 @@ export async function updateSystemConfig(
   if (data.prompt_videollamadas !== undefined) setClause.prompt_videollamadas = data.prompt_videollamadas;
   if (data.prompt_llamadas !== undefined) setClause.prompt_llamadas = data.prompt_llamadas;
   if (data.fuente_llamadas !== undefined) setClause.fuente_llamadas = data.fuente_llamadas;
+  if (data.ghl_location_id !== undefined) setClause.ghl_location_id = data.ghl_location_id;
   if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
   if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
   if (data.embudo_personalizado !== undefined) setClause.embudo_personalizado = data.embudo_personalizado;
