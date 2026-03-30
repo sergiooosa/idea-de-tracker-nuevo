@@ -27,10 +27,12 @@ export async function getLlamadas(
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
+  // Excluir "pdte" y "contacto_creado" — son eventos de lead nuevo, NO llamadas realizadas
   const conditions = [
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromTs),
     lte(logLlamadas.ts, toTs),
+    sql`${logLlamadas.tipo_evento} NOT IN ('pdte', 'contacto_creado')`,
   ];
   if (emails.length > 0) {
     conditions.push(

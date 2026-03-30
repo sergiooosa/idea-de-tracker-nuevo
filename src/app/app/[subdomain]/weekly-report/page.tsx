@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import PageHeader from '@/components/dashboard/PageHeader';
-import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse } from '@/types';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Download, Calendar, TrendingUp, Phone, Users, Video, DollarSign, Loader2 } from 'lucide-react';
+import { Download, Calendar, TrendingUp, Phone, Users, Video, DollarSign, Loader2, MessageSquare, Sparkles } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const fm = (n: number) =>
@@ -18,6 +17,8 @@ const minFmt = (m: number) => (m < 1 ? `${Math.round(m * 60)}s` : `${m.toFixed(1
 export default function WeeklyReportPage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const downloadPdf = useCallback(async () => {
@@ -54,6 +55,20 @@ export default function WeeklyReportPage() {
 
   const { data, loading } = useApiData<DashboardResponse>('/api/data/weekly-report', { from: dateFrom, to: dateTo });
 
+  const generateSummary = useCallback(async () => {
+    setLoadingSummary(true);
+    setAiSummary(null);
+    try {
+      const res = await fetch(`/api/data/weekly-report/summary?from=${dateFrom}&to=${dateTo}`, { method: 'POST' });
+      const json = await res.json() as { summary?: string; error?: string };
+      setAiSummary(json.summary ?? 'No se pudo generar el resumen.');
+    } catch {
+      setAiSummary('Error al conectar con la IA.');
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [dateFrom, dateTo]);
+
   const kpis = data?.kpis ?? {
     totalLeads: 0, callsMade: 0, contestadas: 0, answerRate: 0,
     meetingsBooked: 0, meetingsAttended: 0, meetingsCanceled: 0, meetingsClosed: 0,
@@ -79,7 +94,7 @@ export default function WeeklyReportPage() {
               <Calendar className="w-4 h-4 text-accent-cyan" />
               <select
                 value={weekOffset}
-                onChange={(e) => setWeekOffset(Number(e.target.value))}
+                onChange={(e) => { setWeekOffset(Number(e.target.value)); setAiSummary(null); }}
                 className="bg-transparent text-sm text-white border-none focus:ring-0 cursor-pointer"
               >
                 {[0, 1, 2, 3, 4].map((i) => {
@@ -225,6 +240,65 @@ export default function WeeklyReportPage() {
                 </ul>
               </section>
             </div>
+
+            {/* Chats KPIs */}
+            {data?.chatKpis && data.chatKpis.total > 0 && (
+              <section className="rounded-lg p-3 section-futuristic">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-accent-cyan" /> Chats de la semana
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Conversaciones', value: data.chatKpis.total, color: 'accent-cyan' },
+                    { label: 'Leads únicos', value: data.chatKpis.leadsUnicos, color: 'accent-cyan' },
+                    { label: 'Con respuesta', value: data.chatKpis.conRespuesta, color: 'accent-green' },
+                    { label: 'Tasa respuesta', value: pctFmt(data.chatKpis.tasaRespuesta), color: 'accent-green' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="rounded-lg bg-surface-700/80 p-2 text-center">
+                      <p className={`text-lg font-bold text-${color}`}>{value}</p>
+                      <p className="text-[10px] text-gray-400">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {data.chatKpis.topClosers.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-surface-500/60">
+                    <p className="text-[10px] text-gray-500 mb-1">Top asesores en chat:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {data.chatKpis.topClosers.slice(0, 5).map((c) => (
+                        <span key={c.name} className="text-[10px] bg-surface-600 text-gray-300 px-2 py-0.5 rounded-full">
+                          {c.name} <span className="text-accent-cyan font-medium">{c.count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Resumen IA */}
+            <section className="rounded-lg p-3 section-futuristic border border-accent-cyan/20">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-accent-cyan" /> Análisis IA de la semana
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => void generateSummary()}
+                  disabled={loadingSummary || loading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan text-xs font-semibold hover:bg-accent-cyan/20 transition-colors disabled:opacity-50"
+                >
+                  {loadingSummary ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {loadingSummary ? 'Analizando...' : aiSummary ? 'Regenerar' : 'Generar análisis'}
+                </button>
+              </div>
+              {aiSummary ? (
+                <div className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed bg-surface-700/40 rounded-lg p-3">
+                  {aiSummary}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-600 italic">Haz clic en "Generar análisis" para obtener un resumen ejecutivo de la semana con insights de llamadas, chats, objeciones y financiero.</p>
+              )}
+            </section>
 
             <section className="rounded-lg p-3 section-futuristic">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">

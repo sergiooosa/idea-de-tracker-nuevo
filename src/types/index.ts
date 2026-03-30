@@ -562,4 +562,6 @@ export interface AsesorResponse {
   advisorsList?: ApiAdvisor[];
   breakdown?: AsesorBreakdown;
   fuente_llamadas?: "twilio" | "ghl";
+  /** GHL location ID para construir links directos a contactos */
+  ghlLocationId?: string | null;
 }

@@ -28,10 +28,12 @@ export async function getAsesorData(
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (advisorEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
+  // Excluir "pdte" y "contacto_creado" — son eventos de lead nuevo, NO llamadas realizadas
   const callConditions = [
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromTs),
     lte(logLlamadas.ts, toTs),
+    sql`${logLlamadas.tipo_evento} NOT IN ('pdte', 'contacto_creado')`,
   ];
   if (emails.length > 0) {
     callConditions.push(
@@ -83,7 +85,7 @@ export async function getAsesorData(
       .from(chatsLogs)
       .where(and(...chatConditions)),
     db
-      .select({ fuente_llamadas: cuentas.fuente_llamadas })
+      .select({ fuente_llamadas: cuentas.fuente_llamadas, ghl_location_id: cuentas.ghl_location_id })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1)
@@ -177,11 +179,13 @@ export async function getAsesorData(
     reunionesAgendadas: { total: reunionesAgendadas },
   };
 
-  // Mapear contact_id_ghl desde log_llamadas para cada id_registro
+  // Mapear contact_id_ghl y phone desde log_llamadas para cada id_registro
   const ghlContactMap: Record<number, string> = {};
+  const phoneFromCallsMap: Record<number, string> = {};
   for (const c of callRows) {
-    if (c.id_registro && c.contact_id_ghl) {
-      ghlContactMap[c.id_registro] = c.contact_id_ghl;
+    if (c.id_registro) {
+      if (c.contact_id_ghl) ghlContactMap[c.id_registro] = c.contact_id_ghl;
+      if (c.phone && !phoneFromCallsMap[c.id_registro]) phoneFromCallsMap[c.id_registro] = c.phone;
     }
   }
 
@@ -203,7 +207,7 @@ export async function getAsesorData(
       id: String(r.id_registro),
       name: r.nombre_lead ?? key,
       email: r.mail_lead ?? null,
-      phone: r.phone_raw_format ?? null,
+      phone: r.phone_raw_format ?? phoneFromCallsMap[r.id_registro] ?? null,
       ghlContactId: ghlContactMap[r.id_registro] ?? null,
       estado: r.estado,
       categoria: getCrmCategoria(r.estado),
@@ -228,7 +232,14 @@ export async function getAsesorData(
     return { id: email, name, email };
   });
 
-  return { kpis, leads, advisors, breakdown, fuente_llamadas: fuenteLlamadas };
+  return {
+    kpis,
+    leads,
+    advisors,
+    breakdown,
+    fuente_llamadas: fuenteLlamadas,
+    ghlLocationId: cuentaRow?.ghl_location_id ?? null,
+  };
 }
 
 /** Lista de asesores (closers) del tenant para el filtro "Solo data del asesor" */

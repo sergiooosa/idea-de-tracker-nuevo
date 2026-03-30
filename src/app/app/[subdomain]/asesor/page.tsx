@@ -33,7 +33,7 @@ function SectionInfo({ text }: { text: string }) {
   );
 }
 
-function CRMCard({ lead }: { lead: AsesorLeadCRM }) {
+function CRMCard({ lead, ghlLocationId }: { lead: AsesorLeadCRM; ghlLocationId?: string | null }) {
   const [showNotas, setShowNotas] = useState(false);
   const hasNotas = lead.notasLlamadas.length > 0 || (lead.leadNote?.trim()?.length ?? 0) > 0;
   return (
@@ -58,9 +58,9 @@ function CRMCard({ lead }: { lead: AsesorLeadCRM }) {
               <span className="font-mono truncate max-w-[110px]">{lead.phone}</span>
             </a>
           )}
-          {lead.ghlContactId && (
+          {lead.ghlContactId && ghlLocationId && (
             <a
-              href={`https://app.gohighlevel.com/contacts/${lead.ghlContactId}`}
+              href={`https://app.gohighlevel.com/v2/location/${ghlLocationId}/contacts/detail/${lead.ghlContactId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors ml-auto"
@@ -382,7 +382,7 @@ export default function AsesorPage() {
                         <p className="text-[10px] text-gray-500 py-3 text-center">Ninguno</p>
                       ) : (
                         leadsByCategory[cat.id].map((lead) => (
-                          <CRMCard key={lead.id} lead={lead} />
+                          <CRMCard key={lead.id} lead={lead} ghlLocationId={data?.ghlLocationId} />
                         ))
                       )}
                     </div>

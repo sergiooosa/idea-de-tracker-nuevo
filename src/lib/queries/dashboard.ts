@@ -112,10 +112,13 @@ export async function getDashboard(
   ];
   if (emails.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, emails));
 
+  // Excluir "pdte" y "contacto_creado" — son eventos de lead nuevo, NO llamadas realizadas
+  const TIPOS_NO_LLAMADA = ["pdte", "contacto_creado"];
   const callConditions = [
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromDate),
     lte(logLlamadas.ts, toDate),
+    sql`${logLlamadas.tipo_evento} NOT IN (${sql.join(TIPOS_NO_LLAMADA.map((t) => sql`${t}`), sql`, `)})`,
   ];
   if (emails.length > 0) callConditions.push(inArray(logLlamadas.closer_mail, emails));
 

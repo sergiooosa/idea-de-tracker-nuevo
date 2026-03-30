@@ -188,6 +188,7 @@ export const cuentas = pgTable("cuentas", {
   metricas_manual_data: jsonb("metricas_manual_data").$type<Record<string, MetricaManualEntry[]>>(),
   fuente_llamadas: text("fuente_llamadas").default("twilio"),
   configuracion_ads: jsonb("configuracion_ads").$type<ConfiguracionAds>(),
+  ghl_location_id: text("ghl_location_id"),
 });
 
 /* ------------------------------------------------------------------ */
