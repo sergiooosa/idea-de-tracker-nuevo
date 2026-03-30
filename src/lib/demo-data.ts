@@ -494,6 +494,7 @@ export function generateAsesor(): AsesorResponse {
       text: faker.lorem.sentence(),
     })),
     leadNote: Math.random() > 0.6 ? faker.lorem.sentence() : null,
+    ghlContactId: null,
   }));
 
   return {

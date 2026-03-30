@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig } from "@/lib/metricas-engine";
-import { eq, and, or, gte, lte, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import type {
   DashboardKpis,
   DashboardAdvisorRow,

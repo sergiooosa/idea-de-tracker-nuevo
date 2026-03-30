@@ -4,7 +4,6 @@ import { getDashboard } from "@/lib/queries/dashboard";
 import { db } from "@/lib/db";
 import { cuentas } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import OpenAI from "openai";
 
 export async function POST(req: Request) {
   return withAuthAndPermission(req, "ver_dashboard", async (idCuenta) => {
@@ -12,17 +11,17 @@ export async function POST(req: Request) {
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
 
-    // Obtener datos y API key del tenant
     const [data, cuentaRow] = await Promise.all([
       getDashboard(idCuenta, from, to),
-      db.select({ openai_api_key: cuentas.openai_api_key, nombre_cuenta: cuentas.nombre_cuenta })
+      db
+        .select({ openai_api_key: cuentas.openai_api_key, nombre_cuenta: cuentas.nombre_cuenta })
         .from(cuentas)
         .where(eq(cuentas.id_cuenta, idCuenta))
         .limit(1)
         .then((r) => r[0] ?? null),
     ]);
 
-    const apiKey = cuentaRow?.openai_api_key ?? process.env.OPENAI_API_KEY;
+    const apiKey = cuentaRow?.openai_api_key?.trim() || process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "no_ai_config" }, { status: 422 });
     }
@@ -64,15 +63,30 @@ ${chats && chats.total > 0 ? `CHATS:
 OBJECIONES MÁS FRECUENTES:
 ${objeciones.slice(0, 5).map((o) => `- ${o.name}: ${o.count} veces`).join("\n") || "- Sin datos"}`;
 
-    const openai = new OpenAI({ apiKey });
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 500,
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500,
+      }),
     });
 
-    const summary = completion.choices[0]?.message?.content ?? "No se pudo generar el resumen.";
+    if (!openaiRes.ok) {
+      const err = await openaiRes.text();
+      console.error("[weekly-report/summary] OpenAI error:", openaiRes.status, err);
+      return NextResponse.json({ error: `OpenAI error ${openaiRes.status}` }, { status: 500 });
+    }
+
+    const json = (await openaiRes.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const summary = json.choices?.[0]?.message?.content ?? "No se pudo generar el resumen.";
     return NextResponse.json({ summary });
   });
 }
