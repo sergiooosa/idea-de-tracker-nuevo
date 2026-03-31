@@ -147,9 +147,14 @@ export async function getDashboard(
   ).length;
   const cerradas = filteredAgendas.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
   const efectivas = filteredAgendas.filter((a) => effectiveSet.has((a.categoria ?? "").toLowerCase().trim())).length;
-  const revenueNativo = filteredAgendas
+  // revenue: sumar facturacion de agendas "cerradas". Si closedSet no captura nada
+  // (embudo personalizado con nombres distintos), usar cualquier agenda con facturacion > 0.
+  const revenueClosedSet = filteredAgendas
     .filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
     .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+  const revenueAnyFact = filteredAgendas
+    .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+  const revenueNativo = revenueClosedSet > 0 ? revenueClosedSet : revenueAnyFact;
   const cashNativo = filteredAgendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
 
   let revenue = revenueNativo;
@@ -237,16 +242,31 @@ export async function getDashboard(
   };
 
   // Advisor ranking
+  // Normalizar key de asesor: email lowercase tiene prioridad, luego nombre lowercase
+  const normAdvisorKey = (mail?: string | null, name?: string | null) => {
+    const e = mail?.trim().toLowerCase();
+    if (e) return e;
+    const n = name?.trim().toLowerCase();
+    return n || "sin asignar";
+  };
+
   const advisorMap: Record<string, { calls: typeof filteredCalls; agendas: typeof filteredAgendas }> = {};
   for (const c of filteredCalls) {
-    const key = c.closer_mail ?? c.nombre_closer ?? "Sin asignar";
+    const key = normAdvisorKey(c.closer_mail, c.nombre_closer);
     if (!advisorMap[key]) advisorMap[key] = { calls: [], agendas: [] };
     advisorMap[key].calls.push(c);
   }
   for (const a of filteredAgendas) {
-    const key = a.closer ?? "Sin asignar";
-    if (!advisorMap[key]) advisorMap[key] = { calls: [], agendas: [] };
-    advisorMap[key].agendas.push(a);
+    // agendas no tienen email — buscar si existe un key de llamada que coincida por nombre
+    const nameNorm = (a.closer ?? "").trim().toLowerCase();
+    // Intentar emparejar con key existente por nombre (para no crear duplicado)
+    const existingKey = Object.keys(advisorMap).find(
+      (k) => k === nameNorm || advisorMap[k].calls.some(
+        (c) => (c.nombre_closer ?? "").trim().toLowerCase() === nameNorm
+      )
+    ) ?? normAdvisorKey(null, a.closer);
+    if (!advisorMap[existingKey]) advisorMap[existingKey] = { calls: [], agendas: [] };
+    advisorMap[existingKey].agendas.push(a);
   }
 
   const advisorRanking: DashboardAdvisorRow[] = Object.entries(advisorMap).map(
@@ -257,10 +277,12 @@ export async function getDashboard(
         ...aa.map((a) => a.email_lead).filter(Boolean),
       ]).size;
       const aAsistidas = aa.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
+      const aRevenueClosedSet = aa.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
+        .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+      const aRevenueAny = aa.reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
       const aRevenue = useExterna
         ? 0
-        : aa.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
-            .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+        : (aRevenueClosedSet > 0 ? aRevenueClosedSet : aRevenueAny);
       const aCash = useExterna
         ? 0
         : aa.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);

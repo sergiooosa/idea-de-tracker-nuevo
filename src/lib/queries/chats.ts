@@ -128,7 +128,10 @@ export async function getChats(
 
   const filteredChats =
     emailsLower.length > 0
-      ? chatsList.filter((c) => emailsLower.includes((c.agentName ?? "").trim().toLowerCase()))
+      ? chatsList.filter((c) => {
+          const key = (c.asesorAsignado ?? c.agentName ?? "").trim().toLowerCase();
+          return emailsLower.includes(key);
+        })
       : chatsList;
   const chatsFinal = emailsLower.length > 0 ? filteredChats : chatsList;
 
@@ -144,9 +147,15 @@ export async function getChats(
     speedAvg: speedVals.length > 0 ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length : 0,
   };
 
+  // Normalizar key: usar asesorAsignado primero, luego agentName, nunca vacío
+  const normAgentKey = (c: ApiChatLead) => {
+    const k = (c.asesorAsignado ?? c.agentName ?? "").trim();
+    return k || "Sin asignar";
+  };
+
   const byAgent: Record<string, ApiChatLead[]> = {};
   for (const c of chatsFinal) {
-    const key = c.agentName ?? "Sin asignar";
+    const key = normAgentKey(c);
     if (!byAgent[key]) byAgent[key] = [];
     byAgent[key].push(c);
   }
