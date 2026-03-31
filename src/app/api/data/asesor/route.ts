@@ -12,9 +12,13 @@ export async function GET(req: Request) {
     const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
     const closerEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
 
+    // advisorEmail tiene prioridad sobre closerEmails (que el hook añade automáticamente)
+    // Así el admin puede ver datos de cualquier asesor sin que su propio email interfiera
     const effectiveEmails = allAdvisors
       ? undefined
-      : (closerEmails?.length ? closerEmails : (advisorEmail || email ? [advisorEmail || email] : undefined));
+      : advisorEmail
+        ? [advisorEmail]
+        : (closerEmails?.length ? closerEmails : (email ? [email] : undefined));
 
     const data = await getAsesorData(idCuenta, from, to, effectiveEmails ?? undefined);
     const advisorsList = await getAsesoresList(idCuenta);

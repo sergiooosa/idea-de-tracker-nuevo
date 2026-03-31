@@ -684,6 +684,7 @@ export default function SystemPage() {
                           <option value="asignar_etiqueta">Asignar etiqueta</option>
                           <option value="cambiar_estado">Cambiar estado</option>
                           <option value="etapa_cambiada">Etapa cambiada</option>
+                          <option value="incrementar_metrica">Incrementar métrica</option>
                         </select>
                       </div>
                       <div className="w-32">
@@ -700,7 +701,34 @@ export default function SystemPage() {
                         </select>
                       </div>
                     </div>
-                    {embudoEtapas.length > 0 && (
+                    {(r as unknown as { accion?: string }).accion === 'incrementar_metrica' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-medium text-accent-cyan mb-1">Métrica a incrementar</label>
+                          <select
+                            value={(r as unknown as { metrica_id?: string }).metrica_id ?? ''}
+                            onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, metrica_id: e.target.value || undefined } : x))}
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                          >
+                            <option value="">— Seleccionar —</option>
+                            {metricasConfig.filter((m) => m.tipo === 'manual' || m.tipo === 'fija').map((m) => (
+                              <option key={m.id} value={m.id}>{m.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-accent-cyan mb-1">Incremento</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={(r as unknown as { metrica_incremento?: number }).metrica_incremento ?? 1}
+                            onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, metrica_incremento: parseInt(e.target.value) || 1 } : x))}
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {embudoEtapas.length > 0 && (r as unknown as { accion?: string }).accion !== 'incrementar_metrica' && (
                       <div>
                         <label className="block text-[11px] font-medium text-accent-purple mb-1">
                           {(r as unknown as { accion?: string }).accion === 'etapa_cambiada' ? 'Etapa del embudo' : 'Mover etapa de funnel a (opcional)'}
@@ -863,6 +891,7 @@ export default function SystemPage() {
                     setMetricasEditingId(null);
                   }}
                   onSave={(config, manualData) => {
+                    // Actualizar state local y persistir inmediatamente en BD
                     setMetricasConfig((prev) => {
                       const idx = prev.findIndex((x) => x.id === config.id);
                       const next = [...prev];
@@ -871,12 +900,24 @@ export default function SystemPage() {
                       } else {
                         next.push(config);
                       }
-                      return next.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+                      const sorted = next.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+                      // Auto-guardar en BD con la nueva config
+                      void fetch('/api/data/system-config', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ metricas_config: sorted }),
+                      });
+                      return sorted;
                     });
                     if (manualData !== undefined) {
                       setMetricasManualData((prev) => {
-                        const next = { ...prev };
-                        next[config.id] = manualData;
+                        const next = { ...prev, [config.id]: manualData };
+                        // Auto-guardar datos manuales también
+                        void fetch('/api/data/system-config', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ metricas_manual_data: next }),
+                        });
                         return next;
                       });
                     }

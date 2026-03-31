@@ -49,9 +49,11 @@ export interface ReglaEtiqueta {
   id: string;
   nombre: string;
   condicion: string;
-  accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada";
+  accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica";
   valor: string;
   fuente?: "chats" | "videollamadas" | "llamadas" | "todas";
+  metrica_id?: string; // ID de MetricaConfig cuando accion = "incrementar_metrica"
+  metrica_incremento?: number; // Cuánto sumar (default 1)
   // Legacy fields (kept for backward compatibility)
   condition?: string;
   tag?: string;
