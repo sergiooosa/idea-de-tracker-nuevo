@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -64,18 +64,16 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
     const target = isLocal
       ? `${protocol}//${acc.subdominio}.localhost${port}/dashboard`
       : `${protocol}//${acc.subdominio}.${ROOT_DOMAIN}/dashboard`;
-    // Hacer re-signIn con el subdominio correcto vía action
-    const { loginAction } = await import("@/app/login/actions");
-    const session = await fetch("/api/auth/session").then((r) => r.json()) as { user?: { email?: string } };
-    const email = session?.user?.email;
-    if (!email) { window.location.href = `${protocol}//${ROOT_DOMAIN}/login`; return; }
-    // Necesitamos la contraseña — redirigir al login con el subdominio preseleccionado
-    // Como ya tienen sesión activa, podemos hacer el switch directo via endpoint
-    await fetch("/api/auth/switch-account", {
+    // Validar que el subdominio es legítimo para el usuario actual
+    const res = await fetch("/api/auth/switch-account", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subdominio: acc.subdominio }),
     });
+    if (!res.ok) { setSwitching(null); return; }
+    // El middleware detectará que el JWT tiene otro subdominio y redirigirá al login.
+    // Guardamos el subdominio destino en sessionStorage para pre-seleccionarlo en login.
+    sessionStorage.setItem("autokpi_switch_subdominio", acc.subdominio);
     window.location.href = target;
   };
 

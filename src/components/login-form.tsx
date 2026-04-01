@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { loginAction } from "@/app/login/actions";
 import type { AccountOption } from "@/app/login/actions";
 import Image from "next/image";
@@ -14,7 +14,17 @@ export default function LoginForm() {
   const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
 
   const [accountLoading, setAccountLoading] = useState<number | null>(null);
+  const [pendingSwitchSubdominio, setPendingSwitchSubdominio] = useState<string | null>(null);
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
+
+  // Si viene de un account switch, leer el subdominio destino y auto-seleccionarlo tras login
+  useEffect(() => {
+    const pending = sessionStorage.getItem("autokpi_switch_subdominio");
+    if (pending) {
+      sessionStorage.removeItem("autokpi_switch_subdominio");
+      setPendingSwitchSubdominio(pending);
+    }
+  }, []);
 
   const buildUrl = (subdominio: string) => {
     const isLocalDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -45,6 +55,17 @@ export default function LoginForm() {
       }
 
       if ("accounts" in result && result.accounts) {
+        // Si venimos de un switch, auto-seleccionar la cuenta destino
+        if (pendingSwitchSubdominio) {
+          const targetAcc = result.accounts.find((a) => a.subdominio === pendingSwitchSubdominio);
+          if (targetAcc) {
+            const switchResult = await loginAction({ email, password, subdominio_override: targetAcc.subdominio });
+            if (!("error" in switchResult)) {
+              window.location.href = buildUrl(targetAcc.subdominio);
+              return;
+            }
+          }
+        }
         setAccounts(result.accounts);
         setLoading(false);
         return;

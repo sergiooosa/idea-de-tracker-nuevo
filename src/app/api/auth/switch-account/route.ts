@@ -5,16 +5,10 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { handlers } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { normalizeSubdominio } from "@/lib/subdomain";
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth.config";
-
-// Instancia con update habilitado
-const { unstable_update } = NextAuth(authConfig);
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -27,16 +21,10 @@ export async function POST(req: Request) {
 
   // Verificar que ese subdominio pertenece al email del usuario
   const [row] = await db
-    .select({
-      id_cuenta: cuentas.id_cuenta,
-      subdominio: cuentas.subdominio,
-    })
+    .select({ id_cuenta: cuentas.id_cuenta, subdominio: cuentas.subdominio })
     .from(usuariosDashboard)
     .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
-    .where(and(
-      eq(usuariosDashboard.email, email),
-      eq(cuentas.subdominio, subdominio),
-    ))
+    .where(and(eq(usuariosDashboard.email, email), eq(cuentas.subdominio, subdominio)))
     .limit(1);
 
   if (!row) {
@@ -45,13 +33,7 @@ export async function POST(req: Request) {
 
   const subdominioNorm = normalizeSubdominio(row.subdominio) ?? row.subdominio;
 
-  // Actualizar el JWT con el nuevo subdominio
-  await unstable_update({
-    user: {
-      subdominio: subdominioNorm,
-      id_cuenta: row.id_cuenta,
-    },
-  });
-
+  // El switch real se hace haciendo re-login con subdominio_override desde el cliente.
+  // Este endpoint solo valida que el subdominio es legítimo para ese usuario.
   return NextResponse.json({ ok: true, subdominio: subdominioNorm });
 }
