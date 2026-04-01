@@ -371,77 +371,95 @@ function ApiSection() {
   );
 }
 
-function EmbudoSection({ embudo }: { embudo: SystemConfig["embudo_personalizado"] }) {
+function EmbudoSection() {
+  const flujos = [
+    {
+      icon: "📞",
+      titulo: "Llamadas telefónicas",
+      pasos: [
+        "Asesor llama desde Twilio o GHL",
+        "Al finalizar, GHL envía el audio o la transcripción al sistema",
+        "IA transcribe (si es necesario) y clasifica la llamada: contestó/no contestó, estado del lead",
+        "El resultado aparece en tu panel en segundos",
+      ],
+      color: "accent-cyan",
+    },
+    {
+      icon: "🎥",
+      titulo: "Videollamadas (Fathom)",
+      pasos: [
+        "Asesor realiza la videollamada con Fathom activo",
+        "Fathom genera automáticamente el resumen y la transcripción",
+        "El sistema recibe la transcripción y la analiza con IA",
+        "Se registra el resultado en el panel: asistió, propuesta enviada, cerrada, etc.",
+      ],
+      color: "accent-purple",
+    },
+    {
+      icon: "💬",
+      titulo: "Chats (WhatsApp / Instagram)",
+      pasos: [
+        "El lead escribe por WhatsApp o Instagram a tu número en GHL",
+        "El mensaje llega en tiempo real al sistema",
+        "Cada noche a las 9 AM, la IA analiza las conversaciones del día y clasifica el estado de cada lead",
+        "El asesor asignado aparece automáticamente según quién respondió",
+      ],
+      color: "accent-green",
+    },
+    {
+      icon: "📅",
+      titulo: "Citas y agendas",
+      pasos: [
+        "Cuando un lead agenda en GHL, se envía automáticamente al sistema",
+        "Se registra como 'Agendada' y aparece en el panel",
+        "Si la cita pasa sin marcarse como asistida, al día siguiente se marca como 'No Show' automáticamente",
+        "Al marcar como asistida/cerrada en GHL, el sistema se actualiza",
+      ],
+      color: "accent-amber",
+    },
+  ];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-accent-cyan/20 flex items-center justify-center shrink-0">
           <Brain className="w-5 h-5 text-accent-cyan" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white">Embudo IA Personalizado</h3>
+          <h3 className="text-lg font-semibold text-white">Cómo fluye la información</h3>
           <p className="text-sm text-gray-400 mt-1">
-            La IA de AutoKPI analiza las llamadas y videollamadas clasificando leads según los estados
-            que tú definas. Tu embudo, tus reglas.
+            Todo viene de GHL. El sistema recibe los datos, los procesa con IA y los muestra en tu panel en tiempo real.
           </p>
         </div>
       </div>
 
-      <Card className="bg-surface-700/50 border-surface-500">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-accent-cyan" />
-            ¿Cómo funciona?
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-gray-400">
-          <p>
-            Cuando el Cerebro (backend) procesa una llamada o videollamada, utiliza tu embudo personalizado
-            para clasificar el resultado. Los prompts de IA reciben la lista de estados válidos, sus
-            definiciones y la transcripción completa.
-          </p>
-          <p>
-            Esto significa que puedes tener estados como <em>&quot;Demo Agendada&quot;</em>, <em>&quot;Propuesta Enviada&quot;</em>,
-            o <em>&quot;Cerrada MRR&quot;</em> — lo que tu negocio necesite.
-          </p>
-        </CardContent>
-      </Card>
-
-      {embudo.length > 0 ? (
-        <div>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Tu embudo actual
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {embudo
-              .sort((a, b) => a.orden - b.orden)
-              .map((e, i) => (
-                <div key={e.id} className="flex items-center gap-1.5">
-                  <div
-                    className="flex items-center gap-2 rounded-lg border border-surface-500 bg-surface-700 px-3 py-2"
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: e.color ?? "#06b6d4" }}
-                    />
-                    <span className="text-sm text-white font-medium">{e.nombre}</span>
-                    <Badge variant="outline" className="text-[10px]">#{e.orden}</Badge>
-                  </div>
-                  {i < embudo.length - 1 && (
-                    <ArrowRight className="w-4 h-4 text-gray-600 shrink-0" />
-                  )}
-                </div>
-              ))}
-          </div>
-        </div>
-      ) : (
-        <Card className="bg-surface-700/30 border-surface-500 border-dashed">
-          <CardContent className="py-6 text-center text-gray-500 text-sm">
-            Estás usando el embudo estándar (Cerrada, Ofertada, No_Ofertada, CANCELADA, PDTE).
-            Ve a <strong className="text-accent-cyan">Control del sistema</strong> → paso 7 para crear tu embudo personalizado.
+      {flujos.map((flujo) => (
+        <Card key={flujo.titulo} className="bg-surface-700/50 border-surface-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-white flex items-center gap-2">
+              <span className="text-lg">{flujo.icon}</span> {flujo.titulo}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {flujo.pasos.map((paso, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                <span className={`text-${flujo.color} font-bold shrink-0`}>{i + 1}.</span>
+                <span>{paso}</span>
+              </div>
+            ))}
           </CardContent>
         </Card>
-      )}
+      ))}
+
+      <Card className="bg-accent-cyan/5 border-accent-cyan/20">
+        <CardContent className="pt-4 text-xs text-gray-400 space-y-1">
+          <p>📊 <strong className="text-white">Panel ejecutivo</strong> — resumen de todo: leads, llamadas, citas, ingresos. Fecha de referencia: fecha de la reunión.</p>
+          <p>📞 <strong className="text-white">Rendimiento → Llamadas</strong> — detalle de cada llamada. Fecha de referencia: cuándo se realizó la llamada.</p>
+          <p>🎥 <strong className="text-white">Rendimiento → Videollamadas</strong> — detalle de cada videollamada. Fecha de referencia: fecha de la reunión.</p>
+          <p>👤 <strong className="text-white">Panel asesor</strong> — vista individual por asesor. Fecha de referencia: cuándo tuvo actividad el lead.</p>
+          <p className="text-gray-500 pt-1">⚠️ Por esto los números pueden variar ligeramente entre paneles con el mismo rango de fechas — cada uno mide un momento diferente del proceso.</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -887,7 +905,7 @@ export default function DocumentacionPage() {
               </TabsTrigger>
               <TabsTrigger value="embudo" className="flex items-center gap-1.5">
                 <Brain className="w-3.5 h-3.5" />
-                Embudo IA
+                Cómo funciona
               </TabsTrigger>
               <TabsTrigger value="metricas" className="flex items-center gap-1.5">
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -922,7 +940,7 @@ export default function DocumentacionPage() {
             </TabsContent>
 
             <TabsContent value="embudo">
-              <EmbudoSection embudo={embudo} />
+              <EmbudoSection />
             </TabsContent>
 
             <TabsContent value="metricas">
