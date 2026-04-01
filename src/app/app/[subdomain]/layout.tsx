@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LocaleProvider, useT } from "@/contexts/LocaleContext";
@@ -23,6 +24,8 @@ import {
   ChevronDown,
   BadgeDollarSign,
   BarChart2,
+  Building2,
+  Check,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -32,6 +35,83 @@ import { LayoutGrid } from "lucide-react";
 import { puedeVerRuta, NAV_PERMISOS } from "@/lib/permisos";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
+
+interface AccountItem { id_cuenta: number; nombre_cuenta: string; subdominio: string }
+
+function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
+  const [open, setOpen] = useState(false);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
+  const [switching, setSwitching] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/data/mis-cuentas")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.accounts?.length > 1) setAccounts(d.accounts); })
+      .catch(() => {});
+  }, []);
+
+  if (accounts.length <= 1) return null;
+
+  const current = accounts.find((a) => a.subdominio === currentSubdominio);
+
+  const switchTo = async (acc: AccountItem) => {
+    if (acc.subdominio === currentSubdominio) { setOpen(false); return; }
+    setSwitching(acc.subdominio);
+    setOpen(false);
+    const isLocal = window.location.hostname === "localhost";
+    const protocol = window.location.protocol;
+    const port = window.location.port ? `:${window.location.port}` : "";
+    const target = isLocal
+      ? `${protocol}//${acc.subdominio}.localhost${port}/dashboard`
+      : `${protocol}//${acc.subdominio}.${ROOT_DOMAIN}/dashboard`;
+    // Hacer re-signIn con el subdominio correcto vía action
+    const { loginAction } = await import("@/app/login/actions");
+    const session = await fetch("/api/auth/session").then((r) => r.json()) as { user?: { email?: string } };
+    const email = session?.user?.email;
+    if (!email) { window.location.href = `${protocol}//${ROOT_DOMAIN}/login`; return; }
+    // Necesitamos la contraseña — redirigir al login con el subdominio preseleccionado
+    // Como ya tienen sesión activa, podemos hacer el switch directo via endpoint
+    await fetch("/api/auth/switch-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subdominio: acc.subdominio }),
+    });
+    window.location.href = target;
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-gray-300 hover:bg-surface-700 border border-surface-500/60 transition-all"
+      >
+        <Building2 className="w-4 h-4 shrink-0 text-accent-cyan" />
+        <span className="flex-1 text-left truncate text-xs">{current?.nombre_cuenta ?? currentSubdominio}</span>
+        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 right-0 mb-1 rounded-xl bg-surface-800 border border-surface-500 shadow-2xl overflow-hidden z-50">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider px-3 pt-2 pb-1">Cambiar cuenta</p>
+          {accounts.map((acc) => (
+            <button
+              key={acc.id_cuenta}
+              type="button"
+              onClick={() => void switchTo(acc)}
+              disabled={switching === acc.subdominio}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-700 transition-colors"
+            >
+              <Building2 className="w-4 h-4 shrink-0 text-gray-500" />
+              <span className="flex-1 truncate text-xs text-gray-300">{acc.nombre_cuenta}</span>
+              {acc.subdominio === currentSubdominio && <Check className="w-3.5 h-3.5 text-accent-cyan shrink-0" />}
+              {switching === acc.subdominio && <span className="w-3.5 h-3.5 border border-accent-cyan border-t-transparent rounded-full animate-spin shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "sistema" | "documentacion" | "configuracion";
 
@@ -195,6 +275,8 @@ function PermissionGuard({ children }: { children: React.ReactNode }) {
 
 function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const params = useParams();
+  const currentSubdominio = typeof params?.subdomain === "string" ? params.subdomain : "";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [locale, setLocale] = useState<Locale | null>(null);
@@ -258,6 +340,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
               Volver al listado
             </a>
           )}
+          <AccountSwitcher currentSubdominio={currentSubdominio} />
           <SoloMisDatosToggle />
           {logoutButton}
         </div>
@@ -298,6 +381,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
               Volver al listado
             </a>
           )}
+          <AccountSwitcher currentSubdominio={currentSubdominio} />
           <SoloMisDatosToggle />
           {logoutButton}
         </div>

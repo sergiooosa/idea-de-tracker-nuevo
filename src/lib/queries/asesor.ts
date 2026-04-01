@@ -126,7 +126,9 @@ export async function getAsesorData(
   const leadsFromCalls = new Set(callRows.map(leadKeyFromCall).filter(Boolean));
   const leadsFromAgendas = new Set(agendaRows.map(leadKeyFromAgenda).filter(Boolean));
   const leadsFromRegistros = new Set(regRows.map(leadKeyFromReg).filter(Boolean));
-  const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas, ...leadsFromRegistros]);
+  // leadsAsignados = solo los que tienen actividad en el rango (llamadas + agendas)
+  // Los registros_de_llamada no tienen filtro de fecha → no se cuentan para el período
+  const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]);
 
   // Desglose leads por canal
   const soloLlamadas = [...leadsFromCalls].filter((e) => !leadsFromAgendas.has(e)).length;

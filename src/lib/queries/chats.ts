@@ -107,7 +107,13 @@ export async function getChats(
       leadName: r.nombre_lead,
       leadId: r.id_lead,
       agentName,
-      asesorAsignado: r.asesor_asignado ?? agentName ?? null,
+      // Normalizar asesor: usar asesor_asignado primero, luego nombre del agente.
+      // Si el nombre es vacío, "Agente" genérico o solo espacios → null (Sin asignar)
+      asesorAsignado: (() => {
+        const raw = (r.asesor_asignado?.trim() || agentName?.trim() || "").toLowerCase();
+        if (!raw || raw === "agente" || raw === "agent" || raw === "bot") return null;
+        return r.asesor_asignado?.trim() || agentName?.trim() || null;
+      })(),
       datetime: r.fecha_y_hora_z?.toISOString() ?? "",
       totalMessages: msgs.length,
       agentMessages: agentMsgs.length,
