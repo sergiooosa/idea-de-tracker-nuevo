@@ -259,9 +259,12 @@ function ApiSection() {
     data: [{ fecha: "2025-12-15", metricas: { facturacion: 15000000, cash_collected: 8500000, ingresos: 15000000 } }]
   }, null, 2);
 
-  const subdominio = typeof window !== "undefined" ? window.location.hostname.split(".")[0] : "tu-subdominio";
+  const subdominio = typeof window !== "undefined"
+    ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "")
+    : "tu-subdominio";
+  const webhookUrl = `${API_BASE_URL}/webhooks/external-data/${subdominio}`;
   const curlExample = `curl -X POST \\
-  "${API_BASE_URL}/webhooks/external-data/${subdominio}" \\
+  "${webhookUrl}" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: TU_API_KEY_AQUÍ" \\
   -d '${examplePayload}'`;
@@ -339,12 +342,11 @@ function ApiSection() {
           <div className="flex items-center gap-2 rounded-lg bg-[#0d1117] px-3 py-2 border border-surface-500">
             <Badge variant="default" className="shrink-0">POST</Badge>
             <code className="text-sm text-accent-cyan font-mono break-all">
-              {API_BASE_URL}/webhooks/external-data/:subdominio
+              {webhookUrl}
             </code>
           </div>
           <p className="text-xs text-gray-500">
-            El <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">:subdominio</code> es el que aparece en la URL de tu panel (antes de <code className="bg-surface-700 px-1 py-0.5 rounded text-gray-300">.autokpi.net</code>).
-            Incluye el header <code className="bg-surface-700 px-1.5 py-0.5 rounded text-accent-cyan">x-api-key</code> con el token de arriba.
+            Esta es tu URL exacta. Incluye el header <code className="bg-surface-700 px-1.5 py-0.5 rounded text-accent-cyan">x-api-key</code> con el token de arriba.
           </p>
         </CardContent>
       </Card>
