@@ -21,6 +21,10 @@ import {
   Cpu,
   BarChart3,
   Tag,
+  HelpCircle,
+  Plus,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-config";
 
@@ -148,32 +152,126 @@ function TriggerSection({ triggers }: { triggers: SystemConfig["chat_triggers"] 
   );
 }
 
-function ApiSection() {
-  const examplePayload = JSON.stringify(
+function FaqSection() {
+  const faqs = [
     {
-      data: [
-        {
-          fecha: "2025-12-15",
-          metricas: {
-            facturacion: 15000000,
-            cash_collected: 8500000,
-            ingresos: 15000000,
-          },
-        },
-      ],
+      q: "Pongo las mismas fechas en el panel ejecutivo, en llamadas y en el panel asesor, pero me salen números distintos. ¿Está fallando algo?",
+      a: "No, es que cada panel mide una cosa diferente y usa su propia fecha de referencia. El panel ejecutivo cuenta las citas por la fecha en que está programada la reunión. El panel de llamadas cuenta por la fecha en que se realizó la llamada. El panel asesor cuenta por la fecha en que el lead tuvo actividad. Si un lead entró el lunes, lo llamaste el miércoles y la cita quedó para el viernes, ese lead aparece en distintos paneles según qué rango de fechas uses. Lo más confiable es usar el mismo rango amplio en todos los paneles (por ejemplo, todo el mes) para ver el cuadro completo.",
     },
-    null,
-    2,
-  );
+    {
+      q: "Tengo un asesor que aparece dos veces en la lista (ej: Héctor y Héctor). ¿Por qué?",
+      a: "Pasa cuando ese asesor tiene registros de llamadas con su correo y otros registros de citas con su nombre escrito diferente. El sistema los ve como personas distintas. Solución: asegúrate de que en GHL el asesor siempre use el mismo correo electrónico en todas las automatizaciones. Si el problema ya existe en datos históricos, escríbenos para normalizarlos.",
+    },
+    {
+      q: "En chats sale 'Sin asignar' o aparece el nombre 'Agente' en todos los clientes. ¿Por qué?",
+      a: "Cuando un chat tiene un chatbot activo y el bot responde antes que el asesor humano, el sistema puede registrar 'Agente' o dejar sin asignar hasta que un asesor real tome la conversación. Para que aparezca el nombre correcto, configura el emoji de 'toma de atención' en Control del sistema → Chats. Así el sistema sabe exactamente cuándo entró el asesor humano.",
+    },
+    {
+      q: "El panel dice que se hicieron 3.000 llamadas pero yo sé que no son tantas.",
+      a: "Probablemente hay eventos de 'contacto creado' o 'llamada pendiente' que se están contando como llamadas realizadas. Esos son registros de leads que llegaron, no llamadas que se hicieron. Esto ya está corregido en versiones recientes. Si aún lo ves, recarga la página o limpia el caché del navegador.",
+    },
+    {
+      q: "Puse una cita en GHL pero no aparece en AutoKPI. ¿Qué pasó?",
+      a: "Revisa que la automatización de GHL que envía el webhook de 'cita agendada' esté activa y apunte a la URL correcta del Cerebro. También verifica que el locationId en la automatización coincida exactamente con el de tu cuenta. Si todo parece correcto y sigue sin aparecer, escríbenos con el nombre del lead y la fecha de la cita.",
+    },
+    {
+      q: "Los ingresos dicen $0 pero sí hubo ventas. ¿Por qué?",
+      a: "Sucede cuando la categoría del cierre en tu embudo no coincide exactamente con lo que el sistema espera. Si usas un embudo personalizado, asegúrate de que la etapa de 'cerrada' tenga en su nombre o condición alguna de las palabras clave: Cerrada, Closed, Cierre, Ganada o Won. Si tu etapa se llama diferente, escríbenos para configurarla.",
+    },
+    {
+      q: "¿Por qué el análisis de IA no siempre clasifica las llamadas?",
+      a: "El análisis de IA solo se activa en llamadas efectivas (contestadas). Las llamadas muy cortas (menos de 80 caracteres de transcripción), los buzones de voz y las llamadas donde solo habla el asesor sin respuesta real del cliente se clasifican automáticamente como 'seguimiento' sin consumir IA. Esto es intencional para ahorrar costos.",
+    },
+    {
+      q: "¿Con qué frecuencia se actualizan los datos?",
+      a: "Las llamadas y citas llegan en tiempo real (máximo 1-2 minutos de demora). El análisis de IA de chats se hace una vez al día a las 9 AM hora Colombia. Los no-shows se marcan automáticamente cada noche a las 2 AM hora local de cada cuenta. Los datos de ads se sincronizan cada día a las 6 AM hora Colombia.",
+    },
+  ];
 
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent-amber/20 flex items-center justify-center shrink-0">
+          <HelpCircle className="w-5 h-5 text-accent-amber" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Preguntas frecuentes</h3>
+          <p className="text-sm text-gray-400 mt-1">Las dudas más comunes sobre cómo funciona el sistema.</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {faqs.map((faq, i) => (
+          <Card key={i} className="bg-surface-700/50 border-surface-500">
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm text-white font-medium leading-snug">❓ {faq.q}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-400 leading-relaxed">{faq.a}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ApiSection() {
+  const [apiKeys, setApiKeys] = useState<{ id_key: number; nombre_key: string; token: string; activa: boolean; created_at: string }[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(true);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const loadKeys = async () => {
+    setLoadingKeys(true);
+    try {
+      const res = await fetch("/api/data/api-keys");
+      if (res.ok) {
+        const data = await res.json() as { keys: typeof apiKeys };
+        setApiKeys(data.keys);
+      }
+    } finally { setLoadingKeys(false); }
+  };
+
+  useState(() => { void loadKeys(); });
+
+  const createKey = async () => {
+    if (!newKeyName.trim()) return;
+    setCreatingKey(true);
+    try {
+      const res = await fetch("/api/data/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre_key: newKeyName.trim() }),
+      });
+      if (res.ok) { setNewKeyName(""); await loadKeys(); }
+    } finally { setCreatingKey(false); }
+  };
+
+  const deleteKey = async (id: number) => {
+    await fetch(`/api/data/api-keys?id=${id}`, { method: "DELETE" });
+    await loadKeys();
+  };
+
+  const copyKey = (token: string) => {
+    navigator.clipboard.writeText(token);
+    setCopiedKey(token);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const examplePayload = JSON.stringify({
+    data: [{ fecha: "2025-12-15", metricas: { facturacion: 15000000, cash_collected: 8500000, ingresos: 15000000 } }]
+  }, null, 2);
+
+  const subdominio = typeof window !== "undefined" ? window.location.hostname.split(".")[0] : "tu-subdominio";
   const curlExample = `curl -X POST \\
-  "${API_BASE_URL}/webhooks/external-data/tu-subdominio" \\
+  "${API_BASE_URL}/webhooks/external-data/${subdominio}" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: TU_API_KEY_AQUÍ" \\
   -d '${examplePayload}'`;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-accent-green/20 flex items-center justify-center shrink-0">
           <Globe className="w-5 h-5 text-accent-green" />
@@ -185,6 +283,57 @@ function ApiSection() {
           </p>
         </div>
       </div>
+
+      {/* Gestor de API Keys */}
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <Key className="w-4 h-4 text-accent-amber" />
+            Tus API Keys
+            <button type="button" onClick={() => void loadKeys()} className="ml-auto text-gray-500 hover:text-white transition-colors">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {loadingKeys ? (
+            <p className="text-xs text-gray-500 animate-pulse">Cargando...</p>
+          ) : apiKeys.length === 0 ? (
+            <p className="text-xs text-gray-500">No tienes API keys todavía. Crea una abajo.</p>
+          ) : (
+            <div className="space-y-2">
+              {apiKeys.map((k) => (
+                <div key={k.id_key} className="flex items-center gap-2 rounded-lg bg-surface-600/60 px-3 py-2 text-xs">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">{k.nombre_key}</p>
+                    <p className="font-mono text-gray-500 truncate">{k.token.slice(0, 20)}...</p>
+                  </div>
+                  <button type="button" onClick={() => copyKey(k.token)} title="Copiar token" className="shrink-0 text-gray-400 hover:text-accent-cyan transition-colors">
+                    {copiedKey === k.token ? <Check className="w-3.5 h-3.5 text-accent-green" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  <button type="button" onClick={() => void deleteKey(k.id_key)} title="Eliminar" className="shrink-0 text-gray-400 hover:text-red-400 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void createKey()}
+              placeholder="Nombre de la key (ej: n8n producción)"
+              className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent-cyan"
+            />
+            <button type="button" onClick={() => void createKey()} disabled={creatingKey || !newKeyName.trim()}
+              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-green text-black text-xs font-semibold disabled:opacity-50">
+              <Plus className="w-3.5 h-3.5" /> {creatingKey ? "..." : "Crear"}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="bg-surface-700/50 border-surface-500">
         <CardHeader className="pb-2">
@@ -198,22 +347,9 @@ function ApiSection() {
             </code>
           </div>
           <p className="text-xs text-gray-500">
-            Reemplaza <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">:subdominio</code> con el subdominio de tu cuenta (el mismo que aparece en la URL de tu panel).
-            El body debe ser <code className="bg-surface-700 px-1 py-0.5 rounded text-gray-300">{"{ data: [{ fecha, metricas }] }"}</code> — un array de objetos con fecha y métricas numéricas.
+            El <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-amber">:subdominio</code> es el que aparece en la URL de tu panel (antes de <code className="bg-surface-700 px-1 py-0.5 rounded text-gray-300">.autokpi.net</code>).
+            Incluye el header <code className="bg-surface-700 px-1.5 py-0.5 rounded text-accent-cyan">x-api-key</code> con el token de arriba.
           </p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-surface-700/50 border-surface-500">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
-            <Shield className="w-4 h-4 text-accent-amber" />
-            Autenticación
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-gray-400">
-          <p>Incluye el header <code className="bg-surface-700 px-1.5 py-0.5 rounded text-accent-cyan">x-api-key</code> con
-            tu token de API. Puedes gestionar tus API Keys desde el panel de configuración.</p>
         </CardContent>
       </Card>
 
@@ -226,6 +362,15 @@ function ApiSection() {
         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ejemplo cURL</h4>
         <CodeBlock code={curlExample} language="bash" />
       </div>
+
+      <Card className="bg-accent-green/5 border-accent-green/20">
+        <CardContent className="pt-4 text-xs text-gray-400 space-y-1">
+          <p>✅ Puedes enviar múltiples fechas en un solo request (array <code className="text-accent-cyan">data</code>).</p>
+          <p>✅ Los campos de métricas son flexibles — usa los nombres que quieras: <code className="text-accent-cyan">ingresos</code>, <code className="text-accent-cyan">facturacion</code>, <code className="text-accent-cyan">cash_collected</code>, etc.</p>
+          <p>✅ Si envías la misma fecha dos veces, se crea un registro adicional (no sobreescribe).</p>
+          <p>⚠️ Activa la fuente de datos externa en <strong className="text-white">Control del sistema → paso 3</strong> para que el panel muestre estos datos en lugar de los nativos.</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -760,6 +905,10 @@ export default function DocumentacionPage() {
                 <span>💰</span>
                 Costos de IA
               </TabsTrigger>
+              <TabsTrigger value="faq" className="flex items-center gap-1.5">
+                <HelpCircle className="w-3.5 h-3.5" />
+                FAQ
+              </TabsTrigger>
             </TabsList>
 
             <Separator className="my-4" />
@@ -790,6 +939,9 @@ export default function DocumentacionPage() {
 
             <TabsContent value="costos">
               <CostosIASection />
+            </TabsContent>
+            <TabsContent value="faq">
+              <FaqSection />
             </TabsContent>
           </Tabs>
         )}
