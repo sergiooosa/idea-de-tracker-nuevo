@@ -1,6 +1,25 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { tienePermiso, type PermisoId } from "@/lib/permisos";
+import { tienePermiso, canViewAll, type PermisoId } from "@/lib/permisos";
+
+/**
+ * Enforce server-side: si el usuario tiene ver_solo_propios,
+ * ignora cualquier closerEmails que venga en la request y retorna solo su email.
+ * Previene que un asesor pase closerEmails de otro asesor en la URL.
+ */
+export function enforceCloserFilter(
+  requestedEmails: string[] | undefined,
+  sessionEmail: string,
+  permisosArray: string[],
+  rol: string,
+): string[] | undefined {
+  const puedeVerTodo = rol === "superadmin" || canViewAll(permisosArray);
+  if (!puedeVerTodo) {
+    // Sin importar lo que pida, solo puede ver sus propios datos
+    return sessionEmail ? [sessionEmail] : undefined;
+  }
+  return requestedEmails;
+}
 
 export interface AuthContext {
   idCuenta: number;
