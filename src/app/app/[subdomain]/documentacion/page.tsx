@@ -160,23 +160,19 @@ function FaqSection() {
     },
     {
       q: "Tengo un asesor que aparece dos veces en la lista (ej: Héctor y Héctor). ¿Por qué?",
-      a: "Pasa cuando ese asesor tiene registros de llamadas con su correo y otros registros de citas con su nombre escrito diferente. El sistema los ve como personas distintas. Solución: asegúrate de que en GHL el asesor siempre use el mismo correo electrónico en todas las automatizaciones. Si el problema ya existe en datos históricos, escríbenos para normalizarlos.",
+      a: "Pasa cuando el mismo asesor tiene el nombre escrito de formas distintas en distintos flujos de GHL: con tilde y sin tilde, con mayúscula y sin ella, con apellido completo en unos y abreviado en otros (ej: 'François González' vs 'Francois Gonzalez'). El sistema lo detecta como dos personas. Para unificarlos, escríbenos indicando el nombre 'incorrecto' y el nombre 'correcto' y lo fusionamos en todos los registros.",
     },
     {
       q: "En chats sale 'Sin asignar' o aparece el nombre 'Agente' en todos los clientes. ¿Por qué?",
-      a: "Cuando un chat tiene un chatbot activo y el bot responde antes que el asesor humano, el sistema puede registrar 'Agente' o dejar sin asignar hasta que un asesor real tome la conversación. Para que aparezca el nombre correcto, configura el emoji de 'toma de atención' en Control del sistema → Chats. Así el sistema sabe exactamente cuándo entró el asesor humano.",
+      a: "El nombre 'Agente' aparece cuando el primer mensaje del chat es del bot o del sistema, no de un asesor real. Cuando el asesor humano retoma la conversación, el registro se actualiza automáticamente. Si persiste 'Sin asignar', revisa que el asesor esté correctamente asignado en GHL al contacto. No necesitas hacer nada manual, el sistema se actualiza solo cuando llega el siguiente mensaje del asesor.",
     },
     {
-      q: "El panel dice que se hicieron 3.000 llamadas pero yo sé que no son tantas.",
-      a: "Probablemente hay eventos de 'contacto creado' o 'llamada pendiente' que se están contando como llamadas realizadas. Esos son registros de leads que llegaron, no llamadas que se hicieron. Esto ya está corregido en versiones recientes. Si aún lo ves, recarga la página o limpia el caché del navegador.",
-    },
-    {
-      q: "Puse una cita en GHL pero no aparece en AutoKPI. ¿Qué pasó?",
-      a: "Revisa que la automatización de GHL que envía el webhook de 'cita agendada' esté activa y apunte a la URL correcta del Cerebro. También verifica que el locationId en la automatización coincida exactamente con el de tu cuenta. Si todo parece correcto y sigue sin aparecer, escríbenos con el nombre del lead y la fecha de la cita.",
+      q: "Los datos no llegan o parece que llevan mucho tiempo sin actualizarse. ¿Qué hago?",
+      a: "Si notas que un cliente lleva más de 24 horas sin datos nuevos (sin llamadas, sin citas, sin chats) y sí hubo actividad real en GHL, comunícate con el equipo técnico indicando el nombre del cliente y aproximadamente desde cuándo dejaron de llegar datos. Puede ser que la automatización de GHL se desactivó o el webhook dejó de apuntar a la URL correcta.",
     },
     {
       q: "Los ingresos dicen $0 pero sí hubo ventas. ¿Por qué?",
-      a: "Sucede cuando la categoría del cierre en tu embudo no coincide exactamente con lo que el sistema espera. Si usas un embudo personalizado, asegúrate de que la etapa de 'cerrada' tenga en su nombre o condición alguna de las palabras clave: Cerrada, Closed, Cierre, Ganada o Won. Si tu etapa se llama diferente, escríbenos para configurarla.",
+      a: "El sistema toma los ingresos de las citas marcadas como 'cerradas' con su facturación registrada. Si el campo de facturación no se llenó en GHL al momento del cierre, o si la cita quedó en una etapa diferente a 'Cerrada/Ganada', los ingresos aparecen en $0. Verifica que al marcar una venta en GHL se esté enviando también el valor de facturación en el webhook.",
     },
     {
       q: "¿Por qué el análisis de IA no siempre clasifica las llamadas?",
