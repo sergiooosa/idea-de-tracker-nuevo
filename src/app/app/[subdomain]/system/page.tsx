@@ -93,6 +93,7 @@ interface AdsPlataformaTikTok {
 interface AdsPlataformaVturb {
   activo: boolean;
   api_token: string;
+  auth_header?: string;
   nombre_player: string;
   cron_hora: number;
 }
@@ -279,6 +280,7 @@ export default function SystemPage() {
   const [vturbCronHora, setVturbCronHora] = useState(6);
   const [vturbVerificando, setVturbVerificando] = useState(false);
   const [vturbVerificado, setVturbVerificado] = useState<null | boolean>(null);
+  const [vturbAuthHeader, setVturbAuthHeader] = useState('Authorization');
 
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
@@ -344,6 +346,7 @@ export default function SystemPage() {
             setVturbActivo(adsConf.vturb.activo ?? false);
             setVturbApiToken(adsConf.vturb.api_token ?? '');
             setVturbNombrePlayer(adsConf.vturb.nombre_player ?? '');
+            setVturbAuthHeader(adsConf.vturb.auth_header ?? 'Authorization');
             setVturbCronHora(adsConf.vturb.cron_hora ?? 6);
           }
         }
@@ -1743,6 +1746,13 @@ export default function SystemPage() {
                         type="password" placeholder="vt_..." value={vturbApiToken} onChange={e => setVturbApiToken(e.target.value)} />
                     </div>
                     <div>
+                      <label className="text-xs text-gray-400 block mb-1">Header de autenticación
+                        <span className="ml-1 text-accent-cyan">💡 Pregunta a Vturb cuál header usa (ej: Authorization, x-token, x-api-key)</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-accent-cyan"
+                        placeholder="Authorization" value={vturbAuthHeader} onChange={e => setVturbAuthHeader(e.target.value)} />
+                    </div>
+                    <div>
                       <label className="text-xs text-gray-400 block mb-1">Nombre del VSL/Player
                         <span className="ml-1 text-accent-cyan">💡 El nombre exacto del player en Vturb Analytics (ej: vsl_principal)</span>
                       </label>
@@ -1813,7 +1823,7 @@ export default function SystemPage() {
                       adsConfig.tiktok = { activo: tiktokAdsActivo, advertiser_id: tiktokAdvertiserId, access_token: tiktokAccessToken, cron_hora: tiktokCronHora };
                     }
                     if (vturbActivo || vturbApiToken || vturbNombrePlayer) {
-                      adsConfig.vturb = { activo: vturbActivo, api_token: vturbApiToken, nombre_player: vturbNombrePlayer, cron_hora: vturbCronHora };
+                      adsConfig.vturb = { activo: vturbActivo, api_token: vturbApiToken, auth_header: vturbAuthHeader || 'Authorization', nombre_player: vturbNombrePlayer, cron_hora: vturbCronHora };
                     }
                     const res = await fetch('/api/data/system-config', {
                       method: 'PUT',

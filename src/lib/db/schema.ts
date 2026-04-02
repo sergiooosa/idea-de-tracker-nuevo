@@ -172,8 +172,9 @@ export interface ConfiguracionAds {
   };
   vturb?: {
     activo: boolean;
-    api_token: string; // Token de autenticación de Vturb Analytics
-    nombre_player: string; // Nombre exacto del player en Vturb (ej: vsl_principal)
+    api_token: string;
+    auth_header: string; // Nombre del header de auth (ej: Authorization, x-token, etc.)
+    nombre_player: string;
     cron_hora: number;
   };
 }
