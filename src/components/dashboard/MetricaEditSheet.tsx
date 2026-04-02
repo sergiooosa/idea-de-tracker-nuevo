@@ -63,7 +63,7 @@ interface MetricaEditSheetProps {
   metricasConfig: MetricaConfig[];
   metricasManualData: Record<string, MetricaManualEntry[]>;
   editingMetric: MetricaConfig | null;
-  tipoInicial: "manual" | "automatica" | "fija";
+  tipoInicial: "manual" | "automatica" | "fija" | "webhook";
   onClose: () => void;
   onSave: (
     config: MetricaConfig,
@@ -82,7 +82,7 @@ export default function MetricaEditSheet({
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState<MetricaConfig["ubicacion"]>("ambos");
-  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija">(tipoInicial);
+  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook">(tipoInicial);
 
   const [campos, setCampos] = useState<MetricaCampoConfig[]>([]);
 
@@ -101,6 +101,8 @@ export default function MetricaEditSheet({
   const [siNoFuente, setSiNoFuente] = useState<string[]>([]);
 
   const [valorFijo, setValorFijo] = useState<string>("");
+  const [webhookCampo, setWebhookCampo] = useState<string>("");
+  const [webhookCamposDisponibles, setWebhookCamposDisponibles] = useState<string[]>([]);
   const [formato, setFormato] = useState<MetricaConfig["formato"]>("numero");
   const [color, setColor] = useState<string>("green");
 
@@ -159,6 +161,7 @@ export default function MetricaEditSheet({
       setFormato(editingMetric.formato ?? "numero");
       setColor(editingMetric.color ?? "green");
       setEntradas(metricasManualData[editingMetric.id] ?? []);
+      setWebhookCampo(editingMetric.webhookCampo ?? "");
     } else {
       setNombre("");
       setDescripcion("");
@@ -181,6 +184,7 @@ export default function MetricaEditSheet({
       setFormato("numero");
       setColor("green");
       setEntradas([]);
+      setWebhookCampo("");
     }
     setNuevaEntrada({});
   }, [editingMetric, tipoInicial, metricasManualData]);
@@ -238,7 +242,13 @@ export default function MetricaEditSheet({
 
     const base = { id, nombre: nombre.trim(), descripcion: descripcion.trim() || undefined, ubicacion, orden, formato, color };
 
-    if (tipo === "fija") {
+    if (tipo === "webhook") {
+      config = { ...base, tipo: "webhook" as const, webhookCampo: webhookCampo.trim() };
+      onSave(config);
+      setSaving(false);
+      onClose();
+      return;
+    } else if (tipo === "fija") {
       config = { ...base, tipo: "fija" as const, valorFijo: valorFijo.trim() || "0" };
       onSave(config);
     } else if (tipo === "manual") {
@@ -301,7 +311,7 @@ export default function MetricaEditSheet({
   };
 
   const canSave =
-    nombre.trim() &&
+    nombre.trim() && (tipo === "webhook" ? !!webhookCampo.trim() : true) &&
     (tipo === "fija" ||
       (tipo === "manual" && campos.some((c) => c.nombre.trim())) ||
       (tipo === "automatica" &&
@@ -411,7 +421,67 @@ export default function MetricaEditSheet({
                 <option value="manual">Manual (campos personalizados)</option>
                 <option value="automatica">Automática (fórmula)</option>
                 <option value="fija">Fija (valor constante)</option>
+                <option value="webhook">Webhook (dato externo via API)</option>
               </select>
+            </div>
+          )}
+
+          {tipo === "webhook" && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-1">
+                <p className="text-white font-medium">¿Cómo funciona?</p>
+                <p>Envía datos desde cualquier sistema externo (n8n, GHL, Zapier) al webhook de tu cuenta. El valor de este campo aparecerá aquí automáticamente.</p>
+                <p className="text-accent-cyan">URL: <code className="bg-surface-700 px-1 py-0.5 rounded">autokpi.net/webhooks/metricas/[tu-subdominio]</code></p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-accent-cyan mb-1">
+                  Nombre del campo *
+                  <span className="ml-1 text-gray-500 font-normal">(debe coincidir exactamente con el campo que envías en el JSON)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={webhookCampo}
+                    onChange={(e) => setWebhookCampo(e.target.value)}
+                    placeholder="ej: ventas_facebook, leads_instagram, costo_lead"
+                    className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white font-mono focus:ring-2 focus:ring-accent-cyan/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/data/metricas-webhook");
+                        if (res.ok) {
+                          const data = await res.json() as { campos: Array<{ campo: string }> };
+                          setWebhookCamposDisponibles(data.campos.map((c) => c.campo));
+                        }
+                      } catch { /* ignore */ }
+                    }}
+                    className="px-2 py-1.5 rounded-lg bg-surface-600 border border-surface-500 text-xs text-gray-400 hover:text-white transition-colors"
+                    title="Ver campos que ya han llegado"
+                  >
+                    Ver disponibles
+                  </button>
+                </div>
+                {webhookCamposDisponibles.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <span className="text-[10px] text-gray-500">Ya recibidos:</span>
+                    {webhookCamposDisponibles.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setWebhookCampo(c)}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${webhookCampo === c ? "bg-accent-cyan/20 border-accent-cyan text-accent-cyan" : "bg-surface-600 border-surface-500 text-gray-400 hover:text-white"}`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg bg-surface-700/40 p-3 text-xs text-gray-500 font-mono">
+                {`POST autokpi.net/webhooks/metricas/[subdominio]\nx-api-key: [tu API key]\n\n{ "${webhookCampo || "nombre_campo"}": 42, "fecha": "2026-04-02" }`}
+              </div>
             </div>
           )}
 

@@ -245,7 +245,7 @@ export default function SystemPage() {
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
-  const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija'>('manual');
+  const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija' | 'webhook'>('manual');
   const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
   const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
@@ -374,7 +374,7 @@ export default function SystemPage() {
       const m = metricasConfig.find((x) => x.id === editParam);
       if (m) {
         setMetricasEditingId(m.id);
-        setMetricasSheetTipo(m.tipo);
+        setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook');
         setMetricasSheetOpen(true);
       }
     }
@@ -823,7 +823,7 @@ export default function SystemPage() {
                           m={m}
                           onEdit={() => {
                             setMetricasEditingId(m.id);
-                            setMetricasSheetTipo(m.tipo);
+                            setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook');
                             setMetricasSheetOpen(true);
                           }}
                           onDelete={() => {

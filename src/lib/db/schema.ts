@@ -98,12 +98,13 @@ export interface MetricaConfig {
   id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "manual" | "automatica" | "fija";
+  tipo: "manual" | "automatica" | "fija" | "webhook";
   ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
   orden?: number;
   campos?: MetricaCampoConfig[];
   formula?: MetricaFormulaConfig;
   valorFijo?: number | string;
+  webhookCampo?: string; // Para tipo "webhook": nombre del campo de metricas_webhook
   formato?: "numero" | "moneda" | "porcentaje" | "tiempo" | "decimal";
   color?: string;
 }

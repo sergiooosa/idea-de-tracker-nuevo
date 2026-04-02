@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta, metricasWebhook } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
@@ -415,6 +415,21 @@ export async function getDashboard(
   const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
     ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
     : {};
+
+  // Cargar datos de metricas_webhook para el período (suma por campo)
+  const webhookRows = await db
+    .select({ campo: metricasWebhook.campo, valor: metricasWebhook.valor, fecha: metricasWebhook.fecha })
+    .from(metricasWebhook)
+    .where(and(
+      eq(metricasWebhook.id_cuenta, idCuenta),
+      gte(metricasWebhook.fecha, dateFrom),
+      lte(metricasWebhook.fecha, dateTo),
+    ));
+  const webhookSumas: Record<string, number> = {};
+  for (const row of webhookRows) {
+    const key = row.campo;
+    webhookSumas[key] = (webhookSumas[key] ?? 0) + parseFloat(String(row.valor ?? 0));
+  }
   const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[] = [];
   const metricasValores: Record<string, string | number> = {};
   const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket"]);
@@ -445,6 +460,9 @@ export async function getDashboard(
       } else if (m.tipo === "manual") {
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
+      } else if (m.tipo === "webhook") {
+        // Suma del campo webhook en el período
+        valor = m.webhookCampo ? (webhookSumas[m.webhookCampo] ?? 0) : 0;
       } else {
         valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
       }

@@ -118,7 +118,16 @@ export default function DashboardPage() {
         </section>
 
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">KPIs operativos</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">KPIs operativos</h2>
+            <Link
+              href="/system?step=5"
+              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors border border-surface-500 hover:border-accent-cyan/40 rounded-lg px-2 py-0.5"
+              title="Agregar o editar métricas personalizadas"
+            >
+              <span className="text-base leading-none">+</span> Agregar métrica
+            </Link>
+          </div>
           {kpis.revenue === 0 && !data?.configuracion_ui?.fuente_datos_financieros && (
             <div className="mb-2 px-3 py-2 rounded-lg bg-accent-amber/10 border border-accent-amber/30 text-accent-amber text-[11px] flex items-center gap-2">
               <span>⚠️</span>
