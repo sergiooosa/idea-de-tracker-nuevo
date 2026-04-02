@@ -1760,7 +1760,12 @@ export default function SystemPage() {
                             });
                             if (res.ok) {
                               const d = await res.json() as { data?: Array<{ name: string }> };
-                              const players = d.data ?? (Array.isArray(d) ? d : []);
+                              const raw = d as unknown;
+                              const players: Array<{ name: string }> = Array.isArray(raw) ? raw as Array<{ name: string }> :
+                                (raw && typeof raw === 'object' ? (
+                                  Array.isArray((raw as Record<string,unknown>).data) ? (raw as Record<string,unknown>).data as Array<{name:string}> :
+                                  Array.isArray((raw as Record<string,unknown>).players) ? (raw as Record<string,unknown>).players as Array<{name:string}> : []
+                                ) : []);
                               const found = players.some((p: { name: string }) => p.name.trim().toLowerCase() === vturbNombrePlayer.trim().toLowerCase());
                               setVturbVerificado(found);
                               if (!found) alert(`Player "${vturbNombrePlayer}" no encontrado. Players disponibles: ${players.map((p: {name:string}) => p.name).join(', ')}`);
