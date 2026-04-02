@@ -48,17 +48,24 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   // Usar lowercase para comparaciones case-insensitive
   const allKeys = [...new Set([...nombres, ...ids])];
   const allKeysLower = allKeys.map(k => k.toLowerCase());
+  const closedFromEmbudo = new Set(allKeysLower.filter((k) =>
+    k.includes("cerrad") || k.includes("closed"),
+  ));
+  const effectiveFromEmbudo = new Set(allKeysLower.filter((k) => {
+    return k.includes("cerrad") || k.includes("closed") ||
+           k.includes("ofertad") || k.includes("offered");
+  }));
+  // Si el embudo personalizado no tiene etapas que matcheen "cerrada/closed",
+  // las agendas del sistema usan su propio vocabulario (Cerrada, Ofertada, etc.)
+  // → usar defaults para no romper el cálculo de revenue/cierres
+  const closedSet = closedFromEmbudo.size > 0 ? closedFromEmbudo : new Set(DEFAULT_CLOSED);
+  const effectiveSet = effectiveFromEmbudo.size > 0 ? effectiveFromEmbudo : new Set(DEFAULT_EFFECTIVE);
   return {
-    attendedSet: new Set(allKeysLower.filter((k) => {
+    attendedSet: new Set([...allKeysLower.filter((k) => {
       return !k.includes("cancel") && !k.includes("pdte") && k !== "";
-    })),
-    closedSet: new Set(allKeysLower.filter((k) =>
-      k.includes("cerrad") || k.includes("closed"),
-    )),
-    effectiveSet: new Set(allKeysLower.filter((k) => {
-      return k.includes("cerrad") || k.includes("closed") ||
-             k.includes("ofertad") || k.includes("offered");
-    })),
+    }), ...DEFAULT_ATTENDED.map(k => k.toLowerCase())]),
+    closedSet,
+    effectiveSet,
     etapas: embudo,
   };
 }

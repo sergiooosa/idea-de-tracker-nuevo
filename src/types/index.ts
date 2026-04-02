@@ -386,6 +386,7 @@ export interface DashboardKpis {
   speedToLeadAvg: number;
   avgAttempts: number;
   attemptsToFirstContactAvg: number;
+  noShows: number;
 }
 
 export interface DashboardAdvisorRow {

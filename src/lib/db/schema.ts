@@ -475,3 +475,20 @@ export const comisionesConfig = pgTable("comisiones_config", {
 }, (table) => [
   index("idx_comisiones_id_cuenta").on(table.id_cuenta),
 ]);
+
+/* ------------------------------------------------------------------ */
+/*  metricas_webhook — métricas enviadas vía webhook por los clientes  */
+/* ------------------------------------------------------------------ */
+
+export const metricasWebhook = pgTable("metricas_webhook", {
+  id: serial("id").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  fecha: date("fecha").notNull(),
+  campo: text("campo").notNull(),
+  valor: numeric("valor", { precision: 18, scale: 4 }).notNull().default("0"),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_metricas_webhook_cuenta_fecha").on(table.id_cuenta, table.fecha),
+  uniqueIndex("uq_metricas_webhook").on(table.id_cuenta, table.fecha, table.campo),
+]);

@@ -46,7 +46,7 @@ export default function DashboardPage() {
     meetingsBooked: 0, meetingsAttended: 0, meetingsCanceled: 0, meetingsClosed: 0,
     effectiveAppointments: 0, tasaCierre: 0, tasaAgendamiento: 0,
     revenue: 0, cashCollected: 0, avgTicket: 0, speedToLeadAvg: 0,
-    avgAttempts: 0, attemptsToFirstContactAvg: 0,
+    avgAttempts: 0, attemptsToFirstContactAvg: 0, noShows: 0,
   };
   const objeciones = data?.objeciones ?? [];
   const volumeByDay = data?.volumeByDay ?? [];
@@ -166,50 +166,23 @@ export default function DashboardPage() {
         <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <GitBranch className="w-3.5 h-3.5 text-accent-purple" />
-            Embudo de ventas
-            <span className="relative group ml-1">
-              <HelpCircle className="w-3.5 h-3.5 text-gray-600 cursor-help" />
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2 rounded-lg bg-surface-900 border border-surface-500 text-[11px] text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal normal-case tracking-normal">Muestra cómo se distribuyen los leads en cada etapa de tu proceso de ventas. Configurable en Sistema → Paso 7.</span>
-            </span>
+            Proceso de ventas
           </h2>
           <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-            {data?.embudoPersonalizado && data.embudoPersonalizado.length > 0 ? (
-              data.embudoPersonalizado
-                .sort((a, b) => a.orden - b.orden)
-                .map((etapa) => {
-                  const count = data.distribucionEmbudo?.[etapa.nombre] ?? 0;
-                  const total = kpis.meetingsBooked || 1;
-                  const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0';
-                  return (
-                    <div
-                      key={etapa.id}
-                      className="rounded-lg pl-3 overflow-hidden flex flex-col bg-surface-800/80 border border-surface-500 kpi-card-fixed"
-                      style={{ borderLeftColor: etapa.color ?? '#8b5cf6', borderLeftWidth: 3 }}
-                    >
-                      <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{etapa.nombre}</p>
-                      <p className="text-base font-bold mt-0.5 text-white">{count}</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{pct}% del total</p>
-                      <div className="kpi-card-spacer" />
-                    </div>
-                  );
-                })
-            ) : (
-              <>
-                {[
-                  { label: t.dashboard.kpis.agendadas, value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${pctFmt(kpis.tasaAgendamiento)}` },
-                  { label: t.dashboard.kpis.asistidas, value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
-                  { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
-                  { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
-                ].map(({ label, value, color, sub }) => (
-                  <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
-                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
-                    <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{value}</p>
-                    {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
-                    <div className="kpi-card-spacer" />
-                  </div>
-                ))}
-              </>
-            )}
+            {[
+              { label: t.dashboard.kpis.agendadas, value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${pctFmt(kpis.tasaAgendamiento)}` },
+              { label: t.dashboard.kpis.asistidas, value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
+              { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
+              { label: 'No shows', value: kpis.noShows, color: 'amber' },
+              { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
+            ].map(({ label, value, color, sub }) => (
+              <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
+                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
+                <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{value}</p>
+                {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+                <div className="kpi-card-spacer" />
+              </div>
+            ))}
           </div>
         </section>
 

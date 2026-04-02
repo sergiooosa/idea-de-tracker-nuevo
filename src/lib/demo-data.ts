@@ -179,6 +179,7 @@ export function generateDashboard(): DashboardResponse {
       revenue, cashCollected, avgTicket, speedToLeadAvg,
       avgAttempts: rnd(2, 6) + Math.random(),
       attemptsToFirstContactAvg: rnd(1, 3) + Math.random(),
+      noShows: rnd(0, 8),
     },
     advisorRanking,
     volumeByDay,
