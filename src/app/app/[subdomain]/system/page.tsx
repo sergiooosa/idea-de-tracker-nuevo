@@ -1758,20 +1758,24 @@ export default function SystemPage() {
                         onClick={async () => {
                           setVturbVerificando(true); setVturbVerificado(null);
                           try {
-                            const res = await fetch("https://analytics.vturb.net/players/list", {
-                              headers: { "X-Api-Version": "v1", [vturbAuthHeader || "x-api-token"]: vturbApiToken }
+                            // Llamada via proxy server-side para evitar CORS
+                            const res = await fetch("/api/data/vturb-verify", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ api_token: vturbApiToken, nombre_player: vturbNombrePlayer }),
                             });
                             if (res.ok) {
-                              const d = await res.json() as { data?: Array<{ name: string }> };
-                              const raw = d as unknown;
-                              const players: Array<{ name: string }> = Array.isArray(raw) ? raw as Array<{ name: string }> :
-                                (raw && typeof raw === 'object' ? (
-                                  Array.isArray((raw as Record<string,unknown>).data) ? (raw as Record<string,unknown>).data as Array<{name:string}> :
-                                  Array.isArray((raw as Record<string,unknown>).players) ? (raw as Record<string,unknown>).players as Array<{name:string}> : []
-                                ) : []);
-                              const found = players.some((p: { name: string }) => p.name.trim().toLowerCase() === vturbNombrePlayer.trim().toLowerCase());
-                              setVturbVerificado(found);
-                              if (!found) alert(`Player "${vturbNombrePlayer}" no encontrado. Players disponibles: ${players.map((p: {name:string}) => p.name).join(', ')}`);
+                              const d = await res.json() as { ok: boolean; found?: boolean; players?: string[]; error?: string };
+                              if (d.ok) {
+                                setVturbVerificado(d.found ?? false);
+                                if (!d.found) {
+                                  const lista = (d.players ?? []).join(', ');
+                                  alert(`Player "${vturbNombrePlayer}" no encontrado.\nPlayers disponibles: ${lista}`);
+                                }
+                              } else {
+                                setVturbVerificado(false);
+                                alert(`Error: ${d.error ?? 'No se pudo conectar con Vturb'}`);
+                              }
                             } else { setVturbVerificado(false); }
                           } catch { setVturbVerificado(false); }
                           setVturbVerificando(false);
