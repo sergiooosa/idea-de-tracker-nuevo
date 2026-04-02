@@ -72,6 +72,8 @@ interface AdsPlataformaMeta {
   ad_account_id: string;
   access_token: string;
   cron_hora: number;
+  campos_extra?: string[];
+  pixel_id?: string;
 }
 interface AdsPlataformaGoogle {
   activo: boolean;
@@ -248,6 +250,8 @@ export default function SystemPage() {
   const [metaCronHora, setMetaCronHora] = useState(6);
   const [metaVerificando, setMetaVerificando] = useState(false);
   const [metaVerificado, setMetaVerificado] = useState<null | boolean>(null);
+  const [metaCamposExtra, setMetaCamposExtra] = useState<string[]>([]);
+  const [metaPixelId, setMetaPixelId] = useState('');
 
   const [googleAdsActivo, setGoogleAdsActivo] = useState(false);
   const [googleCustomerId, setGoogleCustomerId] = useState('');
@@ -304,6 +308,8 @@ export default function SystemPage() {
             setMetaAdAccountId(adsConf.meta.ad_account_id ?? '');
             setMetaAccessToken(adsConf.meta.access_token ?? '');
             setMetaCronHora(adsConf.meta.cron_hora ?? 6);
+            setMetaCamposExtra(adsConf.meta.campos_extra ?? []);
+            setMetaPixelId(adsConf.meta.pixel_id ?? '');
           }
           if (adsConf.google) {
             setGoogleAdsActivo(adsConf.google.activo ?? false);
@@ -1536,6 +1542,56 @@ export default function SystemPage() {
                       {metaVerificado === true && <span className="text-xs text-accent-green">✅ Conexión verificada</span>}
                       {metaVerificado === false && <span className="text-xs text-red-400">❌ Error de conexión</span>}
                     </div>
+                    {/* Pixel ID */}
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Pixel ID <span className="text-gray-600">(opcional — para métricas de conversión)</span></label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-blue"
+                        placeholder="1234567890" value={metaPixelId} onChange={e => setMetaPixelId(e.target.value)} />
+                    </div>
+
+                    {/* Selector de campos extra */}
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-2">Métricas adicionales a sincronizar</label>
+                      <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                        {[
+                          { key: "reach", label: "Alcance único" },
+                          { key: "frequency", label: "Frecuencia" },
+                          { key: "actions", label: "Acciones (leads, compras, etc.)" },
+                          { key: "action_values", label: "Valor de acciones ($)" },
+                          { key: "cost_per_action_type", label: "Costo por acción" },
+                          { key: "video_play_actions", label: "Reproducciones de video" },
+                          { key: "video_thruplay_watched_actions", label: "Video visto al 100%" },
+                          { key: "video_30_sec_watched_actions", label: "Video visto 30 seg" },
+                          { key: "outbound_clicks", label: "Clicks salientes" },
+                          { key: "inline_link_clicks", label: "Clicks en enlace" },
+                          { key: "post_reactions", label: "Reacciones" },
+                          { key: "post_comments", label: "Comentarios" },
+                          { key: "post_shares", label: "Compartidos" },
+                          { key: "unique_clicks", label: "Clicks únicos" },
+                          { key: "unique_ctr", label: "CTR único (%)" },
+                          { key: "cost_per_unique_click", label: "Costo por click único" },
+                        ].map(({ key, label }) => (
+                          <label key={key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-300 hover:text-white">
+                            <input
+                              type="checkbox"
+                              checked={metaCamposExtra.includes(key)}
+                              onChange={(e) => setMetaCamposExtra(prev =>
+                                e.target.checked ? [...prev, key] : prev.filter(k => k !== key)
+                              )}
+                              className="accent-blue-500 w-3.5 h-3.5"
+                            />
+                            <span>{label}</span>
+                            <code className="text-[10px] text-gray-600 ml-auto">{key}</code>
+                          </label>
+                        ))}
+                      </div>
+                      {metaCamposExtra.length > 0 && (
+                        <p className="text-[10px] text-accent-blue mt-1.5">
+                          ✓ {metaCamposExtra.length} campo(s) extra seleccionado(s) — se guardarán en "datos_extra" por campaña
+                        </p>
+                      )}
+                    </div>
+
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">Hora de sincronización diaria</label>
                       <select className="bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-blue"
@@ -1651,7 +1707,7 @@ export default function SystemPage() {
                   try {
                     const adsConfig: ConfiguracionAdsLocal = {};
                     if (metaAdsActivo || metaAdAccountId || metaAccessToken) {
-                      adsConfig.meta = { activo: metaAdsActivo, ad_account_id: metaAdAccountId, access_token: metaAccessToken, cron_hora: metaCronHora };
+                      adsConfig.meta = { activo: metaAdsActivo, ad_account_id: metaAdAccountId, access_token: metaAccessToken, cron_hora: metaCronHora, campos_extra: metaCamposExtra, pixel_id: metaPixelId || undefined };
                     }
                     if (googleAdsActivo || googleCustomerId) {
                       adsConfig.google = { activo: googleAdsActivo, customer_id: googleCustomerId, developer_token: googleDeveloperToken, client_id: googleClientId, client_secret: googleClientSecret, refresh_token: googleRefreshToken, cron_hora: googleCronHora };

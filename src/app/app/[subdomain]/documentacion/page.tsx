@@ -152,6 +152,121 @@ function TriggerSection({ triggers }: { triggers: SystemConfig["chat_triggers"] 
   );
 }
 
+function WebhookMetricasSection() {
+  const subdominio = typeof window !== "undefined"
+    ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "")
+    : "tu-subdominio";
+  const webhookUrl = `${API_BASE_URL}/webhooks/metricas/${subdominio}`;
+
+  const { data: keysData } = useApiData<{ keys: { token: string; nombre_key: string }[] }>('/api/data/api-keys');
+  const firstKey = keysData?.keys?.[0]?.token ?? "TU_API_KEY";
+
+  const exampleBody = JSON.stringify({
+    ventas_cerradas: 3,
+    facturacion_total: 15000,
+    leads_calificados: 12,
+    fecha: "2026-04-02"
+  }, null, 2);
+
+  const curlExample = `curl -X POST \\
+  "${webhookUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${firstKey}" \\
+  -d '${exampleBody}'`;
+
+  const n8nExample = `// En n8n → nodo HTTP Request:
+URL: ${webhookUrl}
+Method: POST
+Headers:
+  x-api-key: ${firstKey}
+  Content-Type: application/json
+Body (JSON):
+{
+  "ventas_cerradas": {{ $json.cierres }},
+  "leads_nuevos": {{ $json.leads }},
+  "fecha": "{{ $now.format('yyyy-MM-dd') }}"
+}`;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent-cyan/20 flex items-center justify-center shrink-0">
+          <Zap className="w-5 h-5 text-accent-cyan" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Webhook de Métricas Personalizadas</h3>
+          <p className="text-sm text-gray-400 mt-1">
+            Envía cualquier número desde cualquier sistema externo (n8n, GHL, Zapier, tu código) y aparece automáticamente como métrica en tu panel.
+          </p>
+        </div>
+      </div>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300">Tu URL de webhook</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex items-center gap-2 rounded-lg bg-[#0d1117] px-3 py-2 border border-surface-500">
+            <Badge variant="default" className="shrink-0">POST</Badge>
+            <code className="text-sm text-accent-cyan font-mono break-all">{webhookUrl}</code>
+          </div>
+          <p className="text-xs text-gray-500">
+            Usa el header <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">x-api-key</code> con cualquiera de tus API Keys de la pestaña "API de Ingresos".
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-surface-700/50 border-surface-500">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300">¿Cómo funciona?</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-gray-400 space-y-2">
+          <p>Envía un JSON con los campos que quieras. Los nombres de los campos son libres — el sistema los guarda tal cual y los muestra en tus métricas personalizadas.</p>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-start gap-2">
+              <span className="text-accent-cyan font-bold shrink-0">1.</span>
+              <span>Crea una métrica personalizada de tipo "Manual" en <strong className="text-white">Sistema → Paso 5</strong> con el mismo nombre del campo que vas a enviar.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-accent-cyan font-bold shrink-0">2.</span>
+              <span>Configura tu sistema externo (n8n, GHL automation, Zapier) para hacer POST a esta URL con los campos correspondientes.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-accent-cyan font-bold shrink-0">3.</span>
+              <span>Los datos llegan en segundos y aparecen en tu panel ejecutivo y de rendimiento.</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ejemplo de body</h4>
+        <CodeBlock code={exampleBody} language="json" />
+      </div>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ejemplo cURL — listo para copiar</h4>
+        <CodeBlock code={curlExample} language="bash" />
+      </div>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ejemplo n8n</h4>
+        <CodeBlock code={n8nExample} language="javascript" />
+      </div>
+
+      <Card className="bg-accent-cyan/5 border-accent-cyan/20">
+        <CardContent className="pt-4 text-xs text-gray-400 space-y-1">
+          <p>✅ El campo <code className="text-accent-cyan">fecha</code> es opcional — si no lo envías, se usa la fecha de hoy.</p>
+          <p>✅ Si envías la misma fecha dos veces, el valor se actualiza (no se duplica).</p>
+          <p>✅ Puedes enviar múltiples campos en el mismo request.</p>
+          <p>✅ Los valores deben ser números (enteros o decimales).</p>
+          <p>⚠️ Para que aparezcan en el panel, crea primero la métrica en <strong className="text-white">Sistema → Paso 5</strong> con el mismo nombre del campo.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function FaqSection() {
   const faqs = [
     {
@@ -921,6 +1036,10 @@ export default function DocumentacionPage() {
                 <span>💰</span>
                 Costos de IA
               </TabsTrigger>
+              <TabsTrigger value="webhooks" className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5" />
+                Webhooks
+              </TabsTrigger>
               <TabsTrigger value="faq" className="flex items-center gap-1.5">
                 <HelpCircle className="w-3.5 h-3.5" />
                 FAQ
@@ -955,6 +1074,9 @@ export default function DocumentacionPage() {
 
             <TabsContent value="costos">
               <CostosIASection />
+            </TabsContent>
+            <TabsContent value="webhooks">
+              <WebhookMetricasSection />
             </TabsContent>
             <TabsContent value="faq">
               <FaqSection />

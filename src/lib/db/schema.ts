@@ -151,6 +151,8 @@ export interface ConfiguracionAds {
     ad_account_id: string;
     access_token: string;
     cron_hora: number;
+    campos_extra?: string[];
+    pixel_id?: string;
   };
   google?: {
     activo: boolean;

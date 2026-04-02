@@ -10,7 +10,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { useUserFilter } from '@/contexts/UserFilterContext';
 import type { AsesorResponse, AsesorLeadCRM } from '@/types';
-import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search, HelpCircle, ExternalLink } from 'lucide-react';
+import { MessageSquare, Users, FileText, ChevronDown, ChevronUp, Target, User, Phone, X, Search, HelpCircle, ExternalLink, Plus } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
 type CrmCategory = 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
@@ -273,6 +273,13 @@ export default function AsesorPage() {
                 KPIs en el período
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase">Beta</span>
                 <SectionInfo text="Estos KPIs muestran datos del asesor seleccionado en el período de fechas elegido." />
+                <a
+                  href={pathname.split('/asesor')[0] + '/system?step=5'}
+                  title="Agregar métricas personalizadas"
+                  className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan text-[10px] font-semibold hover:bg-accent-cyan/20 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Agregar métrica
+                </a>
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
                 <KPICard label={t.asesor.kpis.leadsAsignados} value={kpis.leadsAsignados} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con actividad en llamadas y videollamadas en el rango seleccionado.', calculo: 'Correos distintos (mail_lead) que aparecen en el log de llamadas del período.' }} onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined} />
