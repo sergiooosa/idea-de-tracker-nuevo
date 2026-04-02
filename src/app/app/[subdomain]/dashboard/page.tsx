@@ -55,7 +55,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+        <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} />
         <div className="p-6 flex items-center justify-center min-h-[400px]">
           <div className="text-gray-400 text-sm animate-pulse">Cargando panel ejecutivo...</div>
         </div>
@@ -66,7 +66,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <>
-        <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+        <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} />
         <div className="p-4 rounded-xl border border-red-500/50 bg-red-500/10 text-red-200 text-sm space-y-2">
           <p className="font-medium">Error al cargar el panel</p>
           <p className="text-gray-300 break-words">{error}</p>
@@ -80,7 +80,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
+      <PageHeader title={t.dashboard.titulo} subtitle={t.dashboard.subtitulo} />
       <div className="p-3 md:p-4 space-y-3 min-w-0 max-w-full overflow-x-hidden text-sm">
         <section className="flex flex-wrap items-center gap-2">
           <DateRangePicker

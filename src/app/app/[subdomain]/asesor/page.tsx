@@ -271,7 +271,7 @@ export default function AsesorPage() {
             <section>
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
                 KPIs en el período
-                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase">Beta</span>
+                
                 <SectionInfo text="Estos KPIs muestran datos del asesor seleccionado en el período de fechas elegido." />
                 <a
                   href={pathname.split('/asesor')[0] + '/system?step=5'}

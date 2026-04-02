@@ -115,7 +115,7 @@ export default function PerformanceChatsPage() {
         >
           <Plus className="w-3.5 h-3.5" /> Nueva entrada
         </button>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase">Beta</span>
+        
         <span className="text-xs text-gray-400">Rango de fechas:</span>
         <DateRangePicker
           dateFrom={dateFrom}

@@ -90,10 +90,18 @@ interface AdsPlataformaTikTok {
   access_token: string;
   cron_hora: number;
 }
+interface AdsPlataformaVturb {
+  activo: boolean;
+  api_token: string;
+  nombre_player: string;
+  cron_hora: number;
+}
+
 interface ConfiguracionAdsLocal {
   meta?: AdsPlataformaMeta;
   google?: AdsPlataformaGoogle;
   tiktok?: AdsPlataformaTikTok;
+  vturb?: AdsPlataformaVturb;
 }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
@@ -265,6 +273,12 @@ export default function SystemPage() {
   const [tiktokAdvertiserId, setTiktokAdvertiserId] = useState('');
   const [tiktokAccessToken, setTiktokAccessToken] = useState('');
   const [tiktokCronHora, setTiktokCronHora] = useState(6);
+  const [vturbActivo, setVturbActivo] = useState(false);
+  const [vturbApiToken, setVturbApiToken] = useState('');
+  const [vturbNombrePlayer, setVturbNombrePlayer] = useState('');
+  const [vturbCronHora, setVturbCronHora] = useState(6);
+  const [vturbVerificando, setVturbVerificando] = useState(false);
+  const [vturbVerificado, setVturbVerificado] = useState<null | boolean>(null);
 
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
@@ -325,6 +339,12 @@ export default function SystemPage() {
             setTiktokAdvertiserId(adsConf.tiktok.advertiser_id ?? '');
             setTiktokAccessToken(adsConf.tiktok.access_token ?? '');
             setTiktokCronHora(adsConf.tiktok.cron_hora ?? 6);
+          }
+          if (adsConf.vturb) {
+            setVturbActivo(adsConf.vturb.activo ?? false);
+            setVturbApiToken(adsConf.vturb.api_token ?? '');
+            setVturbNombrePlayer(adsConf.vturb.nombre_player ?? '');
+            setVturbCronHora(adsConf.vturb.cron_hora ?? 6);
           }
         }
         const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config : [];
@@ -502,7 +522,7 @@ export default function SystemPage() {
               amber: active ? 'bg-accent-amber text-black border-accent-amber shadow-[0_0_16px_-4px_rgba(255,176,32,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-amber hover:border-accent-amber/50',
               green: active ? 'bg-accent-green text-black border-accent-green shadow-[0_0_16px_-4px_rgba(0,230,118,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-green hover:border-accent-green/50',
             };
-            const isBetaStep = [5, 6, 7, 10, 11].includes(s.id);
+            const isBetaStep = [8].includes(s.id); // Solo Ads es Beta
             return (
               <button key={s.id} type="button" onClick={() => setCurrentStep(s.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${colorClasses[s.color]}`}>
@@ -1700,6 +1720,78 @@ export default function SystemPage() {
                 )}
               </div>
 
+              {/* Vturb Analytics */}
+              <div className="rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🎬</span>
+                    <span className="text-sm font-semibold text-white">Vturb Analytics</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30 font-medium">Nuevo</span>
+                  </div>
+                  <button type="button" onClick={() => setVturbActivo(v => !v)}
+                    className={`w-10 h-6 rounded-full transition-colors relative ${vturbActivo ? 'bg-accent-cyan' : 'bg-surface-600'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${vturbActivo ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {vturbActivo && (
+                  <div className="space-y-3 pt-2 border-t border-surface-600">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">API Token de Vturb
+                        <span className="ml-1 text-accent-cyan">💡 Ve a app.vturb.net → Configurações → API → Gerar token</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-accent-cyan"
+                        type="password" placeholder="vt_..." value={vturbApiToken} onChange={e => setVturbApiToken(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Nombre del VSL/Player
+                        <span className="ml-1 text-accent-cyan">💡 El nombre exacto del player en Vturb Analytics (ej: vsl_principal)</span>
+                      </label>
+                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-cyan"
+                        placeholder="vsl_principal" value={vturbNombrePlayer} onChange={e => setVturbNombrePlayer(e.target.value)} />
+                      <p className="text-[10px] text-gray-600 mt-1">Debe coincidir exactamente con el nombre en Vturb. Puedes verlo en Analytics → Players.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button type="button"
+                        onClick={async () => {
+                          setVturbVerificando(true); setVturbVerificado(null);
+                          try {
+                            const res = await fetch("https://analytics.vturb.net/players/list", {
+                              headers: { "X-Api-Version": "v1", "Authorization": `Bearer ${vturbApiToken}` }
+                            });
+                            if (res.ok) {
+                              const d = await res.json() as { data?: Array<{ name: string }> };
+                              const players = d.data ?? (Array.isArray(d) ? d : []);
+                              const found = players.some((p: { name: string }) => p.name.trim().toLowerCase() === vturbNombrePlayer.trim().toLowerCase());
+                              setVturbVerificado(found);
+                              if (!found) alert(`Player "${vturbNombrePlayer}" no encontrado. Players disponibles: ${players.map((p: {name:string}) => p.name).join(', ')}`);
+                            } else { setVturbVerificado(false); }
+                          } catch { setVturbVerificado(false); }
+                          setVturbVerificando(false);
+                        }}
+                        disabled={!vturbApiToken || !vturbNombrePlayer || vturbVerificando}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan/20 border border-accent-cyan/40 text-accent-cyan text-xs font-medium hover:bg-accent-cyan/30 disabled:opacity-50 transition-all">
+                        {vturbVerificando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '🔍'} Verificar player
+                      </button>
+                      {vturbVerificado === true && <span className="text-xs text-accent-green">✅ Player encontrado</span>}
+                      {vturbVerificado === false && <span className="text-xs text-red-400">❌ No encontrado — revisa el nombre</span>}
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Hora de sincronización diaria</label>
+                      <select className="bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-cyan"
+                        value={vturbCronHora} onChange={e => setVturbCronHora(Number(e.target.value))}>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="rounded-lg bg-surface-700/40 p-3 text-xs text-gray-400 space-y-1">
+                      <p>📊 <strong className="text-white">Métricas que sincroniza:</strong> Impresiones, Clicks, Play Rate, Engagement, CPM, CPC, CTR, Agendamientos</p>
+                      <p>⏰ Se sincroniza automáticamente cada día con los datos del día anterior.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={async () => {
@@ -1714,6 +1806,9 @@ export default function SystemPage() {
                     }
                     if (tiktokAdsActivo || tiktokAdvertiserId) {
                       adsConfig.tiktok = { activo: tiktokAdsActivo, advertiser_id: tiktokAdvertiserId, access_token: tiktokAccessToken, cron_hora: tiktokCronHora };
+                    }
+                    if (vturbActivo || vturbApiToken || vturbNombrePlayer) {
+                      adsConfig.vturb = { activo: vturbActivo, api_token: vturbApiToken, nombre_player: vturbNombrePlayer, cron_hora: vturbCronHora };
                     }
                     const res = await fetch('/api/data/system-config', {
                       method: 'PUT',

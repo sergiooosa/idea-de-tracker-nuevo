@@ -169,6 +169,12 @@ export interface ConfiguracionAds {
     access_token: string;
     cron_hora: number;
   };
+  vturb?: {
+    activo: boolean;
+    api_token: string; // Token de autenticación de Vturb Analytics
+    nombre_player: string; // Nombre exacto del player en Vturb (ej: vsl_principal)
+    cron_hora: number;
+  };
 }
 
 export const cuentas = pgTable("cuentas", {
