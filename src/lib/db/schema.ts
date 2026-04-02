@@ -173,7 +173,7 @@ export interface ConfiguracionAds {
   vturb?: {
     activo: boolean;
     api_token: string;
-    auth_header: string; // Nombre del header de auth (ej: Authorization, x-token, etc.)
+    auth_header?: string; // Header de auth de Vturb — default: x-api-token
     nombre_player: string;
     cron_hora: number;
   };

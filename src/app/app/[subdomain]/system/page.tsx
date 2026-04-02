@@ -280,7 +280,7 @@ export default function SystemPage() {
   const [vturbCronHora, setVturbCronHora] = useState(6);
   const [vturbVerificando, setVturbVerificando] = useState(false);
   const [vturbVerificado, setVturbVerificado] = useState<null | boolean>(null);
-  const [vturbAuthHeader, setVturbAuthHeader] = useState('Authorization');
+  const [vturbAuthHeader, setVturbAuthHeader] = useState('x-api-token');
 
   const loadData = useCallback(async () => {
     setLoadingConfig(true);
@@ -1750,7 +1750,7 @@ export default function SystemPage() {
                         <span className="ml-1 text-accent-cyan">💡 Pregunta a Vturb cuál header usa (ej: Authorization, x-token, x-api-key)</span>
                       </label>
                       <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-accent-cyan"
-                        placeholder="Authorization" value={vturbAuthHeader} onChange={e => setVturbAuthHeader(e.target.value)} />
+                        placeholder="x-api-token" value={vturbAuthHeader} onChange={e => setVturbAuthHeader(e.target.value)} />
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">Nombre del VSL/Player
@@ -1766,7 +1766,7 @@ export default function SystemPage() {
                           setVturbVerificando(true); setVturbVerificado(null);
                           try {
                             const res = await fetch("https://analytics.vturb.net/players/list", {
-                              headers: { "X-Api-Version": "v1", "Authorization": `Bearer ${vturbApiToken}` }
+                              headers: { "X-Api-Version": "v1", [vturbAuthHeader || "x-api-token"]: vturbApiToken }
                             });
                             if (res.ok) {
                               const d = await res.json() as { data?: Array<{ name: string }> };
@@ -1823,7 +1823,7 @@ export default function SystemPage() {
                       adsConfig.tiktok = { activo: tiktokAdsActivo, advertiser_id: tiktokAdvertiserId, access_token: tiktokAccessToken, cron_hora: tiktokCronHora };
                     }
                     if (vturbActivo || vturbApiToken || vturbNombrePlayer) {
-                      adsConfig.vturb = { activo: vturbActivo, api_token: vturbApiToken, auth_header: vturbAuthHeader || 'Authorization', nombre_player: vturbNombrePlayer, cron_hora: vturbCronHora };
+                      adsConfig.vturb = { activo: vturbActivo, api_token: vturbApiToken, auth_header: vturbAuthHeader || 'x-api-token', nombre_player: vturbNombrePlayer, cron_hora: vturbCronHora };
                     }
                     const res = await fetch('/api/data/system-config', {
                       method: 'PUT',
