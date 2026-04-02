@@ -1746,13 +1746,6 @@ export default function SystemPage() {
                         type="password" placeholder="vt_..." value={vturbApiToken} onChange={e => setVturbApiToken(e.target.value)} />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">Header de autenticación
-                        <span className="ml-1 text-accent-cyan">💡 Pregunta a Vturb cuál header usa (ej: Authorization, x-token, x-api-key)</span>
-                      </label>
-                      <input className="w-full bg-surface-700 border border-surface-500 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-accent-cyan"
-                        placeholder="x-api-token" value={vturbAuthHeader} onChange={e => setVturbAuthHeader(e.target.value)} />
-                    </div>
-                    <div>
                       <label className="text-xs text-gray-400 block mb-1">Nombre del VSL/Player
                         <span className="ml-1 text-accent-cyan">💡 El nombre exacto del player en Vturb Analytics (ej: vsl_principal)</span>
                       </label>
