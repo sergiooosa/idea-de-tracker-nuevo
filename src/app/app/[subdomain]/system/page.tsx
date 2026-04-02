@@ -168,7 +168,7 @@ function SortableMetricaCard({
     transform: CSS.Transform.toString(transform),
     transition,
   };
-  const tipoLabel = m.tipo === 'manual' ? 'Manual' : m.tipo === 'automatica' ? 'Automática' : 'Fija';
+  const tipoLabel = m.tipo === 'manual' ? 'Manual' : m.tipo === 'automatica' ? 'Automática' : m.tipo === 'webhook' ? 'Webhook' : 'Fija';
   const ubicLabel = m.ubicacion === 'panel_ejecutivo' ? 'Panel' : m.ubicacion === 'rendimiento' ? 'Rendimiento' : 'Ambos';
   const formatoLabel = m.formato === 'moneda' ? '$' : m.formato === 'porcentaje' ? '%' : m.formato === 'tiempo' ? 'min' : m.formato === 'decimal' ? '.0' : '#';
   const colorMap: Record<string, string> = { blue: 'bg-blue-500', cyan: 'bg-cyan-500', green: 'bg-green-500', purple: 'bg-purple-500', amber: 'bg-amber-500', red: 'bg-red-500' };
@@ -869,6 +869,17 @@ export default function SystemPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50 hover:bg-accent-cyan/30"
                 >
                   <Plus className="w-4 h-4" /> Automática
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMetricasEditingId(null);
+                    setMetricasSheetTipo('webhook');
+                    setMetricasSheetOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30"
+                >
+                  <Plus className="w-4 h-4" /> Webhook / Ads
                 </button>
               </div>
               {metricasDeleteConfirm && (

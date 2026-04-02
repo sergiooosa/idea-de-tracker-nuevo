@@ -463,9 +463,22 @@ export default function MetricaEditSheet({
                     Ver disponibles
                   </button>
                 </div>
+                {/* Campos de Ads disponibles */}
+                <div className="mt-2 space-y-1">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Campos de Ads (Meta/Vturb/Google):</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["gasto_total_ad","impresiones_totales","clicks_unicos","cpm","cpc","ctr","play_rate","engagement","agendamientos"].map((f) => (
+                      <button key={f} type="button" onClick={() => setWebhookCampo(f)}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${webhookCampo === f ? "bg-accent-purple/20 border-accent-purple text-accent-purple" : "bg-surface-600 border-surface-500 text-gray-400 hover:text-white"}`}>
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {webhookCamposDisponibles.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <span className="text-[10px] text-gray-500">Ya recibidos:</span>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Campos recibidos por webhook:</p>
+                    <div className="flex flex-wrap gap-1.5">
                     {webhookCamposDisponibles.map((c) => (
                       <button
                         key={c}
@@ -476,6 +489,7 @@ export default function MetricaEditSheet({
                         {c}
                       </button>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>
