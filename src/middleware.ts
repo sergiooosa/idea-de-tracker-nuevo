@@ -128,25 +128,37 @@ export default async function middleware(req: NextRequest) {
 
   const session = await getSession(req);
 
-  // Sin sesión → redirigir al login central
-  if (!session) {
+  // Construir URL de login
+  const buildLoginUrl = () => {
     const protocol = req.nextUrl.protocol;
     const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
     const isLocalDev = (req.headers.get("host") ?? "").includes("localhost");
     const loginHost = isLocalDev ? `localhost${port}` : ROOT_DOMAIN;
-    return NextResponse.redirect(
-      new URL(`${protocol}//${loginHost}/login`)
-    );
-  }
+    return `${protocol}//${loginHost}/login`;
+  };
 
-  const sessionSubdomainSlug = normalizeSubdominio(session.subdominio);
-  if (sessionSubdomainSlug !== subdomain) {
-    // Sesión válida pero para otro tenant → redirigir al login sin mensaje de error
-    const protocol = req.nextUrl.protocol;
-    const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
-    const isLocalDev = (req.headers.get("host") ?? "").includes("localhost");
-    const loginHost = isLocalDev ? `localhost${port}` : ROOT_DOMAIN;
-    return NextResponse.redirect(new URL(`${protocol}//${loginHost}/login`));
+  // Sin sesión o sesión de otro tenant → redirigir al login
+  // Si viene de iframe (GHL), usar página HTML con JS redirect para evitar que
+  // GHL bloquee el 307 cross-origin y muestre el icono de error
+  const needsLogin = !session || normalizeSubdominio(session.subdominio) !== subdomain;
+  if (needsLogin) {
+    const loginUrl = buildLoginUrl();
+    const fetchDest = req.headers.get("sec-fetch-dest") ?? "";
+    const isIframe = fetchDest === "iframe" || fetchDest === "embed";
+
+    if (isIframe) {
+      // Devolver HTML con JS redirect — funciona dentro de iframes en GHL
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script>window.location.replace(${JSON.stringify(loginUrl)})</script></head><body><p>Redirigiendo...</p></body></html>`;
+      return new NextResponse(html, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Security-Policy": `frame-ancestors 'self' https://*.myghl.com https://*.gohighlevel.com https://*.leadconnectorhq.com https://*.msgsndr.com`,
+        },
+      });
+    }
+
+    return NextResponse.redirect(new URL(loginUrl));
   }
 
   // Raíz del subdominio → /dashboard
