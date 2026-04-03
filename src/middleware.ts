@@ -146,19 +146,17 @@ export default async function middleware(req: NextRequest) {
     const fetchDest = req.headers.get("sec-fetch-dest") ?? "";
     const isIframe = fetchDest === "iframe" || fetchDest === "embed";
 
-    if (isIframe) {
-      // Devolver HTML con JS redirect — funciona dentro de iframes en GHL
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script>window.location.replace(${JSON.stringify(loginUrl)})</script></head><body><p>Redirigiendo...</p></body></html>`;
-      return new NextResponse(html, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Content-Security-Policy": `frame-ancestors 'self' https://*.myghl.com https://*.gohighlevel.com https://*.leadconnectorhq.com https://*.msgsndr.com`,
-        },
-      });
-    }
-
-    return NextResponse.redirect(new URL(loginUrl));
+    // Siempre usar HTML + JS redirect en subdominios para evitar que
+    // GHL/webviews bloqueen el 307 cross-origin mostrando icono de error
+    void isIframe; // unused — siempre usamos HTML redirect en subdominios
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><script>window.location.replace(${JSON.stringify(loginUrl)})</script></head><body><p>Redirigiendo...</p></body></html>`;
+    return new NextResponse(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Security-Policy": `frame-ancestors 'self' https://*.myghl.com https://*.gohighlevel.com https://*.leadconnectorhq.com https://*.msgsndr.com`,
+      },
+    });
   }
 
   // Raíz del subdominio → /dashboard
