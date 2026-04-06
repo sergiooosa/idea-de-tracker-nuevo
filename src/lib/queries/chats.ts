@@ -201,6 +201,7 @@ export async function updateChat(
   const setClause: Record<string, unknown> = {};
   if (data.nombre_lead !== undefined) setClause.nombre_lead = data.nombre_lead;
   if (data.estado !== undefined) setClause.estado = data.estado;
+  if (data.closer !== undefined) setClause.asesor_asignado = data.closer || null;
 
   if (Object.keys(setClause).length > 0) {
     await db.update(chatsLogs).set(setClause).where(eq(chatsLogs.id_evento, id));
