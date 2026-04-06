@@ -1,20 +1,18 @@
 /**
- * URL base de la API pública (webhooks, integraciones).
- * Usado para construir URLs en documentación y enlaces.
- *
- * IMPORTANTE: Esta variable debe apuntar al dominio público (autokpi.net),
- * NUNCA a la URL interna del Cerebro (Cloud Run). El proxy /webhooks/proxy/*
- * se encarga de forwarding interno para ocultar el backend.
- *
- * Configura NEXT_PUBLIC_APP_URL en Coolify para sobreescribir.
+ * URL del Cerebro (Cloud Run) — solo server-side, nunca expuesta al cliente.
+ * Usada internamente para quick-triggers, huérfanos, fathom, etc.
  */
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL ??
-  process.env.AUTH_URL ??
-  "https://autokpi.net";
+  process.env.CEREBRO_INTERNAL_URL ??
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  "https://cerebro-tracker-v6-saas-git-450945964835.us-east1.run.app";
 
 /**
- * URL del proxy de webhooks — siempre usa el dominio público.
- * Los clientes deben usar esta URL en sus integraciones.
+ * URL pública del proxy de webhooks — la que se muestra a clientes en docs.
+ * Apunta a autokpi.net/webhooks/proxy/* que forwarde internamente al Cerebro.
  */
-export const WEBHOOK_PROXY_URL = `${API_BASE_URL}/webhooks/proxy`;
+export const WEBHOOK_PROXY_URL = `${
+  process.env.NEXT_PUBLIC_APP_URL ??
+  process.env.AUTH_URL ??
+  "https://autokpi.net"
+}/webhooks/proxy`;
