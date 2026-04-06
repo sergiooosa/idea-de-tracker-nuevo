@@ -42,10 +42,14 @@ interface AdsResponse {
   resumen: {
     gastoTotal: number;
     leads: number;
+    asistidas: number;
     cierres: number;
     cpl: number;
     costoPorCierre: number;
+    costoPorShow: number;
+    showRate: number;
     roas: number;
+    roasCash: number;
   };
   porPlataforma: PorPlataforma[];
   porCampana: PorCampana[];
@@ -115,23 +119,21 @@ export default function AdsPage() {
             {/* KPI top */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {[
-                { label: 'Inversión total', value: fm(data.resumen.gastoTotal), icon: DollarSign, color: 'cyan' },
-                { label: 'CPL', value: fm(data.resumen.cpl), icon: Target, color: 'purple' },
-                { label: 'Costo por cierre', value: fm(data.resumen.costoPorCierre), icon: TrendingDown, color: 'amber' },
-                { label: 'ROAS', value: fmRoas(data.resumen.roas), icon: BarChart2, color: 'green' },
-              ].map(({ label, value, icon: Icon, color }) => (
+                { label: 'Inversión total', value: fm(data.resumen.gastoTotal), icon: DollarSign, color: 'cyan', sub: `${data.resumen.leads} leads · ${data.resumen.cierres} cierres` },
+                { label: 'CPL', value: fm(data.resumen.cpl), icon: Target, color: 'purple', sub: 'gasto / leads' },
+                { label: 'Costo por show', value: data.resumen.costoPorShow > 0 ? fm(data.resumen.costoPorShow) : '—', icon: TrendingDown, color: 'amber', sub: `gasto / asistidas · ${data.resumen.asistidas} shows` },
+                { label: 'Costo por cierre', value: data.resumen.costoPorCierre > 0 ? fm(data.resumen.costoPorCierre) : '—', icon: TrendingDown, color: 'amber', sub: 'gasto / cierres' },
+                { label: 'Show Rate', value: data.resumen.leads > 0 ? `${(data.resumen.showRate * 100).toFixed(1)}%` : '—', icon: BarChart2, color: 'purple', sub: `asistidas / leads (${data.resumen.asistidas}/${data.resumen.leads})` },
+                { label: 'ROAS Facturación', value: fmRoas(data.resumen.roas), icon: BarChart2, color: 'green', sub: 'facturación / inversión' },
+                { label: 'ROAS Cash', value: fmRoas(data.resumen.roasCash), icon: BarChart2, color: 'green', sub: 'cash collected / inversión' },
+              ].map(({ label, value, icon: Icon, color, sub }) => (
                 <div key={label} className={`rounded-xl p-4 border card-futuristic-${color} flex flex-col gap-1`}>
                   <div className="flex items-center gap-2">
                     <Icon className={`w-4 h-4 text-accent-${color}`} />
                     <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium">{label}</span>
                   </div>
                   <div className={`text-2xl font-bold text-accent-${color}`}>{value}</div>
-                  <div className="text-[10px] text-gray-500">
-                    {label === 'Inversión total' && `${data.resumen.leads} leads · ${data.resumen.cierres} cierres`}
-                    {label === 'CPL' && `gasto / leads`}
-                    {label === 'Costo por cierre' && `gasto / cierres`}
-                    {label === 'ROAS' && `revenue / inversión`}
-                  </div>
+                  <div className="text-[10px] text-gray-500">{sub}</div>
                 </div>
               ))}
             </div>

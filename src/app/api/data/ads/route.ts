@@ -31,7 +31,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         hasAds: false,
         plataformas: [],
-        resumen: { gastoTotal: 0, leads: 0, cierres: 0, cpl: 0, costoPorCierre: 0, roas: 0 },
+        resumen: { gastoTotal: 0, leads: 0, asistidas: 0, cierres: 0, cpl: 0, costoPorCierre: 0, costoPorShow: 0, showRate: 0, roas: 0, roasCash: 0 },
         porPlataforma: [],
         porCampana: [],
       });
@@ -72,11 +72,16 @@ export async function GET(req: Request) {
     const agendasStats = await db.execute(sql`
       SELECT
         COUNT(*) AS total_leads,
+        COUNT(*) FILTER (WHERE categoria NOT ILIKE '%cancel%' AND categoria NOT ILIKE '%pdte%' AND categoria != '') AS asistidas,
         COUNT(*) FILTER (WHERE categoria ILIKE '%cerr%' OR categoria ILIKE '%close%') AS cierres,
         SUM(CASE 
           WHEN facturacion ~ '^[0-9]+\.?[0-9]*$' THEN facturacion::numeric 
           ELSE 0 
-        END) AS revenue
+        END) AS revenue,
+        SUM(CASE 
+          WHEN cash_collected ~ '^[0-9]+\.?[0-9]*$' THEN cash_collected::numeric 
+          ELSE 0 
+        END) AS cash_collected
       FROM resumenes_diarios_agendas
       WHERE id_cuenta = ${idCuenta}
         AND fecha BETWEEN ${from}::date AND ${to}::date
@@ -105,13 +110,17 @@ export async function GET(req: Request) {
 
     const stats = agendasStats.rows[0] as {
       total_leads: string | number;
+      asistidas: string | number;
       cierres: string | number;
       revenue: string | number;
+      cash_collected: string | number;
     };
 
     const totalLeads = Number(stats?.total_leads ?? 0);
+    const totalAsistidas = Number(stats?.asistidas ?? 0);
     const totalCierres = Number(stats?.cierres ?? 0);
     const totalRevenue = Number(stats?.revenue ?? 0);
+    const totalCash = Number(stats?.cash_collected ?? 0);
 
     const porPlataforma = (adsRows.rows as Array<Record<string, unknown>>).map((r) => ({
       plataforma: String(r.plataforma ?? 'meta'),
@@ -147,10 +156,14 @@ export async function GET(req: Request) {
       resumen: {
         gastoTotal,
         leads: totalLeads,
+        asistidas: totalAsistidas,
         cierres: totalCierres,
         cpl: totalLeads > 0 ? gastoTotal / totalLeads : 0,
         costoPorCierre: totalCierres > 0 ? gastoTotal / totalCierres : 0,
+        costoPorShow: totalAsistidas > 0 ? gastoTotal / totalAsistidas : 0,
+        showRate: totalLeads > 0 ? totalAsistidas / totalLeads : 0,
         roas: gastoTotal > 0 ? totalRevenue / gastoTotal : 0,
+        roasCash: gastoTotal > 0 ? totalCash / gastoTotal : 0,
       },
       porPlataforma,
       porCampana,
