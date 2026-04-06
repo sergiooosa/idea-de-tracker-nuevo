@@ -138,23 +138,29 @@ export default async function middleware(req: NextRequest) {
   };
 
   // Sin sesión o sesión de otro tenant → redirigir al login
-  // Si viene de iframe (GHL), usar página HTML con JS redirect para evitar que
-  // GHL bloquee el 307 cross-origin y muestre el icono de error
-  const needsLogin = !session || normalizeSubdominio(session.subdominio) !== subdomain;
+  const sessionSubdomain = session ? normalizeSubdominio(session.subdominio) : null;
+  const needsLogin = !session || sessionSubdomain !== subdomain;
+  const staleSession = !!session && sessionSubdomain !== subdomain; // cookie de otro tenant
+
   if (needsLogin) {
-    // Rewrite interno: servir /login desde el mismo subdominio (same-origin)
-    // Esto evita navegación cross-origin en iframes de GHL que bloquearía la carga
-    // El browser ve smart-business.autokpi.net/login (same-origin) → sin bloqueos
     if (pathname !== "/login") {
       const loginUrl = req.nextUrl.clone();
       loginUrl.pathname = "/login";
-      return NextResponse.redirect(loginUrl);
+      const response = NextResponse.redirect(loginUrl);
+
+      // Cookie de otro tenant → limpiarla antes de ir al login
+      // Evita que el login post-redirect se confunda y redirija al subdominio equivocado
+      if (staleSession) {
+        response.cookies.delete({
+          name: COOKIE_NAME,
+          domain: isProduction ? `.${ROOT_DOMAIN}` : undefined,
+          path: "/",
+        });
+      }
+
+      return response;
     }
     // Ya estamos en /login del subdominio → rewrite al login del dominio raíz
-    const rewriteUrl = req.nextUrl.clone();
-    rewriteUrl.pathname = "/login";
-    rewriteUrl.host = ROOT_DOMAIN;
-    // Servir el contenido del login via rewrite interno
     const internalUrl = req.nextUrl.clone();
     internalUrl.pathname = "/login";
     return NextResponse.rewrite(internalUrl);
