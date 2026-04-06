@@ -606,42 +606,13 @@ export default function SystemPage() {
                 </div>
               </div>
 
-              {/* ── Origen de llamadas ─────────────────────────────────── */}
-              <div className="rounded-xl p-4 bg-surface-700/60 border border-surface-500 space-y-3">
-                <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">📞 Origen de llamadas telefónicas</p>
-                <p className="text-xs text-gray-400">¿Cómo realizan las llamadas telefónicas tus asesores?</p>
-                <div className="space-y-2">
-                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'twilio' ? 'border-accent-cyan/60 bg-accent-cyan/10' : 'border-surface-500 hover:border-surface-400'}`}>
-                    <input type="radio" name="fuente_llamadas" value="twilio" checked={fuenteLlamadas === 'twilio'} onChange={() => setFuenteLlamadas('twilio')} className="mt-0.5 accent-cyan-400" />
-                    <div>
-                      <p className="text-sm font-medium text-white">Twilio</p>
-                      <p className="text-[11px] text-green-400 mt-0.5">✅ IA disponible: transcripción automática + análisis de llamadas</p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman usando Twilio. El sistema transcribe y analiza cada llamada con IA.</p>
-                    </div>
-                  </label>
-                  <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${fuenteLlamadas === 'ghl' ? 'border-accent-cyan/60 bg-accent-cyan/10' : 'border-surface-500 hover:border-surface-400'}`}>
-                    <input type="radio" name="fuente_llamadas" value="ghl" checked={fuenteLlamadas === 'ghl'} onChange={() => setFuenteLlamadas('ghl')} className="mt-0.5 accent-cyan-400" />
-                    <div>
-                      <p className="text-sm font-medium text-white">GoHighLevel (GHL)</p>
-                      <p className="text-[11px] text-green-400 mt-0.5">✅ IA disponible cuando el webhook incluye transcripción</p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Tus asesores llaman desde GHL. Si el webhook trae transcripción, el sistema la analiza con IA igual que Twilio.</p>
-                    </div>
-                  </label>
+              {/* ── Info IA llamadas ─────────────────────────────────── */}
+              <div className="rounded-xl p-4 bg-accent-cyan/5 border border-accent-cyan/20 flex items-start gap-3">
+                <div className="text-accent-cyan text-lg mt-0.5">✅</div>
+                <div>
+                  <p className="text-sm font-medium text-white">IA activa en todas las llamadas</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Cada llamada se transcribe y analiza automáticamente. El sistema clasifica el resultado (interesado, programado, seguimiento, etc.) y lo muestra en el panel de rendimiento.</p>
                 </div>
-              </div>
-
-              {/* ── GHL Location ID ────────────────── */}
-              <div className="rounded-xl p-4 bg-surface-700/60 border border-surface-500 space-y-2">
-                <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">🔗 GHL Location ID</p>
-                <p className="text-xs text-gray-400">Necesario para generar links directos a contactos desde el panel asesor.</p>
-                <input
-                  type="text"
-                  value={ghlLocationId}
-                  onChange={(e) => setGhlLocationId(e.target.value)}
-                  placeholder="ej: 26Syf1QF0jxwjYm5UVSa"
-                  className="w-full rounded-lg bg-surface-700/80 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 font-mono focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
-                />
-                <p className="text-[11px] text-gray-500">Lo encuentras en GHL → Settings → Business Info → Location ID.</p>
               </div>
 
               {/* ── Prompt de evaluación ────────────────── */}
