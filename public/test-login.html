@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoKPI — Test Login Debug</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #0a0a0a; color: #e0e0e0; padding: 20px; font-size: 13px; }
+    h1 { color: #00d4ff; margin-bottom: 20px; font-size: 16px; }
+    h2 { color: #aaa; font-size: 13px; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; color: #888; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; }
+    input, select { width: 100%; padding: 8px 10px; background: #111; border: 1px solid #444; border-radius: 6px; color: #fff; font-family: monospace; font-size: 13px; margin-bottom: 10px; }
+    input:focus, select:focus { outline: none; border-color: #00d4ff; }
+    button { padding: 8px 16px; background: #00d4ff; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; font-family: monospace; }
+    button:hover { background: #00b8e0; }
+    button.secondary { background: #333; color: #ccc; }
+    button.secondary:hover { background: #444; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .log { background: #0d1117; border: 1px solid #2a2a2a; border-radius: 6px; padding: 12px; font-size: 11px; line-height: 1.6; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .ok { color: #4ade80; }
+    .err { color: #f87171; }
+    .info { color: #60a5fa; }
+    .warn { color: #fbbf24; }
+    .sep { border-top: 1px solid #333; margin: 16px 0; }
+    .iframe-container { width: 100%; height: 600px; border: 2px solid #333; border-radius: 8px; overflow: hidden; position: relative; }
+    iframe { width: 100%; height: 100%; border: none; }
+    .status-bar { padding: 6px 12px; background: #111; border-bottom: 1px solid #333; font-size: 11px; color: #888; display: flex; gap: 16px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+    .badge-blue { background: #1e3a5f; color: #60a5fa; }
+    .badge-green { background: #14532d; color: #4ade80; }
+    .badge-red { background: #450a0a; color: #f87171; }
+  </style>
+</head>
+<body>
+
+<h1>🔧 AutoKPI — Debug de Login en iframe</h1>
+
+<div class="card">
+  <h2>1. Configuración del test</h2>
+  <label>URL del iframe (como la pondría GHL)</label>
+  <input type="url" id="iframeUrl" value="https://tracker-ikigai.autokpi.net/dashboard" placeholder="https://tracker-xxx.autokpi.net/dashboard" />
+  
+  <label>Subdominio de prueba</label>
+  <select id="subdomain">
+    <option value="tracker-ikigai">tracker-ikigai (Ikigai)</option>
+    <option value="tracker-serenthys">tracker-serenthys (Serenthys)</option>
+    <option value="tracker-credivit">tracker-credivit (Credivit)</option>
+    <option value="tracker-embahome">tracker-embahome (Embahome)</option>
+    <option value="sharkrealtor">sharkrealtor (Shark re)</option>
+    <option value="tracker-scalebox">tracker-scalebox (ScaleBox)</option>
+  </select>
+
+  <label>Usuario de prueba</label>
+  <input type="email" id="email" value="profesionalfrancoisgonzalez@gmail.com" />
+  
+  <label>Password</label>
+  <input type="password" id="password" value="" placeholder="Ingresa el password del usuario" />
+
+  <div class="btn-row">
+    <button onclick="loadIframe()">📺 Cargar en iframe</button>
+    <button class="secondary" onclick="testDirect()">🔗 Abrir directo (nueva pestaña)</button>
+    <button class="secondary" onclick="clearLog()">🗑 Limpiar log</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. Tests directos de API</h2>
+  <div class="btn-row">
+    <button onclick="testLogin()">🔑 Test Login API</button>
+    <button onclick="testSession()">👤 Ver sesión activa</button>
+    <button onclick="testHeaders()">📋 Ver headers / env</button>
+    <button onclick="testCookies()">🍪 Ver cookies</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>3. Log de resultados</h2>
+  <div class="log" id="log">Esperando acción...</div>
+</div>
+
+<div class="sep"></div>
+
+<div class="card">
+  <h2>4. Preview iframe (como lo ve GHL)</h2>
+  <div class="status-bar">
+    <span>URL cargada: <span id="loadedUrl" style="color:#60a5fa">—</span></span>
+    <span>Estado: <span id="iframeStatus" class="badge badge-blue">idle</span></span>
+  </div>
+  <div class="iframe-container">
+    <iframe id="testIframe" src="about:blank" 
+      onload="iframeLoaded()" 
+      onerror="iframeError()">
+    </iframe>
+  </div>
+</div>
+
+<script>
+const log = document.getElementById('log');
+
+function addLog(msg, type = 'info') {
+  const time = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  line.className = type;
+  line.textContent = `[${time}] ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearLog() {
+  log.innerHTML = '';
+  addLog('Log limpiado', 'info');
+}
+
+function loadIframe() {
+  const url = document.getElementById('iframeUrl').value.trim();
+  if (!url) { addLog('❌ URL vacía', 'err'); return; }
+  
+  const iframe = document.getElementById('testIframe');
+  document.getElementById('loadedUrl').textContent = url;
+  document.getElementById('iframeStatus').textContent = 'cargando...';
+  document.getElementById('iframeStatus').className = 'badge badge-blue';
+  
+  addLog(`📺 Cargando iframe: ${url}`, 'info');
+  iframe.src = url;
+}
+
+function iframeLoaded() {
+  const iframe = document.getElementById('testIframe');
+  document.getElementById('iframeStatus').textContent = 'cargado ✓';
+  document.getElementById('iframeStatus').className = 'badge badge-green';
+  addLog(`✅ iframe cargado correctamente (src: ${iframe.src})`, 'ok');
+  
+  // Intentar detectar si terminó en /login
+  try {
+    const innerUrl = iframe.contentWindow?.location?.href;
+    if (innerUrl && innerUrl.includes('/login')) {
+      addLog(`⚠️ Redirigió a /login — la sesión no está activa en este iframe`, 'warn');
+    } else if (innerUrl) {
+      addLog(`📍 URL final del iframe: ${innerUrl}`, 'info');
+    }
+  } catch (e) {
+    addLog(`ℹ️ No se puede leer URL interna del iframe (cross-origin esperado): ${e.message}`, 'warn');
+  }
+}
+
+function iframeError() {
+  document.getElementById('iframeStatus').textContent = 'error ✗';
+  document.getElementById('iframeStatus').className = 'badge badge-red';
+  addLog('❌ Error al cargar el iframe', 'err');
+}
+
+function testDirect() {
+  const url = document.getElementById('iframeUrl').value.trim();
+  if (!url) { addLog('❌ URL vacía', 'err'); return; }
+  addLog(`🔗 Abriendo en nueva pestaña: ${url}`, 'info');
+  window.open(url, '_blank');
+}
+
+async function testLogin() {
+  const subdomain = document.getElementById('subdomain').value;
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  
+  if (!email || !password) {
+    addLog('❌ Email y password requeridos', 'err');
+    return;
+  }
+
+  addLog(`🔑 Intentando login: email=${email} subdomain=${subdomain}`, 'info');
+
+  try {
+    // Primero intentar CSRF token
+    const csrfRes = await fetch(`https://${subdomain}.autokpi.net/api/auth/csrf`, {
+      credentials: 'include',
+      mode: 'cors',
+    });
+    
+    let csrfToken = '';
+    if (csrfRes.ok) {
+      const csrfData = await csrfRes.json();
+      csrfToken = csrfData.csrfToken ?? '';
+      addLog(`✅ CSRF token obtenido: ${csrfToken.slice(0, 20)}...`, 'ok');
+    } else {
+      addLog(`⚠️ No se pudo obtener CSRF (${csrfRes.status}) — intentando sin él`, 'warn');
+    }
+
+    const formData = new URLSearchParams();
+    formData.append('email', email);
+    formData.append('password', password);
+    formData.append('subdominio_override', subdomain);
+    if (csrfToken) formData.append('csrfToken', csrfToken);
+    formData.append('redirect', 'false');
+    formData.append('callbackUrl', `https://${subdomain}.autokpi.net/dashboard`);
+
+    const loginRes = await fetch(`https://${subdomain}.autokpi.net/api/auth/callback/credentials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
+      credentials: 'include',
+      mode: 'cors',
+      redirect: 'follow',
+    });
+
+    addLog(`📡 Login response: status=${loginRes.status} url=${loginRes.url}`, loginRes.ok ? 'ok' : 'err');
+    
+    if (loginRes.redirected) {
+      addLog(`↩️ Redirected to: ${loginRes.url}`, 'info');
+    }
+
+    const text = await loginRes.text().catch(() => '(no body)');
+    if (text.length < 500) {
+      addLog(`📄 Body: ${text}`, 'info');
+    } else {
+      addLog(`📄 Body (primeros 300 chars): ${text.slice(0, 300)}...`, 'info');
+    }
+
+  } catch (e) {
+    addLog(`❌ Error: ${e.message}`, 'err');
+    addLog(`💡 Si es CORS: el login de GHL usa iframe, no fetch cross-origin directo`, 'warn');
+    addLog(`💡 El iframe SÍ puede hacer POST same-origin porque carga el subdominio directamente`, 'warn');
+  }
+}
+
+async function testSession() {
+  const subdomain = document.getElementById('subdomain').value;
+  addLog(`👤 Verificando sesión en ${subdomain}.autokpi.net...`, 'info');
+  
+  try {
+    const res = await fetch(`https://${subdomain}.autokpi.net/api/auth/session`, {
+      credentials: 'include',
+      mode: 'cors',
+    });
+    const data = await res.json();
+    addLog(`📡 Status: ${res.status}`, res.ok ? 'ok' : 'err');
+    addLog(`📄 Sesión: ${JSON.stringify(data, null, 2)}`, data?.user ? 'ok' : 'warn');
+  } catch(e) {
+    addLog(`❌ Error (CORS esperado desde esta página): ${e.message}`, 'err');
+    addLog(`💡 La sesión solo se puede verificar desde dentro del iframe (same-origin)`, 'warn');
+  }
+}
+
+function testHeaders() {
+  addLog('📋 Info de este contexto:', 'info');
+  addLog(`  window.location: ${window.location.href}`, 'info');
+  addLog(`  navigator.userAgent: ${navigator.userAgent.slice(0,80)}`, 'info');
+  addLog(`  document.referrer: ${document.referrer || '(vacío)'}`, 'info');
+  addLog(`  cookies disponibles: ${document.cookie ? document.cookie.slice(0,100) : '(ninguna visible)'}`, 'info');
+  
+  // Detectar si estamos en iframe
+  try {
+    const inIframe = window.self !== window.top;
+    addLog(`  ¿En iframe?: ${inIframe ? 'SÍ' : 'NO'}`, inIframe ? 'warn' : 'ok');
+    if (inIframe) {
+      addLog(`  ⚠️ Esta página está siendo cargada dentro de un iframe`, 'warn');
+    }
+  } catch(e) {
+    addLog(`  ¿En iframe?: SÍ (cross-origin — no se puede leer window.top)`, 'warn');
+  }
+}
+
+function testCookies() {
+  const cookies = document.cookie;
+  if (!cookies) {
+    addLog('🍪 No hay cookies visibles desde esta página (probablemente HttpOnly)', 'warn');
+    addLog('ℹ️ Las cookies de sesión de NextAuth son HttpOnly — no visibles desde JS', 'info');
+  } else {
+    addLog(`🍪 Cookies: ${cookies}`, 'info');
+  }
+}
+
+// Auto-detectar si esta página corre en iframe
+window.onload = () => {
+  try {
+    const inIframe = window.self !== window.top;
+    if (inIframe) {
+      addLog('⚠️ AVISO: Esta página de test está cargada dentro de un iframe', 'warn');
+    } else {
+      addLog('✅ Página de test cargada correctamente (no está en iframe)', 'ok');
+      addLog('ℹ️ Configura la URL del subdominio arriba y haz clic en "Cargar en iframe"', 'info');
+    }
+  } catch(e) {
+    addLog('ℹ️ Corriendo en contexto cross-origin', 'info');
+  }
+};
+</script>
+
+</body>
+</html>

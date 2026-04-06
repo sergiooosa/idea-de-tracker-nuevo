@@ -26,7 +26,7 @@ import {
   Trash2,
   RefreshCw,
 } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api-config";
+import { WEBHOOK_PROXY_URL } from "@/lib/api-config";
 
 interface SystemConfig {
   chat_triggers: { trigger: string; accion: string; valor: string }[];
@@ -156,10 +156,47 @@ function WebhookMetricasSection() {
   const subdominio = typeof window !== "undefined"
     ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "")
     : "tu-subdominio";
-  const webhookUrl = `${API_BASE_URL}/webhooks/metricas/${subdominio}`;
+  const webhookUrl = `${WEBHOOK_PROXY_URL}/metricas/${subdominio}`;
 
-  const { data: keysData } = useApiData<{ keys: { token: string; nombre_key: string }[] }>('/api/data/api-keys');
-  const firstKey = keysData?.keys?.[0]?.token ?? "TU_API_KEY";
+  const [apiKeys, setApiKeys] = useState<{ id_key: number; nombre_key: string; token: string; activa: boolean }[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(true);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const loadKeys = async () => {
+    setLoadingKeys(true);
+    try {
+      const res = await fetch("/api/data/api-keys");
+      if (res.ok) {
+        const data = await res.json() as { keys: typeof apiKeys };
+        setApiKeys(data.keys ?? []);
+      }
+    } finally { setLoadingKeys(false); }
+  };
+
+  useState(() => { void loadKeys(); });
+
+  const createKey = async () => {
+    if (!newKeyName.trim()) return;
+    setCreatingKey(true);
+    try {
+      const res = await fetch("/api/data/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre_key: newKeyName.trim() }),
+      });
+      if (res.ok) { setNewKeyName(""); await loadKeys(); }
+    } finally { setCreatingKey(false); }
+  };
+
+  const copyKey = (token: string) => {
+    navigator.clipboard.writeText(token);
+    setCopiedKey(token);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const firstKey = apiKeys[0]?.token ?? "TU_API_KEY";
 
   const exampleBody = JSON.stringify({
     ventas_cerradas: 3,
@@ -201,18 +238,58 @@ Body (JSON):
         </div>
       </div>
 
+      {/* URL + API Key juntas */}
       <Card className="bg-surface-700/50 border-surface-500">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm text-gray-300">Tu URL de webhook</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           <div className="flex items-center gap-2 rounded-lg bg-[#0d1117] px-3 py-2 border border-surface-500">
             <Badge variant="default" className="shrink-0">POST</Badge>
             <code className="text-sm text-accent-cyan font-mono break-all">{webhookUrl}</code>
           </div>
-          <p className="text-xs text-gray-500">
-            Usa el header <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">x-api-key</code> con cualquiera de tus API Keys de la pestaña "API de Ingresos".
-          </p>
+
+          {/* Gestor de API Keys inline */}
+          <div className="space-y-2 pt-1">
+            <p className="text-xs text-gray-400 flex items-center gap-1">
+              <Key className="w-3.5 h-3.5 text-accent-amber" />
+              Incluye el header <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">x-api-key</code> con una de tus API Keys:
+            </p>
+            {loadingKeys ? (
+              <p className="text-xs text-gray-500 animate-pulse pl-1">Cargando keys...</p>
+            ) : apiKeys.length === 0 ? (
+              <p className="text-xs text-amber-400 pl-1">⚠️ No tienes API Keys — crea una abajo para poder usar el webhook.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {apiKeys.map((k) => (
+                  <div key={k.id_key} className="flex items-center gap-2 rounded-lg bg-surface-600/60 px-3 py-1.5 text-xs">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-white mr-2">{k.nombre_key}</span>
+                      <span className="font-mono text-gray-500">{k.token.slice(0, 24)}...</span>
+                    </div>
+                    <button type="button" onClick={() => copyKey(k.token)} title="Copiar token completo"
+                      className="shrink-0 text-gray-400 hover:text-accent-cyan transition-colors">
+                      {copiedKey === k.token ? <Check className="w-3.5 h-3.5 text-accent-green" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void createKey()}
+                placeholder="Nombre de la nueva key (ej: n8n producción)"
+                className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent-cyan"
+              />
+              <button type="button" onClick={() => void createKey()} disabled={creatingKey || !newKeyName.trim()}
+                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent-amber/80 text-black text-xs font-semibold disabled:opacity-50 hover:bg-accent-amber transition-colors">
+                <Plus className="w-3.5 h-3.5" /> {creatingKey ? "..." : "Crear key"}
+              </button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -377,7 +454,7 @@ function ApiSection() {
   const subdominio = typeof window !== "undefined"
     ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "")
     : "tu-subdominio";
-  const webhookUrl = `${API_BASE_URL}/webhooks/external-data/${subdominio}`;
+  const webhookUrl = `${WEBHOOK_PROXY_URL}/external-data/${subdominio}`;
   const curlExample = `curl -X POST \\
   "${webhookUrl}" \\
   -H "Content-Type: application/json" \\
@@ -582,9 +659,9 @@ function EmbudoSection() {
 }
 
 function EtiquetasSection() {
-  const configEndpoint = `${API_BASE_URL}/webhooks/config/:subdominio`;
+  const configEndpoint = `${WEBHOOK_PROXY_URL}/config/:subdominio`;
   const curlConfigExample = `curl -X GET \\
-  "${API_BASE_URL}/webhooks/config/tu-subdominio" \\
+  "${WEBHOOK_PROXY_URL}/config/tu-subdominio" \\
   -H "x-api-key: TU_API_KEY_AQUÍ"`;
 
   const responseExample = JSON.stringify(
