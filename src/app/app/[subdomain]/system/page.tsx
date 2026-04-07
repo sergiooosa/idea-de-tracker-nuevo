@@ -1193,34 +1193,70 @@ export default function SystemPage() {
                   <BarChart3 className="w-5 h-5 text-accent-purple" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Etapas del proceso de ventas</h3>
-                  <p className="text-sm text-gray-400">Las etapas (Agendada, Asistida, Cerrada, etc.) se miden automáticamente desde las citas en GHL.</p>
+                  <h3 className="text-lg font-semibold text-white">Etapas de videollamadas</h3>
+                  <p className="text-sm text-gray-400">Define cómo se llaman los resultados de tus videollamadas. La IA clasificará cada reunión en estas etapas.</p>
                 </div>
               </div>
-              <div className="rounded-xl p-4 bg-surface-700/60 border border-surface-500 space-y-3">
-                <p className="text-sm text-white font-medium">¿Quieres medir etapas personalizadas?</p>
-                <p className="text-sm text-gray-400">
-                  Usa las <strong className="text-accent-cyan">Métricas personalizadas</strong> (paso 5) para crear indicadores propios,
-                  y las <strong className="text-accent-amber">Reglas de etiquetas</strong> (paso 4) para que cada etiqueta en GHL
-                  incremente automáticamente esa métrica. Así tienes total control sin configuración adicional.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(5)}
-                    className="px-3 py-1.5 rounded-lg bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30 text-xs font-semibold hover:bg-accent-cyan/30 transition-colors"
-                  >
-                    Ir a Métricas personalizadas →
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(4)}
-                    className="px-3 py-1.5 rounded-lg bg-accent-amber/20 text-accent-amber border border-accent-amber/30 text-xs font-semibold hover:bg-accent-amber/30 transition-colors"
-                  >
-                    Ir a Reglas de etiquetas →
-                  </button>
-                </div>
+
+              <div className="rounded-xl p-3 bg-accent-purple/5 border border-accent-purple/20 text-xs text-gray-400 flex items-start gap-2">
+                <span className="text-accent-purple mt-0.5">ℹ️</span>
+                <span>Estas etapas aplican <strong className="text-white">solo a videollamadas</strong>. Puedes renombrarlas o agregar nuevas. No se pueden eliminar No Show ni Cancelada.</span>
               </div>
+
+              <div className="space-y-2">
+                {embudoEtapas.map((etapa, idx) => {
+                  const esFija = etapa.id === 'default-no-show' || etapa.id === 'default-cancelada' || etapa.id.startsWith('default-');
+                  return (
+                    <div key={etapa.id} className="flex items-center gap-2 rounded-lg bg-surface-700/60 border border-surface-500 px-3 py-2">
+                      {/* Color dot */}
+                      <input
+                        type="color"
+                        value={etapa.color ?? '#8b5cf6'}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === idx ? { ...x, color: e.target.value } : x))}
+                        className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
+                        title="Color de la etapa"
+                      />
+                      {/* Nombre */}
+                      <input
+                        type="text"
+                        value={etapa.nombre}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === idx ? { ...x, nombre: e.target.value } : x))}
+                        placeholder="Nombre de la etapa"
+                        className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none min-w-0"
+                      />
+                      {/* Descripción corta (condition simplificada) */}
+                      <input
+                        type="text"
+                        value={etapa.condition ?? ''}
+                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === idx ? { ...x, condition: e.target.value } : x))}
+                        placeholder="Descripción para la IA (opcional)"
+                        className="flex-1 bg-transparent text-xs text-gray-400 placeholder-gray-600 focus:outline-none min-w-0 hidden sm:block"
+                      />
+                      {/* Eliminar — solo etapas no fijas */}
+                      {!esFija ? (
+                        <button
+                          type="button"
+                          onClick={() => removeEmbudoEtapa(etapa.id)}
+                          className="shrink-0 p-1 rounded text-gray-500 hover:text-red-400 transition-colors"
+                          title="Eliminar etapa"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <span className="shrink-0 w-5 h-5 text-[9px] text-gray-600 flex items-center justify-center" title="Etapa del sistema, no se puede eliminar">🔒</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={addEmbudoEtapa}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-xs text-gray-300 hover:text-white hover:border-accent-purple/50 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar etapa
+              </button>
             </div>
           )}
 
