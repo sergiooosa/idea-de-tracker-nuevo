@@ -320,6 +320,7 @@ export interface LlamadasResponse {
   advisorMetrics: Record<string, LlamadasAdvisorMetrics>;
   advisors: ApiAdvisor[];
   fuente_llamadas?: "twilio" | "ghl";
+  embudoEtapas?: { id: string; nombre: string }[];
 }
 
 export interface ApiChatMessage {

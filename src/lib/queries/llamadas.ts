@@ -49,7 +49,7 @@ export async function getLlamadas(
       .where(and(...conditions))
       .orderBy(sql`${logLlamadas.ts} DESC`),
     db
-      .select({ fuente_llamadas: cuentas.fuente_llamadas })
+      .select({ fuente_llamadas: cuentas.fuente_llamadas, embudo_personalizado: cuentas.embudo_personalizado })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1)
@@ -57,6 +57,13 @@ export async function getLlamadas(
   ]);
 
   const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
+
+  // Extraer etapas del embudo para mostrar en el selector del modal de edición
+  const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
+  const embudoEtapas = embudoRaw.map((e) => ({
+    id: String(e.id ?? ""),
+    nombre: String((e as unknown as { name?: string }).name ?? e.nombre ?? e.id ?? ""),
+  })).filter((e) => e.id);
 
   // Los registros a mostrar son los que tuvieron al menos una llamada en el rango de fechas
   // (se usa log_llamadas.ts como fecha de actividad, no fecha_evento del lead)
@@ -228,7 +235,7 @@ export async function getLlamadas(
     id_user_ghl: r.id_user_ghl ?? null,
   }));
 
-  return { registros, leads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas };
+  return { registros, leads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas };
 }
 
 export async function updateLlamada(

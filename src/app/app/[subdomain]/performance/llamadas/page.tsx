@@ -359,6 +359,7 @@ export default function PerformanceLlamadasPage() {
           type="llamada"
           record={editingRecord}
           advisors={data?.advisors?.map(a => ({ name: a.name, email: a.email })) ?? []}
+          embudoEtapas={data?.embudoEtapas?.map(e => ({ nombre: e.nombre })) ?? []}
           onClose={() => setEditingRecord(null)}
           onSaved={() => { setEditingRecord(null); refetch(); }}
         />
