@@ -62,7 +62,7 @@ export default function PerformanceVideollamadasPage() {
   const [modalSelectorMeetings, setModalSelectorMeetings] = useState<VideoMeeting[] | null>(null);
   const [modalTranscripcionIA, setModalTranscripcionIA] = useState<VideoMeeting | null>(null);
   const [apiMeetingsForModal, setApiMeetingsForModal] = useState<ApiVideollamada[] | null>(null);
-  const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
+  const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null; facturacion?: number | null; cash_collected?: number | null} | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [leadSearch, setLeadSearch] = useState('');
   const [showNuevoModal, setShowNuevoModal] = useState(false);
@@ -394,7 +394,7 @@ export default function PerformanceVideollamadasPage() {
             if (api) {
               setModalTranscripcionIA(null);
               setApiMeetingsForModal(null);
-              setEditingRecord({ id: api.id, nombre_lead: api.leadName, closer: api.closer, estado: api.categoria });
+              setEditingRecord({ id: api.id, nombre_lead: api.leadName, closer: api.closer, estado: api.categoria, facturacion: api.facturacion, cash_collected: api.cashCollected });
             }
           } : undefined}
         />
@@ -405,7 +405,7 @@ export default function PerformanceVideollamadasPage() {
           record={editingRecord}
           advisors={data?.advisors?.map(a => ({ name: a.name, email: a.email })) ?? []}
           onClose={() => setEditingRecord(null)}
-          onSaved={() => setEditingRecord(null)}
+          onSaved={() => { setEditingRecord(null); refetch(); }}
         />
       )}
       <NuevoRegistroModal

@@ -15,6 +15,8 @@ interface EditableFields {
   closer?: string | null;
   estado?: string | null;
   id_user_ghl?: string | null;
+  facturacion?: number | null;
+  cash_collected?: number | null;
 }
 
 interface EditRecordSheetProps {
@@ -53,6 +55,8 @@ export default function EditRecordSheet({
   const [closer, setCloser] = useState(record.closer ?? "");
   const [estado, setEstado] = useState(record.estado ?? "");
   const [idUserGhl, setIdUserGhl] = useState(record.id_user_ghl ?? "");
+  const [facturacion, setFacturacion] = useState(record.facturacion != null ? String(record.facturacion) : "");
+  const [cashCollected, setCashCollected] = useState(record.cash_collected != null ? String(record.cash_collected) : "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -74,6 +78,10 @@ export default function EditRecordSheet({
             nombre_lead: nombre || undefined,
             closer: closer || undefined,
             estado: estado || undefined,
+            ...(type === "videollamada" && {
+              facturacion: facturacion !== "" ? parseFloat(facturacion) || 0 : undefined,
+              cash_collected: cashCollected !== "" ? parseFloat(cashCollected) || 0 : undefined,
+            }),
           };
       const res = await fetch(API_ENDPOINTS[type], {
         method: "PUT",
@@ -206,6 +214,35 @@ export default function EditRecordSheet({
               />
             )}
           </div>
+
+          {type === "videollamada" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-accent-green mb-1.5">Facturación ($)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={facturacion}
+                  onChange={(e) => setFacturacion(e.target.value)}
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-green/40"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-accent-green mb-1.5">Cash cobrado ($)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cashCollected}
+                  onChange={(e) => setCashCollected(e.target.value)}
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-green/40"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-accent-green mb-1.5">Estado del embudo</label>

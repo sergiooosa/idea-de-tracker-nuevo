@@ -220,14 +220,24 @@ export async function getDashboard(
     : 0;
 
   const tasaCierre = asistidas > 0 ? cerradas / asistidas : 0;
-  const tasaAgendamiento = totalLeads > 0 ? filteredAgendas.length / totalLeads : 0;
+
+  // Leads únicos agendados: deduplicar por idcliente (GHL contact ID) o email_lead
+  // Un mismo lead puede tener múltiples registros (PDTE → ofertada → cerrada)
+  // meetingsBooked debe contar leads únicos, no registros totales
+  const uniqueBookedLeads = new Set(
+    filteredAgendas
+      .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
+      .map((a) => a.idcliente?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+  );
+  const meetingsBooked = uniqueBookedLeads.size;
+  const tasaAgendamiento = totalLeads > 0 ? meetingsBooked / totalLeads : 0;
 
   const kpis: DashboardKpis & Record<string, number> = {
     totalLeads,
     callsMade: filteredCalls.length,
     contestadas,
     answerRate: filteredCalls.length > 0 ? contestadas / filteredCalls.length : 0,
-    meetingsBooked: filteredAgendas.length,
+    meetingsBooked,
     meetingsAttended: asistidas,
     meetingsCanceled: canceladas,
     meetingsClosed: cerradas,
@@ -240,7 +250,7 @@ export async function getDashboard(
     speedToLeadAvg: speedAvg,
     avgAttempts: attemptsAvg,
     attemptsToFirstContactAvg: attemptsAvg,
-    agendadas: filteredAgendas.length,
+    agendadas: meetingsBooked,
     asistidas,
     canceladas,
     efectivas,

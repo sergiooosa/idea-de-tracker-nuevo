@@ -225,7 +225,7 @@ export async function getVideollamadas(
 export async function updateVideollamada(
   id: number,
   idCuenta: number,
-  data: { nombre_lead?: string; closer?: string; estado?: string },
+  data: { nombre_lead?: string; closer?: string; estado?: string; facturacion?: number; cash_collected?: number },
 ): Promise<boolean> {
   const [row] = await db
     .select({ id: resumenesDiariosAgendas.id_registro_agenda, id_cuenta: resumenesDiariosAgendas.id_cuenta })
@@ -239,6 +239,8 @@ export async function updateVideollamada(
   if (data.nombre_lead !== undefined) setClause.nombre_de_lead = data.nombre_lead;
   if (data.closer !== undefined) setClause.closer = data.closer;
   if (data.estado !== undefined) setClause.categoria = data.estado;
+  if (data.facturacion !== undefined) setClause.facturacion = String(data.facturacion);
+  if (data.cash_collected !== undefined) setClause.cash_collected = String(data.cash_collected);
 
   if (Object.keys(setClause).length > 0) {
     await db
