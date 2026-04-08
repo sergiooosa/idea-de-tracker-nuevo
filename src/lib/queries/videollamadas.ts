@@ -134,8 +134,20 @@ export async function getVideollamadas(
   const revenue = registros.reduce((s, r) => s + r.facturacion, 0);
   const cash = registros.reduce((s, r) => s + r.cashCollected, 0);
 
+  // Leads únicos agendados: deduplicar por idcliente/email — mismo criterio que dashboard
+  const uniqueBookedLeads = new Set(
+    registros
+      .filter((r) => !r.canceled)
+      .map((r) =>
+        r.idcliente?.trim() ||
+        r.leadEmail?.trim().toLowerCase() ||
+        r.ghl_contact_id?.trim() ||
+        `nokey_${r.id}`
+      )
+  );
+
   const agg = {
-    agendadas: registros.length,
+    agendadas: uniqueBookedLeads.size,
     asistidas,
     canceladas,
     efectivas,
@@ -158,9 +170,15 @@ export async function getVideollamadas(
   for (const [name, meetings] of Object.entries(byAdvisor)) {
     const asist = meetings.filter((m) => m.attended).length;
     const cerr = meetings.filter((m) => m.outcome === "cerrado" || m.qualified).length;
+    // Deduplicar por asesor también
+    const uniqueBooked = new Set(
+      meetings
+        .filter((m) => !m.canceled)
+        .map((m) => m.idcliente?.trim() || m.leadEmail?.trim().toLowerCase() || m.ghl_contact_id?.trim() || `nokey_${m.id}`)
+    );
     advisorMetrics[name] = {
       advisorName: name,
-      agendadas: meetings.length,
+      agendadas: uniqueBooked.size,
       asistencias: asist,
       pctCierre: asist > 0 ? (cerr / asist) * 100 : 0,
       facturacion: meetings.reduce((s, m) => s + m.facturacion, 0),
