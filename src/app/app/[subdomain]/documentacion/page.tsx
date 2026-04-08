@@ -202,7 +202,7 @@ function WebhookMetricasSection() {
     ventas_cerradas: 3,
     facturacion_total: 15000,
     leads_calificados: 12,
-    fecha: "2026-04-02"
+    fecha: "2026-04-08T14:30:00-05:00"
   }, null, 2);
 
   const curlExample = `curl -X POST \\
@@ -221,7 +221,7 @@ Body (JSON):
 {
   "ventas_cerradas": {{ $json.cierres }},
   "leads_nuevos": {{ $json.leads }},
-  "fecha": "{{ $now.format('yyyy-MM-dd') }}"
+  "fecha": "{{ $now.toISO() }}"
 }`;
 
   return (
