@@ -51,7 +51,22 @@ export async function POST(
     }
 
     const body = await req.json() as Record<string, unknown>;
-    const fecha = (body.fecha as string | undefined) ?? new Date().toISOString().slice(0, 10);
+    // Aceptar fecha ("2026-04-08") o datetime con timezone ("2026-04-08T14:30:00-05:00")
+    // Si viene con hora, parsear como Date y extraer la fecha en UTC
+    const fechaRaw = body.fecha as string | undefined;
+    let fecha: string;
+    if (fechaRaw) {
+      if (fechaRaw.includes("T") || fechaRaw.includes(" ")) {
+        // Es datetime — parsear y tomar fecha UTC
+        const d = new Date(fechaRaw);
+        fecha = isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
+      } else {
+        // Solo fecha — usar tal cual
+        fecha = fechaRaw.slice(0, 10);
+      }
+    } else {
+      fecha = new Date().toISOString().slice(0, 10);
+    }
     delete body.fecha; // No guardar fecha como campo de métrica
 
     if (Object.keys(body).length === 0) {

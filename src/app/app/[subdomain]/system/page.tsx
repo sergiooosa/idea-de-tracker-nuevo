@@ -897,6 +897,7 @@ export default function SystemPage() {
                   metricasManualData={metricasManualData}
                   editingMetric={metricasEditingId ? metricasConfig.find((x) => x.id === metricasEditingId) ?? null : null}
                   tipoInicial={metricasSheetTipo}
+                  subdominio={typeof window !== "undefined" ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "") : undefined}
                   onClose={() => {
                     setMetricasSheetOpen(false);
                     setMetricasEditingId(null);

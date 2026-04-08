@@ -64,6 +64,7 @@ interface MetricaEditSheetProps {
   metricasManualData: Record<string, MetricaManualEntry[]>;
   editingMetric: MetricaConfig | null;
   tipoInicial: "manual" | "automatica" | "fija" | "webhook";
+  subdominio?: string;
   onClose: () => void;
   onSave: (
     config: MetricaConfig,
@@ -76,6 +77,7 @@ export default function MetricaEditSheet({
   metricasManualData,
   editingMetric,
   tipoInicial,
+  subdominio,
   onClose,
   onSave,
 }: MetricaEditSheetProps) {
@@ -165,7 +167,7 @@ export default function MetricaEditSheet({
     } else {
       setNombre("");
       setDescripcion("");
-      setUbicacion("ambos");
+      setUbicacion("ambos"); // siempre ambos para nuevas métricas
       setTipo(tipoInicial);
       setCampos([]);
       setFormulaTipo("directo");
@@ -311,17 +313,22 @@ export default function MetricaEditSheet({
   };
 
   const canSave =
-    nombre.trim() && (tipo === "webhook" ? !!webhookCampo.trim() : true) &&
-    (tipo === "fija" ||
-      (tipo === "manual" && campos.some((c) => c.nombre.trim())) ||
-      (tipo === "automatica" &&
-        (formulaTipo === "directo"
-          ? fuente.length === 1
-          : formulaTipo === "condicion"
-            ? fuente.length === 1
-            : formulaTipo === "division" || formulaTipo === "resta"
-              ? fuente.length === 2
-              : fuente.length > 0)));
+    !!nombre.trim() &&
+    (tipo === "webhook"
+      ? !!webhookCampo.trim()
+      : tipo === "fija"
+        ? true
+        : tipo === "manual"
+          ? campos.some((c) => c.nombre.trim())
+          : tipo === "automatica"
+            ? (formulaTipo === "directo"
+                ? fuente.length === 1
+                : formulaTipo === "condicion"
+                  ? fuente.length === 1
+                  : formulaTipo === "division" || formulaTipo === "resta"
+                    ? fuente.length === 2
+                    : fuente.length > 0)
+            : true);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -366,20 +373,7 @@ export default function MetricaEditSheet({
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Ubicación</label>
-            <select
-              value={ubicacion}
-              onChange={(e) => setUbicacion(e.target.value as MetricaConfig["ubicacion"])}
-              className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
-            >
-              {UBICACIONES.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Ubicación oculta — siempre "ambos" para nuevas métricas */}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -431,7 +425,7 @@ export default function MetricaEditSheet({
               <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-1">
                 <p className="text-white font-medium">¿Cómo funciona?</p>
                 <p>Envía datos desde cualquier sistema externo (n8n, GHL, Zapier) al webhook de tu cuenta. El valor de este campo aparecerá aquí automáticamente.</p>
-                <p className="text-accent-cyan">URL: <code className="bg-surface-700 px-1 py-0.5 rounded">autokpi.net/webhooks/metricas/[tu-subdominio]</code></p>
+                <p className="text-accent-cyan">URL: <code className="bg-surface-700 px-1 py-0.5 rounded">autokpi.net/webhooks/proxy/metricas/{subdominio ?? '[tu-subdominio]'}</code></p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-accent-cyan mb-1">
@@ -493,9 +487,12 @@ export default function MetricaEditSheet({
                   </div>
                 )}
               </div>
-              <div className="rounded-lg bg-surface-700/40 p-3 text-xs text-gray-500 font-mono">
-                {`POST autokpi.net/webhooks/metricas/[subdominio]\nx-api-key: [tu API key]\n\n{ "${webhookCampo || "nombre_campo"}": 42, "fecha": "2026-04-02" }`}
+              <div className="rounded-lg bg-surface-700/40 p-3 text-xs text-gray-500 font-mono whitespace-pre">
+                {`POST autokpi.net/webhooks/proxy/metricas/${subdominio ?? '[tu-subdominio]'}\nx-api-key: [tu API key]\n\n{\n  "${webhookCampo || "nombre_campo"}": 42,\n  "fecha": "2026-04-08T14:30:00-05:00"\n}`}
               </div>
+              <p className="text-[10px] text-gray-500">
+                💡 El campo <code className="bg-surface-700 px-1 rounded text-accent-cyan">fecha</code> acepta fecha (<code>2026-04-08</code>) o fecha+hora con zona horaria (<code>2026-04-08T14:30:00-05:00</code>). El sistema convierte automáticamente a UTC.
+              </p>
             </div>
           )}
 
