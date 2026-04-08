@@ -502,3 +502,19 @@ export const metricasWebhook = pgTable("metricas_webhook", {
   index("idx_metricas_webhook_cuenta_fecha").on(table.id_cuenta, table.fecha),
   uniqueIndex("uq_metricas_webhook").on(table.id_cuenta, table.fecha, table.campo),
 ]);
+
+/* ------------------------------------------------------------------ */
+/*  historial_acciones — audit trail de todas las acciones de usuario  */
+/* ------------------------------------------------------------------ */
+
+export const historialAcciones = pgTable("historial_acciones", {
+  id_evento: serial("id_evento").primaryKey(),
+  id_cuenta: integer("id_cuenta").notNull(),
+  usuario_asociado: varchar("usuario_asociado", { length: 255 }),
+  accion: varchar("accion", { length: 100 }).notNull(),
+  detalles: jsonb("detalles").default({}),
+  fecha_y_hora_evento: timestamp("fecha_y_hora_evento", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_historial_id_cuenta").on(table.id_cuenta),
+  index("idx_historial_fecha").on(table.fecha_y_hora_evento),
+]);
