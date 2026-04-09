@@ -62,11 +62,23 @@ export async function getAcquisition(
     ? new Set(allKeys.filter((k) => !k.toLowerCase().includes("cancel") && !k.toLowerCase().includes("pdte")))
     : new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
 
-  const closedSet = allKeys.length > 0
+  // Para cierres: buscar explícitamente etapas con cerrada/closed.
+  // Si el embudo personalizado no tiene ninguna → usar el estado más positivo del embudo
+  // (interesado/interested) como proxy de cierre, o fallback a defaults.
+  const rawClosedSet = allKeys.length > 0
     ? new Set(allKeys.filter((k) =>
         k.toLowerCase().includes("cerrad") || k.toLowerCase().includes("closed"),
       ))
     : new Set(["Cerrada"]);
+  // Si el embudo existe pero no tiene etapa de cierre, usar "interesado" como tope del funnel
+  const closedSet = rawClosedSet.size > 0
+    ? rawClosedSet
+    : allKeys.length > 0
+      ? new Set(allKeys.filter((k) =>
+          k.toLowerCase().includes("interes") || k.toLowerCase().includes("interest") ||
+          k.toLowerCase().includes("calificado") || k.toLowerCase().includes("qualified")
+        ))
+      : new Set(["Cerrada"]);
 
   const fechaFilter = or(
     and(
@@ -155,11 +167,12 @@ export async function getAcquisition(
 
   for (const c of calls) {
     const bucket = getOrCreate(c.creativo_origen ?? "sin_origen");
-    if (c.mail_lead) {
-      bucket.leadEmails.add(c.mail_lead);
-      bucket.calledEmails.add(c.mail_lead);
+    const leadKey = c.mail_lead?.trim() || c.contact_id_ghl?.trim() || null;
+    if (leadKey) {
+      bucket.leadEmails.add(leadKey);
+      bucket.calledEmails.add(leadKey);
       if (c.tipo_evento.startsWith("efectiva_")) {
-        bucket.answeredEmails.add(c.mail_lead);
+        bucket.answeredEmails.add(leadKey);
       }
     }
   }
@@ -202,10 +215,11 @@ export async function getAcquisition(
   const llamadasLeads = new Set<string>();
   const llamadasAnswered = new Set<string>();
   for (const c of calls) {
-    if (c.mail_lead) {
-      llamadasLeads.add(c.mail_lead);
+    const lKey = c.mail_lead?.trim() || c.contact_id_ghl?.trim() || null;
+    if (lKey) {
+      llamadasLeads.add(lKey);
       if (c.tipo_evento.startsWith("efectiva_")) {
-        llamadasAnswered.add(c.mail_lead);
+        llamadasAnswered.add(lKey);
       }
     }
   }
