@@ -347,6 +347,9 @@ export interface ApiChatLead {
   messages: ApiChatMessage[];
   tagsInternos?: string[];
   triggerAplicado?: string;
+  /** Minutos transcurridos desde el último mensaje del lead sin respuesta del agente.
+   *  null si el agente ya respondió después del último mensaje del lead, o si no hay mensajes del lead. */
+  minutesSinceLastLeadMsg: number | null;
 }
 
 export interface ChatsAdvisorMetrics {

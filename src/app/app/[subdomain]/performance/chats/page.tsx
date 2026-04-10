@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Fragment } from 'react';
+import React, { useState, useMemo, Fragment } from 'react';
 import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -16,6 +16,17 @@ const minFmt = (s: number | null) => {
   if (s == null || s === 0) return '—';
   return s < 60 ? `${Math.round(s)}s` : `${(s / 60).toFixed(1)} min`;
 };
+
+/** Formatea minutos de espera con colores: verde <15, amarillo <60, rojo ≥60 */
+function waitBadge(minutes: number | null): React.ReactNode {
+  if (minutes == null) return <span className="text-gray-500">—</span>;
+  if (minutes < 15) return <span className="text-green-400 font-medium">{minutes}m</span>;
+  if (minutes < 60) return <span className="text-accent-amber font-medium">{minutes}m ⚠️</span>;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const label = h > 0 ? `${h}h${m > 0 ? ` ${m}m` : ''}` : `${minutes}m`;
+  return <span className="text-red-400 font-bold">{label} 🔴</span>;
+}
 
 const chatKpiTooltips = {
   asignados: { significado: 'Cantidad de conversaciones de chat en el rango.', calculo: 'Conteo de registros en chats_logs.' },
@@ -259,6 +270,7 @@ export default function PerformanceChatsPage() {
                                           <th className="px-2 py-2 font-medium">Fecha</th>
                                           <th className="px-2 py-2 font-medium">Msgs</th>
                                           <th className="px-2 py-2 font-medium">Speed</th>
+                                          <th className="px-2 py-2 font-medium" title="Minutos desde último mensaje del lead sin respuesta del agente">⏳ Espera</th>
                                           <th className="px-2 py-2 font-medium">Estado</th>
                                           <th className="px-2 py-2 font-medium w-32" />
                                         </tr>
@@ -284,6 +296,7 @@ export default function PerformanceChatsPage() {
                                               <td className="px-2 py-2 text-gray-400">{chat.datetime ? format(new Date(chat.datetime), 'dd/MM/yy HH:mm', { locale: es }) : '—'}</td>
                                               <td className="px-2 py-2 text-accent-purple">{chat.totalMessages}</td>
                                               <td className="px-2 py-2 text-gray-400">{minFmt(chat.speedToLeadSeconds)}</td>
+                                              <td className="px-2 py-2">{waitBadge(chat.minutesSinceLastLeadMsg)}</td>
                                               <td className="px-2 py-2 text-gray-300">{chat.estado ?? '—'}</td>
                                               <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                                                 <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.asesorAsignado ?? chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-2"><Pencil className="w-3 h-3" /> Editar</button>

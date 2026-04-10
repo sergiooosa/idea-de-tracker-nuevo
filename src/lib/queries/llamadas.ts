@@ -131,6 +131,7 @@ export async function getLlamadas(
         ? speedFromReg.reduce((s, v) => s + v, 0) / speedFromReg.length
         : 0;
 
+  // Intentos promedio: total llamadas / leads únicos con al menos una llamada
   const attemptsByLead: Record<string, number> = {};
   for (const r of registros) {
     const key = r.leadEmail ?? r.phone ?? String(r.id);
@@ -141,13 +142,36 @@ export async function getLlamadas(
     ? Object.values(attemptsByLead).reduce((s, v) => s + v, 0) / leadKeys.length
     : 0;
 
+  // Intentos hasta primer contacto: cuántas llamadas se necesitaron hasta la primera efectiva
+  // Solo cuenta leads que tuvieron al menos una llamada contestada
+  const callsPerLead: Record<string, ApiLlamadaLog[]> = {};
+  const sortedRegistros = [...registros].sort(
+    (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime(),
+  );
+  for (const r of sortedRegistros) {
+    const key = r.leadEmail ?? r.phone ?? String(r.id);
+    if (!callsPerLead[key]) callsPerLead[key] = [];
+    callsPerLead[key].push(r);
+  }
+  const attemptsToFirstContact: number[] = [];
+  for (const calls of Object.values(callsPerLead)) {
+    const firstAnsweredIdx = calls.findIndex((c) => c.outcome === "answered");
+    if (firstAnsweredIdx >= 0) {
+      attemptsToFirstContact.push(firstAnsweredIdx + 1); // 1-indexed
+    }
+  }
+  const firstContactAttempts =
+    attemptsToFirstContact.length > 0
+      ? attemptsToFirstContact.reduce((s, v) => s + v, 0) / attemptsToFirstContact.length
+      : 0;
+
   const agg = {
     totalLeads: uniqueLeads.size,
     totalCalls: registros.length,
     answered,
     speedAvg,
     attemptsAvg,
-    firstContactAttempts: attemptsAvg,
+    firstContactAttempts,
     answerRate: registros.length > 0 ? answered / registros.length : 0,
   };
 

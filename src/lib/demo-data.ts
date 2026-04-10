@@ -391,6 +391,7 @@ export function generateChats(): ChatsResponse {
       tagsInternos: Math.random() > 0.6 ? [ETIQUETAS[rnd(0, ETIQUETAS.length - 1)]] : [],
       triggerAplicado: Math.random() > 0.8 ? faker.lorem.words(2) : undefined,
       asesorAsignado: Math.random() > 0.5 ? ASESORES[rnd(0, ASESORES.length - 1)].name : null,
+      minutesSinceLastLeadMsg: Math.random() > 0.5 ? rnd(5, 180) : null,
     };
   });
 

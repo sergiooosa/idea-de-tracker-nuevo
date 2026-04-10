@@ -14,6 +14,32 @@ function extractAgentName(messages: ChatMessage[]): string | null {
   return agent?.name ?? null;
 }
 
+/**
+ * Calcula cuántos minutos han pasado desde el último mensaje del lead
+ * sin que el agente haya respondido después de ese mensaje.
+ * Retorna null si el agente ya respondió después del último msg del lead.
+ */
+function computeMinutesSinceLastLeadMsg(messages: ChatMessage[]): number | null {
+  if (messages.length === 0) return null;
+  // Encontrar el índice del último mensaje del lead
+  let lastLeadIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "lead") { lastLeadIdx = i; break; }
+  }
+  if (lastLeadIdx === -1) return null;
+  // ¿Hay algún mensaje del agente DESPUÉS del último del lead?
+  const agentRepliedAfter = messages.slice(lastLeadIdx + 1).some((m) => m.role === "agent");
+  if (agentRepliedAfter) return null; // ya fue atendido
+  // No hay respuesta → calcular tiempo transcurrido desde ese mensaje
+  const lastLeadMsg = messages[lastLeadIdx];
+  if (!lastLeadMsg?.timestamp) return null;
+  const ts = new Date(lastLeadMsg.timestamp).getTime();
+  if (isNaN(ts)) return null;
+  const diffMs = Date.now() - ts;
+  if (diffMs <= 0) return null;
+  return Math.floor(diffMs / 60000);
+}
+
 function computeSpeedToLead(
   messages: ChatMessage[],
   emojiTomaAtencion?: string,
@@ -97,6 +123,7 @@ export async function getChats(
     const leadMsgs = msgs.filter((m) => m.role === "lead");
     const agentName = extractAgentName(msgs);
     const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot);
+    const minutesSinceLastLeadMsg = computeMinutesSinceLastLeadMsg(msgs);
 
     // Estado proviene de la IA (chats_logs.estado escrito por analyzeChatsNightly)
     // Los triggers de emoji ya NO determinan el estado del chat.
@@ -129,6 +156,7 @@ export async function getChats(
         timestamp: m.timestamp,
       })),
       tagsInternos: Array.isArray(r.tags_internos) ? r.tags_internos : undefined,
+      minutesSinceLastLeadMsg,
     };
   });
 
