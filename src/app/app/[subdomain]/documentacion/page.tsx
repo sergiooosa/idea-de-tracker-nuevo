@@ -205,11 +205,25 @@ function WebhookMetricasSection() {
     fecha: "2026-04-08T14:30:00-05:00"
   }, null, 2);
 
+  const exampleBodyAtribuido = JSON.stringify({
+    ventas_cerradas: 1,
+    fecha: "2026-04-08T14:30:00-05:00",
+    userId: "GHL_USER_ID_DEL_ASESOR",
+    customerId: "GHL_CONTACT_ID_DEL_CLIENTE"
+  }, null, 2);
+
   const curlExample = `curl -X POST \\
   "${webhookUrl}" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ${firstKey}" \\
   -d '${exampleBody}'`;
+
+  const curlAtribuidoExample = `# Con atribución a asesor (userId) y/o cliente (customerId):
+curl -X POST \\
+  "${webhookUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${firstKey}" \\
+  -d '${exampleBodyAtribuido}'`;
 
   const n8nExample = `// En n8n → nodo HTTP Request:
 URL: ${webhookUrl}
@@ -221,7 +235,9 @@ Body (JSON):
 {
   "ventas_cerradas": {{ $json.cierres }},
   "leads_nuevos": {{ $json.leads }},
-  "fecha": "{{ $now.toISO() }}"
+  "fecha": "{{ $now.toISO() }}",
+  "userId": "{{ $json.ghl_user_id }}",
+  "customerId": "{{ $json.ghl_contact_id }}"
 }`;
 
   return (
@@ -331,10 +347,35 @@ Body (JSON):
         <CodeBlock code={n8nExample} language="javascript" />
       </div>
 
+      {/* Atribución a asesor/cliente */}
+      <Card className="bg-accent-purple/5 border-accent-purple/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-white flex items-center gap-2">
+            <span>👤</span> Atribución a asesor o cliente <span className="text-[10px] font-normal text-accent-cyan bg-accent-cyan/10 px-1.5 py-0.5 rounded-full ml-1">Nuevo</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-gray-400 space-y-3">
+          <p>Si activas <strong className="text-white">"Atribuible a asesor / cliente"</strong> en la configuración de la métrica (Sistema → Paso 5), puedes incluir dos campos reservados en el body del webhook:</p>
+          <div className="space-y-1.5">
+            <div className="flex items-start gap-2">
+              <code className="shrink-0 bg-surface-600 px-1.5 py-0.5 rounded text-accent-cyan font-mono">userId</code>
+              <span>ID del asesor/closer en GHL. La métrica se suma a esa persona y podrás ver el desglose por asesor.</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <code className="shrink-0 bg-surface-600 px-1.5 py-0.5 rounded text-accent-cyan font-mono">customerId</code>
+              <span>ID del contacto/cliente en GHL. Permite saber a qué cliente corresponde cada entrada.</span>
+            </div>
+          </div>
+          <p className="text-[11px]">Cuando envías <code className="text-accent-cyan">userId</code>, el sistema guarda la entrada individualmente <strong className="text-white">y</strong> acumula en el total global de la cuenta. Cambiar el rango de fechas en el panel siempre muestra el total correcto.</p>
+          <CodeBlock code={curlAtribuidoExample} language="bash" />
+        </CardContent>
+      </Card>
+
       <Card className="bg-accent-cyan/5 border-accent-cyan/20">
         <CardContent className="pt-4 text-xs text-gray-400 space-y-1">
           <p>✅ El campo <code className="text-accent-cyan">fecha</code> es opcional — si no lo envías, se usa la fecha de hoy.</p>
-          <p>✅ Si envías la misma fecha dos veces, el valor se actualiza (no se duplica).</p>
+          <p>✅ Sin <code className="text-accent-cyan">userId</code>: si envías la misma fecha dos veces, el valor se actualiza (no se duplica).</p>
+          <p>✅ Con <code className="text-accent-cyan">userId</code>: cada envío es una entrada nueva acumulable.</p>
           <p>✅ Puedes enviar múltiples campos en el mismo request.</p>
           <p>✅ Los valores deben ser números (enteros o decimales).</p>
           <p>⚠️ Para que aparezcan en el panel, crea primero la métrica en <strong className="text-white">Sistema → Paso 5</strong> con el mismo nombre del campo.</p>

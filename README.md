@@ -1,6 +1,6 @@
 # 🚀 AutoKPI — Panel de Clientes SaaS Multi-tenant (Marca Blanca)
 
-> Dashboard de ventas B2B que centraliza videollamadas, llamadas telefónicas y chats. Cada cliente (tenant) accede a su panel personalizado desde un subdominio dedicado. **v2.0** añade embudos dinámicos, triggers por emoji y BYOK. **v3.0 Enterprise** añade roles/permisos dinámicos, filtro "Solo mis datos", bandeja de huérfanos, editor CRUD en tablas de rendimiento, constructor de layouts para métricas y UI profesional para reglas/emojis.
+> Dashboard de ventas B2B que centraliza videollamadas, llamadas telefónicas y chats. Cada cliente (tenant) accede a su panel personalizado desde un subdominio dedicado. **v2.0** añade embudos dinámicos, triggers por emoji y BYOK. **v3.0 Enterprise** añade roles/permisos dinámicos, filtro "Solo mis datos", bandeja de huérfanos, editor CRUD en tablas de rendimiento, constructor de layouts para métricas y UI profesional para reglas/emojis. **v3.1** añade atribución de métricas a usuarios/clientes GHL y dashboards personalizados.
 
 **URL de producción:** `autokpi.net` (landing + login) · `[subdominio].autokpi.net` (panel del tenant)
 
@@ -22,6 +22,18 @@
 | 📊 **Métricas Personalizadas v2** | Sistema completo: métricas manuales (campos texto/número/fecha/boolean), automáticas (fórmulas con KPIs), fijas (valor constante). Búsqueda por nombre, aviso al borrar si alimenta otras, drag-and-drop para ordenar. Ver Documentación → Métricas. | System paso 5, Dashboard, Performance |
 
 **Avisos Beta:** En Dashboard, Asesor (sección KPIs en el período), Documentación, Configuración, Performance > Chats, Acquisition, System (pasos 5 Métricas custom, 6 Metas, 7 Embudo IA, 10 Fuente financiera) y en el botón "Generar reporte semanal" se muestra un badge "Beta" para indicar que pueden existir ajustes en curso.
+
+---
+
+## 🆕 Novedades v3.1 — Atribución + Dashboards personalizados
+
+| Feature | Descripción | Impacto |
+|---|---|---|
+| 👤 **Métricas atribuibles** | Cualquier métrica de tipo Manual o Webhook puede marcarse como "Atribuible a asesor/cliente". El webhook acepta campos reservados `userId` (ID de closer en GHL) y `customerId` (ID de contacto). Cada entrada se guarda individualmente y también acumula en el aggregate global de la cuenta. | System paso 5, Webhook `/webhooks/metricas/:locationId`, BD `metricas_webhook` |
+| 📊 **Dashboards personalizados** | Cada cuenta puede crear hasta 3 paneles adicionales al Panel Ejecutivo. Se crean desde Sistema → paso 5 (sección "Dashboards personalizados"). Cada métrica puede asignarse a múltiples paneles mediante selección de chips. El dashboard principal muestra tabs automáticos cuando hay dashboards creados. | System paso 5, Dashboard, `/api/data/dashboards` |
+| 🔧 **fix: firstContactAttempts real** | "Intentos hasta primer contacto" ahora calcula correctamente cuántas llamadas tomó hasta la primera contestada, en vez de ser igual al promedio general de intentos. | Performance > Llamadas |
+| 🤖 **fix: activos con chatbot** | En cuentas con chatbot configurado, "Chats activos" ya no cuenta mensajes del bot. Solo marca activo si el emoji de toma de atención apareció (un humano tomó el chat). Nuevo campo `humanTookOver` por chat. | Performance > Chats |
+| ⏳ **Columna "Espera" en chats** | En el detalle de chats por asesor aparece cuántos minutos llevan sin respuesta del agente desde el último mensaje del lead. Semáforo: verde <15m / amarillo <60m / rojo ≥60m. | Performance > Chats |
 
 **Bandeja:** Extracción robusta de `share_url` y `transcript` aunque vengan como objeto o array (Fathom). Botón "Ver grabación" (enlace) y botón "Ver transcripción" que despliega u oculta el texto completo.
 
@@ -506,8 +518,9 @@ export async function withAuth(
 | `prompt_llamadas` | `text` | Prompt para evaluar llamadas |
 | `reglas_etiquetas` | `jsonb` | Array de `{id, condition, tag, source, funnelStage?}` — usadas por Cerebro (ver GET /webhooks/config) |
 | `metricas_personalizadas` | `jsonb` | Array formato legacy (fallback). `ubicacion`: `panel_ejecutivo` \| `rendimiento` \| `ambos` |
-| `metricas_config` | `jsonb` | Array de `MetricaConfig` — métricas manuales, automáticas o fijas (v3.0) |
-| `metricas_manual_data` | `jsonb` | `Record<metricId, MetricaManualEntry[]>` — datos de métricas manuales (v3.0) |
+| `metricas_config` | `jsonb` | Array de `MetricaConfig` — métricas manuales, automáticas o fijas (v3.0). Cada `MetricaConfig` incluye `paneles?: string[]` (multi-panel), `atribuible_a_usuario?: boolean` y `visualizacion?: "kpi_card"\|"barra"\|"comparativo"` (v3.1) |
+| `metricas_manual_data` | `jsonb` | `Record<metricId, MetricaManualEntry[]>` — datos de métricas manuales. Las entradas pueden incluir `_ghl_user_id` y `_ghl_customer_id` si la métrica es atribuible (v3.1) |
+| `dashboards_personalizados` | `jsonb` | Array de `DashboardPersonalizado` — hasta 3 paneles personalizados por cuenta. Cada uno tiene `id` (`"dashboard-1"\|"dashboard-2"\|"dashboard-3"`), `nombre`, `icono?`, `creado_en` (v3.1) |
 | `roles_config` | `jsonb` | Array de `{rol, permisos: string[]}` — permisos dinámicos por tenant (v3.0) |
 
 **Estructura de `configuracion_ui`:**
@@ -702,6 +715,30 @@ Eventos que el Cerebro no pudo asociar a un lead (falta de correo, etc.). La ban
 | `created_at` | `timestamptz` | |
 | `updated_at` | `timestamptz` | |
 
+### `metricas_webhook` — Métricas enviadas por webhook (v3.1)
+
+Tabla donde se persisten los valores enviados por el webhook `POST /webhooks/metricas/:locationId`.
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | `serial PK` | |
+| `id_cuenta` | `integer FK` | Tenant |
+| `fecha` | `date NOT NULL` | Fecha del dato |
+| `campo` | `text NOT NULL` | Nombre del campo (ej. `ventas_cerradas`) |
+| `valor` | `numeric(18,4)` | Valor numérico |
+| `ghl_user_id` | `text` | ID del asesor/closer en GHL. `null` = fila de aggregate global |
+| `ghl_customer_id` | `text` | ID del contacto/cliente en GHL. `null` = no atribuido |
+| `created_at` | `timestamptz` | |
+| `updated_at` | `timestamptz` | |
+
+**Índices:**
+- `uq_metricas_webhook_global`: unique parcial en `(id_cuenta, fecha, campo)` solo cuando `ghl_user_id IS NULL AND ghl_customer_id IS NULL` → garantiza un solo aggregate global por campo/fecha.
+- `idx_metricas_webhook_user`: en `(id_cuenta, ghl_user_id, fecha)` para consultas de desglose por asesor.
+
+**Lógica de escritura:**
+- Sin `userId`/`customerId` → upsert en fila global (actualiza el valor).
+- Con `userId` y/o `customerId` → insert individual acumulable + suma en la fila global.
+
 ### `metas_cuenta` — Metas persistentes por tenant
 
 | Columna | Tipo | Descripción |
@@ -754,6 +791,12 @@ Todas las rutas bajo `/api/data/*` usan el helper `withAuth()` que extrae `id_cu
 | `/api/data/roles` | GET | cuentas.roles_config | | Lista roles (requiere `gestionar_roles` o `gestionar_usuarios`) |
 | `/api/data/roles` | PUT | cuentas.roles_config | body: `{ roles_config: RolConfig[] }` | Actualizar roles (requiere `gestionar_roles`) |
 | `/api/data/asesores` | GET | log_llamadas + agendas | | Lista asesores para filtro (requiere `ver_todo`) |
+| `/api/data/dashboards` | GET | `cuentas.dashboards_personalizados` | | Lista dashboards personalizados (v3.1) |
+| `/api/data/dashboards` | POST | `cuentas.dashboards_personalizados` | body: `{ nombre, icono? }` | Crea dashboard (máx. 3) (v3.1) |
+| `/api/data/dashboards` | PUT | `cuentas.dashboards_personalizados` | body: `{ id, nombre?, icono? }` | Edita nombre/icono (v3.1) |
+| `/api/data/dashboards` | DELETE | `cuentas.dashboards_personalizados` + `metricas_config` | `?id=dashboard-1` | Elimina dashboard y limpia referencias en métricas (v3.1) |
+| `/api/data/metricas-webhook` | GET | `metricas_webhook` | `from?`, `to?` | Campos únicos + suma por campo + desglose por userId (v3.1) |
+| `/webhooks/metricas/[locationId]` | POST | `metricas_webhook` | Header `x-api-key`, body campos numéricos + `fecha?` + `userId?` + `customerId?` | Webhook de métricas (v3.1: atribución por userId/customerId) |
 | `/api/auth/logout` | POST | *(limpia cookie)* | | Cerrar sesión |
 | `/webhooks/external-data/[subdominio]` | POST | kpis_externos | Header `x-api-key`, body `{ data: [{ fecha, metricas }] }` | Zapier, Make, CRMs externos |
 | `/webhooks/config/[subdominio]` | GET | cuentas (solo lectura) | Header `x-api-key` | Cerebro: obtener reglas_etiquetas, embudo_personalizado, chat_triggers, prompts |
@@ -887,20 +930,26 @@ El embudo ya no está hardcodeado. Cada tenant define sus propias etapas en `cue
 
 ---
 
-## 📊 Métricas Personalizadas v2
+## 📊 Métricas Personalizadas v3.1
 
-Sistema de métricas configurable en Control del sistema → paso 5. Tres tipos:
+Sistema de métricas configurable en Control del sistema → paso 5. Cuatro tipos:
 
 | Tipo | Descripción |
 |---|---|
 | **Manual** | Campos personalizados (texto, número, fecha, boolean). Añades datos manualmente. Si hay campo fecha, filtra por rango del panel. Número → suma; boolean → conteo de true. |
-| **Automática** | Fórmula con KPIs u otras métricas. Operaciones: directo, suma, promedio, división, multiplicación, resta, condición (si X op Y entonces Z sino W). Búsqueda por nombre al elegir fuentes. |
+| **Automática** | Fórmula con KPIs u otras métricas. Operaciones: directo, suma, promedio, división, multiplicación, resta, condición (si X op Y entonces Z sino W). |
 | **Fija** | Valor constante (ej. meta mensual = 100). |
+| **Webhook** | Valor recibido externamente via `POST /webhooks/metricas/:locationId`. El campo `webhookCampo` define qué nombre de campo del body tomar. |
 
-- **Ubicación:** Panel Ejecutivo, Rendimiento (videollamadas) o Ambos.
+**Atribución a asesor/cliente (v3.1):** Las métricas Manual y Webhook pueden marcarse como `atribuible_a_usuario`. El webhook acepta `userId` (asesor GHL) y `customerId` (contacto GHL). Ver sección `metricas_webhook` en BD.
+
+**Paneles multi-selección (v3.1):** Cada métrica define `paneles: string[]` — puede aparecer en Panel Ejecutivo, Rendimiento y/o cualquier dashboard personalizado. Sustituye al campo `ubicacion` (mantenido por backward compat).
+
+**Dashboards personalizados (v3.1):** Crear hasta 3 dashboards adicionales en Sistema → paso 5. El dashboard principal muestra tabs automáticos. Cada tab filtra las métricas por `paneles`. Los dashboards vacíos arrancan sin métricas asignadas.
+
 - **Orden:** Drag-and-drop en la lista.
 - **Editar:** Botón lápiz en cada tarjeta (Dashboard/Performance) → `/system?step=5&edit=metricId`.
-- **Borrar:** Si la métrica alimenta a otras, aviso: "Esta métrica alimenta a X otras, si la eliminas esas fallarán".
+- **Borrar:** Si la métrica alimenta a otras, aviso de dependencias. Al borrar un dashboard, las métricas asignadas solo a ese panel vuelven a Panel Ejecutivo.
 
 Ver guía completa en **Documentación** → pestaña Métricas.
 
@@ -987,6 +1036,17 @@ Las metas se persisten en `metas_cuenta` con UPSERT por `id_cuenta`. El Panel As
 ---
 
 ## Pendientes y Roadmap
+
+### ✅ Completado en v3.1
+- [x] Métricas atribuibles: `userId` (asesor) y `customerId` (cliente) en webhook de métricas
+- [x] Unique index parcial en `metricas_webhook` para permitir filas por usuario sin romper aggregate global
+- [x] API `/api/data/dashboards` CRUD completo (GET/POST/PUT/DELETE)
+- [x] `MetricaConfig.paneles[]` — asignación multi-panel con selector visual tipo chips
+- [x] `DashboardsManager` — componente crear/editar/borrar dashboards con emoji picker
+- [x] Dashboard principal con tabs automáticos al tener dashboards creados
+- [x] Fix `firstContactAttempts`: calcula intentos hasta primer contacto real (no era igual a attemptsAvg)
+- [x] Fix `humanTookOver`: activos en chats con chatbot solo cuentan si el emoji de toma apareció
+- [x] Columna `⏳ Espera` en tabla de chats: minutos sin respuesta, semáforo verde/amarillo/rojo
 
 ### ✅ Completado en v3.0 Enterprise
 - [x] CRUD de roles con permisos granulares (Configuración > Roles)
