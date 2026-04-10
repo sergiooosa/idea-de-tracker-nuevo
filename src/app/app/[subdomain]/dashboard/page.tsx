@@ -35,6 +35,7 @@ export default function DashboardPage() {
   const [showObjeciones, setShowObjeciones] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showObj') !== 'false' : true);
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
   const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
+  const [panelActivo, setPanelActivo] = useState<string>("panel_ejecutivo");
 
   const toggleObjeciones = () => setShowObjeciones((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showObj', String(next)); return next; });
   const toggleVolumen = () => setShowVolumen((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showVol', String(next)); return next; });
@@ -139,9 +140,46 @@ export default function DashboardPage() {
               </span>
             </div>
           )}
+          {/* ── Tabs de paneles ── */}
+          {(() => {
+            const dashboards = (data as unknown as { dashboardsPersonalizados?: { id: string; nombre: string; icono?: string }[] })?.dashboardsPersonalizados ?? [];
+            if (dashboards.length === 0) return null;
+            const tabs = [
+              { id: "panel_ejecutivo", label: "Panel Ejecutivo", emoji: "🏠" },
+              ...dashboards.map((d) => ({ id: d.id, label: d.nombre, emoji: d.icono ?? "📊" })),
+            ];
+            return (
+              <div className="flex gap-1.5 flex-wrap mb-1">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setPanelActivo(tab.id)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+                      panelActivo === tab.id
+                        ? "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50"
+                        : "bg-surface-700 text-gray-400 border-surface-500 hover:border-accent-cyan/30 hover:text-gray-300"
+                    }`}
+                  >
+                    <span>{tab.emoji}</span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
             {(data?.metricasComputadas ?? [])
-              .filter((m) => m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion)
+              .filter((m) => {
+                // Soporte legacy (ubicacion) + nuevo (paneles[])
+                const paneles: string[] = (m as unknown as { paneles?: string[] }).paneles ?? [];
+                if (paneles.length > 0) return paneles.includes(panelActivo);
+                // Fallback a ubicacion legacy
+                if (panelActivo === "panel_ejecutivo") return m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion;
+                if (panelActivo === "rendimiento") return m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos';
+                return false;
+              })
               .map((m) => {
                 const color = m.color || 'green';
                 const raw = typeof m.valor === 'number' ? m.valor : parseFloat(String(m.valor)) || 0;

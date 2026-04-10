@@ -88,6 +88,7 @@ export async function getDashboard(
       metricas_personalizadas: cuentas.metricas_personalizadas,
       metricas_config: cuentas.metricas_config,
       metricas_manual_data: cuentas.metricas_manual_data,
+      dashboards_personalizados: cuentas.dashboards_personalizados,
       fuente_llamadas: cuentas.fuente_llamadas,
       // chat_triggers ya no se usa para clasificar — la IA escribe chats_logs.estado directamente
     })
@@ -440,7 +441,7 @@ export async function getDashboard(
     const key = row.campo;
     webhookSumas[key] = (webhookSumas[key] ?? 0) + parseFloat(String(row.valor ?? 0));
   }
-  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[] = [];
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string }[] = [];
   const metricasValores: Record<string, string | number> = {};
   const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket"]);
 
@@ -477,14 +478,14 @@ export async function getDashboard(
         valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
       }
       metricasValores[m.id] = typeof valor === "number" ? valor : parseFloat(String(valor)) || 0;
-      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion, formato: m.formato, color: m.color });
+      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color });
       computed.add(m.id);
     }
   }
 
   for (const m of sorted) {
     if (computed.has(m.id)) continue;
-    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, formato: m.formato, color: m.color });
+    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color });
   }
 
   // ----------------------------------------------------------------
@@ -828,6 +829,7 @@ export async function getDashboard(
     tagCounts,
     metricasPersonalizadas: Array.isArray(cuentaRow?.metricas_personalizadas) ? cuentaRow.metricas_personalizadas : [],
     metricasComputadas,
+    dashboardsPersonalizados: Array.isArray(cuentaRow?.dashboards_personalizados) ? cuentaRow.dashboards_personalizados as { id: string; nombre: string; icono?: string }[] : [],
     chatKpis: chatKpis.total > 0 ? chatKpis : undefined,
     alertasMetas: alertasMetas.length > 0 ? alertasMetas : undefined,
     configuracion_ui: cuentaRow?.configuracion_ui as DashboardResponse["configuracion_ui"] ?? undefined,

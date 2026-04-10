@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cuentas, apiKeysCuenta, metricasWebhook } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 export async function POST(
   req: Request,
@@ -51,23 +51,31 @@ export async function POST(
     }
 
     const body = await req.json() as Record<string, unknown>;
+
+    // ── Atribución: extraer userId / customerId si vienen en el body ──────────
+    // Campos reservados (no se guardan como métricas):
+    //   userId      → ID del asesor/closer en GHL
+    //   customerId  → ID del contacto/cliente en GHL
+    const ghlUserId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : null;
+    const ghlCustomerId = typeof body.customerId === "string" && body.customerId.trim() ? body.customerId.trim() : null;
+    delete body.userId;
+    delete body.customerId;
+
+    // ── Fecha ────────────────────────────────────────────────────────────────
     // Aceptar fecha ("2026-04-08") o datetime con timezone ("2026-04-08T14:30:00-05:00")
-    // Si viene con hora, parsear como Date y extraer la fecha en UTC
     const fechaRaw = body.fecha as string | undefined;
     let fecha: string;
     if (fechaRaw) {
       if (fechaRaw.includes("T") || fechaRaw.includes(" ")) {
-        // Es datetime — parsear y tomar fecha UTC
         const d = new Date(fechaRaw);
         fecha = isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
       } else {
-        // Solo fecha — usar tal cual
         fecha = fechaRaw.slice(0, 10);
       }
     } else {
       fecha = new Date().toISOString().slice(0, 10);
     }
-    delete body.fecha; // No guardar fecha como campo de métrica
+    delete body.fecha;
 
     if (Object.keys(body).length === 0) {
       return NextResponse.json({ error: "Body vacío — envía al menos un campo numérico" }, { status: 400 });
@@ -81,15 +89,40 @@ export async function POST(
       const num = Number(valor);
       if (isNaN(num) || typeof valor === "object") continue;
 
-      await db.insert(metricasWebhook).values({
-        id_cuenta: idCuenta,
-        fecha,
-        campo,
-        valor: String(num),
-      }).onConflictDoUpdate({
-        target: [metricasWebhook.id_cuenta, metricasWebhook.fecha, metricasWebhook.campo],
-        set: { valor: String(num), updated_at: new Date() },
-      });
+      if (ghlUserId !== null || ghlCustomerId !== null) {
+        // ── Modo atribuido: INSERT individual, sin upsert global ────────────
+        // Cada llamada con userId/customerId genera una fila nueva acumulable.
+        // El campo global (sin user/customer) se actualiza por separado abajo
+        // solo si también viene valor sin atribución (caso raro, pero seguro).
+        await db.insert(metricasWebhook).values({
+          id_cuenta: idCuenta,
+          fecha,
+          campo,
+          valor: String(num),
+          ghl_user_id: ghlUserId,
+          ghl_customer_id: ghlCustomerId,
+        });
+        // También acumular en el aggregate global (fila sin user/customer)
+        // El unique parcial uq_metricas_webhook_global cubre solo filas NULL+NULL
+        await db.execute(sql`
+          INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, updated_at)
+          VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NOW())
+          ON CONFLICT ON CONSTRAINT uq_metricas_webhook_global DO UPDATE
+          SET valor = metricas_webhook.valor + ${String(num)},
+              updated_at = NOW()
+        `);
+      } else {
+        // ── Modo global: upsert simple ───────────────────────────────────────
+        await db.insert(metricasWebhook).values({
+          id_cuenta: idCuenta,
+          fecha,
+          campo,
+          valor: String(num),
+        }).onConflictDoUpdate({
+          target: [metricasWebhook.id_cuenta, metricasWebhook.fecha, metricasWebhook.campo],
+          set: { valor: String(num), updated_at: new Date() },
+        });
+      }
 
       campos_guardados.push(campo);
       inserted++;
@@ -100,6 +133,7 @@ export async function POST(
       message: `Se guardaron ${inserted} campo(s) para ${fecha}`,
       campos_guardados,
       fecha,
+      atribuido_a: ghlUserId ? { userId: ghlUserId, customerId: ghlCustomerId } : null,
     });
   } catch (err) {
     console.error("[webhooks/metricas]", err);

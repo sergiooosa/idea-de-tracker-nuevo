@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas, metasCuenta } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds } from "@/lib/db/schema";
+import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds, DashboardPersonalizado } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseMetricasConfig } from "@/lib/metricas-engine";
 
@@ -22,6 +22,7 @@ export interface SystemConfigData {
   metricas_personalizadas: MetricaPersonalizada[];
   metricas_config: MetricaConfig[];
   metricas_manual_data: Record<string, MetricaManualEntry[]>;
+  dashboards_personalizados: DashboardPersonalizado[];
   embudo_personalizado: EmbudoEtapa[];
   tipos_eventos_config: TipoEventoConfig[];
   has_openai_key: boolean;
@@ -67,6 +68,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         roles_config: cuentas.roles_config,
         metricas_config: cuentas.metricas_config,
         metricas_manual_data: cuentas.metricas_manual_data,
+        dashboards_personalizados: cuentas.dashboards_personalizados,
         fuente_llamadas: cuentas.fuente_llamadas,
         ghl_location_id: cuentas.ghl_location_id,
         configuracion_ads: cuentas.configuracion_ads,
@@ -98,6 +100,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       roles_config: [],
       metricas_config: [],
       metricas_manual_data: {},
+      dashboards_personalizados: [],
       chat_config: { tiene_chatbot: false, emoji_toma_atencion: "" },
       chat_analisis_hora: chatAnalisisHora,
       fuente_llamadas: "twilio" as const,
@@ -122,6 +125,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
     metricas_config: parseMetricasConfig(r.metricas_config),
     metricas_manual_data: (r.metricas_manual_data && typeof r.metricas_manual_data === "object") ? r.metricas_manual_data as Record<string, MetricaManualEntry[]> : {},
+    dashboards_personalizados: Array.isArray(r.dashboards_personalizados) ? r.dashboards_personalizados as DashboardPersonalizado[] : [],
     chat_config: {
       tiene_chatbot: r.configuracion_ui?.chat_config?.tiene_chatbot ?? false,
       emoji_toma_atencion: r.configuracion_ui?.chat_config?.emoji_toma_atencion ?? "",

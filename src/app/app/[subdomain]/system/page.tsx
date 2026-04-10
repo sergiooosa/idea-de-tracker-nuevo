@@ -26,6 +26,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { getMetricasQueDependenDe, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from '@/lib/metricas-engine';
 import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
+import DashboardsManager from '@/components/dashboard/DashboardsManager';
 import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
 import ChatRecoverySection from '@/features/quick-triggers/chat-recovery/ChatRecoverySection';
 
@@ -108,6 +109,7 @@ interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
   reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
   metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
+  dashboards_personalizados?: import('@/lib/db/schema').DashboardPersonalizado[];
   embudo_personalizado: EmbudoEtapa[];
   has_openai_key: boolean; fuente_datos_financieros: 'nativa' | 'api_externa';
   seccion_chats_dashboard?: boolean;
@@ -243,6 +245,7 @@ export default function SystemPage() {
   const [seccionChatsDashboard, setSeccionChatsDashboard] = useState(true);
   const [fuenteLlamadas, setFuenteLlamadas] = useState<'twilio' | 'ghl'>('twilio');
   const [ghlLocationId, setGhlLocationId] = useState<string>('');
+  const [dashboardsPersonalizados, setDashboardsPersonalizados] = useState<import('@/lib/db/schema').DashboardPersonalizado[]>([]);
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
@@ -357,6 +360,7 @@ export default function SystemPage() {
             ? cfg.metricas_manual_data
             : {},
         );
+        setDashboardsPersonalizados(Array.isArray(cfg.dashboards_personalizados) ? cfg.dashboards_personalizados : []);
       }
       if (metasRes.ok) {
         const m = await metasRes.json();
@@ -762,6 +766,23 @@ export default function SystemPage() {
 
           {currentStep === 5 && (
             <div className="space-y-4">
+              {/* ── Sección: Dashboards personalizados ── */}
+              <div className="rounded-xl border border-surface-500 bg-surface-700/30 p-4 space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-accent-cyan/20">
+                  <div className="rounded-lg p-1.5 bg-accent-cyan/10 border border-accent-cyan/30">
+                    <span className="text-base">📊</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-white">Dashboards personalizados</h4>
+                    <p className="text-xs text-gray-400">Crea hasta 3 paneles adicionales para organizar tus métricas.</p>
+                  </div>
+                </div>
+                <DashboardsManager
+                  dashboards={dashboardsPersonalizados}
+                  onChange={(updated) => setDashboardsPersonalizados(updated)}
+                />
+              </div>
+
               <div className="flex items-center gap-2 pb-2 border-b border-accent-green/30">
                 <div className="rounded-lg p-2 bg-accent-green/20 border border-accent-green/40"><BarChart3 className="w-5 h-5 text-accent-green" /></div>
                 <div>
@@ -897,6 +918,7 @@ export default function SystemPage() {
                   metricasManualData={metricasManualData}
                   editingMetric={metricasEditingId ? metricasConfig.find((x) => x.id === metricasEditingId) ?? null : null}
                   tipoInicial={metricasSheetTipo}
+                  dashboardsPersonalizados={dashboardsPersonalizados}
                   subdominio={typeof window !== "undefined" ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "") : undefined}
                   onClose={() => {
                     setMetricasSheetOpen(false);

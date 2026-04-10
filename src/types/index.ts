@@ -498,7 +498,8 @@ export interface DashboardResponse {
   tagsDisponibles?: string[];
   tagCounts?: Record<string, number>;
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
-  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; formato?: string; color?: string }[];
+  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string }[];
+  dashboardsPersonalizados?: { id: string; nombre: string; icono?: string }[];
   chatKpis?: ChatKpis;
   alertasMetas?: AlertaMeta[];
   configuracion_ui?: {

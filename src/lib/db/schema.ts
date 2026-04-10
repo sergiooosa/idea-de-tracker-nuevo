@@ -93,24 +93,76 @@ export interface MetricaFormulaConfig {
   valorSiNo?: number | string;
 }
 
-/** Configuración de métrica (manual, automática o fija) */
+// ─── Dashboards personalizados ────────────────────────────────────────────────
+
+/** Un dashboard personalizado creado por el usuario (máx. 3 por cuenta) */
+export interface DashboardPersonalizado {
+  id: string;       // "dashboard-1" | "dashboard-2" | "dashboard-3"
+  nombre: string;   // Nombre libre que pone el usuario
+  icono?: string;   // Emoji o similar
+  creado_en: string; // ISO timestamp
+}
+
+// ─── Métricas ─────────────────────────────────────────────────────────────────
+
+/** Paneles disponibles. Los "dashboard-N" son los personalizados creados por el usuario. */
+export type UbicacionPanel =
+  | "panel_ejecutivo"
+  | "rendimiento"
+  | "ambos"
+  | "dashboard-1"
+  | "dashboard-2"
+  | "dashboard-3";
+
+/** Configuración de visualización en barra o línea */
+export interface MetricaBarraConfig {
+  /** ID de otra MetricaConfig que actúa como categoría / eje X (ej. "Asesor") — opcional */
+  categoria_metrica_id?: string;
+  /** ID de la MetricaConfig que aporta el segundo valor en gráfico comparativo */
+  comparar_con_id?: string;
+  /** Etiqueta del eje Y */
+  label_y?: string;
+}
+
+/** Configuración de métrica (manual, automática, fija o webhook) */
 export interface MetricaConfig {
   id: string;
   nombre: string;
   descripcion?: string;
   tipo: "manual" | "automatica" | "fija" | "webhook";
-  ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
+  /** Deprecated: usar paneles[] para multi-panel. Se mantiene para backward compat. */
+  ubicacion?: UbicacionPanel;
+  /** Lista de paneles donde aparece esta métrica. Sustituye a ubicacion. */
+  paneles?: UbicacionPanel[];
   orden?: number;
   campos?: MetricaCampoConfig[];
   formula?: MetricaFormulaConfig;
   valorFijo?: number | string;
-  webhookCampo?: string; // Para tipo "webhook": nombre del campo de metricas_webhook
+  webhookCampo?: string;
   formato?: "numero" | "moneda" | "porcentaje" | "tiempo" | "decimal";
   color?: string;
+  /** Tipo de visualización del KPI */
+  visualizacion?: "kpi_card" | "barra" | "comparativo";
+  /** Config para visualización barra/comparativo */
+  barra_config?: MetricaBarraConfig;
+  /** Si true, cada entrada puede atribuirse a un usuario GHL (closer) o contacto. Default false. */
+  atribuible_a_usuario?: boolean;
 }
 
-/** Entrada manual: valores por campo */
-export type MetricaManualEntry = Record<string, string | number | boolean | null>;
+/** Campos reservados en MetricaManualEntry para atribución */
+export interface MetricaAtribucion {
+  /** ID del usuario GHL (closer/asesor) que generó esta entrada */
+  _ghl_user_id?: string;
+  /** Nombre del usuario GHL para mostrar (no usar para agrupar, usar el id) */
+  _ghl_user_name?: string;
+  /** ID del contacto/cliente en GHL */
+  _ghl_customer_id?: string;
+  /** Nombre del contacto para mostrar */
+  _ghl_customer_name?: string;
+}
+
+/** Entrada manual: valores por campo + atribución opcional */
+export type MetricaManualEntry = Record<string, string | number | boolean | null> & MetricaAtribucion;
 
 export interface ReglaAutomatica {
   evento: 'no_show' | 'cancelada' | 'sin_actividad_dias';
@@ -198,6 +250,7 @@ export const cuentas = pgTable("cuentas", {
   roles_config: jsonb("roles_config").$type<RolConfig[]>(),
   metricas_config: jsonb("metricas_config").$type<MetricaConfig[]>(),
   metricas_manual_data: jsonb("metricas_manual_data").$type<Record<string, MetricaManualEntry[]>>(),
+  dashboards_personalizados: jsonb("dashboards_personalizados").$type<DashboardPersonalizado[]>().default([]),
   fuente_llamadas: text("fuente_llamadas").default("twilio"),
   configuracion_ads: jsonb("configuracion_ads").$type<ConfiguracionAds>(),
   ghl_location_id: text("ghl_location_id"),
@@ -496,10 +549,15 @@ export const metricasWebhook = pgTable("metricas_webhook", {
   fecha: date("fecha").notNull(),
   campo: text("campo").notNull(),
   valor: numeric("valor", { precision: 18, scale: 4 }).notNull().default("0"),
+  /** ID del usuario GHL (closer) que generó este dato. null = no atribuido / cuenta global */
+  ghl_user_id: text("ghl_user_id"),
+  /** ID del contacto/cliente en GHL. null = no atribuido */
+  ghl_customer_id: text("ghl_customer_id"),
   created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
   index("idx_metricas_webhook_cuenta_fecha").on(table.id_cuenta, table.fecha),
+  // Unique solo en el aggregate global (sin user ni customer). Con user/customer se acumulan individualmente.
   uniqueIndex("uq_metricas_webhook").on(table.id_cuenta, table.fecha, table.campo),
 ]);
 

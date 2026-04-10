@@ -65,6 +65,7 @@ interface MetricaEditSheetProps {
   editingMetric: MetricaConfig | null;
   tipoInicial: "manual" | "automatica" | "fija" | "webhook";
   subdominio?: string;
+  dashboardsPersonalizados?: import("@/lib/db/schema").DashboardPersonalizado[];
   onClose: () => void;
   onSave: (
     config: MetricaConfig,
@@ -78,12 +79,16 @@ export default function MetricaEditSheet({
   editingMetric,
   tipoInicial,
   subdominio,
+  dashboardsPersonalizados = [],
   onClose,
   onSave,
 }: MetricaEditSheetProps) {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState<MetricaConfig["ubicacion"]>("ambos");
+  // paneles: selección múltiple de dónde aparece esta métrica
+  const [panelesSeleccionados, setPanelesSeleccionados] = useState<string[]>(["panel_ejecutivo"]);
+  const [atribuibleUsuario, setAtribuibleUsuario] = useState(false);
   const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook">(tipoInicial);
 
   const [campos, setCampos] = useState<MetricaCampoConfig[]>([]);
@@ -118,6 +123,14 @@ export default function MetricaEditSheet({
       setNombre(editingMetric.nombre);
       setDescripcion(editingMetric.descripcion ?? "");
       setUbicacion(editingMetric.ubicacion ?? "ambos");
+      // Inicializar paneles: usar paneles[] si existe, sino derivar de ubicacion
+      const panelesInic: string[] = editingMetric.paneles?.length
+        ? editingMetric.paneles
+        : editingMetric.ubicacion === "ambos"
+          ? ["panel_ejecutivo", "rendimiento"]
+          : [editingMetric.ubicacion ?? "panel_ejecutivo"];
+      setPanelesSeleccionados(panelesInic);
+      setAtribuibleUsuario(editingMetric.atribuible_a_usuario ?? false);
       setTipo(editingMetric.tipo);
       setCampos(editingMetric.campos ?? []);
       if (editingMetric.formula) {
@@ -242,7 +255,19 @@ export default function MetricaEditSheet({
 
     let config: MetricaConfig;
 
-    const base = { id, nombre: nombre.trim(), descripcion: descripcion.trim() || undefined, ubicacion, orden, formato, color };
+    // Derivar ubicacion legacy desde paneles para backward compat con código que aún lo lee
+    const ubicacionLegacy: MetricaConfig["ubicacion"] =
+      panelesSeleccionados.includes("panel_ejecutivo") && panelesSeleccionados.includes("rendimiento")
+        ? "ambos"
+        : panelesSeleccionados.find((p) => p === "panel_ejecutivo" || p === "rendimiento") as MetricaConfig["ubicacion"] ?? "panel_ejecutivo";
+
+    const base = {
+      id, nombre: nombre.trim(), descripcion: descripcion.trim() || undefined,
+      ubicacion: ubicacionLegacy,
+      paneles: panelesSeleccionados as MetricaConfig["paneles"],
+      atribuible_a_usuario: atribuibleUsuario,
+      orden, formato, color,
+    };
 
     if (tipo === "webhook") {
       config = { ...base, tipo: "webhook" as const, webhookCampo: webhookCampo.trim() };
@@ -373,7 +398,65 @@ export default function MetricaEditSheet({
             />
           </div>
 
-          {/* Ubicación oculta — siempre "ambos" para nuevas métricas */}
+          {/* ── Selector de paneles (multi-selección) ── */}
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">
+              ¿En qué panel(es) aparece esta métrica?
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: "panel_ejecutivo", label: "Panel Ejecutivo", emoji: "🏠" },
+                { id: "rendimiento", label: "Rendimiento", emoji: "📈" },
+                ...dashboardsPersonalizados.map((d) => ({ id: d.id, label: d.nombre, emoji: d.icono ?? "📊" })),
+              ].map((panel) => {
+                const activo = panelesSeleccionados.includes(panel.id);
+                return (
+                  <button
+                    key={panel.id}
+                    type="button"
+                    onClick={() => setPanelesSeleccionados((prev) =>
+                      activo ? prev.filter((p) => p !== panel.id) : [...prev, panel.id]
+                    )}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+                      activo
+                        ? "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50"
+                        : "bg-surface-700 text-gray-400 border-surface-500 hover:border-accent-cyan/30 hover:text-gray-300"
+                    }`}
+                  >
+                    <span>{panel.emoji}</span>
+                    {panel.label}
+                  </button>
+                );
+              })}
+            </div>
+            {panelesSeleccionados.length === 0 && (
+              <p className="text-[10px] text-amber-400 mt-1">Selecciona al menos un panel.</p>
+            )}
+          </div>
+
+          {/* ── Atribución a usuario GHL ── */}
+          {(tipo === "manual" || tipo === "webhook") && (
+            <div className="flex items-start gap-3 p-2.5 rounded-lg bg-surface-700/50 border border-surface-500">
+              <input
+                id="atribuible"
+                type="checkbox"
+                checked={atribuibleUsuario}
+                onChange={(e) => setAtribuibleUsuario(e.target.checked)}
+                className="mt-0.5 accent-cyan-400"
+              />
+              <div>
+                <label htmlFor="atribuible" className="text-xs font-medium text-white cursor-pointer">
+                  Atribuible a asesor / cliente
+                </label>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  Si está activo, al enviar el webhook puedes incluir{" "}
+                  <code className="bg-surface-600 px-1 rounded text-accent-cyan">userId</code> (asesor) o{" "}
+                  <code className="bg-surface-600 px-1 rounded text-accent-cyan">customerId</code> (cliente).
+                  La métrica se sumará individualmente y podrás verla por persona.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
