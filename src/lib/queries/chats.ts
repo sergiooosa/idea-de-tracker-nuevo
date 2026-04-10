@@ -124,6 +124,11 @@ export async function getChats(
     const agentName = extractAgentName(msgs);
     const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot);
     const minutesSinceLastLeadMsg = computeMinutesSinceLastLeadMsg(msgs);
+    // humanTookOver: con chatbot → solo true si el emoji de toma apareció (un humano intervino).
+    // Sin chatbot → true si hay cualquier mensaje de agente (comportamiento normal).
+    const humanTookOver = tieneChatbot && emojiTomaAtencion
+      ? detectTakeoverEmoji(msgs, emojiTomaAtencion)
+      : agentMsgs.length > 0;
 
     // Estado proviene de la IA (chats_logs.estado escrito por analyzeChatsNightly)
     // Los triggers de emoji ya NO determinan el estado del chat.
@@ -157,6 +162,7 @@ export async function getChats(
       })),
       tagsInternos: Array.isArray(r.tags_internos) ? r.tags_internos : undefined,
       minutesSinceLastLeadMsg,
+      humanTookOver,
     };
   });
 
@@ -169,7 +175,9 @@ export async function getChats(
       : chatsList;
   const chatsFinal = emailsLower.length > 0 ? filteredChats : chatsList;
 
-  const contacted = chatsFinal.filter((c) => c.agentMessages > 0);
+  // "Activos" = chats donde un humano realmente respondió.
+  // Con chatbot: solo si el emoji de toma apareció. Sin chatbot: cualquier msg de agente.
+  const contacted = chatsFinal.filter((c) => c.humanTookOver);
   const speedVals = chatsFinal
     .filter((c) => c.speedToLeadSeconds != null)
     .map((c) => c.speedToLeadSeconds!);
@@ -198,7 +206,7 @@ export async function getChats(
   const advisors: ApiAdvisor[] = [];
 
   for (const [name, chats] of Object.entries(byAgent)) {
-    const activos = chats.filter((c) => c.agentMessages > 0).length;
+    const activos = chats.filter((c) => c.humanTookOver).length;
     const speeds = chats.filter((c) => c.speedToLeadSeconds != null).map((c) => c.speedToLeadSeconds!);
     advisorMetrics[name] = {
       advisorName: name,

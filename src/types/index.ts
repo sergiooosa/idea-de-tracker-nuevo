@@ -350,6 +350,13 @@ export interface ApiChatLead {
   /** Minutos transcurridos desde el último mensaje del lead sin respuesta del agente.
    *  null si el agente ya respondió después del último mensaje del lead, o si no hay mensajes del lead. */
   minutesSinceLastLeadMsg: number | null;
+  /**
+   * true si un humano realmente atendió el chat.
+   * - Con chatbot (emojiTomaAtencion configurado): solo true si el emoji de toma de atención
+   *   apareció en un mensaje del agente (un humano tomó el control).
+   * - Sin chatbot: true si hay al menos un mensaje de role="agent".
+   */
+  humanTookOver: boolean;
 }
 
 export interface ChatsAdvisorMetrics {

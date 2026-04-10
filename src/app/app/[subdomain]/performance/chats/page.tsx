@@ -90,7 +90,7 @@ export default function PerformanceChatsPage() {
   const filteredChats = useMemo(() => {
     if (!data) return [];
     let chats = canalActivo === 'todos' ? data.chats : data.chats.filter((c) => detectCanal(c) === canalActivo);
-    if (soloSinContactar) chats = chats.filter((c) => c.agentMessages === 0);
+    if (soloSinContactar) chats = chats.filter((c) => !c.humanTookOver);
     return chats;
   }, [data, canalActivo, soloSinContactar]);
 
@@ -199,7 +199,7 @@ export default function PerformanceChatsPage() {
           ⚡ Sin contactar
           {data && (
             <span className={`rounded-full px-1 text-[10px] ${soloSinContactar ? 'bg-accent-amber/30' : 'bg-surface-600'}`}>
-              {data.chats.filter((c) => c.agentMessages === 0).length}
+              {data.chats.filter((c) => !c.humanTookOver).length}
             </span>
           )}
         </button>
@@ -235,7 +235,7 @@ export default function PerformanceChatsPage() {
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([agentKey, agentChats]) => {
                       const isExpanded = expandedAdvisorId === agentKey;
-                      const agentActivos = agentChats.filter((c) => c.agentMessages > 0).length;
+                      const agentActivos = agentChats.filter((c) => c.humanTookOver).length;
                       const agentSpeeds = agentChats.filter((c) => c.speedToLeadSeconds != null).map((c) => c.speedToLeadSeconds!);
                       const agentSpeedAvg = agentSpeeds.length > 0 ? agentSpeeds.reduce((s, v) => s + v, 0) / agentSpeeds.length : null;
                       return (

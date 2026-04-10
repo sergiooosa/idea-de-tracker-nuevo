@@ -392,6 +392,7 @@ export function generateChats(): ChatsResponse {
       triggerAplicado: Math.random() > 0.8 ? faker.lorem.words(2) : undefined,
       asesorAsignado: Math.random() > 0.5 ? ASESORES[rnd(0, ASESORES.length - 1)].name : null,
       minutesSinceLastLeadMsg: Math.random() > 0.5 ? rnd(5, 180) : null,
+      humanTookOver: agentMsgs > 0 && Math.random() > 0.3,
     };
   });
 
