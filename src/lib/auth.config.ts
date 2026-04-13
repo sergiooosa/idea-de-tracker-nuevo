@@ -17,11 +17,16 @@ const DEFAULT_ROLES_CONFIG: RolConfig[] = [
 
 function resolvePermisos(rol: string, rolesConfig: RolConfig[] | null): string[] {
   if (rol === "superadmin") return ALL_PERMISOS;
-  const config = Array.isArray(rolesConfig) && rolesConfig.length > 0
-    ? rolesConfig
-    : DEFAULT_ROLES_CONFIG;
+  const hasCustomConfig = Array.isArray(rolesConfig) && rolesConfig.length > 0;
+  const config = hasCustomConfig ? rolesConfig : DEFAULT_ROLES_CONFIG;
   const match = config.find((r) => r.id === rol);
   if (match) return match.permisos;
+  // Si hay config personalizada pero el rol del usuario no existe en ella,
+  // dar acceso de lectura completo (ver_todo) sin permisos de edición ni restricción
+  // a datos propios. Evita que usuarios legítimos vean 0 data por rol desconocido.
+  if (hasCustomConfig) {
+    return ["ver_todo", "ver_dashboard", "ver_rendimiento", "ver_asesor", "ver_bandeja", "ver_acquisition", "ver_documentacion"];
+  }
   if (rol === "usuario") return DEFAULT_ROLES_CONFIG[1]!.permisos;
   return [];
 }
