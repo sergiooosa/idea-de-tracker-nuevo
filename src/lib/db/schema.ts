@@ -270,6 +270,10 @@ export const usuariosDashboard = pgTable("usuarios_dashboard", {
   permisos: jsonb("permisos").$type<Record<string, boolean>>(),
   fathom: text("fathom"),
   id_webhook_fathom: text("id_webhook_fathom"),
+  /** Nombre del asesor tal como aparece en resumenes_diarios_agendas.closer.
+   *  Necesario porque Fathom a veces guarda nombre completo en lugar de email.
+   *  Ej: miguel@serenthys.com → nombre_closer = "Miguel Puga" */
+  nombre_closer: text("nombre_closer"),
 });
 
 /* ------------------------------------------------------------------ */

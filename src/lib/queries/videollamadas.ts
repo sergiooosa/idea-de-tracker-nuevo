@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, cuentas } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, cuentas, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, sql, isNull, isNotNull, inArray } from "drizzle-orm";
@@ -61,6 +61,18 @@ export async function getVideollamadas(
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
+  // Resolver nombre_closer para cada email — Fathom a veces guarda nombre en lugar de email
+  let closerValues: string[] = [...emails];
+  if (emails.length > 0) {
+    const usuariosRows = await db
+      .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+      .from(usuariosDashboard)
+      .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), inArray(usuariosDashboard.email, emails)));
+    for (const u of usuariosRows) {
+      if (u.nombre_closer) closerValues.push(u.nombre_closer);
+    }
+  }
+
   const fechaFilter = or(
     and(
       isNotNull(resumenesDiariosAgendas.fecha_reunion),
@@ -77,7 +89,7 @@ export async function getVideollamadas(
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
   ];
-  if (emails.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, emails));
+  if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
   const [[cuentaRow], rows] = await Promise.all([
     db
