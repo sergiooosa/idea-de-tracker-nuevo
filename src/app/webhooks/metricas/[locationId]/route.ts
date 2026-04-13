@@ -41,7 +41,7 @@ export async function POST(
 
     // Validar que el locationId corresponde a la cuenta
     const [cuentaRow] = await db
-      .select({ id_cuenta: cuentas.id_cuenta })
+      .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
       .from(cuentas)
       .where(eq(cuentas.subdominio, locationId))
       .limit(1);
@@ -73,7 +73,12 @@ export async function POST(
         fecha = fechaRaw.slice(0, 10);
       }
     } else {
-      fecha = new Date().toISOString().slice(0, 10);
+      const tz = cuentaRow.zona_horaria_iana ?? "UTC";
+      try {
+        fecha = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+      } catch {
+        fecha = new Date().toISOString().slice(0, 10); // fallback UTC si el IANA es inválido
+      }
     }
     delete body.fecha;
 
