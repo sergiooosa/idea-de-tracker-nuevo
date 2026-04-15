@@ -130,7 +130,16 @@ export async function getDashboard(
   ];
   if (emails.length > 0) callConditions.push(inArray(logLlamadas.closer_mail, emails));
 
-  const [agendas, calls] = await Promise.all([
+  // Query separada para eventos de leads nuevos (pdte/contacto_creado)
+  const newLeadConditions = [
+    eq(logLlamadas.id_cuenta, idCuenta),
+    gte(logLlamadas.ts, fromDate),
+    lte(logLlamadas.ts, toDate),
+    sql`${logLlamadas.tipo_evento} IN (${sql.join(TIPOS_NO_LLAMADA.map((t) => sql`${t}`), sql`, `)})`,
+  ];
+  if (emails.length > 0) newLeadConditions.push(inArray(logLlamadas.closer_mail, emails));
+
+  const [agendas, calls, newLeadEvents] = await Promise.all([
     db
       .select()
       .from(resumenesDiariosAgendas)
@@ -139,14 +148,28 @@ export async function getDashboard(
       .select()
       .from(logLlamadas)
       .where(and(...callConditions)),
+    db
+      .select({
+        id: logLlamadas.id,
+        mail_lead: logLlamadas.mail_lead,
+        nombre_lead: logLlamadas.nombre_lead,
+        phone: logLlamadas.phone,
+        closer_mail: logLlamadas.closer_mail,
+        nombre_closer: logLlamadas.nombre_closer,
+        ts: logLlamadas.ts,
+      })
+      .from(logLlamadas)
+      .where(and(...newLeadConditions)),
   ]);
 
   let filteredAgendas = agendas;
   let filteredCalls = calls;
+  let filteredNewLeadEvents = newLeadEvents;
   if (filterTags && filterTags.length > 0) {
     const tagSet = new Set(filterTags);
     filteredAgendas = agendas.filter((a) => Array.isArray(a.tags_internos) && a.tags_internos.some((t) => tagSet.has(t)));
     filteredCalls = calls.filter((c) => Array.isArray(c.tags_internos) && c.tags_internos.some((t) => tagSet.has(t)));
+    // newLeadEvents no tiene tags_internos en la query selectiva — no filtrar por tags
   }
 
   const asistidas = filteredAgendas.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
@@ -268,6 +291,14 @@ export async function getDashboard(
     return n || "sin asignar";
   };
 
+  // Construir mapa de leads generados (nuevos contactos) por asesor
+  const newLeadsMap: Record<string, typeof filteredNewLeadEvents> = {};
+  for (const c of filteredNewLeadEvents) {
+    const key = normAdvisorKey(c.closer_mail, c.nombre_closer);
+    if (!newLeadsMap[key]) newLeadsMap[key] = [];
+    newLeadsMap[key].push(c);
+  }
+
   const advisorMap: Record<string, { calls: typeof filteredCalls; agendas: typeof filteredAgendas }> = {};
   for (const c of filteredCalls) {
     const key = normAdvisorKey(c.closer_mail, c.nombre_closer);
@@ -309,10 +340,54 @@ export async function getDashboard(
         .map((c) => parseFloat(c.speed_to_lead!) || 0)
         .filter((v) => v > 0);
 
+      // Leads generados: nuevos contactos del periodo asignados a este asesor
+      const advisorNewLeads = newLeadsMap[key] ?? [];
+      const uniqueNewLeadsMap = new Map<string, (typeof advisorNewLeads)[0]>();
+      for (const nl of advisorNewLeads) {
+        const leadKey = nl.mail_lead?.trim().toLowerCase() || nl.phone?.trim() || String(nl.id);
+        if (!uniqueNewLeadsMap.has(leadKey)) uniqueNewLeadsMap.set(leadKey, nl);
+      }
+      const leadsGeneradosDetalle = Array.from(uniqueNewLeadsMap.values()).map((nl) => ({
+        nombre: nl.nombre_lead ?? null,
+        email: nl.mail_lead ?? null,
+        telefono: nl.phone ?? null,
+        ultimaActividad: nl.ts ? toDateString(nl.ts) : null,
+      }));
+
+      // Leads con actividad: leads únicos del periodo que tuvieron llamada o cita
+      const uniqueActivosMap = new Map<string, { nombre: string | null; email: string | null; telefono: string | null; ultimaActividad: string | null }>();
+      for (const c of ac) {
+        const leadKey = c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || String(c.id);
+        if (!uniqueActivosMap.has(leadKey)) {
+          uniqueActivosMap.set(leadKey, {
+            nombre: c.nombre_lead ?? null,
+            email: c.mail_lead ?? null,
+            telefono: c.phone ?? null,
+            ultimaActividad: c.ts ? toDateString(c.ts) : null,
+          });
+        }
+      }
+      for (const a of aa) {
+        const leadKey = a.email_lead?.trim().toLowerCase() || `agenda_${a.id_registro_agenda}`;
+        if (!uniqueActivosMap.has(leadKey)) {
+          uniqueActivosMap.set(leadKey, {
+            nombre: a.nombre_de_lead ?? null,
+            email: a.email_lead ?? null,
+            telefono: null,
+            ultimaActividad: toDateString(a.fecha_reunion ?? null) || toDateString(a.fecha as Date | string | null) || null,
+          });
+        }
+      }
+      const leadsConActividadDetalle = Array.from(uniqueActivosMap.values());
+
       return {
         advisorName: ac[0]?.nombre_closer ?? aa[0]?.closer ?? key,
         advisorEmail: ac[0]?.closer_mail ?? null,
         totalLeads: aLeads,
+        leadsGenerados: leadsGeneradosDetalle.length,
+        leadsConActividad: leadsConActividadDetalle.length,
+        leadsGeneradosDetalle,
+        leadsConActividadDetalle,
         callsMade: ac.length,
         speedToLeadAvg: aSpeeds.length > 0 ? aSpeeds.reduce((s, v) => s + v, 0) / aSpeeds.length : null,
         meetingsBooked: aa.length,
