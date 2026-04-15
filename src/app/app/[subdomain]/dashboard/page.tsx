@@ -237,45 +237,102 @@ export default function DashboardPage() {
             );
           })()}
 
-          <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-            {(data?.metricasComputadas ?? [])
-              .filter((m) => {
-                // Soporte legacy (ubicacion) + nuevo (paneles[])
-                const paneles: string[] = (m as unknown as { paneles?: string[] }).paneles ?? [];
-                if (paneles.length > 0) return paneles.includes(panelActivo);
-                // Fallback a ubicacion legacy
-                if (panelActivo === "panel_ejecutivo") return m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion;
-                if (panelActivo === "rendimiento") return m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos';
-                return false;
-              })
-              .map((m) => {
-                const color = m.color || 'green';
-                const raw = typeof m.valor === 'number' ? m.valor : parseFloat(String(m.valor)) || 0;
-                let display: string | number = m.valor;
-                switch (m.formato) {
-                  case 'moneda': display = fm(raw); break;
-                  case 'porcentaje': display = pctFmt(raw); break;
-                  case 'tiempo': display = minFmt(raw); break;
-                  case 'decimal': display = raw.toFixed(1); break;
-                  case 'numero': display = typeof m.valor === 'number' ? m.valor : raw; break;
-                }
-                return (
-                  <div key={m.id} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed relative group`}>
-                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
-                    <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{display}</p>
-                    {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
-                    <div className="kpi-card-spacer" />
-                    <Link
-                      href={`/system?step=5&edit=${m.id}`}
-                      className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
-                      title="Editar métrica"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Link>
+          {(() => {
+            const metricasDelPanel = (data?.metricasComputadas ?? []).filter((m) => {
+              const paneles: string[] = m.paneles ?? [];
+              if (paneles.length > 0) return paneles.includes(panelActivo);
+              if (panelActivo === "panel_ejecutivo") return m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion;
+              if (panelActivo === "rendimiento") return m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos';
+              return false;
+            });
+            const metricasKPI = metricasDelPanel.filter((m) => m.visualizacion !== "barra" && m.visualizacion !== "comparativo");
+            const metricasBarra = metricasDelPanel.filter((m) => m.visualizacion === "barra" || m.visualizacion === "comparativo");
+            return (
+              <>
+                <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+                  {metricasKPI.map((m) => {
+                    const color = m.color || 'green';
+                    const raw = typeof m.valor === 'number' ? m.valor : parseFloat(String(m.valor)) || 0;
+                    let display: string | number = m.valor;
+                    switch (m.formato) {
+                      case 'moneda': display = fm(raw); break;
+                      case 'porcentaje': display = pctFmt(raw); break;
+                      case 'tiempo': display = minFmt(raw); break;
+                      case 'decimal': display = raw.toFixed(1); break;
+                      case 'numero': display = typeof m.valor === 'number' ? m.valor : raw; break;
+                    }
+                    return (
+                      <div key={m.id} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed relative group`}>
+                        <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
+                        <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{display}</p>
+                        {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
+                        <div className="kpi-card-spacer" />
+                        <Link
+                          href={`/system?step=5&edit=${m.id}`}
+                          className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
+                          title="Editar métrica"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+                {metricasBarra.length > 0 && (
+                  <div className="mt-3 space-y-3">
+                    {metricasBarra.map((m) => {
+                      const color = m.color || 'green';
+                      const series = m.seriesTiempo ?? [];
+                      const raw = typeof m.valor === 'number' ? m.valor : parseFloat(String(m.valor)) || 0;
+                      let displayTotal: string | number = m.valor;
+                      switch (m.formato) {
+                        case 'moneda': displayTotal = fm(raw); break;
+                        case 'porcentaje': displayTotal = pctFmt(raw); break;
+                        case 'tiempo': displayTotal = minFmt(raw); break;
+                        case 'decimal': displayTotal = raw.toFixed(1); break;
+                        case 'numero': displayTotal = typeof m.valor === 'number' ? m.valor : raw; break;
+                      }
+                      return (
+                        <div key={m.id} className="rounded-lg p-3 section-futuristic relative group">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className={`text-xs font-semibold text-accent-${color} uppercase tracking-wider`}>{m.nombre}</span>
+                              {m.descripcion && <span className="ml-2 text-[10px] text-gray-500">{m.descripcion}</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-bold text-accent-${color}`}>{displayTotal}</span>
+                              <Link
+                                href={`/system?step=5&edit=${m.id}`}
+                                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
+                                title="Editar métrica"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Link>
+                            </div>
+                          </div>
+                          {series.length > 0 ? (
+                            <div className="h-36">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2f3a" />
+                                  <XAxis dataKey="fecha" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+                                  <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" width={40} />
+                                  <Tooltip contentStyle={{ background: '#22262e', border: '1px solid #2a2f3a', borderRadius: '8px', fontSize: '11px' }} />
+                                  <Bar dataKey="valor" name={m.nombre} fill={`var(--color-accent-${color}, #4dabf7)`} radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-gray-500 text-center py-4">Sin datos en el período seleccionado</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-          </div>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         <section>

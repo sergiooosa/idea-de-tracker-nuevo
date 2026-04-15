@@ -512,11 +512,16 @@ export async function getDashboard(
       lte(metricasWebhook.fecha, dateTo),
     ));
   const webhookSumas: Record<string, number> = {};
+  // seriesTiempo: campo → mapa de fecha → valor sumado
+  const webhookSeriesPorCampo: Record<string, Record<string, number>> = {};
   for (const row of webhookRows) {
     const key = row.campo;
+    const fecha = toDateString(row.fecha);
     webhookSumas[key] = (webhookSumas[key] ?? 0) + parseFloat(String(row.valor ?? 0));
+    if (!webhookSeriesPorCampo[key]) webhookSeriesPorCampo[key] = {};
+    webhookSeriesPorCampo[key][fecha] = (webhookSeriesPorCampo[key][fecha] ?? 0) + parseFloat(String(row.valor ?? 0));
   }
-  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string }[] = [];
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
   const metricasValores: Record<string, string | number> = {};
   const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket"]);
 
@@ -553,14 +558,22 @@ export async function getDashboard(
         valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
       }
       metricasValores[m.id] = typeof valor === "number" ? valor : parseFloat(String(valor)) || 0;
-      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color });
+      // Incluir series de tiempo para métricas webhook con visualización de barra
+      let seriesTiempo: { fecha: string; valor: number }[] | undefined;
+      if (m.tipo === "webhook" && m.visualizacion === "barra" && m.webhookCampo) {
+        const seriesMap = webhookSeriesPorCampo[m.webhookCampo] ?? {};
+        seriesTiempo = Object.entries(seriesMap)
+          .map(([fecha, val]) => ({ fecha, valor: val }))
+          .sort((a, b) => a.fecha.localeCompare(b.fecha));
+      }
+      metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color, visualizacion: m.visualizacion, seriesTiempo });
       computed.add(m.id);
     }
   }
 
   for (const m of sorted) {
     if (computed.has(m.id)) continue;
-    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color });
+    metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color, visualizacion: m.visualizacion });
   }
 
   // ----------------------------------------------------------------
