@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useT } from '@/contexts/LocaleContext';
 import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
@@ -10,7 +10,7 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse, LeadDetailItem } from '@/types';
 import Link from 'next/link';
-import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap } from 'lucide-react';
+import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap, SlidersHorizontal } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -25,6 +25,23 @@ const defaultDateFrom = subDays(defaultDateTo, 7);
 
 const OBJECTION_PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6'];
 
+const RANKING_COLS = [
+  { key: 'leads', label: 'Leads' },
+  { key: 'generados', label: 'Generados' },
+  { key: 'con_actividad', label: 'Con actividad' },
+  { key: 'llamadas', label: 'Llamadas' },
+  { key: 'tiempo_lead', label: 'Tiempo al lead' },
+  { key: 'agendadas', label: 'Agendadas' },
+  { key: 'asistidas', label: 'Asistidas' },
+  { key: 'facturacion', label: 'Facturación' },
+  { key: 'efectivo', label: 'Efectivo' },
+  { key: 'tasa_contacto', label: 'Tasa contacto' },
+  { key: 'tasa_agend', label: 'Tasa agend.' },
+] as const;
+
+type RankingColKey = typeof RANKING_COLS[number]['key'];
+const ALL_RANKING_COL_KEYS: RankingColKey[] = RANKING_COLS.map(c => c.key);
+
 export default function DashboardPage() {
   const t = useT();
   const [dateFrom, setDateFrom] = useState(format(defaultDateFrom, 'yyyy-MM-dd'));
@@ -37,6 +54,10 @@ export default function DashboardPage() {
   const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
   const [panelActivo, setPanelActivo] = useState<string>("panel_ejecutivo");
   const [modalLeads, setModalLeads] = useState<{ titulo: string; leads: LeadDetailItem[] } | null>(null);
+  const [rankingColsOpen, setRankingColsOpen] = useState(false);
+  const [rankingColsVisible, setRankingColsVisible] = useState<RankingColKey[]>(ALL_RANKING_COL_KEYS);
+  const [rankingColsInitialized, setRankingColsInitialized] = useState(false);
+  const rankingColsPopoverRef = useRef<HTMLDivElement>(null);
 
   const toggleObjeciones = () => setShowObjeciones((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showObj', String(next)); return next; });
   const toggleVolumen = () => setShowVolumen((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showVol', String(next)); return next; });
@@ -53,6 +74,52 @@ export default function DashboardPage() {
   const objeciones = data?.objeciones ?? [];
   const volumeByDay = data?.volumeByDay ?? [];
   const advisorRanking = data?.advisorRanking ?? [];
+
+  // Inicializar columnas de ranking desde la config del tenant (solo la primera vez que llegan datos)
+  useEffect(() => {
+    if (!rankingColsInitialized && data?.configuracion_ui?.ranking_columnas) {
+      const saved = data.configuracion_ui.ranking_columnas as string[];
+      const valid = saved.filter((k): k is RankingColKey => ALL_RANKING_COL_KEYS.includes(k as RankingColKey));
+      if (valid.length > 0) setRankingColsVisible(valid);
+      setRankingColsInitialized(true);
+    } else if (!rankingColsInitialized && data) {
+      setRankingColsInitialized(true);
+    }
+  }, [data, rankingColsInitialized]);
+
+  // Cerrar popover al hacer click fuera
+  useEffect(() => {
+    if (!rankingColsOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (rankingColsPopoverRef.current && !rankingColsPopoverRef.current.contains(e.target as Node)) {
+        setRankingColsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [rankingColsOpen]);
+
+  const saveRankingCols = async (cols: RankingColKey[]) => {
+    try {
+      await fetch('/api/data/system-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ranking_columnas: cols }),
+      });
+    } catch {
+      // Fallo silencioso — la config se guarda en el siguiente load
+    }
+  };
+
+  const toggleRankingCol = (key: RankingColKey) => {
+    setRankingColsVisible(prev => {
+      const next = prev.includes(key)
+        ? prev.filter(k => k !== key)
+        : [...prev, key];
+      void saveRankingCols(next);
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -562,24 +629,53 @@ export default function DashboardPage() {
         </div>
 
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ranking por asesor</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranking por asesor</h2>
+            <div className="relative" ref={rankingColsPopoverRef}>
+              <button
+                type="button"
+                onClick={() => setRankingColsOpen(v => !v)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-gray-400 hover:text-white hover:bg-surface-700 transition-colors"
+                title="Configurar columnas"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Columnas
+              </button>
+              {rankingColsOpen && (
+                <div className="absolute right-0 top-full mt-1 z-30 w-48 rounded-lg border border-surface-500 bg-surface-800 shadow-xl p-2 flex flex-col gap-1">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 pb-1">Mostrar columnas</p>
+                  {RANKING_COLS.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rankingColsVisible.includes(col.key)}
+                        onChange={() => toggleRankingCol(col.key)}
+                        className="accent-accent-cyan w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-300">{col.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="rounded-lg border border-surface-500 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium">Asesor</th>
-                    <th className="px-2 py-2 font-medium">Leads</th>
-                    <th className="px-2 py-2 font-medium">Generados</th>
-                    <th className="px-2 py-2 font-medium">Con actividad</th>
-                    <th className="px-2 py-2 font-medium">Llamadas</th>
-                    <th className="px-2 py-2 font-medium">Tiempo al lead</th>
-                    <th className="px-2 py-2 font-medium">Agendadas</th>
-                    <th className="px-2 py-2 font-medium">Asistidas</th>
-                    <th className="px-2 py-2 font-medium">Facturación</th>
-                    <th className="px-2 py-2 font-medium">Efectivo</th>
-                    <th className="px-2 py-2 font-medium">Tasa contacto</th>
-                    <th className="px-2 py-2 font-medium">Tasa agend.</th>
+                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium">Leads</th>}
+                    {rankingColsVisible.includes('generados') && <th className="px-2 py-2 font-medium">Generados</th>}
+                    {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium">Con actividad</th>}
+                    {rankingColsVisible.includes('llamadas') && <th className="px-2 py-2 font-medium">Llamadas</th>}
+                    {rankingColsVisible.includes('tiempo_lead') && <th className="px-2 py-2 font-medium">Tiempo al lead</th>}
+                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium">Agendadas</th>}
+                    {rankingColsVisible.includes('asistidas') && <th className="px-2 py-2 font-medium">Asistidas</th>}
+                    {rankingColsVisible.includes('facturacion') && <th className="px-2 py-2 font-medium">Facturación</th>}
+                    {rankingColsVisible.includes('efectivo') && <th className="px-2 py-2 font-medium">Efectivo</th>}
+                    {rankingColsVisible.includes('tasa_contacto') && <th className="px-2 py-2 font-medium">Tasa contacto</th>}
+                    {rankingColsVisible.includes('tasa_agend') && <th className="px-2 py-2 font-medium">Tasa agend.</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -601,37 +697,41 @@ export default function DashboardPage() {
                               <><span className="inline-block w-2 h-2 rounded-full bg-accent-green mr-2" />{a.advisorName}</>
                             )}
                           </td>
-                          <td className="px-2 py-2 text-white">{a.totalLeads}</td>
-                          <td className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); if (a.leadsGenerados > 0) setModalLeads({ titulo: `Leads generados — ${a.advisorName}`, leads: a.leadsGeneradosDetalle }); }}
-                              className={clsx('tabular-nums', a.leadsGenerados > 0 ? 'text-accent-amber underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
-                            >
-                              {a.leadsGenerados}
-                            </button>
-                          </td>
-                          <td className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); if (a.leadsConActividad > 0) setModalLeads({ titulo: `Leads con actividad — ${a.advisorName}`, leads: a.leadsConActividadDetalle }); }}
-                              className={clsx('tabular-nums', a.leadsConActividad > 0 ? 'text-accent-cyan underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
-                            >
-                              {a.leadsConActividad}
-                            </button>
-                          </td>
-                          <td className="px-2 py-2 text-accent-cyan">{a.callsMade}</td>
-                          <td className="px-2 py-2 text-gray-300">{a.speedToLeadAvg != null ? minFmt(a.speedToLeadAvg) : '—'}</td>
-                          <td className="px-2 py-2 text-accent-purple">{a.meetingsBooked}</td>
-                          <td className="px-2 py-2 text-accent-cyan">{a.meetingsAttended}</td>
-                          <td className="px-2 py-2 text-accent-green">{fm(a.revenue)}</td>
-                          <td className="px-2 py-2 text-accent-green">{fm(a.cashCollected)}</td>
-                          <td className="px-2 py-2">{pctFmt(a.contactRate)}</td>
-                          <td className="px-2 py-2">{pctFmt(a.bookingRate)}</td>
+                          {rankingColsVisible.includes('leads') && <td className="px-2 py-2 text-white">{a.totalLeads}</td>}
+                          {rankingColsVisible.includes('generados') && (
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); if (a.leadsGenerados > 0) setModalLeads({ titulo: `Leads generados — ${a.advisorName}`, leads: a.leadsGeneradosDetalle }); }}
+                                className={clsx('tabular-nums', a.leadsGenerados > 0 ? 'text-accent-amber underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
+                              >
+                                {a.leadsGenerados}
+                              </button>
+                            </td>
+                          )}
+                          {rankingColsVisible.includes('con_actividad') && (
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); if (a.leadsConActividad > 0) setModalLeads({ titulo: `Leads con actividad — ${a.advisorName}`, leads: a.leadsConActividadDetalle }); }}
+                                className={clsx('tabular-nums', a.leadsConActividad > 0 ? 'text-accent-cyan underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
+                              >
+                                {a.leadsConActividad}
+                              </button>
+                            </td>
+                          )}
+                          {rankingColsVisible.includes('llamadas') && <td className="px-2 py-2 text-accent-cyan">{a.callsMade}</td>}
+                          {rankingColsVisible.includes('tiempo_lead') && <td className="px-2 py-2 text-gray-300">{a.speedToLeadAvg != null ? minFmt(a.speedToLeadAvg) : '—'}</td>}
+                          {rankingColsVisible.includes('agendadas') && <td className="px-2 py-2 text-accent-purple">{a.meetingsBooked}</td>}
+                          {rankingColsVisible.includes('asistidas') && <td className="px-2 py-2 text-accent-cyan">{a.meetingsAttended}</td>}
+                          {rankingColsVisible.includes('facturacion') && <td className="px-2 py-2 text-accent-green">{fm(a.revenue)}</td>}
+                          {rankingColsVisible.includes('efectivo') && <td className="px-2 py-2 text-accent-green">{fm(a.cashCollected)}</td>}
+                          {rankingColsVisible.includes('tasa_contacto') && <td className="px-2 py-2">{pctFmt(a.contactRate)}</td>}
+                          {rankingColsVisible.includes('tasa_agend') && <td className="px-2 py-2">{pctFmt(a.bookingRate)}</td>}
                         </tr>
                         {expandedAdvisor === (a.advisorEmail ?? a.advisorName) && (
                           <tr className="bg-surface-800/60">
-                            <td colSpan={12} className="px-4 py-3">
+                            <td colSpan={1 + rankingColsVisible.length} className="px-4 py-3">
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                                 <div><span className="text-gray-500 block">Llamadas telefónicas</span><span className="text-accent-cyan font-semibold">{a.callsMade}</span></div>
                                 <div><span className="text-gray-500 block">Videollamadas</span><span className="text-accent-purple font-semibold">{a.meetingsBooked}</span></div>

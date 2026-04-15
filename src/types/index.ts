@@ -518,6 +518,7 @@ export interface DashboardResponse {
       seccion_chats_dashboard?: boolean;
       [key: string]: boolean | undefined;
     };
+    ranking_columnas?: string[];
     [key: string]: unknown;
   };
   fuente_llamadas?: "twilio" | "ghl";
