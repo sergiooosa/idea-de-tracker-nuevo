@@ -391,21 +391,6 @@ export const PLANTILLA_METRICAS_REALESTATE: MetricaConfig[] = [
     color: "cyan",
     formula: { tipo: "directo", fuente: "meetingsAttended" },
   },
-  {
-    id: "re-pct-perfilamiento",
-    nombre: "% Perfilamiento",
-    descripcion: "Perfilados ÷ Leads nuevos",
-    tipo: "automatica",
-    paneles: ["panel_ejecutivo"],
-    orden: 33,
-    formato: "porcentaje",
-    color: "cyan",
-    formula: {
-      tipo: "division",
-      fuentes: ["re-perfilamiento", "re-leads-mes"],
-    },
-  },
-
   // ─── KPI 3: Recorridos ───────────────────────────────────────────────────
   {
     id: "re-recorridos-agendados",
