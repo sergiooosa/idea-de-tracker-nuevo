@@ -336,3 +336,238 @@ export function getMetricasBaseFaltantes(
   const idsExistentes = new Set(metricasExistentes.map((m) => m.id));
   return PLANTILLA_METRICAS_BASE.filter((m) => !idsExistentes.has(m.id));
 }
+
+// ─── Vertical: Real Estate ────────────────────────────────────────────────────
+
+/**
+ * Plantilla vertical para clientes inmobiliarios (Imexico, etc.)
+ * 8 categorías de KPIs específicas del sector.
+ *
+ * Enfoque híbrido:
+ * - Genéricos (leads, conversión, ranking) → automatica con formula nativa
+ * - Específicos (recorridos, apartados, capacitación) → webhook, requieren n8n
+ *
+ * Todos los IDs tienen prefijo "re-" para evitar colisión con base-* y métricas custom.
+ *
+ * Semáforo de metas: los KPIs 2 (Perfilamiento), 3 (Recorridos) y 4 (Apartados)
+ * soportan metas via metas_cuenta — configurar desde el admin panel.
+ */
+export const PLANTILLA_METRICAS_REALESTATE: MetricaConfig[] = [
+  // ─── KPI 1: Leads ───────────────────────────────────────────────────────
+  {
+    id: "re-leads-semana",
+    nombre: "Leads nuevos (semana)",
+    descripcion: "Nuevos leads generados en la semana por asesor",
+    tipo: "webhook",
+    paneles: ["panel_ejecutivo"],
+    orden: 30,
+    formato: "numero",
+    color: "blue",
+    webhookCampo: "re_leads_nuevos",
+    atribuible_a_usuario: true,
+  },
+  {
+    id: "re-leads-mes",
+    nombre: "Leads nuevos (mes)",
+    descripcion: "Nuevos leads acumulados en el mes",
+    tipo: "webhook",
+    paneles: ["panel_ejecutivo"],
+    orden: 31,
+    formato: "numero",
+    color: "blue",
+    webhookCampo: "re_leads_mes",
+    atribuible_a_usuario: true,
+  },
+
+  // ─── KPI 2: Perfilamiento ────────────────────────────────────────────────
+  {
+    id: "re-perfilamiento",
+    nombre: "Leads perfilados",
+    descripcion: "Leads que completaron perfilamiento (llamada o videollamada)",
+    tipo: "automatica",
+    paneles: ["panel_ejecutivo"],
+    orden: 32,
+    formato: "numero",
+    color: "cyan",
+    formula: { tipo: "directo", fuente: "meetingsAttended" },
+  },
+  // ─── KPI 3: Recorridos ───────────────────────────────────────────────────
+  {
+    id: "re-recorridos-agendados",
+    nombre: "Recorridos agendados",
+    descripcion: "Tours inmobiliarios agendados en el período (vía n8n)",
+    tipo: "webhook",
+    paneles: ["panel_ejecutivo"],
+    orden: 34,
+    formato: "numero",
+    color: "purple",
+    webhookCampo: "re_recorridos_agendados",
+    atribuible_a_usuario: true,
+  },
+  {
+    id: "re-recorridos-realizados",
+    nombre: "Recorridos realizados",
+    descripcion: "Tours inmobiliarios completados (vía n8n)",
+    tipo: "webhook",
+    paneles: ["panel_ejecutivo"],
+    orden: 35,
+    formato: "numero",
+    color: "purple",
+    webhookCampo: "re_recorridos_realizados",
+    atribuible_a_usuario: true,
+  },
+  {
+    id: "re-recorridos-cancelados",
+    nombre: "Recorridos cancelados",
+    descripcion: "Tours cancelados o no presentados (vía n8n)",
+    tipo: "webhook",
+    paneles: ["rendimiento"],
+    orden: 36,
+    formato: "numero",
+    color: "red",
+    webhookCampo: "re_recorridos_cancelados",
+    atribuible_a_usuario: true,
+  },
+
+  // ─── KPI 4: Apartados ────────────────────────────────────────────────────
+  {
+    id: "re-apartados",
+    nombre: "Apartados",
+    descripcion: "Propiedades apartadas o reservadas (vía n8n)",
+    tipo: "webhook",
+    paneles: ["panel_ejecutivo"],
+    orden: 37,
+    formato: "numero",
+    color: "amber",
+    webhookCampo: "re_apartados",
+    atribuible_a_usuario: true,
+  },
+  {
+    id: "re-monto-apartados",
+    nombre: "Monto apartados",
+    descripcion: "Valor total de propiedades apartadas (vía n8n)",
+    tipo: "webhook",
+    paneles: ["panel_ejecutivo"],
+    orden: 38,
+    formato: "moneda",
+    color: "green",
+    webhookCampo: "re_monto_apartados",
+    atribuible_a_usuario: true,
+  },
+  {
+    id: "re-comision-apartados",
+    nombre: "Comisión por apartados",
+    descripcion: "Comisión estimada sobre propiedades apartadas (vía n8n)",
+    tipo: "webhook",
+    paneles: ["rendimiento"],
+    orden: 39,
+    formato: "moneda",
+    color: "green",
+    webhookCampo: "re_comision_apartados",
+    atribuible_a_usuario: true,
+  },
+
+  // ─── KPI 5: Tasas de conversión ──────────────────────────────────────────
+  {
+    id: "re-tasa-lead-perfilado",
+    nombre: "Conversión Lead → Perfilado",
+    descripcion: "% de leads que completaron perfilamiento",
+    tipo: "automatica",
+    paneles: ["panel_ejecutivo"],
+    orden: 40,
+    formato: "porcentaje",
+    color: "cyan",
+    formula: {
+      tipo: "division",
+      fuentes: ["re-perfilamiento", "re-leads-mes"],
+    },
+  },
+  {
+    id: "re-tasa-perfilado-recorrido",
+    nombre: "Conversión Perfilado → Recorrido",
+    descripcion: "% de perfilados que hicieron recorrido",
+    tipo: "automatica",
+    paneles: ["panel_ejecutivo"],
+    orden: 41,
+    formato: "porcentaje",
+    color: "purple",
+    formula: {
+      tipo: "division",
+      fuentes: ["re-recorridos-realizados", "re-perfilamiento"],
+    },
+  },
+  {
+    id: "re-tasa-recorrido-apartado",
+    nombre: "Conversión Recorrido → Apartado",
+    descripcion: "% de recorridos que terminaron en apartado",
+    tipo: "automatica",
+    paneles: ["panel_ejecutivo"],
+    orden: 42,
+    formato: "porcentaje",
+    color: "amber",
+    formula: {
+      tipo: "division",
+      fuentes: ["re-apartados", "re-recorridos-realizados"],
+    },
+  },
+
+  // ─── KPI 6: Ranking ventas ───────────────────────────────────────────────
+  {
+    id: "re-ranking-comisiones",
+    nombre: "Ranking por comisiones",
+    descripcion: "Comisión mensual acumulada por asesor (vía n8n)",
+    tipo: "webhook",
+    paneles: ["rendimiento"],
+    orden: 43,
+    formato: "moneda",
+    color: "green",
+    webhookCampo: "re_comision_mensual",
+    atribuible_a_usuario: true,
+    visualizacion: "barra",
+  },
+
+  // ─── KPI 7: Horas de capacitación ───────────────────────────────────────
+  {
+    id: "re-horas-capacitacion",
+    nombre: "Horas de capacitación",
+    descripcion: "Horas de entrenamiento completadas (integración GHL/n8n)",
+    tipo: "webhook",
+    paneles: ["rendimiento"],
+    orden: 44,
+    formato: "decimal",
+    color: "blue",
+    webhookCampo: "re_horas_capacitacion",
+    atribuible_a_usuario: true,
+  },
+
+  // ─── KPI 8: Actividad vencida ────────────────────────────────────────────
+  {
+    id: "re-actividad-vencida",
+    nombre: "Actividad vencida",
+    descripcion: "Oportunidades sin seguimiento en los últimos N días (vía n8n)",
+    tipo: "webhook",
+    paneles: ["rendimiento"],
+    orden: 45,
+    formato: "numero",
+    color: "red",
+    webhookCampo: "re_actividad_vencida",
+    atribuible_a_usuario: true,
+  },
+];
+
+/**
+ * IDs de las métricas Real Estate. Se usan para evitar duplicados al aplicar la plantilla.
+ */
+export const PLANTILLA_METRICAS_REALESTATE_IDS = new Set(
+  PLANTILLA_METRICAS_REALESTATE.map((m) => m.id),
+);
+
+/**
+ * Retorna las métricas Real Estate faltantes en un tenant dado.
+ */
+export function getMetricasRealEstateFaltantes(
+  metricasExistentes: MetricaConfig[],
+): MetricaConfig[] {
+  const idsExistentes = new Set(metricasExistentes.map((m) => m.id));
+  return PLANTILLA_METRICAS_REALESTATE.filter((m) => !idsExistentes.has(m.id));
+}
