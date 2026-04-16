@@ -400,10 +400,21 @@ export interface DashboardKpis {
   noShows: number;
 }
 
+export interface LeadDetailItem {
+  nombre: string | null;
+  email: string | null;
+  telefono: string | null;
+  ultimaActividad: string | null;
+}
+
 export interface DashboardAdvisorRow {
   advisorName: string;
   advisorEmail: string | null;
   totalLeads: number;
+  leadsGenerados: number;
+  leadsConActividad: number;
+  leadsGeneradosDetalle: LeadDetailItem[];
+  leadsConActividadDetalle: LeadDetailItem[];
   callsMade: number;
   speedToLeadAvg: number | null;
   meetingsBooked: number;

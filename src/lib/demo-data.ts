@@ -88,10 +88,15 @@ export function generateDashboard(): DashboardResponse {
     const booked = Math.floor(leads * (0.15 + Math.random() * 0.3));
     const attended = Math.floor(booked * (0.5 + Math.random() * 0.35));
     const rev = Math.floor(attended * (0.2 + Math.random() * 0.3)) * rnd(1500000, 7000000);
+    const generados = rnd(5, Math.max(6, Math.floor(leads * 0.4)));
     return {
       advisorName: a.name,
       advisorEmail: a.email,
       totalLeads: leads,
+      leadsGenerados: generados,
+      leadsConActividad: leads,
+      leadsGeneradosDetalle: [],
+      leadsConActividadDetalle: [],
       callsMade: calls,
       speedToLeadAvg: rnd(2, 50) + Math.random(),
       meetingsBooked: booked,

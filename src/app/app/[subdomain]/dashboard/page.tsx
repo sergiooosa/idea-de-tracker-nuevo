@@ -8,7 +8,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
-import type { DashboardResponse } from '@/types';
+import type { DashboardResponse, LeadDetailItem } from '@/types';
 import Link from 'next/link';
 import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap } from 'lucide-react';
 import { subDays, format } from 'date-fns';
@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
   const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
   const [panelActivo, setPanelActivo] = useState<string>("panel_ejecutivo");
+  const [modalLeads, setModalLeads] = useState<{ titulo: string; leads: LeadDetailItem[] } | null>(null);
 
   const toggleObjeciones = () => setShowObjeciones((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showObj', String(next)); return next; });
   const toggleVolumen = () => setShowVolumen((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showVol', String(next)); return next; });
@@ -569,6 +570,8 @@ export default function DashboardPage() {
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium">Asesor</th>
                     <th className="px-2 py-2 font-medium">Leads</th>
+                    <th className="px-2 py-2 font-medium">Generados</th>
+                    <th className="px-2 py-2 font-medium">Con actividad</th>
                     <th className="px-2 py-2 font-medium">Llamadas</th>
                     <th className="px-2 py-2 font-medium">Tiempo al lead</th>
                     <th className="px-2 py-2 font-medium">Agendadas</th>
@@ -599,6 +602,24 @@ export default function DashboardPage() {
                             )}
                           </td>
                           <td className="px-2 py-2 text-white">{a.totalLeads}</td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (a.leadsGenerados > 0) setModalLeads({ titulo: `Leads generados — ${a.advisorName}`, leads: a.leadsGeneradosDetalle }); }}
+                              className={clsx('tabular-nums', a.leadsGenerados > 0 ? 'text-accent-amber underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
+                            >
+                              {a.leadsGenerados}
+                            </button>
+                          </td>
+                          <td className="px-2 py-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (a.leadsConActividad > 0) setModalLeads({ titulo: `Leads con actividad — ${a.advisorName}`, leads: a.leadsConActividadDetalle }); }}
+                              className={clsx('tabular-nums', a.leadsConActividad > 0 ? 'text-accent-cyan underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
+                            >
+                              {a.leadsConActividad}
+                            </button>
+                          </td>
                           <td className="px-2 py-2 text-accent-cyan">{a.callsMade}</td>
                           <td className="px-2 py-2 text-gray-300">{a.speedToLeadAvg != null ? minFmt(a.speedToLeadAvg) : '—'}</td>
                           <td className="px-2 py-2 text-accent-purple">{a.meetingsBooked}</td>
@@ -610,7 +631,7 @@ export default function DashboardPage() {
                         </tr>
                         {expandedAdvisor === (a.advisorEmail ?? a.advisorName) && (
                           <tr className="bg-surface-800/60">
-                            <td colSpan={10} className="px-4 py-3">
+                            <td colSpan={12} className="px-4 py-3">
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                                 <div><span className="text-gray-500 block">Llamadas telefónicas</span><span className="text-accent-cyan font-semibold">{a.callsMade}</span></div>
                                 <div><span className="text-gray-500 block">Videollamadas</span><span className="text-accent-purple font-semibold">{a.meetingsBooked}</span></div>
@@ -649,6 +670,40 @@ export default function DashboardPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalLeads && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setModalLeads(null)} aria-hidden />
+          <div className="relative w-full max-w-lg max-h-[85vh] rounded-xl bg-surface-800 border border-surface-500 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-surface-500 shrink-0">
+              <h3 className="font-semibold text-white text-sm">{modalLeads.titulo}</h3>
+              <button type="button" onClick={() => setModalLeads(null)} className="p-2 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {modalLeads.leads.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-4">Sin datos</p>
+              ) : (
+                <ul className="space-y-2">
+                  {modalLeads.leads.map((lead, idx) => (
+                    <li key={lead.email ?? lead.telefono ?? idx} className="rounded-lg bg-surface-700 px-3 py-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-white truncate">{lead.nombre ?? '—'}</span>
+                        {lead.ultimaActividad && <span className="text-gray-500 shrink-0">{lead.ultimaActividad}</span>}
+                      </div>
+                      {(lead.email || lead.telefono) && (
+                        <div className="flex gap-3 mt-0.5 text-gray-400">
+                          {lead.email && <span>{lead.email}</span>}
+                          {lead.telefono && <span>{lead.telefono}</span>}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
