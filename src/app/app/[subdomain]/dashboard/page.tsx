@@ -245,8 +245,8 @@ export default function DashboardPage() {
               if (panelActivo === "rendimiento") return m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos';
               return false;
             });
-            const metricasKPI = metricasDelPanel.filter((m) => m.visualizacion !== "barra" && m.visualizacion !== "comparativo");
-            const metricasBarra = metricasDelPanel.filter((m) => m.visualizacion === "barra" || m.visualizacion === "comparativo");
+            const metricasKPI = metricasDelPanel.filter((m) => m.visualizacion !== "barra");
+            const metricasBarra = metricasDelPanel.filter((m) => m.visualizacion === "barra");
             return (
               <>
                 <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
