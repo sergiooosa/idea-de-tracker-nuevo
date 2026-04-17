@@ -43,6 +43,8 @@ export interface ConfiguracionUI {
   fuente_datos_financieros?: "nativa" | "api_externa";
   chat_config?: ChatConfig;
   idioma?: "es" | "en";
+  /** Columnas visibles en el ranking de asesores. Si undefined → todas visibles. */
+  ranking_columnas?: string[];
 }
 
 export interface ReglaEtiqueta {

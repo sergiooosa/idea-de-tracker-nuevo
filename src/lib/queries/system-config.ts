@@ -33,6 +33,8 @@ export interface SystemConfigData {
   chat_config: ChatConfigData;
   chat_analisis_hora: number;
   idioma: "es" | "en";
+  /** Columnas visibles en el ranking de asesores. Si undefined → todas visibles. */
+  ranking_columnas: string[] | null;
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
@@ -43,6 +45,7 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
   chat_config?: ChatConfigData;
   idioma?: "es" | "en";
   configuracion_ads?: ConfiguracionAds;
+  ranking_columnas?: string[] | null;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -107,6 +110,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       ghl_location_id: null,
       idioma: "es" as const,
       configuracion_ads: {},
+      ranking_columnas: null,
     };
   }
 
@@ -135,6 +139,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     ghl_location_id: r.ghl_location_id ?? null,
     idioma: (r.configuracion_ui?.idioma === "en" ? "en" : "es") as "es" | "en",
     configuracion_ads: (r.configuracion_ads && typeof r.configuracion_ads === "object") ? r.configuracion_ads as ConfiguracionAds : {},
+    ranking_columnas: Array.isArray(r.configuracion_ui?.ranking_columnas) ? r.configuracion_ui.ranking_columnas : null,
   };
 }
 
@@ -178,7 +183,8 @@ export async function updateSystemConfig(
     data.fuente_datos_financieros !== undefined ||
     (data as Record<string, unknown>).seccion_chats_dashboard !== undefined ||
     data.chat_config !== undefined ||
-    data.idioma !== undefined
+    data.idioma !== undefined ||
+    data.ranking_columnas !== undefined
   ) {
     const [row] = await db
       .select({ configuracion_ui: cuentas.configuracion_ui })
@@ -200,6 +206,9 @@ export async function updateSystemConfig(
     }
     if (data.idioma !== undefined) {
       updatedUi.idioma = data.idioma;
+    }
+    if (data.ranking_columnas !== undefined) {
+      updatedUi.ranking_columnas = data.ranking_columnas ?? undefined;
     }
     setClause.configuracion_ui = updatedUi;
   }

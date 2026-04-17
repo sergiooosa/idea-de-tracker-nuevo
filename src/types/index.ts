@@ -509,7 +509,7 @@ export interface DashboardResponse {
   tagsDisponibles?: string[];
   tagCounts?: Record<string, number>;
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
-  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string }[];
+  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[];
   dashboardsPersonalizados?: { id: string; nombre: string; icono?: string }[];
   chatKpis?: ChatKpis;
   alertasMetas?: AlertaMeta[];
@@ -518,6 +518,7 @@ export interface DashboardResponse {
       seccion_chats_dashboard?: boolean;
       [key: string]: boolean | undefined;
     };
+    ranking_columnas?: string[];
     [key: string]: unknown;
   };
   fuente_llamadas?: "twilio" | "ghl";
