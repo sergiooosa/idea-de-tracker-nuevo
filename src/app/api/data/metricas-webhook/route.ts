@@ -50,6 +50,8 @@ export async function GET(req: Request) {
     let sumaPorCampo: Record<string, number> = {};
     // Desglose por usuario (ghl_user_id) en el rango
     let desgloseUsuario: Record<string, Record<string, number>> = {};
+    // Desglose por contacto/lead (ghl_customer_id) en el rango
+    let desgloseCliente: Record<string, Record<string, number>> = {};
 
     if (from && to) {
       const sumas = await db.execute(sql`
@@ -80,12 +82,30 @@ export async function GET(req: Request) {
         if (!desgloseUsuario[campo]) desgloseUsuario[campo] = {};
         desgloseUsuario[campo][userId] = parseFloat(String(row.total ?? 0));
       }
+
+      // Desglose por contacto/lead — solo filas con ghl_customer_id
+      const porCliente = await db.execute(sql`
+        SELECT campo, ghl_customer_id, SUM(valor) as total
+        FROM metricas_webhook
+        WHERE id_cuenta = ${idCuenta}
+          AND fecha BETWEEN ${from}::date AND ${to}::date
+          AND ghl_customer_id IS NOT NULL
+        GROUP BY campo, ghl_customer_id
+        ORDER BY campo, total DESC
+      `);
+      for (const row of porCliente.rows as Array<Record<string, unknown>>) {
+        const campo = String(row.campo);
+        const customerId = String(row.ghl_customer_id);
+        if (!desgloseCliente[campo]) desgloseCliente[campo] = {};
+        desgloseCliente[campo][customerId] = parseFloat(String(row.total ?? 0));
+      }
     }
 
     return NextResponse.json({
       campos: Object.values(map),
       suma_por_campo: sumaPorCampo,
       desglose_usuario: desgloseUsuario,
+      desglose_cliente: desgloseCliente,
       total_campos: Object.keys(map).length,
     });
   });
