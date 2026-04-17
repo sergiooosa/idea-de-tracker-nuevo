@@ -3,6 +3,34 @@ import type { NextRequest } from "next/server";
 import { decode } from "@auth/core/jwt";
 import { normalizeSubdominio } from "@/lib/subdomain";
 
+// Dominios GHL estándar permitidos para embedding como iframe
+const GHL_FRAME_ORIGINS = [
+  "https://*.myghl.com",
+  "https://*.gohighlevel.com",
+  "https://*.leadconnectorhq.com",
+  "https://*.msgsndr.com",
+].join(" ");
+
+// Dominios embed personalizados por subdominio (para clientes WL y CRMs externos).
+// Formato env: EMBED_DOMAINS={"tracker-ikigai":"https://app.ikigai.com.ec","patrimonio-para-tu-familia":"https://crmpatrimonioparatufamilia.netlify.app"}
+let embedDomainsMap: Record<string, string> = {};
+try {
+  embedDomainsMap = JSON.parse(process.env.EMBED_DOMAINS ?? "{}");
+} catch {
+  // Env var malformada — continuar sin dominios custom
+}
+
+function buildFrameAncestorsCsp(subdomain: string): string {
+  const extra = embedDomainsMap[subdomain];
+  const origins = extra ? `${GHL_FRAME_ORIGINS} ${extra}` : GHL_FRAME_ORIGINS;
+  return `frame-ancestors 'self' ${origins}`;
+}
+
+function setCspHeaders(response: NextResponse, subdomain: string | null): NextResponse {
+  response.headers.set("Content-Security-Policy", buildFrameAncestorsCsp(subdomain ?? ""));
+  return response;
+}
+
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 const isProduction = process.env.NODE_ENV === "production";
 const COOKIE_NAME = isProduction
@@ -163,7 +191,7 @@ export default async function middleware(req: NextRequest) {
     // Ya estamos en /login del subdominio → rewrite al login del dominio raíz
     const internalUrl = req.nextUrl.clone();
     internalUrl.pathname = "/login";
-    return NextResponse.rewrite(internalUrl);
+    return setCspHeaders(NextResponse.rewrite(internalUrl), subdomain);
   }
 
   // Raíz del subdominio → /dashboard
@@ -182,7 +210,7 @@ export default async function middleware(req: NextRequest) {
   // Rewrite interno: testv1.autokpi.net/dashboard → /app/testv1/dashboard
   const url = req.nextUrl.clone();
   url.pathname = `/app/${subdomain}${pathname}`;
-  return NextResponse.rewrite(url);
+  return setCspHeaders(NextResponse.rewrite(url), subdomain);
 }
 
 export const config = {
