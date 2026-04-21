@@ -172,11 +172,19 @@ export async function getDashboard(
     // newLeadEvents no tiene tags_internos en la query selectiva — no filtrar por tags
   }
 
-  const asistidas = filteredAgendas.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
+  // Un registro con cash_collected > 0 se considera cierre aunque la categoría no diga "Cerrada".
+  // Esto cubre casos como Serentis donde los agentes cobran pero no marcan la etapa correcta.
+  const hasCash = (a: (typeof filteredAgendas)[0]) =>
+    (parseFloat(a.cash_collected || "0") || 0) > 0;
+  const asistidas = filteredAgendas.filter((a) =>
+    attendedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)
+  ).length;
   const canceladas = filteredAgendas.filter((a) =>
     (a.categoria ?? "").toLowerCase().includes("cancel")
   ).length;
-  const cerradas = filteredAgendas.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
+  const cerradas = filteredAgendas.filter((a) =>
+    closedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)
+  ).length;
   const efectivas = filteredAgendas.filter((a) => effectiveSet.has((a.categoria ?? "").toLowerCase().trim())).length;
   // revenue: sumar facturacion de agendas "cerradas". Si closedSet no captura nada
   // (embudo personalizado con nombres distintos), usar cualquier agenda con facturacion > 0.
@@ -414,7 +422,7 @@ export async function getDashboard(
     if (!d) continue;
     if (!volumeMap[d]) volumeMap[d] = { date: d, llamadas: 0, citasPresentaciones: 0, cierres: 0 };
     volumeMap[d].citasPresentaciones++;
-    if (closedSet.has((a.categoria ?? "").toLowerCase().trim())) volumeMap[d].cierres++;
+    if (closedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)) volumeMap[d].cierres++;
   }
   const volumeByDay = Object.values(volumeMap).sort((a, b) =>
     String(a.date).localeCompare(String(b.date)),
