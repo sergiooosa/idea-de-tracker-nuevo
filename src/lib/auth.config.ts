@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import type { RolConfig } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { PERMISOS_DISPONIBLES } from "@/lib/permisos";
 import { normalizeSubdominio } from "@/lib/subdomain";
 
@@ -65,6 +65,18 @@ export const authConfig: NextAuthConfig = {
         }
 
         try {
+          // Cuando viene subdominio_override (selección de cuenta en login multi-tenant),
+          // filtrar también por subdominio para obtener el registro correcto del usuario
+          // (id_cuenta y pass) para esa cuenta específica. Sin este filtro, .limit(1)
+          // puede devolver la cuenta equivocada, haciendo fallar la verificación de password
+          // o almacenando un id_cuenta incorrecto en el JWT.
+          const whereClause = subdominioOverride
+            ? and(
+                eq(usuariosDashboard.email, email),
+                eq(cuentas.subdominio, subdominioOverride),
+              )
+            : eq(usuariosDashboard.email, email);
+
           const result = await db
             .select({
               id_evento: usuariosDashboard.id_evento,
@@ -82,11 +94,11 @@ export const authConfig: NextAuthConfig = {
               cuentas,
               eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta),
             )
-            .where(eq(usuariosDashboard.email, email))
+            .where(whereClause)
             .limit(1);
 
           if (result.length === 0) {
-            console.error("[auth] usuario no encontrado:", email);
+            console.error("[auth] usuario no encontrado:", email, subdominioOverride ? `(subdominio: ${subdominioOverride})` : "");
             return null;
           }
 
@@ -107,11 +119,7 @@ export const authConfig: NextAuthConfig = {
 
           const permisosArray = resolvePermisos(user.rol, user.roles_config);
 
-          // Si el usuario tiene múltiples cuentas y se especificó un subdominio,
-          // usarlo en vez del que retornó el .limit(1)
-          const subdominioFinal = subdominioOverride
-            ? normalizeSubdominio(subdominioOverride) ?? subdominioOverride
-            : (normalizeSubdominio(user.subdominio) ?? user.subdominio);
+          const subdominioFinal = normalizeSubdominio(user.subdominio) ?? user.subdominio;
 
           return {
             id: String(user.id_evento),

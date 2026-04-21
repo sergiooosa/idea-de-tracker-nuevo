@@ -111,16 +111,27 @@ export default function LoginForm() {
                 onClick={async () => {
                   setAccountLoading(acc.id_cuenta);
                   try {
-                    const result = await loginAction({
-                      email,
-                      password,
-                      subdominio_override: acc.subdominio,
+                    // Usar switch-account en lugar de re-autenticar con contraseña.
+                    // El usuario ya está autenticado desde el primer signIn; re-verificar
+                    // el password contra CADA cuenta falla si los hashes difieren entre cuentas.
+                    const switchResp = await fetch("/api/auth/switch-account", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ subdominio: acc.subdominio }),
                     });
-                    if ("error" in result && result.error) {
-                      setError(result.error);
-                      setAccounts(null);
-                      setAccountLoading(null);
-                      return;
+                    if (!switchResp.ok) {
+                      // Fallback: si el switch falla (ej. sesión expirada), re-autenticar
+                      const result = await loginAction({
+                        email,
+                        password,
+                        subdominio_override: acc.subdominio,
+                      });
+                      if ("error" in result && result.error) {
+                        setError(result.error);
+                        setAccounts(null);
+                        setAccountLoading(null);
+                        return;
+                      }
                     }
                     window.location.href = buildUrl(acc.subdominio);
                   } catch {
