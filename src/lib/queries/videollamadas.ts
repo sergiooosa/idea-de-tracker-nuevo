@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
-import { eq, and, or, gte, lte, sql, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import type {
   ApiVideollamada,
   VideollamadasAdvisorMetrics,
@@ -57,8 +57,6 @@ export async function getVideollamadas(
   dateTo: string,
   closerEmails?: string[],
 ): Promise<VideollamadasResponse> {
-  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
-  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
 
   // Resolver nombre_closer para cada email — Fathom a veces guarda nombre en lugar de email
@@ -73,21 +71,14 @@ export async function getVideollamadas(
     }
   }
 
-  const fechaFilter = or(
-    and(
-      isNotNull(resumenesDiariosAgendas.fecha_reunion),
-      gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
-      lte(resumenesDiariosAgendas.fecha_reunion, toDate),
-    ),
-    and(
-      isNull(resumenesDiariosAgendas.fecha_reunion),
-      gte(resumenesDiariosAgendas.fecha, dateFrom),
-      lte(resumenesDiariosAgendas.fecha, dateTo),
-    ),
-  )!;
+  // Filtrar siempre por `fecha` (date string asignado por Cerebro al procesar el webhook).
+  // No usar `fecha_reunion` para el rango de fechas porque es un timestamp UTC que puede
+  // caer en un día distinto al de la fecha local del cliente (ej: reunión 22:30 UTC = 00:30
+  // del día siguiente en UTC+2). `fecha` es la fecha canónica que ve el usuario.
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-    fechaFilter,
+    gte(resumenesDiariosAgendas.fecha, dateFrom),
+    lte(resumenesDiariosAgendas.fecha, dateTo),
   ];
   if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
