@@ -17,13 +17,20 @@ export default function LoginForm() {
   const [pendingSwitchSubdominio, setPendingSwitchSubdominio] = useState<string | null>(null);
   const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
 
-  // Si viene de un account switch, leer el subdominio destino y auto-seleccionarlo tras login
+  // Si viene de un account switch o redirigido desde un subdominio, auto-seleccionar la cuenta correcta
   useEffect(() => {
+    // sessionStorage: usado cuando el usuario cambia de cuenta desde el dashboard
     const pending = sessionStorage.getItem("autokpi_switch_subdominio");
     if (pending) {
       sessionStorage.removeItem("autokpi_switch_subdominio");
       setPendingSwitchSubdominio(pending);
+      return;
     }
+    // ?from=subdominio: añadido por el middleware cuando redirige desde un subdominio sin sesión
+    // Permite pre-seleccionar automáticamente la cuenta correcta para usuarios multi-cuenta
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from");
+    if (from) setPendingSwitchSubdominio(from);
   }, []);
 
   const buildUrl = (subdominio: string) => {

@@ -102,11 +102,11 @@ export default async function middleware(req: NextRequest) {
 
   // ── Dominio raíz (autokpi.net) ──────────────────────────────────────────
   if (isRoot) {
-    if (pathname.startsWith("/api/auth")) return NextResponse.next();
+    if (pathname.startsWith("/api/auth")) return setCspHeaders(NextResponse.next(), subdomain);
 
     // /demo → público en dominio raíz también
     if (pathname === "/demo" || pathname.startsWith("/demo/")) {
-      return NextResponse.next();
+      return setCspHeaders(NextResponse.next(), subdomain);
     }
 
     const session = await getSession(req);
@@ -142,16 +142,16 @@ export default async function middleware(req: NextRequest) {
       }
     }
 
-    return NextResponse.next();
+    return setCspHeaders(NextResponse.next(), subdomain);
   }
 
   // ── Subdominio tenant (ej. testv1.autokpi.net) ──────────────────────────
   // Todas las rutas /api/* pasan directo sin reescribir
-  if (pathname.startsWith("/api")) return NextResponse.next();
+  if (pathname.startsWith("/api")) return setCspHeaders(NextResponse.next(), subdomain);
 
   // Ruta /demo → pública, sin auth
   if (pathname === "/demo" || pathname.startsWith("/demo/")) {
-    return NextResponse.next();
+    return setCspHeaders(NextResponse.next(), subdomain);
   }
 
   const session = await getSession(req);
@@ -172,8 +172,14 @@ export default async function middleware(req: NextRequest) {
 
   if (needsLogin) {
     if (pathname !== "/login") {
-      const loginUrl = req.nextUrl.clone();
-      loginUrl.pathname = "/login";
+      // Redirigir siempre al login del dominio raíz (no al login del subdominio).
+      // El login de subdominio causaba bucles con usuarios multi-cuenta: la cookie
+      // se establecía para .autokpi.net pero el flujo de switch-account fallaba
+      // en ciertos contextos de subdominio. El parámetro `from` permite al login
+      // pre-seleccionar automáticamente la cuenta correcta.
+      const loginUrlStr = buildLoginUrl();
+      const loginUrl = new URL(loginUrlStr);
+      if (subdomain) loginUrl.searchParams.set("from", subdomain);
       const response = NextResponse.redirect(loginUrl);
 
       // Cookie de otro tenant → limpiarla antes de ir al login
@@ -188,10 +194,11 @@ export default async function middleware(req: NextRequest) {
 
       return response;
     }
-    // Ya estamos en /login del subdominio → rewrite al login del dominio raíz
-    const internalUrl = req.nextUrl.clone();
-    internalUrl.pathname = "/login";
-    return setCspHeaders(NextResponse.rewrite(internalUrl), subdomain);
+
+
+    // Ya estamos en /login del dominio raíz (o acceso directo a subdomain/login)
+    // → servir normalmente
+    return setCspHeaders(NextResponse.next(), subdomain);
   }
 
   // Raíz del subdominio → /dashboard
@@ -204,7 +211,7 @@ export default async function middleware(req: NextRequest) {
   // /demo no se reescribe — la ruta vive en /app/demo directamente
   // (ya fue permitida sin auth arriba, pero si llega aquí por otra razón, la dejamos pasar)
   if (pathname === "/demo" || pathname.startsWith("/demo/")) {
-    return NextResponse.next();
+    return setCspHeaders(NextResponse.next(), subdomain);
   }
 
   // Rewrite interno: testv1.autokpi.net/dashboard → /app/testv1/dashboard
