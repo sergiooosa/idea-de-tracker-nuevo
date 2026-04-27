@@ -131,7 +131,18 @@ export async function getVideollamadas(
 
   const asistidas = registros.filter((r) => r.attended).length;
   const canceladas = registros.filter((r) => r.canceled).length;
-  const noShows = registros.filter((r) => r.outcome === "no_show").length;
+  // Deduplicar no-shows por lead único (GHL puede enviar el mismo evento múltiples veces)
+  const uniqueNoShowLeads = new Set(
+    registros
+      .filter((r) => r.outcome === "no_show")
+      .map((r) =>
+        r.idcliente?.trim() ||
+        r.ghl_contact_id?.trim() ||
+        r.leadEmail?.trim().toLowerCase() ||
+        `nokey_${r.id}`
+      )
+  );
+  const noShows = uniqueNoShowLeads.size;
   const efectivas = registros.filter((r) => r.attended && r.qualified).length;
   const cerradas = registros.filter((r) => r.outcome === "cerrado").length;
   const revenue = registros.reduce((s, r) => s + r.facturacion, 0);
