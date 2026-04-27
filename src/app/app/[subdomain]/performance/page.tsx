@@ -56,7 +56,7 @@ function apiToVideoMeeting(r: ApiVideollamada): VideoMeeting {
 
 export default function PerformanceVideollamadasPage() {
   const t = useT();
-  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
+  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
   const [modalSelectorMeetings, setModalSelectorMeetings] = useState<VideoMeeting[] | null>(null);

@@ -179,9 +179,12 @@ export async function getDashboard(
   const asistidas = filteredAgendas.filter((a) =>
     attendedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)
   ).length;
-  const canceladas = filteredAgendas.filter((a) =>
-    (a.categoria ?? "").toLowerCase().includes("cancel")
-  ).length;
+  // Deduplicar canceladas por lead único (GHL puede enviar el mismo evento múltiples veces)
+  const canceladas = new Set(
+    filteredAgendas
+      .filter((a) => (a.categoria ?? "").toLowerCase().includes("cancel"))
+      .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+  ).size;
   const cerradas = filteredAgendas.filter((a) =>
     closedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)
   ).length;
@@ -286,7 +289,12 @@ export async function getDashboard(
     asistidas,
     canceladas,
     efectivas,
-    noShows: filteredAgendas.filter((a) => (a.categoria ?? "").toLowerCase() === "no_show").length,
+    // Deduplicar no-shows por lead único (GHL puede enviar el mismo evento múltiples veces)
+    noShows: new Set(
+      filteredAgendas
+        .filter((a) => (a.categoria ?? "").toLowerCase() === "no_show")
+        .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+    ).size,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
   };
 
