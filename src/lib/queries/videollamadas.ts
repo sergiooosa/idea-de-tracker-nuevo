@@ -130,7 +130,18 @@ export async function getVideollamadas(
   });
 
   const asistidas = registros.filter((r) => r.attended).length;
-  const canceladas = registros.filter((r) => r.canceled).length;
+  // Deduplicar canceladas por lead único (igual que agendadas y noShows)
+  const uniqueCanceledLeads = new Set(
+    registros
+      .filter((r) => r.canceled)
+      .map((r) =>
+        r.idcliente?.trim() ||
+        r.ghl_contact_id?.trim() ||
+        r.leadEmail?.trim().toLowerCase() ||
+        `nokey_${r.id}`
+      )
+  );
+  const canceladas = uniqueCanceledLeads.size;
   // Deduplicar no-shows por lead único (GHL puede enviar el mismo evento múltiples veces)
   const uniqueNoShowLeads = new Set(
     registros
