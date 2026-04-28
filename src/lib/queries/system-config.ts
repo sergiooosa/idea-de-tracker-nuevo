@@ -35,6 +35,8 @@ export interface SystemConfigData {
   idioma: "es" | "en";
   /** Columnas visibles en el ranking de asesores. Si undefined → todas visibles. */
   ranking_columnas: string[] | null;
+  /** Control de notas en GHL tras procesar videollamada de Fathom */
+  ghl_notas?: { ia?: boolean; transcripcion?: boolean };
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
@@ -46,6 +48,7 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
   idioma?: "es" | "en";
   configuracion_ads?: ConfiguracionAds;
   ranking_columnas?: string[] | null;
+  ghl_notas?: { ia?: boolean; transcripcion?: boolean };
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -140,6 +143,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     idioma: (r.configuracion_ui?.idioma === "en" ? "en" : "es") as "es" | "en",
     configuracion_ads: (r.configuracion_ads && typeof r.configuracion_ads === "object") ? r.configuracion_ads as ConfiguracionAds : {},
     ranking_columnas: Array.isArray(r.configuracion_ui?.ranking_columnas) ? r.configuracion_ui.ranking_columnas : null,
+    ghl_notas: r.configuracion_ui?.ghl_notas ?? { ia: true, transcripcion: false },
   };
 }
 
@@ -184,7 +188,8 @@ export async function updateSystemConfig(
     (data as Record<string, unknown>).seccion_chats_dashboard !== undefined ||
     data.chat_config !== undefined ||
     data.idioma !== undefined ||
-    data.ranking_columnas !== undefined
+    data.ranking_columnas !== undefined ||
+    (data as Record<string, unknown>).ghl_notas !== undefined
   ) {
     const [row] = await db
       .select({ configuracion_ui: cuentas.configuracion_ui })
@@ -209,6 +214,9 @@ export async function updateSystemConfig(
     }
     if (data.ranking_columnas !== undefined) {
       updatedUi.ranking_columnas = data.ranking_columnas ?? undefined;
+    }
+    if ((data as Record<string, unknown>).ghl_notas !== undefined) {
+      updatedUi.ghl_notas = (data as Record<string, unknown>).ghl_notas as { ia?: boolean; transcripcion?: boolean };
     }
     setClause.configuracion_ui = updatedUi;
   }

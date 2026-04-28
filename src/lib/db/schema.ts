@@ -45,6 +45,13 @@ export interface ConfiguracionUI {
   idioma?: "es" | "en";
   /** Columnas visibles en el ranking de asesores. Si undefined → todas visibles. */
   ranking_columnas?: string[];
+  /** Notas GHL: controla qué se guarda en GHL después de procesar una videollamada de Fathom */
+  ghl_notas?: {
+    /** Guardar nota con el análisis IA (categoría, etiquetas, resumen). Default: true */
+    ia?: boolean;
+    /** Guardar nota con la transcripción completa. Default: false (consume tokens, puede fallar por límite de 65k chars) */
+    transcripcion?: boolean;
+  };
 }
 
 export interface ReglaEtiqueta {

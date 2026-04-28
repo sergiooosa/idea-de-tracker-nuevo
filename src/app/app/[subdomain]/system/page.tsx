@@ -118,6 +118,7 @@ interface SystemConfig {
   roles_config?: RolConfigLocal[];
   idioma?: 'es' | 'en';
   configuracion_ads?: ConfiguracionAdsLocal;
+  ghl_notas?: { ia?: boolean; transcripcion?: boolean };
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -238,6 +239,8 @@ export default function SystemPage() {
     emoji_toma_atencion: '',
   });
   const [chatAnalisisHora, setChatAnalisisHora] = useState<number>(2);
+  const [ghlNotasIa, setGhlNotasIa] = useState<boolean>(true);
+  const [ghlNotasTranscripcion, setGhlNotasTranscripcion] = useState<boolean>(false);
   const [analizandoChats, setAnalizandoChats] = useState(false);
   const [analisisResult, setAnalisisResult] = useState<{ processed: number; updated: number; errors: number; costEstimate: string } | null>(null);
   const [reglasAbiertasMap, setReglasAbiertasMap] = useState<Record<string, boolean>>({});
@@ -315,6 +318,10 @@ export default function SystemPage() {
         }
         if (typeof cfg.chat_analisis_hora === 'number') {
           setChatAnalisisHora(cfg.chat_analisis_hora);
+        }
+        if (cfg.ghl_notas) {
+          setGhlNotasIa(cfg.ghl_notas.ia !== false); // default true
+          setGhlNotasTranscripcion(cfg.ghl_notas.transcripcion === true); // default false
         }
         if (Array.isArray(cfg.roles_config)) {
           setRolesConfig(cfg.roles_config);
@@ -403,6 +410,7 @@ export default function SystemPage() {
         seccion_chats_dashboard: seccionChatsDashboard,
         chat_config: chatConfig,
         chat_analisis_hora: chatAnalisisHora,
+        ghl_notas: { ia: ghlNotasIa, transcripcion: ghlNotasTranscripcion },
         fuente_llamadas: fuenteLlamadas,
         ghl_location_id: ghlLocationId.trim() || null,
       };
@@ -597,6 +605,51 @@ export default function SystemPage() {
                 className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-colors"
                 placeholder="Evalúa la videollamada según..." />
               <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
+
+              {/* ── Sección: Notas en GHL después de videollamada ── */}
+              <div className="rounded-xl border border-accent-amber/30 bg-accent-amber/5 p-4 space-y-4">
+                <h4 className="text-sm font-semibold text-accent-amber flex items-center gap-2">
+                  📝 Notas en GHL después de videollamada
+                </h4>
+                <p className="text-sm text-gray-400">
+                  Cuando Fathom envía una grabación, el sistema puede guardar notas automáticamente en el contacto de GHL.
+                  Elige qué quieres guardar — cada nota consume recursos del servidor y puede fallar si la transcripción es muy larga.
+                </p>
+
+                {/* Toggle: Nota IA */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 space-y-1">
+                    <span className="text-sm text-white font-medium">Nota de análisis IA</span>
+                    <p className="text-[11px] text-gray-500">
+                      Guarda en GHL: categoría del lead, etiquetas detectadas y resumen del análisis. Breve y siempre dentro del límite.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setGhlNotasIa((v) => !v)}
+                    className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${ghlNotasIa ? 'bg-accent-green' : 'bg-surface-500'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ghlNotasIa ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                {/* Toggle: Transcripción completa */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 space-y-1">
+                    <span className="text-sm text-white font-medium">Nota con transcripción completa</span>
+                    <p className="text-[11px] text-gray-500">
+                      Guarda el texto completo de la reunión en GHL. <span className="text-accent-amber">⚠️</span> Las transcripciones largas (&gt;65k caracteres) pueden fallar por límite de GHL. Recomendado solo si realmente lo necesitas.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setGhlNotasTranscripcion((v) => !v)}
+                    className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${ghlNotasTranscripcion ? 'bg-accent-green' : 'bg-surface-500'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ghlNotasTranscripcion ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
