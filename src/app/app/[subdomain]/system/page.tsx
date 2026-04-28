@@ -715,9 +715,19 @@ export default function SystemPage() {
                             className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
                           >
                             <option value="">— Seleccionar —</option>
-                            {metricasConfig.filter((m) => m.tipo === 'manual' || m.tipo === 'fija').map((m) => (
-                              <option key={m.id} value={m.id}>{m.nombre}</option>
-                            ))}
+                            {/* manual/fija: incremento escrito en metricas_manual_data
+                                webhook: incremento escrito en metricas_webhook (compatible con el engine) */}
+                            {metricasConfig
+                              .filter((m) => m.tipo === 'manual' || m.tipo === 'fija' || m.tipo === 'webhook')
+                              .sort((a, b) => {
+                                const order: Record<string, number> = { manual: 0, fija: 1, webhook: 2 };
+                                return (order[a.tipo] ?? 9) - (order[b.tipo] ?? 9);
+                              })
+                              .map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.nombre}{m.tipo === 'webhook' ? ' (webhook)' : ''}
+                                </option>
+                              ))}
                           </select>
                         </div>
                         <div>

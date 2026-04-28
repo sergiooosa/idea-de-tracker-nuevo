@@ -581,8 +581,20 @@ export async function getDashboard(
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
       } else if (m.tipo === "webhook") {
-        // Suma del campo webhook en el período
-        valor = m.webhookCampo ? (webhookSumas[m.webhookCampo] ?? 0) : 0;
+        // Suma del campo webhook en el período (fuente API externa)
+        let baseWebhook = m.webhookCampo ? (webhookSumas[m.webhookCampo] ?? 0) : 0;
+        // Sumar también incrementos manuales (de reglas de etiquetas vía Cerebro)
+        // que se almacenan en metricas_manual_data con estructura {date, valor}
+        const manualEntries = (manualData[m.id] ?? []) as Array<{date?: string; valor?: number}>;
+        if (manualEntries.length > 0) {
+          const fromTs = new Date(`${dateFrom}T00:00:00Z`).getTime();
+          const toTs = new Date(`${dateTo}T23:59:59.999Z`).getTime();
+          const manualSum = manualEntries
+            .filter(e => { const d = e.date ? new Date(e.date).getTime() : 0; return d >= fromTs && d <= toTs; })
+            .reduce((s, e) => s + (e.valor ?? 0), 0);
+          baseWebhook += manualSum;
+        }
+        valor = baseWebhook;
       } else {
         valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
       }
