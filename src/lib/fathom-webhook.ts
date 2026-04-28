@@ -1,12 +1,14 @@
 /**
  * Registra un webhook en Fathom apuntando al Cerebro: POST /webhooks/fathom/:idCuenta
  */
+import { API_BASE_URL } from "@/lib/api-config";
+
 export type RegistrarWebhookFathomResult =
   | { ok: true; webhookId: string }
   | { ok: false; error: string };
 
 export function getFathomDestinationUrl(idCuenta: number): string {
-  const base = (process.env.API_BASE_URL ?? "https://api.autokpi.net").replace(/\/$/, "");
+  const base = API_BASE_URL.replace(/\/$/, "");
   return `${base}/webhooks/fathom/${idCuenta}`;
 }
 
