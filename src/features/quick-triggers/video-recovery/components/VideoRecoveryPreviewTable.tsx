@@ -12,14 +12,14 @@ interface VideoRecoveryPreviewTableProps {
   selectedRecordingIds: Set<number>;
   actionOverrides: Map<number, SuggestedAction>;
   estadoFilter: string;
-  actionFilter: "all" | SuggestedAction;
+  actionFilter: "all" | "no_skip" | SuggestedAction;
   onToggleSelection: (recordingId: number) => void;
   onSelectRecoverable: () => void;
   onClearSelection: () => void;
   onSetBulkAction: (action: SuggestedAction) => void;
   onSetActionForRow: (recordingId: number, action: SuggestedAction) => void;
   onChangeEstadoFilter: (next: string) => void;
-  onChangeActionFilter: (next: "all" | SuggestedAction) => void;
+  onChangeActionFilter: (next: "all" | "no_skip" | SuggestedAction) => void;
 }
 
 function actionVariant(action: SuggestedAction): "default" | "secondary" | "outline" {
@@ -62,7 +62,7 @@ export function VideoRecoveryPreviewTable({
   const filteredItems = items.filter((item) => {
     const localAction = getLocalAction(item, actionOverrides);
     const matchesEstado = estadoFilter === "all" || item.estado_bd_actual === estadoFilter;
-    const matchesAction = actionFilter === "all" || localAction === actionFilter;
+    const matchesAction = actionFilter === "all" || (actionFilter === "no_skip" ? localAction !== "skip" : localAction === actionFilter);
     return matchesEstado && matchesAction;
   });
 
@@ -119,13 +119,14 @@ export function VideoRecoveryPreviewTable({
             className="h-8 rounded-md border border-surface-500 bg-surface-700 px-2 text-xs text-white"
             value={actionFilter}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              onChangeActionFilter(event.target.value as "all" | SuggestedAction)
+              onChangeActionFilter(event.target.value as "all" | "no_skip" | SuggestedAction)
             }
           >
-            <option value="all">all</option>
-            <option value="recover_existing">recover_existing</option>
-            <option value="create_if_missing">create_if_missing</option>
-            <option value="skip">skip</option>
+            <option value="all">Todas</option>
+            <option value="no_skip">Pendientes de acción</option>
+            <option value="recover_existing">Recuperar existente</option>
+            <option value="create_if_missing">Crear si falta</option>
+            <option value="skip">Ya procesadas</option>
           </select>
         </label>
       </div>

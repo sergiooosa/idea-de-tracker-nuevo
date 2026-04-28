@@ -49,7 +49,8 @@ export function VideoRecoveryPage() {
   );
   const [executionResult, setExecutionResult] = useState<VideoRecoveryExecuteAggregate | null>(null);
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
-  const [actionFilter, setActionFilter] = useState<"all" | SuggestedAction>("all");
+  // Por defecto ocultar las ya procesadas ("skip") — solo mostrar las que necesitan acción
+  const [actionFilter, setActionFilter] = useState<"all" | "no_skip" | SuggestedAction>("no_skip");
   const [values, setValues] = useState<VideoRecoveryFiltersValues>({
     id_evento: "",
     from: toInitialDateTimeLocal(24),
