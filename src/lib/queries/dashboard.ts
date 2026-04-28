@@ -334,6 +334,10 @@ export async function getDashboard(
     advisorMap[existingKey].agendas.push(a);
   }
 
+  // webhookPorUsuario debe declararse ANTES del loop de advisorRanking
+  // (se llena después con los webhookRows, pero necesita existir para el closure)
+  const webhookPorUsuario: Record<string, Record<string, number>> = {};
+
   const advisorRanking: DashboardAdvisorRow[] = Object.entries(advisorMap).map(
     ([key, { calls: ac, agendas: aa }]) => {
       const aContestadas = ac.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
@@ -539,8 +543,7 @@ export async function getDashboard(
     webhookSeriesPorCampo[key][fecha] = (webhookSeriesPorCampo[key][fecha] ?? 0) + parseFloat(String(row.valor ?? 0));
   }
 
-  // webhookPorUsuario: métricas webhook agrupadas por ghl_user_id
-  const webhookPorUsuario: Record<string, Record<string, number>> = {};
+  // Poblar webhookPorUsuario (declarado antes del loop de advisorRanking)
   for (const row of webhookRows) {
     if (!row.ghl_user_id) continue;
     const uid = row.ghl_user_id;
