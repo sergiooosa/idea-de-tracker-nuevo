@@ -412,6 +412,7 @@ export async function getDashboard(
         cashCollected: aCash,
         contactRate: ac.length > 0 ? aContestadas / ac.length : 0,
         bookingRate: aLeads > 0 ? aa.length / aLeads : 0,
+        metricasWebhook: webhookPorUsuario[ac[0]?.closer_mail ?? key] ?? {},
       };
     },
   );
@@ -520,7 +521,7 @@ export async function getDashboard(
 
   // Cargar datos de metricas_webhook para el período (suma por campo)
   const webhookRows = await db
-    .select({ campo: metricasWebhook.campo, valor: metricasWebhook.valor, fecha: metricasWebhook.fecha })
+    .select({ campo: metricasWebhook.campo, valor: metricasWebhook.valor, fecha: metricasWebhook.fecha, ghl_user_id: metricasWebhook.ghl_user_id })
     .from(metricasWebhook)
     .where(and(
       eq(metricasWebhook.id_cuenta, idCuenta),
@@ -536,6 +537,15 @@ export async function getDashboard(
     webhookSumas[key] = (webhookSumas[key] ?? 0) + parseFloat(String(row.valor ?? 0));
     if (!webhookSeriesPorCampo[key]) webhookSeriesPorCampo[key] = {};
     webhookSeriesPorCampo[key][fecha] = (webhookSeriesPorCampo[key][fecha] ?? 0) + parseFloat(String(row.valor ?? 0));
+  }
+
+  // webhookPorUsuario: métricas webhook agrupadas por ghl_user_id
+  const webhookPorUsuario: Record<string, Record<string, number>> = {};
+  for (const row of webhookRows) {
+    if (!row.ghl_user_id) continue;
+    const uid = row.ghl_user_id;
+    if (!webhookPorUsuario[uid]) webhookPorUsuario[uid] = {};
+    webhookPorUsuario[uid][row.campo] = (webhookPorUsuario[uid][row.campo] ?? 0) + parseFloat(String(row.valor ?? 0));
   }
   const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
   const metricasValores: Record<string, string | number> = {};

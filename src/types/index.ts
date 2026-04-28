@@ -423,6 +423,7 @@ export interface DashboardAdvisorRow {
   cashCollected: number;
   contactRate: number;
   bookingRate: number;
+  metricasWebhook?: Record<string, number>;
 }
 
 export interface DashboardVolumeDay {

@@ -74,6 +74,20 @@ export default function DashboardPage() {
   const volumeByDay = data?.volumeByDay ?? [];
   const advisorRanking = data?.advisorRanking ?? [];
 
+  // Extraer columnas webhook dinámicamente
+  const webhookRankingCols = useMemo(() => {
+    const fields = new Set<string>();
+    for (const advisor of advisorRanking) {
+      const webhook = advisor.metricasWebhook ?? {};
+      for (const field of Object.keys(webhook)) {
+        fields.add(field);
+      }
+    }
+    return Array.from(fields)
+      .sort()
+      .map((field) => ({ key: field, label: field }));
+  }, [advisorRanking]);
+
   // Inicializar columnas de ranking desde la config del tenant (solo la primera vez que llegan datos)
   useEffect(() => {
     if (!rankingColsInitialized && data?.configuracion_ui?.ranking_columnas) {
@@ -703,6 +717,9 @@ export default function DashboardPage() {
                     {rankingColsVisible.includes('efectivo') && <th className="px-2 py-2 font-medium">Efectivo</th>}
                     {rankingColsVisible.includes('tasa_contacto') && <th className="px-2 py-2 font-medium">Tasa contacto</th>}
                     {rankingColsVisible.includes('tasa_agend') && <th className="px-2 py-2 font-medium">Tasa agend.</th>}
+                    {webhookRankingCols.map((col) => (
+                      <th key={col.key} className="px-2 py-2 font-medium">{col.label}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -755,6 +772,11 @@ export default function DashboardPage() {
                           {rankingColsVisible.includes('efectivo') && <td className="px-2 py-2 text-accent-green">{fm(a.cashCollected)}</td>}
                           {rankingColsVisible.includes('tasa_contacto') && <td className="px-2 py-2">{pctFmt(a.contactRate)}</td>}
                           {rankingColsVisible.includes('tasa_agend') && <td className="px-2 py-2">{pctFmt(a.bookingRate)}</td>}
+                          {webhookRankingCols.map((col) => (
+                            <td key={col.key} className="px-2 py-2 text-gray-300">
+                              {a.metricasWebhook?.[col.key] ?? '—'}
+                            </td>
+                          ))}
                         </tr>
                         {expandedAdvisor === (a.advisorEmail ?? a.advisorName) && (
                           <tr className="bg-surface-800/60">
