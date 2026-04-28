@@ -52,7 +52,6 @@ export default function DashboardPage() {
   const [showObjeciones, setShowObjeciones] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showObj') !== 'false' : true);
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
   const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
-  const [panelActivo, setPanelActivo] = useState<string>("panel_ejecutivo");
   const [modalLeads, setModalLeads] = useState<{ titulo: string; leads: LeadDetailItem[] } | null>(null);
   const [rankingColsOpen, setRankingColsOpen] = useState(false);
   const [rankingColsVisible, setRankingColsVisible] = useState<RankingColKey[]>(ALL_RANKING_COL_KEYS);
@@ -208,42 +207,13 @@ export default function DashboardPage() {
               </span>
             </div>
           )}
-          {/* ── Tabs de paneles ── */}
-          {(() => {
-            const dashboards = (data as unknown as { dashboardsPersonalizados?: { id: string; nombre: string; icono?: string }[] })?.dashboardsPersonalizados ?? [];
-            if (dashboards.length === 0) return null;
-            const tabs = [
-              { id: "panel_ejecutivo", label: "Panel Ejecutivo", emoji: "🏠" },
-              ...dashboards.map((d) => ({ id: d.id, label: d.nombre, emoji: d.icono ?? "📊" })),
-            ];
-            return (
-              <div className="flex gap-1.5 flex-wrap mb-1">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setPanelActivo(tab.id)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
-                      panelActivo === tab.id
-                        ? "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50"
-                        : "bg-surface-700 text-gray-400 border-surface-500 hover:border-accent-cyan/30 hover:text-gray-300"
-                    }`}
-                  >
-                    <span>{tab.emoji}</span>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
+
 
           {(() => {
             const metricasDelPanel = (data?.metricasComputadas ?? []).filter((m) => {
               const paneles: string[] = m.paneles ?? [];
-              if (paneles.length > 0) return paneles.includes(panelActivo);
-              if (panelActivo === "panel_ejecutivo") return m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion;
-              if (panelActivo === "rendimiento") return m.ubicacion === 'rendimiento' || m.ubicacion === 'ambos';
-              return false;
+              if (paneles.length > 0) return paneles.includes('panel_ejecutivo');
+              return m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion;
             });
             const metricasKPI = metricasDelPanel.filter((m) => m.visualizacion !== "barra");
             const metricasBarra = metricasDelPanel.filter((m) => m.visualizacion === "barra");

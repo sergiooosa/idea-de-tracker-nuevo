@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -216,7 +216,13 @@ function SoloMisDatosToggle() {
   );
 }
 
-function NavFiltered({ onLinkClick }: { onLinkClick?: () => void }) {
+function NavFiltered({
+  onLinkClick,
+  dashboards = [],
+}: {
+  onLinkClick?: () => void;
+  dashboards?: { id: string; nombre: string; icono?: string }[];
+}) {
   const pathname = usePathname();
   const { session, sessionLoading } = useUserFilter();
   const t = useT();
@@ -231,26 +237,61 @@ function NavFiltered({ onLinkClick }: { onLinkClick?: () => void }) {
     return pathname.includes(path);
   };
 
+  const isDashboardActive = (dashboardId: string) => {
+    return pathname.includes(`/dashboard/${dashboardId}`);
+  };
+
   return (
     <>
       {navFiltered.map(({ path, navKey, label, icon: Icon }) => (
-        <Link key={`${path}-${navKey}`} href={path} onClick={onLinkClick}
-          className={clsx(
-            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-            isActive(path)
-              ? "bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 shadow-glow-cyan"
-              : "text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent"
-          )}>
-          <Icon className="w-5 h-5 shrink-0" />
-          {t.nav[navKey] ?? label}
-        </Link>
+        <React.Fragment key={`${path}-${navKey}`}>
+          <Link
+            href={path}
+            onClick={onLinkClick}
+            className={clsx(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+              isActive(path)
+                ? "bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20 shadow-glow-cyan"
+                : "text-gray-400 hover:bg-surface-600 hover:text-white border border-transparent"
+            )}
+          >
+            <Icon className="w-5 h-5 shrink-0" />
+            {t.nav[navKey] ?? label}
+          </Link>
+          {path === "/dashboard" && dashboards.length > 0 && (
+            <div className="space-y-1 ml-3">
+              {dashboards.map((dash) => (
+                <Link
+                  key={dash.id}
+                  href={`/dashboard/${dash.id}`}
+                  onClick={onLinkClick}
+                  className={clsx(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200",
+                    isDashboardActive(dash.id)
+                      ? "bg-accent-amber/10 text-accent-amber border border-accent-amber/20"
+                      : "text-gray-500 hover:bg-surface-600 hover:text-gray-300 border border-transparent"
+                  )}
+                >
+                  {dash.icono && <span className="text-sm">{dash.icono}</span>}
+                  <span className="truncate">{dash.nombre}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </React.Fragment>
       ))}
     </>
   );
 }
 
-function NavFilteredMobile({ onClose }: { onClose: () => void }) {
-  return <NavFiltered onLinkClick={onClose} />;
+function NavFilteredMobile({
+  onClose,
+  dashboards = [],
+}: {
+  onClose: () => void;
+  dashboards?: { id: string; nombre: string; icono?: string }[];
+}) {
+  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} />;
 }
 
 function PermissionGuard({ children }: { children: React.ReactNode }) {
@@ -278,6 +319,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [locale, setLocale] = useState<Locale | null>(null);
+  const [dashboardsNav, setDashboardsNav] = useState<{ id: string; nombre: string; icono?: string }[]>([]);
   const { session } = useUserFilter();
 
   useEffect(() => {
@@ -285,6 +327,13 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.idioma) setLocale(d.idioma as Locale); })
       .catch(() => { /* fallback to default (es) */ });
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/data/dashboards")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.dashboards) setDashboardsNav(d.dashboards); })
+      .catch(() => {});
   }, []);
 
   const isActive = (path: string) => {
@@ -326,7 +375,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
-          <NavFiltered />
+          <NavFiltered dashboards={dashboardsNav} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
@@ -366,7 +415,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex-1 p-2">
-          <NavFilteredMobile onClose={() => setSidebarOpen(false)} />
+          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
