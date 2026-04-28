@@ -71,9 +71,9 @@ export async function GET(req: Request) {
     // Total leads and closures in the period from resumenes_diarios_agendas
     const agendasStats = await db.execute(sql`
       SELECT
-        COUNT(*) AS total_leads,
-        COUNT(*) FILTER (WHERE categoria NOT ILIKE '%cancel%' AND categoria NOT ILIKE '%pdte%' AND categoria != '') AS asistidas,
-        COUNT(*) FILTER (WHERE categoria ILIKE '%cerr%' OR categoria ILIKE '%close%') AS cierres,
+        COUNT(DISTINCT COALESCE(idcliente, ghl_contact_id, email_lead)) AS total_leads,
+        COUNT(DISTINCT COALESCE(idcliente, ghl_contact_id, email_lead)) FILTER (WHERE categoria NOT ILIKE '%cancel%' AND categoria NOT ILIKE '%pdte%' AND categoria != '') AS asistidas,
+        COUNT(DISTINCT COALESCE(idcliente, ghl_contact_id, email_lead)) FILTER (WHERE categoria ILIKE '%cerr%' OR categoria ILIKE '%close%') AS cierres,
         SUM(CASE 
           WHEN facturacion ~ '^[0-9]+\.?[0-9]*$' THEN facturacion::numeric 
           ELSE 0 
