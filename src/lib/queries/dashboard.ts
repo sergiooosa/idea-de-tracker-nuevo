@@ -957,31 +957,35 @@ export async function getDashboard(
     );
     if (hasAdsConfig) {
       const adsAggRows = await db.execute(sql`
+        WITH extras AS (
+          SELECT plataforma, key, AVG((value #>> '{}')::numeric) AS avg_val
+          FROM resumenes_diarios_ads r2,
+               jsonb_each(r2.datos_extra) AS kv(key, value)
+          WHERE r2.id_cuenta = ${idCuenta}
+            AND r2.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+            AND r2.datos_extra IS NOT NULL
+            AND r2.datos_extra != '{}'::jsonb
+            AND (value #>> '{}')::text ~ '^[0-9]+\\.?[0-9]*$'
+          GROUP BY plataforma, key
+        ),
+        extras_agg AS (
+          SELECT plataforma, jsonb_object_agg(key, avg_val)::text AS campos_extra_json
+          FROM extras
+          GROUP BY plataforma
+        )
         SELECT
-          SUM(gasto_total_ad) AS gasto,
-          SUM(impresiones_totales) AS impresiones,
-          SUM(clicks_unicos) AS clicks,
-          AVG(CASE WHEN gasto_total_ad > 0 THEN ctr END) AS ctr,
-          AVG(CASE WHEN gasto_total_ad > 0 THEN cpm END) AS cpm,
-          AVG(CASE WHEN gasto_total_ad > 0 THEN cpc END) AS cpc,
-          array_agg(DISTINCT plataforma) FILTER (WHERE gasto_total_ad > 0) AS plataformas,
-          (
-            SELECT jsonb_object_agg(key, avg_val)
-            FROM (
-              SELECT key, AVG((value #>> '{}')::numeric) AS avg_val
-              FROM resumenes_diarios_ads r2,
-                   jsonb_each(r2.datos_extra) AS kv(key, value)
-              WHERE r2.id_cuenta = ${idCuenta}
-                AND r2.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
-                AND r2.datos_extra IS NOT NULL
-                AND r2.datos_extra != '{}'::jsonb
-                AND (value #>> '{}')::text ~ '^[0-9]+\\.?[0-9]*$'
-              GROUP BY key
-            ) sub
-          )::text AS campos_extra_json
-        FROM resumenes_diarios_ads
-        WHERE id_cuenta = ${idCuenta}
-          AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+          SUM(rda.gasto_total_ad) AS gasto,
+          SUM(rda.impresiones_totales) AS impresiones,
+          SUM(rda.clicks_unicos) AS clicks,
+          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.ctr END) AS ctr,
+          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpm END) AS cpm,
+          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpc END) AS cpc,
+          array_agg(DISTINCT rda.plataforma) FILTER (WHERE rda.gasto_total_ad > 0) AS plataformas,
+          MAX(ea.campos_extra_json) AS campos_extra_json
+        FROM resumenes_diarios_ads rda
+        LEFT JOIN extras_agg ea ON ea.plataforma = rda.plataforma
+        WHERE rda.id_cuenta = ${idCuenta}
+          AND rda.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
       `);
       const aggRow = adsAggRows.rows[0] as Record<string, unknown> | undefined;
       const gastoTotal = Number(aggRow?.gasto ?? 0);
