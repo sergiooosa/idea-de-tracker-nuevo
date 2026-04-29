@@ -43,14 +43,18 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
     }
   }
 
-  // Comparaciones case-insensitive (fallback)
-  if (cl === "cerrada" || cl === "closed") return { attended: true, qualified: true, canceled: false, outcome: "cerrado" };
-  if (cl === "ofertada" || cl === "offered") return { attended: true, qualified: true, canceled: false, outcome: "seguimiento" };
-  if (cl === "no_ofertada" || cl === "no ofertada") return { attended: true, qualified: false, canceled: false, outcome: "seguimiento" };
+  // Nuevas etapas fijas del sistema
+  if (cl === "calificada") return { attended: true, qualified: true, canceled: false, outcome: "calificada" };
+  if (cl === "no_calificada") return { attended: true, qualified: false, canceled: false, outcome: "no_calificada" };
+  if (cl === "cerrada") return { attended: true, qualified: true, canceled: false, outcome: "cerrada" };
   if (cl === "no_show" || cl === "noshow") return { attended: false, qualified: false, canceled: false, outcome: "no_show" };
-  if (cl.includes("cancel")) return { attended: false, qualified: false, canceled: true, outcome: "cancelada" };
+  if (cl === "cancelada" || cl.includes("cancel")) return { attended: false, qualified: false, canceled: true, outcome: "cancelada" };
   if (cl === "pdte" || cl === "pendiente") return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
-  return { attended: false, qualified: false, canceled: false, outcome: cl };
+  // Backward compat etapas legacy
+  if (cl === "closed") return { attended: true, qualified: true, canceled: false, outcome: "cerrada" };
+  if (cl === "ofertada" || cl === "offered") return { attended: true, qualified: true, canceled: false, outcome: "calificada" };
+  if (cl === "no_ofertada" || cl === "no ofertada") return { attended: true, qualified: false, canceled: false, outcome: "no_calificada" };
+  return { attended: true, qualified: false, canceled: false, outcome: cl };
 }
 
 export async function getVideollamadas(

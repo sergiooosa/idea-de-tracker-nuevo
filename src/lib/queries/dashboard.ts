@@ -15,9 +15,10 @@ import type {
   AlertaMeta,
 } from "@/types";
 
-const DEFAULT_ATTENDED = ["Cerrada", "Ofertada", "No_Ofertada", "cerrada", "ofertada", "no_ofertada"];
-const DEFAULT_CLOSED = ["Cerrada", "cerrada"];
-const DEFAULT_EFFECTIVE = ["Cerrada", "Ofertada", "cerrada", "ofertada"];
+// Nuevas etapas fijas del sistema + legacy backward compat
+const DEFAULT_ATTENDED = ["calificada", "no_calificada", "cerrada", "Cerrada", "Ofertada", "No_Ofertada", "cerrada", "ofertada", "no_ofertada"];
+const DEFAULT_CLOSED = ["cerrada", "Cerrada"];
+const DEFAULT_EFFECTIVE = ["calificada", "cerrada", "Cerrada", "Ofertada", "cerrada", "ofertada"];
 
 /**
  * Normaliza un valor de fecha a string "YYYY-MM-DD".
@@ -42,12 +43,11 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
     };
   }
 
-  // Usar flags es_calificada, es_cerrada como criterio principal
+  // Usar flags es_calificada, es_cerrada como criterio principal (nuevo sistema)
   const calificadas = embudo.filter((e) => e.es_calificada === true).map((e) => e.id.toLowerCase());
   const cerradas = embudo.filter((e) => e.es_cerrada === true).map((e) => e.id.toLowerCase());
-  const noCalificadas = embudo.filter((e) => e.es_calificada === false).map((e) => e.id.toLowerCase());
 
-  // Fallback a heurística de texto si no hay flags (backward compat con embudos viejos)
+  // IDs y nombres para backward compat con embudos sin flags
   const getLabel = (e: EmbudoEtapa) =>
     (e?.nombre ?? (e as any)?.name ?? e?.id ?? "").trim();
   const ids = embudo.map((e) => (e?.id ?? "").trim()).filter(Boolean);
@@ -55,27 +55,31 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   const allKeys = [...new Set([...nombres, ...ids])];
   const allKeysLower = allKeys.map(k => k.toLowerCase());
 
-  // Si no tenemos flags, usar heurística de texto
-  const closedSet = cerradas.length > 0
+  // closedSet: etapas cerradas por flag o por texto heurístico
+  const closedByFlag = cerradas.length > 0;
+  const closedSet = closedByFlag
     ? new Set(cerradas)
     : new Set(allKeysLower.filter((k) => k.includes("cerrad") || k.includes("closed")));
-  const qualifiedSet = calificadas.length > 0
-    ? new Set(calificadas)
-    : new Set(allKeysLower.filter((k) => !k.includes("no_calificada") && !k.includes("no calificada")));
 
-  const effectiveFromEmbudo = new Set(allKeysLower.filter((k) => {
-    return k.includes("cerrad") || k.includes("closed") ||
-           k.includes("ofertad") || k.includes("offered");
-  }));
-  const effectiveSet = effectiveFromEmbudo.size > 0 ? effectiveFromEmbudo : new Set(DEFAULT_EFFECTIVE);
+  // effectiveSet: calificadas + cerradas (las que "asistieron y valió la pena")
+  const effectiveByFlag = calificadas.length > 0 || cerradas.length > 0;
+  const effectiveSet = effectiveByFlag
+    ? new Set([...calificadas, ...cerradas])
+    : new Set([...allKeysLower.filter((k) =>
+        k.includes("cerrad") || k.includes("closed") ||
+        k.includes("ofertad") || k.includes("offered") ||
+        k === "calificada"
+      ), ...DEFAULT_EFFECTIVE.map(k => k.toLowerCase())]);
+
+  // attendedSet: todas excepto cancelada, no_show, pdte
+  const SYSTEM_EXCLUDED = new Set(["cancelada", "no_show", "noshow", "pdte", "pendiente"]);
+  const attendedFromEmbudo = allKeysLower.filter((k) => !SYSTEM_EXCLUDED.has(k) && k !== "");
 
   return {
-    attendedSet: new Set([...allKeysLower.filter((k) => {
-      return !k.includes("cancel") && !k.includes("pdte") && k !== "";
-    }), ...DEFAULT_ATTENDED.map(k => k.toLowerCase())]),
+    attendedSet: new Set([...attendedFromEmbudo, ...DEFAULT_ATTENDED.map(k => k.toLowerCase())]),
     closedSet,
     effectiveSet,
-    qualifiedSet,
+    qualifiedSet: new Set(calificadas),
     etapas: embudo,
   };
 }
