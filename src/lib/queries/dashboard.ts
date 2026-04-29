@@ -9,6 +9,7 @@ import type {
   DashboardVolumeDay,
   DashboardObjecion,
   DashboardResponse,
+  DashboardAdsSummary,
   ApiAdvisor,
   ChatKpis,
   AlertaMeta,
@@ -939,6 +940,81 @@ export async function getDashboard(
     }
   }
 
+  // ── Ads summary para widget en Panel Ejecutivo ──────────────────────────────
+  let adsSummary: DashboardAdsSummary | undefined;
+  {
+    const cfgAds = cuentaRow?.configuracion_ui as Record<string, unknown> | null | undefined;
+    // We need to read configuracion_ads from cuentas — do a targeted SQL query to avoid circular deps
+    const [adsConfigRow] = await db.execute(sql`
+      SELECT configuracion_ads FROM cuentas WHERE id_cuenta = ${idCuenta}
+    `).then(r => r.rows as Array<{ configuracion_ads: Record<string, unknown> | null }>);
+    void cfgAds; // avoid lint unused warning
+    const adsCfg = adsConfigRow?.configuracion_ads;
+    const hasAdsConfig = adsCfg && typeof adsCfg === 'object' && (
+      (adsCfg.meta as { activo?: boolean } | undefined)?.activo ||
+      (adsCfg.google as { activo?: boolean } | undefined)?.activo ||
+      (adsCfg.tiktok as { activo?: boolean } | undefined)?.activo
+    );
+    if (hasAdsConfig) {
+      const adsAggRows = await db.execute(sql`
+        SELECT
+          SUM(gasto_total_ad) AS gasto,
+          SUM(impresiones_totales) AS impresiones,
+          SUM(clicks_unicos) AS clicks,
+          AVG(ctr) AS ctr,
+          AVG(cpm) AS cpm,
+          AVG(cpc) AS cpc,
+          array_agg(DISTINCT plataforma) AS plataformas
+        FROM resumenes_diarios_ads
+        WHERE id_cuenta = ${idCuenta}
+          AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+          AND gasto_total_ad > 0
+      `);
+      const adsExtraRows = await db.execute(sql`
+        SELECT plataforma, datos_extra
+        FROM resumenes_diarios_ads
+        WHERE id_cuenta = ${idCuenta}
+          AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+          AND datos_extra IS NOT NULL
+          AND datos_extra != '{}'::jsonb
+      `);
+      const aggRow = adsAggRows.rows[0] as Record<string, unknown> | undefined;
+      const gastoTotal = Number(aggRow?.gasto ?? 0);
+      const plataformasArr = Array.isArray(aggRow?.plataformas) ? (aggRow.plataformas as string[]).filter(Boolean) : [];
+
+      // Avg numeric campos_extra (frequency, unique_ctr, etc.) across all rows
+      const extraAcc: Record<string, { sum: number; count: number }> = {};
+      for (const row of adsExtraRows.rows as Array<{ plataforma: string; datos_extra: Record<string, unknown> }>) {
+        const extra = row.datos_extra ?? {};
+        for (const [key, val] of Object.entries(extra)) {
+          const num = typeof val === 'number' ? val : parseFloat(String(val));
+          if (!Number.isFinite(num)) continue;
+          if (!extraAcc[key]) extraAcc[key] = { sum: 0, count: 0 };
+          extraAcc[key].sum += num;
+          extraAcc[key].count += 1;
+        }
+      }
+      const camposExtra: Record<string, number> = {};
+      for (const [key, { sum, count }] of Object.entries(extraAcc)) {
+        camposExtra[key] = count > 0 ? sum / count : 0;
+      }
+
+      if (gastoTotal > 0 || plataformasArr.length > 0) {
+        adsSummary = {
+          hasAds: true,
+          gastoTotal,
+          impresiones: Number(aggRow?.impresiones ?? 0),
+          clicks: Number(aggRow?.clicks ?? 0),
+          ctr: Number(aggRow?.ctr ?? 0),
+          cpm: Number(aggRow?.cpm ?? 0),
+          cpc: Number(aggRow?.cpc ?? 0),
+          camposExtra,
+          plataformas: plataformasArr,
+        };
+      }
+    }
+  }
+
   return {
     kpis,
     advisorRanking,
@@ -961,6 +1037,7 @@ export async function getDashboard(
     dashboardsPersonalizados: Array.isArray(cuentaRow?.dashboards_personalizados) ? cuentaRow.dashboards_personalizados as { id: string; nombre: string; icono?: string }[] : [],
     chatKpis: chatKpis.total > 0 ? chatKpis : undefined,
     alertasMetas: alertasMetas.length > 0 ? alertasMetas : undefined,
+    adsSummary,
     configuracion_ui: cuentaRow?.configuracion_ui as DashboardResponse["configuracion_ui"] ?? undefined,
     fuente_llamadas: (cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio") as "twilio" | "ghl",
   };

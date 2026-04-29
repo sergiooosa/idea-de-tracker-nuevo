@@ -24,6 +24,7 @@ interface PorPlataforma {
   cpm: number;
   cpc: number;
   agendamientos: number;
+  camposExtra: Record<string, number>;
 }
 
 interface PorCampana {
@@ -162,6 +163,20 @@ export default function AdsPage() {
                           {p.agendamientos > 0 && (
                             <div className="col-span-2"><span className="text-gray-500">Agendamientos</span><div className="font-bold text-white">{p.agendamientos}</div></div>
                           )}
+                          {/* Campos extra: frequency, unique_ctr (hook rate), etc. */}
+                          {p.camposExtra?.frequency != null && (
+                            <div><span className="text-gray-500">Frecuencia</span><div className="font-bold text-white">{Number(p.camposExtra.frequency).toFixed(2)}</div></div>
+                          )}
+                          {p.camposExtra?.unique_ctr != null && (
+                            <div><span className="text-gray-500">Hook Rate</span><div className="font-bold text-white">{Number(p.camposExtra.unique_ctr).toFixed(2)}%</div></div>
+                          )}
+                          {/* Render any remaining campos_extra not explicitly named above */}
+                          {Object.entries(p.camposExtra ?? {})
+                            .filter(([k]) => k !== 'frequency' && k !== 'unique_ctr')
+                            .map(([key, val]) => (
+                              <div key={key}><span className="text-gray-500 capitalize">{key.replace(/_/g, ' ')}</span><div className="font-bold text-white">{typeof val === 'number' ? val.toFixed(2) : String(val)}</div></div>
+                            ))
+                          }
                         </div>
                       </div>
                     );

@@ -498,6 +498,18 @@ export interface AlertaMeta {
   historialDiario?: MetaDiariaHistorial[]; // días del rango con cumplimiento
 }
 
+export interface DashboardAdsSummary {
+  hasAds: boolean;
+  gastoTotal: number;
+  impresiones: number;
+  clicks: number;
+  ctr: number;
+  cpm: number;
+  cpc: number;
+  camposExtra: Record<string, number>; // frequency, unique_ctr, etc.
+  plataformas: string[];
+}
+
 export interface DashboardResponse {
   kpis: DashboardKpis;
   advisorRanking: DashboardAdvisorRow[];
@@ -514,6 +526,7 @@ export interface DashboardResponse {
   dashboardsPersonalizados?: { id: string; nombre: string; icono?: string }[];
   chatKpis?: ChatKpis;
   alertasMetas?: AlertaMeta[];
+  adsSummary?: DashboardAdsSummary;
   configuracion_ui?: {
     modulos_activos?: {
       seccion_chats_dashboard?: boolean;

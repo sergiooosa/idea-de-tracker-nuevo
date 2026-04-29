@@ -669,6 +669,42 @@ export default function DashboardPage() {
           </section>
         </div>
 
+        {/* 📊 Ads Summary Widget */}
+        {data?.adsSummary?.hasAds && (
+          <section className="rounded-lg p-3 section-futuristic">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                📊 Inversión publicitaria
+                {data.adsSummary.plataformas.length > 0 && (
+                  <span className="text-[10px] text-gray-500 normal-case font-normal">
+                    · {data.adsSummary.plataformas.map(p => p === 'meta' ? '📘 Meta' : p === 'google' ? '🔍 Google' : p === 'tiktok' ? '🎵 TikTok' : p).join(' · ')}
+                  </span>
+                )}
+              </h2>
+              <Link href="/ads" className="text-[10px] text-accent-cyan hover:text-white transition-colors">
+                Ver detalle →
+              </Link>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {[
+                { label: 'Inversión', value: data.adsSummary.gastoTotal >= 1000 ? `$${(data.adsSummary.gastoTotal / 1000).toFixed(1)}k` : `$${data.adsSummary.gastoTotal.toFixed(0)}`, color: 'cyan' },
+                { label: 'Impresiones', value: data.adsSummary.impresiones >= 1000 ? `${(data.adsSummary.impresiones / 1000).toFixed(1)}k` : String(data.adsSummary.impresiones), color: 'purple' },
+                { label: 'Clicks', value: String(data.adsSummary.clicks), color: 'blue' },
+                { label: 'CTR', value: `${Number(data.adsSummary.ctr).toFixed(2)}%`, color: 'green' },
+                { label: 'CPM', value: `$${Number(data.adsSummary.cpm).toFixed(2)}`, color: 'amber' },
+                { label: 'CPC', value: `$${Number(data.adsSummary.cpc).toFixed(2)}`, color: 'amber' },
+                ...(data.adsSummary.camposExtra.frequency != null ? [{ label: 'Frecuencia', value: Number(data.adsSummary.camposExtra.frequency).toFixed(2), color: 'purple' }] : []),
+                ...(data.adsSummary.camposExtra.unique_ctr != null ? [{ label: 'Hook Rate', value: `${Number(data.adsSummary.camposExtra.unique_ctr).toFixed(2)}%`, color: 'green' }] : []),
+              ].map(({ label, value, color }) => (
+                <div key={label} className={`rounded-lg p-2 border card-futuristic-${color}`}>
+                  <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight truncate">{label}</p>
+                  <p className={`text-sm font-bold text-accent-${color} mt-0.5`}>{value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranking por asesor</h2>

@@ -54,6 +54,17 @@ export async function GET(req: Request) {
       GROUP BY plataforma
     `);
 
+    // Fetch datos_extra rows for campos_extra (frequency, unique_ctr, hook_rate, etc.)
+    // We collect all datos_extra JSONBs, then avg numeric fields client-side
+    const datosExtraRows = await db.execute(sql`
+      SELECT plataforma, datos_extra
+      FROM resumenes_diarios_ads
+      WHERE id_cuenta = ${idCuenta}
+        AND fecha BETWEEN ${from}::date AND ${to}::date
+        AND datos_extra IS NOT NULL
+        AND datos_extra != '{}'::jsonb
+    `);
+
     // Campaign-level data
     const campanaRows = await db.execute(sql`
       SELECT
@@ -122,6 +133,33 @@ export async function GET(req: Request) {
     const totalRevenue = Number(stats?.revenue ?? 0);
     const totalCash = Number(stats?.cash_collected ?? 0);
 
+    // Aggregate datos_extra campos (frequency, unique_ctr, hook_rate, etc.) per platform
+    // We avg numeric scalar fields across all rows of each platform
+    const extraByPlatform: Record<string, Record<string, { sum: number; count: number }>> = {};
+    for (const row of datosExtraRows.rows as Array<{ plataforma: string; datos_extra: Record<string, unknown> }>) {
+      const plat = row.plataforma ?? 'meta';
+      if (!extraByPlatform[plat]) extraByPlatform[plat] = {};
+      const extra = row.datos_extra ?? {};
+      for (const [key, val] of Object.entries(extra)) {
+        // Only aggregate top-level numeric fields (skip nested objects like actions arrays)
+        const num = typeof val === 'number' ? val : parseFloat(String(val));
+        if (!Number.isFinite(num)) continue;
+        if (!extraByPlatform[plat][key]) extraByPlatform[plat][key] = { sum: 0, count: 0 };
+        extraByPlatform[plat][key].sum += num;
+        extraByPlatform[plat][key].count += 1;
+      }
+    }
+    // Convert to averaged values
+    const camposExtraPorPlataforma: Record<string, Record<string, number>> = {};
+    for (const [plat, campos] of Object.entries(extraByPlatform)) {
+      camposExtraPorPlataforma[plat] = {};
+      for (const [key, { sum, count }] of Object.entries(campos)) {
+        // frequency, unique_ctr → avg; sums for count-like fields would need different logic
+        // Using avg for all for now (suitable for rates/percentages like frequency, ctr)
+        camposExtraPorPlataforma[plat][key] = count > 0 ? sum / count : 0;
+      }
+    }
+
     const porPlataforma = (adsRows.rows as Array<Record<string, unknown>>).map((r) => ({
       plataforma: String(r.plataforma ?? 'meta'),
       gasto: Number(r.gasto ?? 0),
@@ -131,6 +169,7 @@ export async function GET(req: Request) {
       cpm: Number(r.cpm ?? 0),
       cpc: Number(r.cpc ?? 0),
       agendamientos: Number(r.agendamientos ?? 0),
+      camposExtra: camposExtraPorPlataforma[String(r.plataforma ?? 'meta')] ?? {},
     }));
 
     const gastoTotal = porPlataforma.reduce((s, p) => s + p.gasto, 0);
