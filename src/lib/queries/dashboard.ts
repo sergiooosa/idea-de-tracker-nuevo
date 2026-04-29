@@ -175,7 +175,10 @@ export async function getDashboard(
           AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpm END) AS cpm,
           AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpc END) AS cpc,
           array_agg(DISTINCT rda.plataforma) FILTER (WHERE rda.gasto_total_ad > 0) AS plataformas,
-          MAX(ea.campos_extra_json) AS campos_extra_json
+          MAX(ea.campos_extra_json) AS campos_extra_json,
+          -- Vturb metrics: avg across days with activity
+          AVG(CASE WHEN rda.play_rate > 0 THEN rda.play_rate END) AS avg_play_rate,
+          AVG(CASE WHEN rda.engagement > 0 THEN rda.engagement END) AS avg_engagement
         FROM resumenes_diarios_ads rda
         LEFT JOIN extras_agg ea ON ea.plataforma = rda.plataforma
         WHERE rda.id_cuenta = ${idCuenta}
@@ -223,6 +226,8 @@ export async function getDashboard(
   const adsCtr = Number(adsAggRowEarly.ctr ?? 0);
   const adsCpm = Number(adsAggRowEarly.cpm ?? 0);
   const adsCpc = Number(adsAggRowEarly.cpc ?? 0);
+  const adsPlayRate = Number(adsAggRowEarly.avg_play_rate ?? 0);
+  const adsEngagement = Number(adsAggRowEarly.avg_engagement ?? 0);
   const adsCamposExtra = parseCamposExtraEarly(adsAggRowEarly.campos_extra_json);
   const adsPlataformasEarly = Array.isArray(adsAggRowEarly.plataformas) ? (adsAggRowEarly.plataformas as string[]).filter(Boolean) : [];
   // Lookup map for tipo="ads" metricas: adsCampo → value
@@ -233,6 +238,9 @@ export async function getDashboard(
     ctr: adsCtr,
     cpm: adsCpm,
     cpc: adsCpc,
+    play_rate: adsPlayRate,
+    engagement: adsEngagement,
+    engagement_rate: adsEngagement,
     ...adsCamposExtra, // includes frequency, unique_ctr, etc.
   };
 
@@ -1020,7 +1028,7 @@ export async function getDashboard(
   // ── Ads summary para widget en Panel Ejecutivo ──────────────────────────────
   // Re-uses adsAggRowEarly computed at the start (no extra DB query needed)
   let adsSummary: DashboardAdsSummary | undefined;
-  if (hasAdsConfigEarly && (adsGastoTotal > 0 || adsPlataformasEarly.length > 0)) {
+  if (hasAdsConfigEarly && (adsGastoTotal > 0 || adsPlataformasEarly.length > 0 || adsPlayRate > 0)) {
     adsSummary = {
       hasAds: true,
       gastoTotal: adsGastoTotal,
@@ -1029,6 +1037,8 @@ export async function getDashboard(
       ctr: adsCtr,
       cpm: adsCpm,
       cpc: adsCpc,
+      playRate: adsPlayRate > 0 ? adsPlayRate : undefined,
+      engagementRate: adsEngagement > 0 ? adsEngagement : undefined,
       camposExtra: adsCamposExtra,
       plataformas: adsPlataformasEarly,
     };

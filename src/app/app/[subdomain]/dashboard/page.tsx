@@ -225,6 +225,8 @@ export default function DashboardPage() {
                 { label: 'CPC', value: `$${Number(data.adsSummary.cpc).toFixed(2)}`, color: 'amber' },
                 ...(data.adsSummary.camposExtra.frequency != null ? [{ label: 'Frecuencia', value: Number(data.adsSummary.camposExtra.frequency).toFixed(2), color: 'purple' }] : []),
                 ...(data.adsSummary.camposExtra.unique_ctr != null ? [{ label: 'Hook Rate', value: `${Number(data.adsSummary.camposExtra.unique_ctr).toFixed(2)}%`, color: 'green' }] : []),
+                ...(data.adsSummary.playRate != null && data.adsSummary.playRate > 0 ? [{ label: 'VSL Play Rate', value: `${Number(data.adsSummary.playRate).toFixed(1)}%`, color: 'purple' }] : []),
+                ...(data.adsSummary.engagementRate != null && data.adsSummary.engagementRate > 0 ? [{ label: 'VSL Engagement', value: `${Number(data.adsSummary.engagementRate).toFixed(1)}%`, color: 'amber' }] : []),
               ].map(({ label, value, color }) => (
                 <div key={label} className={`rounded-lg p-2 border card-futuristic-${color}`}>
                   <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight truncate">{label}</p>

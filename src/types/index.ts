@@ -506,6 +506,8 @@ export interface DashboardAdsSummary {
   ctr: number;
   cpm: number;
   cpc: number;
+  playRate?: number;      // Vturb: avg play rate % across active days
+  engagementRate?: number; // Vturb: avg engagement % across active days
   camposExtra: Record<string, number>; // frequency, unique_ctr, etc.
   plataformas: string[];
 }
