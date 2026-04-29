@@ -37,7 +37,8 @@ export async function GET(req: Request) {
       });
     }
 
-    // Aggregate ads data per platform (exclude zero-spend days to avoid distorting CTR/CPM/CPC averages)
+    // Aggregate ads data per platform — also avg campos_extra (frequency, unique_ctr, etc.)
+    // Use a single query with aggregated extras to avoid driver aliasing issues
     const adsRows = await db.execute(sql`
       SELECT
         plataforma,
@@ -47,23 +48,31 @@ export async function GET(req: Request) {
         AVG(CASE WHEN gasto_total_ad > 0 THEN ctr END) AS ctr,
         AVG(CASE WHEN gasto_total_ad > 0 THEN cpm END) AS cpm,
         AVG(CASE WHEN gasto_total_ad > 0 THEN cpc END) AS cpc,
-        SUM(agendamientos) AS agendamientos
-      FROM resumenes_diarios_ads
+        SUM(agendamientos) AS agendamientos,
+        -- Aggregate all datos_extra JSONB fields as averaged numeric values per platform
+        (
+          SELECT jsonb_object_agg(key, avg_val)
+          FROM (
+            SELECT key, AVG((value #>> '{}')::numeric) AS avg_val
+            FROM resumenes_diarios_ads r2,
+                 jsonb_each(r2.datos_extra) AS kv(key, value)
+            WHERE r2.id_cuenta = ${idCuenta}
+              AND r2.fecha BETWEEN ${from}::date AND ${to}::date
+              AND r2.plataforma = rda.plataforma
+              AND r2.datos_extra IS NOT NULL
+              AND r2.datos_extra != '{}'::jsonb
+              AND (value #>> '{}')::text ~ '^[0-9]+\.?[0-9]*$'
+            GROUP BY key
+          ) sub
+        )::text AS campos_extra_json
+      FROM resumenes_diarios_ads rda
       WHERE id_cuenta = ${idCuenta}
         AND fecha BETWEEN ${from}::date AND ${to}::date
       GROUP BY plataforma
     `);
 
-    // Fetch datos_extra rows for campos_extra (frequency, unique_ctr, hook_rate, etc.)
-    // Cast to text to ensure reliable parsing regardless of pg/neon driver JSONB handling
-    const datosExtraRows = await db.execute(sql`
-      SELECT plataforma, datos_extra::text AS datos_extra_text
-      FROM resumenes_diarios_ads
-      WHERE id_cuenta = ${idCuenta}
-        AND fecha BETWEEN ${from}::date AND ${to}::date
-        AND datos_extra IS NOT NULL
-        AND datos_extra != '{}'::jsonb
-    `);
+    // datosExtraRows no longer needed — campos_extra_json is embedded in adsRows
+    const datosExtraRows = { rows: [] as unknown[] };
 
     // Campaign-level data
     const campanaRows = await db.execute(sql`
@@ -133,39 +142,22 @@ export async function GET(req: Request) {
     const totalRevenue = Number(stats?.revenue ?? 0);
     const totalCash = Number(stats?.cash_collected ?? 0);
 
-    // Aggregate datos_extra campos (frequency, unique_ctr, hook_rate, etc.) per platform
-    // We avg numeric scalar fields across all rows of each platform
-    const extraByPlatform: Record<string, Record<string, { sum: number; count: number }>> = {};
-    for (const rawRow of datosExtraRows.rows as Array<{ plataforma: string; datos_extra_text?: string; datos_extra?: Record<string, unknown> | string }>) {
-      const plat = rawRow.plataforma ?? 'meta';
-      if (!extraByPlatform[plat]) extraByPlatform[plat] = {};
-      // Handle both text-cast (datos_extra_text) and direct JSONB (datos_extra)
-      let extra: Record<string, unknown> = {};
-      const rawExtra = rawRow.datos_extra_text ?? rawRow.datos_extra;
-      if (typeof rawExtra === 'string') {
-        try { extra = JSON.parse(rawExtra) as Record<string, unknown>; } catch { extra = {}; }
-      } else if (rawExtra && typeof rawExtra === 'object') {
-        extra = rawExtra as Record<string, unknown>;
+    // campos_extra_json is computed by the SQL subquery — parse it from each adsRow
+    const parseCamposExtra = (raw: unknown): Record<string, number> => {
+      if (!raw) return {};
+      let obj: Record<string, unknown> = {};
+      if (typeof raw === 'string') {
+        try { obj = JSON.parse(raw) as Record<string, unknown>; } catch { return {}; }
+      } else if (typeof raw === 'object') {
+        obj = raw as Record<string, unknown>;
       }
-      for (const [key, val] of Object.entries(extra)) {
-        // Only aggregate top-level numeric fields (skip nested objects like actions arrays)
-        const num = typeof val === 'number' ? val : parseFloat(String(val));
-        if (!Number.isFinite(num)) continue;
-        if (!extraByPlatform[plat][key]) extraByPlatform[plat][key] = { sum: 0, count: 0 };
-        extraByPlatform[plat][key].sum += num;
-        extraByPlatform[plat][key].count += 1;
+      const result: Record<string, number> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const n = typeof v === 'number' ? v : parseFloat(String(v));
+        if (Number.isFinite(n)) result[k] = n;
       }
-    }
-    // Convert to averaged values
-    const camposExtraPorPlataforma: Record<string, Record<string, number>> = {};
-    for (const [plat, campos] of Object.entries(extraByPlatform)) {
-      camposExtraPorPlataforma[plat] = {};
-      for (const [key, { sum, count }] of Object.entries(campos)) {
-        // frequency, unique_ctr → avg; sums for count-like fields would need different logic
-        // Using avg for all for now (suitable for rates/percentages like frequency, ctr)
-        camposExtraPorPlataforma[plat][key] = count > 0 ? sum / count : 0;
-      }
-    }
+      return result;
+    };
 
     const porPlataforma = (adsRows.rows as Array<Record<string, unknown>>).map((r) => ({
       plataforma: String(r.plataforma ?? 'meta'),
@@ -176,7 +168,7 @@ export async function GET(req: Request) {
       cpm: Number(r.cpm ?? 0),
       cpc: Number(r.cpc ?? 0),
       agendamientos: Number(r.agendamientos ?? 0),
-      camposExtra: camposExtraPorPlataforma[String(r.plataforma ?? 'meta')] ?? {},
+      camposExtra: parseCamposExtra(r.campos_extra_json),
     }));
 
     const gastoTotal = porPlataforma.reduce((s, p) => s + p.gasto, 0);

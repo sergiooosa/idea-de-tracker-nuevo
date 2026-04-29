@@ -964,46 +964,46 @@ export async function getDashboard(
           AVG(CASE WHEN gasto_total_ad > 0 THEN ctr END) AS ctr,
           AVG(CASE WHEN gasto_total_ad > 0 THEN cpm END) AS cpm,
           AVG(CASE WHEN gasto_total_ad > 0 THEN cpc END) AS cpc,
-          array_agg(DISTINCT plataforma) FILTER (WHERE gasto_total_ad > 0) AS plataformas
+          array_agg(DISTINCT plataforma) FILTER (WHERE gasto_total_ad > 0) AS plataformas,
+          (
+            SELECT jsonb_object_agg(key, avg_val)
+            FROM (
+              SELECT key, AVG((value #>> '{}')::numeric) AS avg_val
+              FROM resumenes_diarios_ads r2,
+                   jsonb_each(r2.datos_extra) AS kv(key, value)
+              WHERE r2.id_cuenta = ${idCuenta}
+                AND r2.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+                AND r2.datos_extra IS NOT NULL
+                AND r2.datos_extra != '{}'::jsonb
+                AND (value #>> '{}')::text ~ '^[0-9]+\\.?[0-9]*$'
+              GROUP BY key
+            ) sub
+          )::text AS campos_extra_json
         FROM resumenes_diarios_ads
         WHERE id_cuenta = ${idCuenta}
           AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
-      `);
-      const adsExtraRows = await db.execute(sql`
-        SELECT plataforma, datos_extra::text AS datos_extra_text
-        FROM resumenes_diarios_ads
-        WHERE id_cuenta = ${idCuenta}
-          AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
-          AND datos_extra IS NOT NULL
-          AND datos_extra != '{}'::jsonb
       `);
       const aggRow = adsAggRows.rows[0] as Record<string, unknown> | undefined;
       const gastoTotal = Number(aggRow?.gasto ?? 0);
       const plataformasArr = Array.isArray(aggRow?.plataformas) ? (aggRow.plataformas as string[]).filter(Boolean) : [];
 
-      // Avg numeric campos_extra (frequency, unique_ctr, etc.) across all rows
-      const extraAcc: Record<string, { sum: number; count: number }> = {};
-      for (const rawRow of adsExtraRows.rows as Array<{ plataforma: string; datos_extra_text?: string; datos_extra?: Record<string, unknown> | string }>) {
-        // Handle both text-cast and direct JSONB (driver-agnostic)
-        let extra: Record<string, unknown> = {};
-        const rawExtra = rawRow.datos_extra_text ?? rawRow.datos_extra;
-        if (typeof rawExtra === 'string') {
-          try { extra = JSON.parse(rawExtra) as Record<string, unknown>; } catch { extra = {}; }
-        } else if (rawExtra && typeof rawExtra === 'object') {
-          extra = rawExtra as Record<string, unknown>;
+      // campos_extra_json comes from SQL subquery — parse it directly
+      const parseCamposExtraAgg = (raw: unknown): Record<string, number> => {
+        if (!raw) return {};
+        let obj: Record<string, unknown> = {};
+        if (typeof raw === 'string') {
+          try { obj = JSON.parse(raw) as Record<string, unknown>; } catch { return {}; }
+        } else if (typeof raw === 'object') {
+          obj = raw as Record<string, unknown>;
         }
-        for (const [key, val] of Object.entries(extra)) {
-          const num = typeof val === 'number' ? val : parseFloat(String(val));
-          if (!Number.isFinite(num)) continue;
-          if (!extraAcc[key]) extraAcc[key] = { sum: 0, count: 0 };
-          extraAcc[key].sum += num;
-          extraAcc[key].count += 1;
+        const result: Record<string, number> = {};
+        for (const [k, v] of Object.entries(obj)) {
+          const n = typeof v === 'number' ? v : parseFloat(String(v));
+          if (Number.isFinite(n)) result[k] = n;
         }
-      }
-      const camposExtra: Record<string, number> = {};
-      for (const [key, { sum, count }] of Object.entries(extraAcc)) {
-        camposExtra[key] = count > 0 ? sum / count : 0;
-      }
+        return result;
+      };
+      const camposExtra = parseCamposExtraAgg(aggRow?.campos_extra_json);
 
       if (gastoTotal > 0 || plataformasArr.length > 0) {
         adsSummary = {
