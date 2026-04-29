@@ -97,12 +97,12 @@ export function parseMetricasConfig(raw: unknown): MetricaConfig[] {
 }
 
 /** Etapas por defecto del embudo. Se usan si embudo_personalizado está vacío. */
+// Etapas que la IA puede clasificar. No Show y Cancelada las determina el SISTEMA
+// (cron y webhook de GHL), no aparecen aquí ni se muestran en el embudo.
 export const DEFAULT_EMBUDO_CONFIG: EmbudoEtapa[] = [
-  { id: "calificada", nombre: "Calificada", color: "#22c55e", orden: 1, es_fija: true, es_calificada: true, es_unica: true, condition: "El lead cumple el perfil de cliente ideal: necesidad, autoridad y presupuesto." },
-  { id: "no_calificada", nombre: "No calificada", color: "#f97316", orden: 2, es_fija: true, es_calificada: false, es_unica: true, condition: "El lead no cumple el perfil de cliente ideal." },
-  { id: "cerrada", nombre: "Cerrada", color: "#10b981", orden: 3, es_fija: true, es_cerrada: true, es_calificada: true, es_unica: true, condition: "El lead aceptó la propuesta y se concretó la venta." },
-  { id: "no_show", nombre: "No Show", color: "#eab308", orden: 4, es_fija: true, es_unica: true, condition: "El lead no se presentó a la reunión sin avisar." },
-  { id: "cancelada", nombre: "Cancelada", color: "#ef4444", orden: 5, es_fija: true, es_unica: true, condition: "El lead canceló la cita antes de asistir." },
+  { id: "calificada", nombre: "Calificada", color: "#22c55e", orden: 1, es_fija: true, es_calificada: true, es_unica: true, condition: "El lead cumple el perfil de cliente ideal: tiene necesidad, autoridad y presupuesto. Mostró interés genuino en la oferta." },
+  { id: "no_calificada", nombre: "No calificada", color: "#f97316", orden: 2, es_fija: true, es_calificada: false, es_unica: true, condition: "El lead no cumple el perfil de cliente ideal. No tiene necesidad, presupuesto o no es el decisor." },
+  { id: "cerrada", nombre: "Cerrada", color: "#10b981", orden: 3, es_fija: true, es_cerrada: true, es_calificada: true, es_unica: true, condition: "El lead aceptó la propuesta y se concretó la venta. Hay confirmación de pago en la llamada." },
 ];
 
 /** Obtener métricas que dependen de esta (para aviso al borrar) */

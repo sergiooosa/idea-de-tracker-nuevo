@@ -1299,12 +1299,12 @@ export default function SystemPage() {
               {/* ─────────────────────────────────────────────────── */}
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                  🔒 Etapas Fijas del Sistema
+                  🔒 Resultados de videollamada (la IA los determina)
                 </h4>
-                <p className="text-xs text-gray-500">Estas 5 etapas son obligatorias y no se pueden eliminar. Su ID es inmutable. Puedes cambiar el color y la descripción.</p>
+                <p className="text-xs text-gray-500">Estas 3 etapas son los únicos resultados posibles que la IA puede clasificar cuando analiza una videollamada. No Show y Cancelada los determina el sistema automáticamente — no necesitan configuración.</p>
                 
                 <div className="grid gap-3">
-                  {embudoEtapas.filter((e) => e.es_fija).map((etapa, idx) => {
+                  {embudoEtapas.filter((e) => e.es_fija && e.id !== 'no_show' && e.id !== 'cancelada').map((etapa, idx) => {
                     const allIdx = embudoEtapas.findIndex((x) => x.id === etapa.id);
                     return (
                       <div key={etapa.id} className="rounded-lg p-4 bg-surface-700/50 border border-surface-600 space-y-3">
@@ -1349,6 +1349,19 @@ export default function SystemPage() {
               </div>
 
               {/* ─────────────────────────────────────────────────── */}
+              {/* Info: No Show y Cancelada — los maneja el sistema */}
+              <div className="rounded-lg px-4 py-3 bg-surface-800/60 border border-surface-600 flex items-start gap-3">
+                <span className="text-lg mt-0.5">⚙️</span>
+                <div>
+                  <p className="text-xs font-semibold text-gray-300">No Show y Cancelada — determinados por el sistema</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <strong className="text-gray-400">No Show:</strong> lo marca el cron automático a las 2 AM si el lead no se presentó.<br />
+                    <strong className="text-gray-400">Cancelada:</strong> lo marca el webhook de GHL cuando el lead cancela su cita.<br />
+                    Ninguno de los dos requiere intervención de la IA ni configuración aquí.
+                  </p>
+                </div>
+              </div>
+
               {/* TOGGLE: Cerradas cuentan como Calificadas */}
               {/* ─────────────────────────────────────────────────── */}
               <div className="rounded-lg p-4 bg-accent-cyan/5 border border-accent-cyan/30 space-y-3">
