@@ -91,7 +91,7 @@ export async function getDashboard(
       metricas_manual_data: cuentas.metricas_manual_data,
       dashboards_personalizados: cuentas.dashboards_personalizados,
       fuente_llamadas: cuentas.fuente_llamadas,
-      // chat_triggers ya no se usa para clasificar — la IA escribe chats_logs.estado directamente
+      configuracion_ads: cuentas.configuracion_ads,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -140,7 +140,50 @@ export async function getDashboard(
   ];
   if (emails.length > 0) newLeadConditions.push(inArray(logLlamadas.closer_mail, emails));
 
-  const [agendas, calls, newLeadEvents] = await Promise.all([
+  // Check if ads is configured — fetch ads agg data early (needed for metricas tipo=ads)
+  const adsCfgEarly = cuentaRow?.configuracion_ads;
+  type AdsCfgType = { meta?: { activo?: boolean; ad_account_id?: string }; google?: { activo?: boolean; customer_id?: string }; tiktok?: { activo?: boolean; advertiser_id?: string } };
+  const adsCfgTyped = adsCfgEarly as AdsCfgType | undefined;
+  const hasAdsConfigEarly = !!(
+    (adsCfgTyped?.meta?.activo && adsCfgTyped.meta.ad_account_id) ||
+    (adsCfgTyped?.google?.activo && adsCfgTyped.google.customer_id) ||
+    (adsCfgTyped?.tiktok?.activo && adsCfgTyped.tiktok.advertiser_id)
+  );
+
+  const adsAggPromise: Promise<Record<string, unknown>> = hasAdsConfigEarly
+    ? db.execute(sql`
+        WITH extras AS (
+          SELECT plataforma, key, AVG((value #>> '{}')::numeric) AS avg_val
+          FROM resumenes_diarios_ads r2,
+               jsonb_each(r2.datos_extra) AS kv(key, value)
+          WHERE r2.id_cuenta = ${idCuenta}
+            AND r2.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+            AND r2.datos_extra IS NOT NULL
+            AND r2.datos_extra != '{}'::jsonb
+            AND (value #>> '{}')::text ~ '^[0-9]+\\.?[0-9]*$'
+          GROUP BY plataforma, key
+        ),
+        extras_agg AS (
+          SELECT plataforma, jsonb_object_agg(key, avg_val)::text AS campos_extra_json
+          FROM extras GROUP BY plataforma
+        )
+        SELECT
+          SUM(rda.gasto_total_ad) AS gasto,
+          SUM(rda.impresiones_totales) AS impresiones,
+          SUM(rda.clicks_unicos) AS clicks,
+          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.ctr END) AS ctr,
+          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpm END) AS cpm,
+          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpc END) AS cpc,
+          array_agg(DISTINCT rda.plataforma) FILTER (WHERE rda.gasto_total_ad > 0) AS plataformas,
+          MAX(ea.campos_extra_json) AS campos_extra_json
+        FROM resumenes_diarios_ads rda
+        LEFT JOIN extras_agg ea ON ea.plataforma = rda.plataforma
+        WHERE rda.id_cuenta = ${idCuenta}
+          AND rda.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+      `).then(r => (r.rows[0] ?? {}) as Record<string, unknown>)
+    : Promise.resolve({} as Record<string, unknown>);
+
+  const [agendas, calls, newLeadEvents, adsAggRowEarly] = await Promise.all([
     db
       .select()
       .from(resumenesDiariosAgendas)
@@ -161,7 +204,37 @@ export async function getDashboard(
       })
       .from(logLlamadas)
       .where(and(...newLeadConditions)),
+    adsAggPromise,
   ]);
+
+  // Parse ads fields for use in metricas tipo="ads" and adsSummary widget
+  const parseCamposExtraEarly = (raw: unknown): Record<string, number> => {
+    if (!raw) return {};
+    let obj: Record<string, unknown> = {};
+    if (typeof raw === 'string') { try { obj = JSON.parse(raw) as Record<string, unknown>; } catch { return {}; } }
+    else if (typeof raw === 'object') { obj = raw as Record<string, unknown>; }
+    const result: Record<string, number> = {};
+    for (const [k, v] of Object.entries(obj)) { const n = typeof v === 'number' ? v : parseFloat(String(v)); if (Number.isFinite(n)) result[k] = n; }
+    return result;
+  };
+  const adsGastoTotal = Number(adsAggRowEarly.gasto ?? 0);
+  const adsImpresiones = Number(adsAggRowEarly.impresiones ?? 0);
+  const adsClicks = Number(adsAggRowEarly.clicks ?? 0);
+  const adsCtr = Number(adsAggRowEarly.ctr ?? 0);
+  const adsCpm = Number(adsAggRowEarly.cpm ?? 0);
+  const adsCpc = Number(adsAggRowEarly.cpc ?? 0);
+  const adsCamposExtra = parseCamposExtraEarly(adsAggRowEarly.campos_extra_json);
+  const adsPlataformasEarly = Array.isArray(adsAggRowEarly.plataformas) ? (adsAggRowEarly.plataformas as string[]).filter(Boolean) : [];
+  // Lookup map for tipo="ads" metricas: adsCampo → value
+  const ADS_CAMPO_MAP: Record<string, number> = {
+    gastoTotal: adsGastoTotal, gasto: adsGastoTotal,
+    impresiones: adsImpresiones,
+    clicks: adsClicks,
+    ctr: adsCtr,
+    cpm: adsCpm,
+    cpc: adsCpc,
+    ...adsCamposExtra, // includes frequency, unique_ctr, etc.
+  };
 
   let filteredAgendas = agendas;
   let filteredCalls = calls;
@@ -578,6 +651,10 @@ export async function getDashboard(
       let valor: string | number;
       if (m.tipo === "fija") {
         valor = m.valorFijo ?? 0;
+      } else if (m.tipo === "ads") {
+        // Lee directamente de resumenes_diarios_ads via adsAggRowEarly
+        const campo = m.adsCampo ?? "";
+        valor = ADS_CAMPO_MAP[campo] ?? 0;
       } else if (m.tipo === "manual") {
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
@@ -941,88 +1018,20 @@ export async function getDashboard(
   }
 
   // ── Ads summary para widget en Panel Ejecutivo ──────────────────────────────
+  // Re-uses adsAggRowEarly computed at the start (no extra DB query needed)
   let adsSummary: DashboardAdsSummary | undefined;
-  {
-    const cfgAds = cuentaRow?.configuracion_ui as Record<string, unknown> | null | undefined;
-    // We need to read configuracion_ads from cuentas — do a targeted SQL query to avoid circular deps
-    const [adsConfigRow] = await db.execute(sql`
-      SELECT configuracion_ads FROM cuentas WHERE id_cuenta = ${idCuenta}
-    `).then(r => r.rows as Array<{ configuracion_ads: Record<string, unknown> | null }>);
-    void cfgAds; // avoid lint unused warning
-    const adsCfg = adsConfigRow?.configuracion_ads;
-    const hasAdsConfig = adsCfg && typeof adsCfg === 'object' && (
-      (adsCfg.meta as { activo?: boolean } | undefined)?.activo ||
-      (adsCfg.google as { activo?: boolean } | undefined)?.activo ||
-      (adsCfg.tiktok as { activo?: boolean } | undefined)?.activo
-    );
-    if (hasAdsConfig) {
-      const adsAggRows = await db.execute(sql`
-        WITH extras AS (
-          SELECT plataforma, key, AVG((value #>> '{}')::numeric) AS avg_val
-          FROM resumenes_diarios_ads r2,
-               jsonb_each(r2.datos_extra) AS kv(key, value)
-          WHERE r2.id_cuenta = ${idCuenta}
-            AND r2.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
-            AND r2.datos_extra IS NOT NULL
-            AND r2.datos_extra != '{}'::jsonb
-            AND (value #>> '{}')::text ~ '^[0-9]+\\.?[0-9]*$'
-          GROUP BY plataforma, key
-        ),
-        extras_agg AS (
-          SELECT plataforma, jsonb_object_agg(key, avg_val)::text AS campos_extra_json
-          FROM extras
-          GROUP BY plataforma
-        )
-        SELECT
-          SUM(rda.gasto_total_ad) AS gasto,
-          SUM(rda.impresiones_totales) AS impresiones,
-          SUM(rda.clicks_unicos) AS clicks,
-          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.ctr END) AS ctr,
-          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpm END) AS cpm,
-          AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpc END) AS cpc,
-          array_agg(DISTINCT rda.plataforma) FILTER (WHERE rda.gasto_total_ad > 0) AS plataformas,
-          MAX(ea.campos_extra_json) AS campos_extra_json
-        FROM resumenes_diarios_ads rda
-        LEFT JOIN extras_agg ea ON ea.plataforma = rda.plataforma
-        WHERE rda.id_cuenta = ${idCuenta}
-          AND rda.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
-      `);
-      const aggRow = adsAggRows.rows[0] as Record<string, unknown> | undefined;
-      const gastoTotal = Number(aggRow?.gasto ?? 0);
-      const plataformasArr = Array.isArray(aggRow?.plataformas) ? (aggRow.plataformas as string[]).filter(Boolean) : [];
-
-      // campos_extra_json comes from SQL subquery — parse it directly
-      const parseCamposExtraAgg = (raw: unknown): Record<string, number> => {
-        if (!raw) return {};
-        let obj: Record<string, unknown> = {};
-        if (typeof raw === 'string') {
-          try { obj = JSON.parse(raw) as Record<string, unknown>; } catch { return {}; }
-        } else if (typeof raw === 'object') {
-          obj = raw as Record<string, unknown>;
-        }
-        const result: Record<string, number> = {};
-        for (const [k, v] of Object.entries(obj)) {
-          const n = typeof v === 'number' ? v : parseFloat(String(v));
-          if (Number.isFinite(n)) result[k] = n;
-        }
-        return result;
-      };
-      const camposExtra = parseCamposExtraAgg(aggRow?.campos_extra_json);
-
-      if (gastoTotal > 0 || plataformasArr.length > 0) {
-        adsSummary = {
-          hasAds: true,
-          gastoTotal,
-          impresiones: Number(aggRow?.impresiones ?? 0),
-          clicks: Number(aggRow?.clicks ?? 0),
-          ctr: Number(aggRow?.ctr ?? 0),
-          cpm: Number(aggRow?.cpm ?? 0),
-          cpc: Number(aggRow?.cpc ?? 0),
-          camposExtra,
-          plataformas: plataformasArr,
-        };
-      }
-    }
+  if (hasAdsConfigEarly && (adsGastoTotal > 0 || adsPlataformasEarly.length > 0)) {
+    adsSummary = {
+      hasAds: true,
+      gastoTotal: adsGastoTotal,
+      impresiones: adsImpresiones,
+      clicks: adsClicks,
+      ctr: adsCtr,
+      cpm: adsCpm,
+      cpc: adsCpc,
+      camposExtra: adsCamposExtra,
+      plataformas: adsPlataformasEarly,
+    };
   }
 
   return {

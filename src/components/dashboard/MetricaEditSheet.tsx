@@ -63,7 +63,7 @@ interface MetricaEditSheetProps {
   metricasConfig: MetricaConfig[];
   metricasManualData: Record<string, MetricaManualEntry[]>;
   editingMetric: MetricaConfig | null;
-  tipoInicial: "manual" | "automatica" | "fija" | "webhook";
+  tipoInicial: "manual" | "automatica" | "fija" | "webhook" | "ads";
   subdominio?: string;
   dashboardsPersonalizados?: import("@/lib/db/schema").DashboardPersonalizado[];
   onClose: () => void;
@@ -89,7 +89,7 @@ export default function MetricaEditSheet({
   // paneles: selección múltiple de dónde aparece esta métrica
   const [panelesSeleccionados, setPanelesSeleccionados] = useState<string[]>(["panel_ejecutivo"]);
   const [atribuibleUsuario, setAtribuibleUsuario] = useState(false);
-  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook">(tipoInicial);
+  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook" | "ads">(tipoInicial);
 
   const [campos, setCampos] = useState<MetricaCampoConfig[]>([]);
 

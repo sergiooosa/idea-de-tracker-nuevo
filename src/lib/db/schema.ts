@@ -138,7 +138,7 @@ export interface MetricaConfig {
   id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "manual" | "automatica" | "fija" | "webhook";
+  tipo: "manual" | "automatica" | "fija" | "webhook" | "ads";
   /** Deprecated: usar paneles[] para multi-panel. Se mantiene para backward compat. */
   ubicacion?: UbicacionPanel;
   /** Lista de paneles donde aparece esta métrica. Sustituye a ubicacion. */
@@ -148,6 +148,8 @@ export interface MetricaConfig {
   formula?: MetricaFormulaConfig;
   valorFijo?: number | string;
   webhookCampo?: string;
+  /** For tipo="ads": which field from adsSummary to use (gastoTotal, impresiones, clicks, ctr, cpm, cpc, or a camposExtra key like "frequency", "unique_ctr") */
+  adsCampo?: string;
   formato?: "numero" | "moneda" | "porcentaje" | "tiempo" | "decimal";
   color?: string;
   /** Tipo de visualización del KPI */
