@@ -49,6 +49,11 @@ interface EmbudoEtapa {
   fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];
   reglas_automaticas?: ReglaAutomatica[];
   es_fallback?: boolean;  // captura leads que no clasifican en ninguna otra etapa
+  es_fija?: boolean;  // no eliminable, id inmutable
+  es_calificada?: boolean;  // cuenta como qualified=true
+  es_cerrada?: boolean;  // cuenta como cerrada (revenue)
+  es_unica?: boolean;  // true=un registro por lead, false=múltiple
+  metrica_id?: string;  // id de métrica auto-creada para etapas custom
 }
 interface ChatConfig {
   tiene_chatbot: boolean;
@@ -253,6 +258,7 @@ export default function SystemPage() {
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
   const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija' | 'webhook'>('manual');
+  const [cerradasCuentanComoCal, setCerradasCuentanComoCal] = useState(true);
   const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
   const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
@@ -322,6 +328,9 @@ export default function SystemPage() {
         if (cfg.ghl_notas) {
           setGhlNotasIa(cfg.ghl_notas.ia !== false); // default true
           setGhlNotasTranscripcion(cfg.ghl_notas.transcripcion === true); // default false
+        }
+        if ((cfg as any).cerradas_cuentan_como_calificadas !== undefined) {
+          setCerradasCuentanComoCal((cfg as any).cerradas_cuentan_como_calificadas);
         }
         if (Array.isArray(cfg.roles_config)) {
           setRolesConfig(cfg.roles_config);
@@ -413,6 +422,7 @@ export default function SystemPage() {
         ghl_notas: { ia: ghlNotasIa, transcripcion: ghlNotasTranscripcion },
         fuente_llamadas: fuenteLlamadas,
         ghl_location_id: ghlLocationId.trim() || null,
+        cerradas_cuentan_como_calificadas: cerradasCuentanComoCal,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -480,7 +490,7 @@ export default function SystemPage() {
   );
   const addTagRule = () => setTagRules((r) => [...r, { id: Date.now().toString(), condition: '', tag: '', source: 'call' }]);
   const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '', ubicacion: 'ambos' }]);
-  const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1 }]);
+  const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1, es_unica: true }]);
   const removeEmbudoEtapa = (id: string) => setEmbudoEtapas((e) => e.filter((x) => x.id !== id).map((x, i) => ({ ...x, orden: i + 1 })));
   const handleAnalizarChats = async () => {
     setAnalizandoChats(true);
@@ -1279,69 +1289,171 @@ export default function SystemPage() {
                   <BarChart3 className="w-5 h-5 text-accent-purple" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Etapas de videollamadas</h3>
-                  <p className="text-sm text-gray-400">Define cómo se llaman los resultados de tus videollamadas. La IA clasificará cada reunión en estas etapas.</p>
+                  <h3 className="text-lg font-semibold text-white">Sistema de Embudo</h3>
+                  <p className="text-sm text-gray-400">Define las etapas clave donde clasificas a tus leads. La IA automatiza este proceso en videollamadas.</p>
                 </div>
               </div>
 
-              <div className="rounded-xl p-3 bg-accent-purple/5 border border-accent-purple/20 text-xs text-gray-400 flex items-start gap-2">
-                <span className="text-accent-purple mt-0.5">ℹ️</span>
-                <span>Estas etapas aplican <strong className="text-white">solo a videollamadas</strong>. Puedes renombrarlas o agregar nuevas. No se pueden eliminar No Show ni Cancelada.</span>
+              {/* ─────────────────────────────────────────────────── */}
+              {/* ETAPAS FIJAS (5 obligatorias) */}
+              {/* ─────────────────────────────────────────────────── */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                  🔒 Etapas Fijas del Sistema
+                </h4>
+                <p className="text-xs text-gray-500">Estas 5 etapas son obligatorias y no se pueden eliminar. Su ID es inmutable. Puedes cambiar el color y la descripción.</p>
+                
+                <div className="grid gap-3">
+                  {embudoEtapas.filter((e) => e.es_fija).map((etapa, idx) => {
+                    const allIdx = embudoEtapas.findIndex((x) => x.id === etapa.id);
+                    return (
+                      <div key={etapa.id} className="rounded-lg p-4 bg-surface-700/50 border border-surface-600 space-y-3">
+                        {/* Encabezado: Badge + Nombre inmutable */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-gray-400 bg-surface-600 px-2 py-1 rounded">🔒</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-white">{etapa.nombre}</p>
+                            <p className="text-[10px] text-gray-500">ID: {etapa.id}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Color editable */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-gray-300">Color</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={etapa.color ?? '#8b5cf6'}
+                              onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === allIdx ? { ...x, color: e.target.value } : x))}
+                              className="w-10 h-10 rounded cursor-pointer border border-surface-500"
+                            />
+                            <span className="text-xs text-gray-500">{etapa.color ?? '#8b5cf6'}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Descripción para la IA */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-gray-300">Descripción (para la IA)</label>
+                          <textarea
+                            value={etapa.condition ?? ''}
+                            onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === allIdx ? { ...x, condition: e.target.value } : x))}
+                            placeholder="Describe qué significa esta etapa para tu negocio..."
+                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-xs text-white placeholder-gray-600 focus:ring-2 focus:ring-accent-purple/40 resize-none"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                {embudoEtapas.map((etapa, idx) => {
-                  const esFija = etapa.id === 'default-no-show' || etapa.id === 'default-cancelada' || etapa.id.startsWith('default-');
-                  return (
-                    <div key={etapa.id} className="flex items-center gap-2 rounded-lg bg-surface-700/60 border border-surface-500 px-3 py-2">
-                      {/* Color dot */}
-                      <input
-                        type="color"
-                        value={etapa.color ?? '#8b5cf6'}
-                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === idx ? { ...x, color: e.target.value } : x))}
-                        className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
-                        title="Color de la etapa"
-                      />
-                      {/* Nombre */}
-                      <input
-                        type="text"
-                        value={etapa.nombre}
-                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === idx ? { ...x, nombre: e.target.value } : x))}
-                        placeholder="Nombre de la etapa"
-                        className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none min-w-0"
-                      />
-                      {/* Descripción corta (condition simplificada) */}
-                      <input
-                        type="text"
-                        value={etapa.condition ?? ''}
-                        onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === idx ? { ...x, condition: e.target.value } : x))}
-                        placeholder="Descripción para la IA (opcional)"
-                        className="flex-1 bg-transparent text-xs text-gray-400 placeholder-gray-600 focus:outline-none min-w-0 hidden sm:block"
-                      />
-                      {/* Eliminar — solo etapas no fijas */}
-                      {!esFija ? (
-                        <button
-                          type="button"
-                          onClick={() => removeEmbudoEtapa(etapa.id)}
-                          className="shrink-0 p-1 rounded text-gray-500 hover:text-red-400 transition-colors"
-                          title="Eliminar etapa"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <span className="shrink-0 w-5 h-5 text-[9px] text-gray-600 flex items-center justify-center" title="Etapa del sistema, no se puede eliminar">🔒</span>
-                      )}
-                    </div>
-                  );
-                })}
+              {/* ─────────────────────────────────────────────────── */}
+              {/* TOGGLE: Cerradas cuentan como Calificadas */}
+              {/* ─────────────────────────────────────────────────── */}
+              <div className="rounded-lg p-4 bg-accent-cyan/5 border border-accent-cyan/30 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <label className="text-sm font-semibold text-white">¿Contar Cerradas como Calificadas?</label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Si activas esto, los leads en la etapa "Cerrada" también contarán en tus métricas de "Leads Calificados".
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCerradasCuentanComoCal(!cerradasCuentanComoCal)}
+                    className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${cerradasCuentanComoCal ? 'bg-accent-cyan' : 'bg-surface-500'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${cerradasCuentanComoCal ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
               </div>
 
+              {/* ─────────────────────────────────────────────────── */}
+              {/* ETAPAS CUSTOM */}
+              {/* ─────────────────────────────────────────────────── */}
+              {embudoEtapas.filter((e) => !e.es_fija).length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                    ✏️ Etapas Personalizadas
+                  </h4>
+                  <p className="text-xs text-gray-500">Puedes crear etapas custom. Elige si cada lead suma +1 solo la 1ª vez (Única) o cada vez que ocurra (Múltiple).</p>
+                  
+                  <div className="space-y-2">
+                    {embudoEtapas.filter((e) => !e.es_fija).map((etapa, customIdx) => {
+                      const allIdx = embudoEtapas.findIndex((x) => x.id === etapa.id);
+                      return (
+                        <div key={etapa.id} className="rounded-lg p-4 bg-surface-700/50 border border-surface-600 space-y-3">
+                          {/* Encabezado: Color + Nombre editable */}
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="color"
+                              value={etapa.color ?? '#06b6d4'}
+                              onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === allIdx ? { ...x, color: e.target.value } : x))}
+                              className="w-10 h-10 rounded cursor-pointer border border-surface-500"
+                            />
+                            <input
+                              type="text"
+                              value={etapa.nombre}
+                              onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === allIdx ? { ...x, nombre: e.target.value } : x))}
+                              placeholder="Nombre de la etapa"
+                              className="flex-1 bg-transparent text-sm font-semibold text-white placeholder-gray-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeEmbudoEtapa(etapa.id)}
+                              className="shrink-0 p-2 rounded text-gray-500 hover:text-red-400 hover:bg-surface-600 transition-colors"
+                              title="Eliminar etapa"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          {/* Switch Única / Múltiple */}
+                          <div className="flex items-center gap-3 pt-2 border-t border-surface-500">
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-gray-300">Modalidad de conteo</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                {etapa.es_unica === true
+                                  ? "El lead suma +1 solo la primera vez que tiene este resultado"
+                                  : "El lead suma +1 cada vez que tiene este resultado"}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setEmbudoEtapas((prev) => prev.map((x, i) => i === allIdx ? { ...x, es_unica: !x.es_unica } : x))}
+                              className={`shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition-colors text-[10px] font-bold ${etapa.es_unica !== false ? 'bg-accent-green/50 border border-accent-green' : 'bg-accent-amber/50 border border-accent-amber'}`}
+                              title={etapa.es_unica !== false ? "Única (1ª vez)" : "Múltiple (cada vez)"}
+                            >
+                              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${etapa.es_unica !== false ? 'translate-x-4' : 'translate-x-1'}`} />
+                            </button>
+                          </div>
+                          
+                          {/* Descripción */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-medium text-gray-300">Descripción (para la IA)</label>
+                            <textarea
+                              value={etapa.condition ?? ''}
+                              onChange={(e) => setEmbudoEtapas((prev) => prev.map((x, i) => i === allIdx ? { ...x, condition: e.target.value } : x))}
+                              placeholder="Describe qué significa esta etapa..."
+                              className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-xs text-white placeholder-gray-600 focus:ring-2 focus:ring-accent-cyan/40 resize-none"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Botón: Agregar etapa */}
               <button
                 type="button"
                 onClick={addEmbudoEtapa}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-xs text-gray-300 hover:text-white hover:border-accent-purple/50 transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-700 border border-surface-600 text-xs text-gray-300 hover:text-white hover:border-accent-cyan/50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" /> Agregar etapa
+                <Plus className="w-4 h-4" /> Agregar etapa personalizada
               </button>
             </div>
           )}

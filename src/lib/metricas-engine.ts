@@ -98,12 +98,11 @@ export function parseMetricasConfig(raw: unknown): MetricaConfig[] {
 
 /** Etapas por defecto del embudo. Se usan si embudo_personalizado está vacío. */
 export const DEFAULT_EMBUDO_CONFIG: EmbudoEtapa[] = [
-  { id: "default-agendada", nombre: "Agendada", color: "#06b6d4", orden: 1, condition: "El lead aceptó agendar una cita o demo. Mostró disposición para una reunión." },
-  { id: "default-asistida", nombre: "Asistida", color: "#8b5cf6", orden: 2, condition: "El lead se presentó a la reunión/cita programada." },
-  { id: "default-ofertada", nombre: "Ofertada", color: "#f97316", orden: 3, condition: "Se le presentó una propuesta comercial concreta al lead con precio y condiciones." },
-  { id: "default-cerrada", nombre: "Cerrada", color: "#22c55e", orden: 4, condition: "El lead aceptó la propuesta y se concretó la venta. Cerrada = venta ganada." },
-  { id: "default-cancelada", nombre: "CANCELADA", color: "#ef4444", orden: 5, condition: "El lead canceló la cita o la reunión antes de asistir." },
-  { id: "default-no-show", nombre: "No_Show", color: "#eab308", orden: 6, condition: "El lead no se presentó a la reunión programada sin avisar." },
+  { id: "calificada", nombre: "Calificada", color: "#22c55e", orden: 1, es_fija: true, es_calificada: true, es_unica: true, condition: "El lead cumple el perfil de cliente ideal: necesidad, autoridad y presupuesto." },
+  { id: "no_calificada", nombre: "No calificada", color: "#f97316", orden: 2, es_fija: true, es_calificada: false, es_unica: true, condition: "El lead no cumple el perfil de cliente ideal." },
+  { id: "cerrada", nombre: "Cerrada", color: "#10b981", orden: 3, es_fija: true, es_cerrada: true, es_calificada: true, es_unica: true, condition: "El lead aceptó la propuesta y se concretó la venta." },
+  { id: "no_show", nombre: "No Show", color: "#eab308", orden: 4, es_fija: true, es_unica: true, condition: "El lead no se presentó a la reunión sin avisar." },
+  { id: "cancelada", nombre: "Cancelada", color: "#ef4444", orden: 5, es_fija: true, es_unica: true, condition: "El lead canceló la cita antes de asistir." },
 ];
 
 /** Obtener métricas que dependen de esta (para aviso al borrar) */

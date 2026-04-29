@@ -30,18 +30,20 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
     );
     if (match) {
       const label = match.nombre ?? (match as any).name ?? c;
-      const isClosed = label.toLowerCase().includes("cerrad") || label.toLowerCase().includes("closed");
+      // Usar flags es_calificada, es_cerrada si están presentes
       const isCanceled = label.toLowerCase().includes("cancel");
+      const isQualified = match.es_calificada !== undefined ? match.es_calificada : (label.toLowerCase().includes("cerrad") || label.toLowerCase().includes("closed"));
+      const isClosed = match.es_cerrada !== undefined ? match.es_cerrada : (label.toLowerCase().includes("cerrad") || label.toLowerCase().includes("closed"));
       return {
         attended: !isCanceled,
-        qualified: isClosed,
+        qualified: isQualified || isClosed,
         canceled: isCanceled,
         outcome: label.toLowerCase(),
       };
     }
   }
 
-  // Comparaciones case-insensitive
+  // Comparaciones case-insensitive (fallback)
   if (cl === "cerrada" || cl === "closed") return { attended: true, qualified: true, canceled: false, outcome: "cerrado" };
   if (cl === "ofertada" || cl === "offered") return { attended: true, qualified: true, canceled: false, outcome: "seguimiento" };
   if (cl === "no_ofertada" || cl === "no ofertada") return { attended: true, qualified: false, canceled: false, outcome: "seguimiento" };

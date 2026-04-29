@@ -37,36 +37,45 @@ function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
       attendedSet: new Set(DEFAULT_ATTENDED),
       closedSet: new Set(DEFAULT_CLOSED),
       effectiveSet: new Set(DEFAULT_EFFECTIVE),
+      qualifiedSet: new Set(),
       etapas: null,
     };
   }
-  // Soporta campo "nombre" (estándar) y "name" (legacy) y también el "id"
+
+  // Usar flags es_calificada, es_cerrada como criterio principal
+  const calificadas = embudo.filter((e) => e.es_calificada === true).map((e) => e.id.toLowerCase());
+  const cerradas = embudo.filter((e) => e.es_cerrada === true).map((e) => e.id.toLowerCase());
+  const noCalificadas = embudo.filter((e) => e.es_calificada === false).map((e) => e.id.toLowerCase());
+
+  // Fallback a heurística de texto si no hay flags (backward compat con embudos viejos)
   const getLabel = (e: EmbudoEtapa) =>
     (e?.nombre ?? (e as any)?.name ?? e?.id ?? "").trim();
   const ids = embudo.map((e) => (e?.id ?? "").trim()).filter(Boolean);
   const nombres = embudo.map(getLabel).filter(Boolean);
-  // Reconocer tanto por label como por id (el Cerebro puede guardar el id como categoría)
-  // Usar lowercase para comparaciones case-insensitive
   const allKeys = [...new Set([...nombres, ...ids])];
   const allKeysLower = allKeys.map(k => k.toLowerCase());
-  const closedFromEmbudo = new Set(allKeysLower.filter((k) =>
-    k.includes("cerrad") || k.includes("closed"),
-  ));
+
+  // Si no tenemos flags, usar heurística de texto
+  const closedSet = cerradas.length > 0
+    ? new Set(cerradas)
+    : new Set(allKeysLower.filter((k) => k.includes("cerrad") || k.includes("closed")));
+  const qualifiedSet = calificadas.length > 0
+    ? new Set(calificadas)
+    : new Set(allKeysLower.filter((k) => !k.includes("no_calificada") && !k.includes("no calificada")));
+
   const effectiveFromEmbudo = new Set(allKeysLower.filter((k) => {
     return k.includes("cerrad") || k.includes("closed") ||
            k.includes("ofertad") || k.includes("offered");
   }));
-  // Si el embudo personalizado no tiene etapas que matcheen "cerrada/closed",
-  // las agendas del sistema usan su propio vocabulario (Cerrada, Ofertada, etc.)
-  // → usar defaults para no romper el cálculo de revenue/cierres
-  const closedSet = closedFromEmbudo.size > 0 ? closedFromEmbudo : new Set(DEFAULT_CLOSED);
   const effectiveSet = effectiveFromEmbudo.size > 0 ? effectiveFromEmbudo : new Set(DEFAULT_EFFECTIVE);
+
   return {
     attendedSet: new Set([...allKeysLower.filter((k) => {
       return !k.includes("cancel") && !k.includes("pdte") && k !== "";
     }), ...DEFAULT_ATTENDED.map(k => k.toLowerCase())]),
     closedSet,
     effectiveSet,
+    qualifiedSet,
     etapas: embudo,
   };
 }
@@ -99,9 +108,15 @@ export async function getDashboard(
 
   const fuenteFinanciera = cuentaRow?.configuracion_ui?.fuente_datos_financieros;
   const useExterna = fuenteFinanciera === "api_externa";
+  const cerradasCuentanComoCal = cuentaRow?.configuracion_ui?.cerradas_cuentan_como_calificadas ?? true;
   const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
   const embudoRaw = embudoRawArr.length > 0 ? embudoRawArr : DEFAULT_EMBUDO_CONFIG;
-  const { attendedSet, closedSet, effectiveSet, etapas } = buildFunnelSets(embudoRaw);
+  const { attendedSet, closedSet, effectiveSet, qualifiedSet, etapas } = buildFunnelSets(embudoRaw);
+  
+  // Si cerradasCuentanComoCal=true, añadir las etapas cerradas al set de calificadas
+  const effectiveQualifiedSet = cerradasCuentanComoCal
+    ? new Set([...qualifiedSet, ...closedSet])
+    : qualifiedSet;
 
   const fechaFilter = or(
     and(
@@ -684,6 +699,42 @@ export async function getDashboard(
           baseWebhook += manualSum;
         }
         valor = baseWebhook;
+      } else if (m.tipo === "embudo_etapa") {
+        // Contar agendas donde categoria === m.id en el rango
+        const etapaDelEmbudo = embudoRaw.find((e) => e.id === m.id);
+        const agendas = await db
+          .select({ categoria: resumenesDiariosAgendas.categoria, idcliente: resumenesDiariosAgendas.idcliente, ghl_contact_id: resumenesDiariosAgendas.ghl_contact_id, email_lead: resumenesDiariosAgendas.email_lead })
+          .from(resumenesDiariosAgendas)
+          .where(
+            and(
+              eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
+              or(
+                and(
+                  isNotNull(resumenesDiariosAgendas.fecha_reunion),
+                  gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+                  lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+                ),
+                and(
+                  isNull(resumenesDiariosAgendas.fecha_reunion),
+                  gte(resumenesDiariosAgendas.fecha, dateFrom),
+                  lte(resumenesDiariosAgendas.fecha, dateTo),
+                ),
+              ),
+              sql`LOWER(${resumenesDiariosAgendas.categoria}) = LOWER(${m.id})`,
+            )
+          );
+        
+        // Si es_unica: deduplicar por idcliente || ghl_contact_id || email_lead
+        if (etapaDelEmbudo?.es_unica === true) {
+          const deduped = new Set<string>();
+          agendas.forEach((a) => {
+            const key = a.idcliente || a.ghl_contact_id || a.email_lead || "";
+            if (key) deduped.add(key);
+          });
+          valor = deduped.size;
+        } else {
+          valor = agendas.length;
+        }
       } else {
         valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
       }

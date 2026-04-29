@@ -52,6 +52,8 @@ export interface ConfiguracionUI {
     /** Guardar nota con la transcripción completa. Default: false (consume tokens, puede fallar por límite de 65k chars) */
     transcripcion?: boolean;
   };
+  /** Toggle: si true, las etapas con es_cerrada:true también cuentan como calificadas. Default: true */
+  cerradas_cuentan_como_calificadas?: boolean;
 }
 
 export interface ReglaEtiqueta {
@@ -133,12 +135,12 @@ export interface MetricaBarraConfig {
   label_y?: string;
 }
 
-/** Configuración de métrica (manual, automática, fija o webhook) */
+/** Configuración de métrica (manual, automática, fija, webhook, ads, embudo_etapa) */
 export interface MetricaConfig {
   id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "manual" | "automatica" | "fija" | "webhook" | "ads";
+  tipo: "manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa";
   /** Deprecated: usar paneles[] para multi-panel. Se mantiene para backward compat. */
   ubicacion?: UbicacionPanel;
   /** Lista de paneles donde aparece esta métrica. Sustituye a ubicacion. */
@@ -189,6 +191,11 @@ export interface EmbudoEtapa {
   fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];  // canales que alimentan esta etapa
   reglas_automaticas?: ReglaAutomatica[];  // reglas sin IA para mover leads
   es_fallback?: boolean;  // catch-all para leads sin categoría reconocida
+  es_fija?: boolean;  // no eliminable, id inmutable
+  es_calificada?: boolean;  // cuenta como qualified=true
+  es_cerrada?: boolean;  // cuenta como cerrada (revenue)
+  es_unica?: boolean;  // true=un registro por lead, false=múltiple
+  metrica_id?: string;  // id de métrica auto-creada para etapas custom
 }
 
 export interface ChatTrigger {

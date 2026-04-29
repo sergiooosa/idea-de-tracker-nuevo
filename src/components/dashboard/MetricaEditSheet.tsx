@@ -89,7 +89,7 @@ export default function MetricaEditSheet({
   // paneles: selección múltiple de dónde aparece esta métrica
   const [panelesSeleccionados, setPanelesSeleccionados] = useState<string[]>(["panel_ejecutivo"]);
   const [atribuibleUsuario, setAtribuibleUsuario] = useState(false);
-  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook" | "ads">(tipoInicial);
+  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa">(tipoInicial);
 
   const [campos, setCampos] = useState<MetricaCampoConfig[]>([]);
 

@@ -37,6 +37,8 @@ export interface SystemConfigData {
   ranking_columnas: string[] | null;
   /** Control de notas en GHL tras procesar videollamada de Fathom */
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
+  /** Toggle: si true, las etapas con es_cerrada:true también cuentan como calificadas */
+  cerradas_cuentan_como_calificadas?: boolean;
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
@@ -49,6 +51,7 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
   configuracion_ads?: ConfiguracionAds;
   ranking_columnas?: string[] | null;
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
+  cerradas_cuentan_como_calificadas?: boolean;
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -114,6 +117,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       idioma: "es" as const,
       configuracion_ads: {},
       ranking_columnas: null,
+      cerradas_cuentan_como_calificadas: true,
     };
   }
 
@@ -144,6 +148,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     configuracion_ads: (r.configuracion_ads && typeof r.configuracion_ads === "object") ? r.configuracion_ads as ConfiguracionAds : {},
     ranking_columnas: Array.isArray(r.configuracion_ui?.ranking_columnas) ? r.configuracion_ui.ranking_columnas : null,
     ghl_notas: r.configuracion_ui?.ghl_notas ?? { ia: true, transcripcion: false },
+    cerradas_cuentan_como_calificadas: r.configuracion_ui?.cerradas_cuentan_como_calificadas ?? true,
   };
 }
 
@@ -160,7 +165,31 @@ export async function updateSystemConfig(
   if (data.ghl_location_id !== undefined) setClause.ghl_location_id = data.ghl_location_id;
   if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
   if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
-  if (data.embudo_personalizado !== undefined) setClause.embudo_personalizado = data.embudo_personalizado;
+  if (data.embudo_personalizado !== undefined) {
+    setClause.embudo_personalizado = data.embudo_personalizado;
+    // Auto-crear métricas para etapas custom (no fijas)
+    const embudoNuevo = data.embudo_personalizado as EmbudoEtapa[];
+    const metricsExisting = (data.metricas_config ?? []) as MetricaConfig[];
+    for (const etapa of embudoNuevo) {
+      if (etapa.es_fija !== true) {
+        const metricId = `embudo-${etapa.id}`;
+        const alreadyExists = metricsExisting.some((m) => m.id === metricId);
+        if (!alreadyExists) {
+          const newMetric: MetricaConfig = {
+            id: metricId,
+            nombre: etapa.nombre,
+            tipo: "embudo_etapa",
+            paneles: ["panel_ejecutivo"],
+            formato: "numero",
+            color: etapa.color ?? "cyan",
+            descripcion: `Leads clasificados como "${etapa.nombre}"`,
+          };
+          metricsExisting.push(newMetric);
+        }
+      }
+    }
+    setClause.metricas_config = metricsExisting;
+  }
   if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
   if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
   if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
@@ -189,7 +218,8 @@ export async function updateSystemConfig(
     data.chat_config !== undefined ||
     data.idioma !== undefined ||
     data.ranking_columnas !== undefined ||
-    (data as Record<string, unknown>).ghl_notas !== undefined
+    (data as Record<string, unknown>).ghl_notas !== undefined ||
+    (data as Record<string, unknown>).cerradas_cuentan_como_calificadas !== undefined
   ) {
     const [row] = await db
       .select({ configuracion_ui: cuentas.configuracion_ui })
@@ -217,6 +247,9 @@ export async function updateSystemConfig(
     }
     if ((data as Record<string, unknown>).ghl_notas !== undefined) {
       updatedUi.ghl_notas = (data as Record<string, unknown>).ghl_notas as { ia?: boolean; transcripcion?: boolean };
+    }
+    if ((data as Record<string, unknown>).cerradas_cuentan_como_calificadas !== undefined) {
+      updatedUi.cerradas_cuentan_como_calificadas = (data as Record<string, unknown>).cerradas_cuentan_como_calificadas as boolean;
     }
     setClause.configuracion_ui = updatedUi;
   }
