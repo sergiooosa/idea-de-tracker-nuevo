@@ -961,14 +961,13 @@ export async function getDashboard(
           SUM(gasto_total_ad) AS gasto,
           SUM(impresiones_totales) AS impresiones,
           SUM(clicks_unicos) AS clicks,
-          AVG(ctr) AS ctr,
-          AVG(cpm) AS cpm,
-          AVG(cpc) AS cpc,
-          array_agg(DISTINCT plataforma) AS plataformas
+          AVG(CASE WHEN gasto_total_ad > 0 THEN ctr END) AS ctr,
+          AVG(CASE WHEN gasto_total_ad > 0 THEN cpm END) AS cpm,
+          AVG(CASE WHEN gasto_total_ad > 0 THEN cpc END) AS cpc,
+          array_agg(DISTINCT plataforma) FILTER (WHERE gasto_total_ad > 0) AS plataformas
         FROM resumenes_diarios_ads
         WHERE id_cuenta = ${idCuenta}
           AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
-          AND gasto_total_ad > 0
       `);
       const adsExtraRows = await db.execute(sql`
         SELECT plataforma, datos_extra::text AS datos_extra_text

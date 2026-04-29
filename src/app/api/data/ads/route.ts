@@ -37,16 +37,16 @@ export async function GET(req: Request) {
       });
     }
 
-    // Aggregate ads data per platform
+    // Aggregate ads data per platform (exclude zero-spend days to avoid distorting CTR/CPM/CPC averages)
     const adsRows = await db.execute(sql`
       SELECT
         plataforma,
         SUM(gasto_total_ad) AS gasto,
         SUM(impresiones_totales) AS impresiones,
         SUM(clicks_unicos) AS clicks,
-        AVG(ctr) AS ctr,
-        AVG(cpm) AS cpm,
-        AVG(cpc) AS cpc,
+        AVG(CASE WHEN gasto_total_ad > 0 THEN ctr END) AS ctr,
+        AVG(CASE WHEN gasto_total_ad > 0 THEN cpm END) AS cpm,
+        AVG(CASE WHEN gasto_total_ad > 0 THEN cpc END) AS cpc,
         SUM(agendamientos) AS agendamientos
       FROM resumenes_diarios_ads
       WHERE id_cuenta = ${idCuenta}

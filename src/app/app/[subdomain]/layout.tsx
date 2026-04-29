@@ -219,9 +219,11 @@ function SoloMisDatosToggle() {
 function NavFiltered({
   onLinkClick,
   dashboards = [],
+  hasAds = null,
 }: {
   onLinkClick?: () => void;
   dashboards?: { id: string; nombre: string; icono?: string }[];
+  hasAds?: boolean | null;
 }) {
   const pathname = usePathname();
   const { session, sessionLoading } = useUserFilter();
@@ -245,6 +247,18 @@ function NavFiltered({
     <>
       {navFiltered.map(({ path, navKey, label, icon: Icon }) => (
         <React.Fragment key={`${path}-${navKey}`}>
+          {/* Ads item: grayed out with tooltip when ads not configured */}
+          {path === "/ads" && hasAds === false ? (
+            <div
+              title="Conecta una plataforma de Ads en Sistema → Integraciones de Ads para activar esta sección"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border border-transparent text-gray-600 cursor-not-allowed opacity-50 select-none"
+              aria-disabled="true"
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {t.nav[navKey] ?? label}
+              <span className="ml-auto text-[9px] text-gray-600 uppercase tracking-wide font-semibold border border-gray-700 rounded px-1 py-0.5">No conectado</span>
+            </div>
+          ) : (
           <Link
             href={path}
             onClick={onLinkClick}
@@ -258,6 +272,7 @@ function NavFiltered({
             <Icon className="w-5 h-5 shrink-0" />
             {t.nav[navKey] ?? label}
           </Link>
+          )}
           {path === "/dashboard" && dashboards.length > 0 && (
             <div className="space-y-1 ml-3">
               {dashboards.map((dash) => (
@@ -287,11 +302,13 @@ function NavFiltered({
 function NavFilteredMobile({
   onClose,
   dashboards = [],
+  hasAds = null,
 }: {
   onClose: () => void;
   dashboards?: { id: string; nombre: string; icono?: string }[];
+  hasAds?: boolean | null;
 }) {
-  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} />;
+  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} hasAds={hasAds} />;
 }
 
 function PermissionGuard({ children }: { children: React.ReactNode }) {
@@ -320,13 +337,17 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [locale, setLocale] = useState<Locale | null>(null);
   const [dashboardsNav, setDashboardsNav] = useState<{ id: string; nombre: string; icono?: string }[]>([]);
+  const [hasAds, setHasAds] = useState<boolean | null>(null); // null = loading
   const { session } = useUserFilter();
 
   useEffect(() => {
     fetch("/api/data/locale")
       .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.idioma) setLocale(d.idioma as Locale); })
-      .catch(() => { /* fallback to default (es) */ });
+      .then((d) => {
+        if (d?.idioma) setLocale(d.idioma as Locale);
+        if (typeof d?.hasAds === "boolean") setHasAds(d.hasAds);
+      })
+      .catch(() => { /* fallback */ });
   }, []);
 
   useEffect(() => {
@@ -375,7 +396,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
-          <NavFiltered dashboards={dashboardsNav} />
+          <NavFiltered dashboards={dashboardsNav} hasAds={hasAds} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
@@ -415,7 +436,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex-1 p-2">
-          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} />
+          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} hasAds={hasAds} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
