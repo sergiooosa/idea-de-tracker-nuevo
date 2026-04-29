@@ -971,7 +971,7 @@ export async function getDashboard(
           AND gasto_total_ad > 0
       `);
       const adsExtraRows = await db.execute(sql`
-        SELECT plataforma, datos_extra
+        SELECT plataforma, datos_extra::text AS datos_extra_text
         FROM resumenes_diarios_ads
         WHERE id_cuenta = ${idCuenta}
           AND fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
@@ -984,8 +984,15 @@ export async function getDashboard(
 
       // Avg numeric campos_extra (frequency, unique_ctr, etc.) across all rows
       const extraAcc: Record<string, { sum: number; count: number }> = {};
-      for (const row of adsExtraRows.rows as Array<{ plataforma: string; datos_extra: Record<string, unknown> }>) {
-        const extra = row.datos_extra ?? {};
+      for (const rawRow of adsExtraRows.rows as Array<{ plataforma: string; datos_extra_text?: string; datos_extra?: Record<string, unknown> | string }>) {
+        // Handle both text-cast and direct JSONB (driver-agnostic)
+        let extra: Record<string, unknown> = {};
+        const rawExtra = rawRow.datos_extra_text ?? rawRow.datos_extra;
+        if (typeof rawExtra === 'string') {
+          try { extra = JSON.parse(rawExtra) as Record<string, unknown>; } catch { extra = {}; }
+        } else if (rawExtra && typeof rawExtra === 'object') {
+          extra = rawExtra as Record<string, unknown>;
+        }
         for (const [key, val] of Object.entries(extra)) {
           const num = typeof val === 'number' ? val : parseFloat(String(val));
           if (!Number.isFinite(num)) continue;

@@ -55,9 +55,9 @@ export async function GET(req: Request) {
     `);
 
     // Fetch datos_extra rows for campos_extra (frequency, unique_ctr, hook_rate, etc.)
-    // We collect all datos_extra JSONBs, then avg numeric fields client-side
+    // Cast to text to ensure reliable parsing regardless of pg/neon driver JSONB handling
     const datosExtraRows = await db.execute(sql`
-      SELECT plataforma, datos_extra
+      SELECT plataforma, datos_extra::text AS datos_extra_text
       FROM resumenes_diarios_ads
       WHERE id_cuenta = ${idCuenta}
         AND fecha BETWEEN ${from}::date AND ${to}::date
@@ -136,10 +136,17 @@ export async function GET(req: Request) {
     // Aggregate datos_extra campos (frequency, unique_ctr, hook_rate, etc.) per platform
     // We avg numeric scalar fields across all rows of each platform
     const extraByPlatform: Record<string, Record<string, { sum: number; count: number }>> = {};
-    for (const row of datosExtraRows.rows as Array<{ plataforma: string; datos_extra: Record<string, unknown> }>) {
-      const plat = row.plataforma ?? 'meta';
+    for (const rawRow of datosExtraRows.rows as Array<{ plataforma: string; datos_extra_text?: string; datos_extra?: Record<string, unknown> | string }>) {
+      const plat = rawRow.plataforma ?? 'meta';
       if (!extraByPlatform[plat]) extraByPlatform[plat] = {};
-      const extra = row.datos_extra ?? {};
+      // Handle both text-cast (datos_extra_text) and direct JSONB (datos_extra)
+      let extra: Record<string, unknown> = {};
+      const rawExtra = rawRow.datos_extra_text ?? rawRow.datos_extra;
+      if (typeof rawExtra === 'string') {
+        try { extra = JSON.parse(rawExtra) as Record<string, unknown>; } catch { extra = {}; }
+      } else if (rawExtra && typeof rawExtra === 'object') {
+        extra = rawExtra as Record<string, unknown>;
+      }
       for (const [key, val] of Object.entries(extra)) {
         // Only aggregate top-level numeric fields (skip nested objects like actions arrays)
         const num = typeof val === 'number' ? val : parseFloat(String(val));
