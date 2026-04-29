@@ -231,17 +231,20 @@ export async function getDashboard(
   const adsCamposExtra = parseCamposExtraEarly(adsAggRowEarly.campos_extra_json);
   const adsPlataformasEarly = Array.isArray(adsAggRowEarly.plataformas) ? (adsAggRowEarly.plataformas as string[]).filter(Boolean) : [];
   // Lookup map for tipo="ads" metricas: adsCampo → value
+  // NOTE: percentage fields (ctr, play_rate, engagement) are stored as 0-100 in BD
+  // but formato="porcentaje" renders via pctFmt(n) = (n*100)%, so store as 0-1 fraction here.
+  // Dollar/count fields stay as-is.
   const ADS_CAMPO_MAP: Record<string, number> = {
     gastoTotal: adsGastoTotal, gasto: adsGastoTotal,
     impresiones: adsImpresiones,
     clicks: adsClicks,
-    ctr: adsCtr,
+    ctr: adsCtr / 100,          // BD: 1.73 → map: 0.0173 → pctFmt: 1.73%
     cpm: adsCpm,
     cpc: adsCpc,
-    play_rate: adsPlayRate,
-    engagement: adsEngagement,
-    engagement_rate: adsEngagement,
-    ...adsCamposExtra, // includes frequency, unique_ctr, etc.
+    play_rate: adsPlayRate / 100,      // BD: 39.67 → map: 0.3967 → pctFmt: 39.67%
+    engagement: adsEngagement / 100,   // BD: 30.12 → map: 0.3012 → pctFmt: 30.12%
+    engagement_rate: adsEngagement / 100,
+    ...adsCamposExtra, // frequency, unique_ctr etc. (rendered as numbers, not pctFmt)
   };
 
   let filteredAgendas = agendas;
