@@ -357,17 +357,25 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
       .catch(() => { /* fallback */ });
   }, []);
 
-  // Check GHL token status
+  // Check GHL token status — only for admins/superadmins with configurar_sistema perm
   useEffect(() => {
-    fetch("/api/data/ghl-token")
+    const perms = session?.permisosArray ?? [];
+    const canConfigure = session?.rol === "superadmin" || perms.includes("configurar_sistema");
+    if (!canConfigure) return; // asesores no necesitan esto
+
+    const controller = new AbortController();
+    const tId = setTimeout(() => controller.abort(), 5000); // 5s max
+
+    fetch("/api/data/ghl-token", { signal: controller.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
+        clearTimeout(tId);
         if (d?.status) setGhlTokenStatus(d.status as "ok" | "invalid" | "unknown");
-        if (d?.locationid ?? d?.ghl_location_id) setGhlLocationId(d.locationid);
+        if (d?.locationid) setGhlLocationId(d.locationid);
         if (typeof d?.pending_count === "number") setGhlPendingCount(d.pending_count);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => { clearTimeout(tId); });
+  }, [session?.rol, JSON.stringify(session?.permisosArray)]);
 
   useEffect(() => {
     fetch("/api/data/dashboards")
@@ -478,17 +486,40 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ token: ghlNewToken.trim() }),
                       });
-                      const d = await r.json() as { valid?: boolean; error?: string; success?: number; failed?: number; retried?: number };
+                      const d = await r.json() as { valid?: boolean; error?: string; success?: number; failed?: number; remaining?: number; total_pending?: number };
                       if (d.valid) {
                         setGhlTokenStatus("ok");
-                        setGhlPendingCount(0);
                         setGhlRetryResult({ success: d.success ?? 0, failed: d.failed ?? 0 });
-                        setTimeout(() => setShowGhlAlert(false), 3000);
+                        const remaining = d.remaining ?? 0;
+                        setGhlPendingCount(remaining);
+                        if (remaining === 0) {
+                          setTimeout(() => setShowGhlAlert(false), 2500);
+                        }
+                        // Si quedan pendientes, seguir reintentando en batches automáticamente
+                        if (remaining > 0) {
+                          let stillPending = remaining;
+                          let totalSuccess = d.success ?? 0;
+                          while (stillPending > 0) {
+                            await new Promise(res => setTimeout(res, 1500));
+                            const r2 = await fetch("/api/data/ghl-token", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ token: ghlNewToken.trim() }),
+                            });
+                            const d2 = await r2.json() as typeof d;
+                            if (!d2.valid) break;
+                            totalSuccess += d2.success ?? 0;
+                            stillPending = d2.remaining ?? 0;
+                            setGhlPendingCount(stillPending);
+                            setGhlRetryResult({ success: totalSuccess, failed: d2.failed ?? 0 });
+                          }
+                          if (stillPending === 0) setTimeout(() => setShowGhlAlert(false), 2500);
+                        }
                       } else {
-                        alert(`Token inválido: ${d.error ?? "Error desconocido"}`);
+                        alert(`Token inválido: ${d.error ?? "El token no fue aceptado por GHL. Verifica que tenga todos los permisos."}`);
                       }
                     } catch {
-                      alert("Error al validar el token. Revisa tu conexión.");
+                      alert("Error de conexión. Verifica tu internet e inténtalo de nuevo.");
                     } finally {
                       setGhlValidating(false);
                     }

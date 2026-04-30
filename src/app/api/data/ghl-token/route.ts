@@ -67,11 +67,21 @@ export async function POST(req: Request) {
       UPDATE cuentas SET token_ghl = ${token}, token_ghl_status = 'ok' WHERE id_cuenta = ${idCuenta}
     `);
 
-    // Reintentar pendientes con delay entre cada una
+    // Contar pendientes (para reportar al usuario)
+    const totalPending = await db.execute(sql`
+      SELECT COUNT(*) as total FROM ghl_pending_actions
+      WHERE id_cuenta = ${idCuenta} AND resolved_at IS NULL
+    `).then(r => Number((r.rows[0] as { total: string }).total));
+
+    // Procesar solo las primeras 20 en este request (evita timeout de 30s de Next.js)
+    // El resto se procesará cuando el usuario refresque o en el siguiente check.
+    // 20 notas × 600ms = 12s << 30s límite ✅
+    const BATCH_SIZE = 20;
     const pendientes = await db.execute(sql`
       SELECT id, contact_id, action_type, payload FROM ghl_pending_actions
       WHERE id_cuenta = ${idCuenta} AND resolved_at IS NULL
       ORDER BY created_at ASC
+      LIMIT ${BATCH_SIZE}
     `);
 
     let success = 0;
@@ -85,7 +95,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: { Authorization: bearer, "Content-Type": "application/json", Version: "2021-07-28" },
             body: JSON.stringify({ body: action.payload.body }),
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(8000),
           });
           if (!r.ok) throw new Error(`GHL ${r.status}`);
         } else if (action.action_type === "tag" && action.payload.tag) {
@@ -93,7 +103,7 @@ export async function POST(req: Request) {
             method: "POST",
             headers: { Authorization: bearer, "Content-Type": "application/json", Version: "2021-07-28" },
             body: JSON.stringify({ tags: [action.payload.tag] }),
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(8000),
           });
           if (!r.ok) throw new Error(`GHL ${r.status}`);
         }
@@ -105,6 +115,14 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ valid: true, retried: pendientes.rows.length, success, failed });
+    const remaining = totalPending - success;
+    return NextResponse.json({
+      valid: true,
+      total_pending: totalPending,
+      processed: pendientes.rows.length,
+      success,
+      failed,
+      remaining,  // frontend puede mostrar progreso y seguir reintentando
+    });
   });
 }
