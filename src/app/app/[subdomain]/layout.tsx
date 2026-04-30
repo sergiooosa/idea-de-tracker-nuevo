@@ -338,6 +338,13 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [dashboardsNav, setDashboardsNav] = useState<{ id: string; nombre: string; icono?: string }[]>([]);
   const [hasAds, setHasAds] = useState<boolean | null>(null); // null = loading
+  const [ghlTokenStatus, setGhlTokenStatus] = useState<"ok" | "invalid" | "unknown" | null>(null);
+  const [ghlPendingCount, setGhlPendingCount] = useState(0);
+  const [ghlLocationId, setGhlLocationId] = useState<string | null>(null);
+  const [showGhlAlert, setShowGhlAlert] = useState(false);
+  const [ghlNewToken, setGhlNewToken] = useState("");
+  const [ghlValidating, setGhlValidating] = useState(false);
+  const [ghlRetryResult, setGhlRetryResult] = useState<{ success: number; failed: number } | null>(null);
   const { session } = useUserFilter();
 
   useEffect(() => {
@@ -348,6 +355,18 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
         if (typeof d?.hasAds === "boolean") setHasAds(d.hasAds);
       })
       .catch(() => { /* fallback */ });
+  }, []);
+
+  // Check GHL token status
+  useEffect(() => {
+    fetch("/api/data/ghl-token")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.status) setGhlTokenStatus(d.status as "ok" | "invalid" | "unknown");
+        if (d?.locationid ?? d?.ghl_location_id) setGhlLocationId(d.locationid);
+        if (typeof d?.pending_count === "number") setGhlPendingCount(d.pending_count);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -386,6 +405,104 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <LocaleProvider locale={locale}>
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg)]" style={{ background: "var(--bg)", backgroundImage: "var(--bg-gradient)" }}>
+
+      {/* ⚠️ ALERTA GLOBAL: Token GHL inválido */}
+      {ghlTokenStatus === "invalid" && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl rounded-2xl border-2 border-red-500 bg-surface-900 shadow-2xl overflow-hidden">
+            {/* Header rojo */}
+            <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
+              <span className="text-3xl">🚨</span>
+              <div>
+                <h2 className="text-white text-lg font-bold">Conexión con GoHighLevel rota</h2>
+                <p className="text-red-100 text-sm">El token de acceso a GHL es inválido. Las notas y tags no se están enviando.</p>
+              </div>
+            </div>
+            {/* Impacto */}
+            {ghlPendingCount > 0 && (
+              <div className="mx-6 mt-4 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-200">
+                ⚠️ <strong>{ghlPendingCount} notas/acciones</strong> están en cola esperando ser enviadas a GHL. Se enviarán automáticamente cuando actualices el token.
+              </div>
+            )}
+            {/* Paso a paso */}
+            <div className="px-6 py-4 space-y-4">
+              <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Cómo solucionarlo — paso a paso:</h3>
+              <ol className="space-y-3 text-sm text-gray-300">
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-accent-cyan text-black text-xs font-bold flex items-center justify-center">1</span>
+                  <span>Ve a <strong className="text-white">GoHighLevel</strong> → Esquina superior derecha → tu nombre → <strong className="text-white">Settings</strong></span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-accent-cyan text-black text-xs font-bold flex items-center justify-center">2</span>
+                  <span>Busca <strong className="text-white">API Keys</strong> en el menú lateral</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-accent-cyan text-black text-xs font-bold flex items-center justify-center">3</span>
+                  <span>Crea un nuevo token con todos los permisos: <strong className="text-white">contacts.write, contacts.read, notes.write, tags.write</strong></span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-accent-cyan text-black text-xs font-bold flex items-center justify-center">4</span>
+                  <span>Verifica que el <strong className="text-white">Location ID</strong> de tu GHL sea: <code className="bg-surface-700 px-2 py-0.5 rounded text-accent-cyan font-mono text-xs">{ghlLocationId ?? "—"}</code>. Si no coincide, usa el Location ID correcto.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-accent-cyan text-black text-xs font-bold flex items-center justify-center">5</span>
+                  <span>Pega el nuevo token aquí abajo y haz clic en <strong className="text-white">Validar y guardar</strong></span>
+                </li>
+              </ol>
+              {/* Input del nuevo token */}
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 font-medium">Nuevo token de GHL (empieza con pit-...)</label>
+                <input
+                  type="text"
+                  value={ghlNewToken}
+                  onChange={(e) => setGhlNewToken(e.target.value)}
+                  placeholder="pit-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-4 py-2.5 text-sm text-white placeholder-gray-600 font-mono focus:outline-none focus:border-accent-cyan"
+                />
+              </div>
+              {ghlRetryResult && (
+                <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-3 text-sm text-green-200">
+                  ✅ Token válido. {ghlRetryResult.success} notas enviadas a GHL. {ghlRetryResult.failed > 0 ? `${ghlRetryResult.failed} fallaron y se reintentarán.` : ""}
+                </div>
+              )}
+              {/* Botones */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={!ghlNewToken.trim() || ghlValidating}
+                  onClick={async () => {
+                    setGhlValidating(true);
+                    try {
+                      const r = await fetch("/api/data/ghl-token", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ token: ghlNewToken.trim() }),
+                      });
+                      const d = await r.json() as { valid?: boolean; error?: string; success?: number; failed?: number; retried?: number };
+                      if (d.valid) {
+                        setGhlTokenStatus("ok");
+                        setGhlPendingCount(0);
+                        setGhlRetryResult({ success: d.success ?? 0, failed: d.failed ?? 0 });
+                        setTimeout(() => setShowGhlAlert(false), 3000);
+                      } else {
+                        alert(`Token inválido: ${d.error ?? "Error desconocido"}`);
+                      }
+                    } catch {
+                      alert("Error al validar el token. Revisa tu conexión.");
+                    } finally {
+                      setGhlValidating(false);
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-accent-cyan text-black text-sm font-bold hover:bg-accent-cyan/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {ghlValidating ? "Validando..." : "✅ Validar y guardar token"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <aside className="hidden md:flex md:flex-col w-56 bg-surface-800/95 backdrop-blur-sm border-r border-surface-500 shrink-0 shadow-[2px_0_24px_-8px_rgba(0,240,255,0.12)]">
         <div className="p-4 border-b border-surface-500/80">
           <Link href="/dashboard" className="flex items-center gap-2 font-display font-semibold text-lg text-white">

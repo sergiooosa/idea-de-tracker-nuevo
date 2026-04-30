@@ -272,6 +272,7 @@ export const cuentas = pgTable("cuentas", {
   fuente_llamadas: text("fuente_llamadas").default("twilio"),
   configuracion_ads: jsonb("configuracion_ads").$type<ConfiguracionAds>(),
   ghl_location_id: text("ghl_location_id"),
+  locationid: text("locationid"),  // GHL location ID (campo real de la tabla)
 });
 
 /* ------------------------------------------------------------------ */
