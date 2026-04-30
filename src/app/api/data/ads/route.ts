@@ -46,6 +46,7 @@ export async function GET(req: Request) {
              jsonb_each(r2.datos_extra) AS kv(key, value)
         WHERE r2.id_cuenta = ${idCuenta}
           AND r2.fecha BETWEEN ${from}::date AND ${to}::date
+          AND r2.plataforma != 'vturb'
           AND r2.datos_extra IS NOT NULL
           AND r2.datos_extra != '{}'::jsonb
           AND (value #>> '{}')::text ~ '^[0-9]+\.?[0-9]*$'
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
       LEFT JOIN extras_agg ea ON ea.plataforma = rda.plataforma
       WHERE rda.id_cuenta = ${idCuenta}
         AND rda.fecha BETWEEN ${from}::date AND ${to}::date
+        AND rda.plataforma != 'vturb'  -- Vturb is a video tracker, not an ad platform
       GROUP BY rda.plataforma, ea.campos_extra_json
     `);
 
@@ -86,6 +88,7 @@ export async function GET(req: Request) {
       WHERE id_cuenta = ${idCuenta}
         AND fecha BETWEEN ${from}::date AND ${to}::date
         AND campana IS NOT NULL
+        AND plataforma != 'vturb'
       GROUP BY campana, plataforma
       ORDER BY gasto DESC
     `);
