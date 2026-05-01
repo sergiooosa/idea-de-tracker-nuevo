@@ -30,10 +30,13 @@ function normalizarEstado(estado: string | null): EstadoNormalizado {
   if (limpio.startsWith("seguimiento")) return "seguimiento"; // seguimiento, seguimiento_1..10
   if (limpio === "interesado") return "interesado";
   if (limpio === "programado") return "programado";
-  if (limpio === "calificada") return "calificada";
+  // Embudo viejo con prefijo "default-" (High-Line y otros clientes migrados)
+  if (limpio === "calificada" || limpio === "default-agendada" || limpio === "default-asistida" || limpio === "default-ofertada") return "calificada";
   if (limpio === "no_calificada") return "no_calificada";
   if (limpio === "cerrada" || limpio === "complet") return "cerrada";
   if (["no_interesado", "no interesado", "perdido", "perdida"].includes(limpio)) return "no_interesado";
+  if (limpio === "no_show" || limpio === "default-no-show") return "no_contesto"; // en llamadas, no_show = no contestó la cita
+  if (limpio === "cancelada" || limpio === "default-cancelada") return "no_interesado";
   return "otro";
 }
 
