@@ -540,6 +540,8 @@ export interface DashboardResponse {
   fuente_llamadas?: "twilio" | "ghl";
 }
 
+// ── Canal: Llamadas ───────────────────────────────────────────────────────────
+
 export interface AsesorLeadCRM {
   id: string;
   name: string;
@@ -547,24 +549,81 @@ export interface AsesorLeadCRM {
   phone: string | null;
   ghlContactId: string | null;
   estado: string | null;
-  categoria: 'primera_llamada' | 'seguimiento' | 'interesados' | 'no_interesados';
+  /** Estado normalizado para agrupar en columnas del pipeline */
+  estadoNormalizado: 'pendiente' | 'no_contesto' | 'buzon' | 'seguimiento' | 'interesado' | 'programado' | 'calificada' | 'no_calificada' | 'cerrada' | 'no_interesado' | 'otro';
   intentosContacto: number;
   speedToLead: string;
   notasLlamadas: { date: string; text: string }[];
   leadNote: string | null;
 }
 
+// ── Canal: Videollamadas ──────────────────────────────────────────────────────
+
+export interface AsesorVideollamada {
+  id: number;
+  leadName: string | null;
+  leadEmail: string | null;
+  ghlContactId: string | null;
+  categoria: string;           // el id de la etapa del embudo (calificada, cerrada, etc.)
+  fechaReunion: string | null;
+  facturacion: number;
+  cashCollected: number;
+  fathomUrl: string | null;
+  resumenIa: string | null;
+}
+
+// ── Canal: Chats ──────────────────────────────────────────────────────────────
+
+export interface AsesorChat {
+  chatId: string;
+  leadName: string | null;
+  leadEmail: string | null;
+  estado: string | null;
+  fechaUltimoMensaje: string;
+  respondido: boolean;
+  speedToLeadSeg: number | null;
+}
+
+// ── Canal: Métricas personalizadas atribuibles ────────────────────────────────
+
+export interface AsesorMetricaCustom {
+  id: string;
+  nombre: string;
+  valor: number;
+  formato: string;
+  color: string;
+}
+
+// ── KPIs por canal ────────────────────────────────────────────────────────────
+
 export interface AsesorKpis {
+  // Llamadas
   leadsAsignados: number;
   llamadasRealizadas: number;
   llamadasContestadas: number;
-  reunionesAgendadas: number;
   tasaContacto: number;
+  // Videollamadas
+  reunionesAgendadas: number;
+  reunionesAsistidas: number;
+  reunionesCalificadas: number;
+  reunionesCerradas: number;
+  reunionesNoShow: number;
+  reunionesCanceladas: number;
   tasaAgendamiento: number;
-  /** Total chats asignados al asesor en el período */
-  totalChats?: number;
-  /** Chats con al menos un mensaje de agente */
-  chatsConRespuesta?: number;
+  // Chats
+  totalChats: number;
+  chatsConRespuesta: number;
+  tasaRespuestaChats: number;
+  speedToLeadChatsAvg: number | null; // segundos
+}
+
+// ── Canales activos del tenant (para mostrar/ocultar tabs) ────────────────────
+
+export interface AsesorCanales {
+  llamadas: boolean;
+  videollamadas: boolean;
+  chats: boolean;
+  metricasCustom: boolean;
 }
 
 /** Desglose por canal/origen para KPIs del panel asesor */
@@ -572,37 +631,37 @@ export interface AsesorBreakdown {
   leadsAsignados: {
     desdeLlamadas: number;
     desdeAgendas: number;
-    /** Leads desde registros_de_llamada (CRM) */
     desdeRegistros: number;
-    /** Leads que aparecen solo en llamadas (no en agendas ni registros) */
     soloLlamadas: number;
-    /** Leads que aparecen solo en agendas (no en llamadas ni registros) */
     soloAgendas: number;
-    /** Leads que aparecen solo en registros (CRM), sin log ni agendas */
     soloRegistros: number;
-    /** Leads que aparecen en llamadas y agendas */
     enAmbos: number;
   };
   llamadasRealizadas: {
     total: number;
     porTipo: Record<string, number>;
   };
-  llamadasContestadas: {
-    total: number;
-  };
-  reunionesAgendadas: {
-    total: number;
-  };
+  llamadasContestadas: { total: number };
+  reunionesAgendadas: { total: number };
 }
 
 export interface AsesorResponse {
   kpis: AsesorKpis;
+  // Pipeline de llamadas (registros_de_llamada normalizados)
   leads: AsesorLeadCRM[];
+  // Pipeline de videollamadas (resumenes_diarios_agendas)
+  videollamadas: AsesorVideollamada[];
+  // Pipeline de chats (chats_logs)
+  chats: AsesorChat[];
+  // Métricas custom atribuibles al asesor
+  metricasCustom: AsesorMetricaCustom[];
+  // Etapas del embudo de la cuenta para el pipeline de videollamadas
+  embudoEtapas: { id: string; nombre: string; color: string; es_fija?: boolean }[];
+  // Canales disponibles en la cuenta
+  canales: AsesorCanales;
   advisors: ApiAdvisor[];
-  /** Lista completa de asesores del tenant (para combobox super admin) */
   advisorsList?: ApiAdvisor[];
   breakdown?: AsesorBreakdown;
-  fuente_llamadas?: "twilio" | "ghl";
-  /** GHL location ID para construir links directos a contactos */
-  ghlLocationId?: string | null;
+  fuente_llamadas: "twilio" | "ghl";
+  ghlLocationId: string | null;
 }
