@@ -106,34 +106,33 @@ export async function POST(
         // Cada llamada con userId/customerId genera una fila nueva acumulable.
         // El campo global (sin user/customer) se actualiza por separado abajo
         // solo si también viene valor sin atribución (caso raro, pero seguro).
-        await db.insert(metricasWebhook).values({
-          id_cuenta: idCuenta,
-          fecha,
-          campo,
-          valor: String(num),
-          ghl_user_id: ghlUserId,
-          ghl_customer_id: ghlCustomerId,
-        });
-        // También acumular en el aggregate global (fila sin user/customer)
-        // Usa el constraint real: metricas_webhook_id_cuenta_fecha_campo_key
+        // INSERT atribuido — acumula por (id_cuenta, fecha, campo, ghl_user_id)
         await db.execute(sql`
-          INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, updated_at)
-          VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NOW())
-          ON CONFLICT (id_cuenta, fecha, campo) DO UPDATE
+          INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, ghl_user_id, ghl_customer_id, updated_at)
+          VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, ${ghlUserId}, ${ghlCustomerId}, NOW())
+          ON CONFLICT (id_cuenta, fecha, campo, ghl_user_id) DO UPDATE
+          SET valor = metricas_webhook.valor + ${String(num)},
+              ghl_customer_id = EXCLUDED.ghl_customer_id,
+              updated_at = NOW()
+        `);
+        // También acumular en el aggregate global (fila con ghl_user_id IS NULL)
+        // Usa el índice parcial uq_metricas_webhook_global WHERE ghl_user_id IS NULL
+        await db.execute(sql`
+          INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, ghl_user_id, updated_at)
+          VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NULL, NOW())
+          ON CONFLICT (id_cuenta, fecha, campo) WHERE ghl_user_id IS NULL DO UPDATE
           SET valor = metricas_webhook.valor + ${String(num)},
               updated_at = NOW()
         `);
       } else {
-        // ── Modo global: upsert simple ───────────────────────────────────────
-        await db.insert(metricasWebhook).values({
-          id_cuenta: idCuenta,
-          fecha,
-          campo,
-          valor: String(num),
-        }).onConflictDoUpdate({
-          target: [metricasWebhook.id_cuenta, metricasWebhook.fecha, metricasWebhook.campo],
-          set: { valor: String(num), updated_at: new Date() },
-        });
+        // ── Modo global: upsert simple por índice parcial global ─────────────
+        await db.execute(sql`
+          INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, ghl_user_id, updated_at)
+          VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NULL, NOW())
+          ON CONFLICT (id_cuenta, fecha, campo) WHERE ghl_user_id IS NULL DO UPDATE
+          SET valor = ${String(num)},
+              updated_at = NOW()
+        `);
       }
 
       campos_guardados.push(campo);
