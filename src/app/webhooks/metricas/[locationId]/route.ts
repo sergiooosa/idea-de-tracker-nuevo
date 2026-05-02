@@ -115,11 +115,11 @@ export async function POST(
           ghl_customer_id: ghlCustomerId,
         });
         // También acumular en el aggregate global (fila sin user/customer)
-        // El unique parcial uq_metricas_webhook_global cubre solo filas NULL+NULL
+        // Usa el constraint real: metricas_webhook_id_cuenta_fecha_campo_key
         await db.execute(sql`
           INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, updated_at)
           VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NOW())
-          ON CONFLICT ON CONSTRAINT uq_metricas_webhook_global DO UPDATE
+          ON CONFLICT (id_cuenta, fecha, campo) DO UPDATE
           SET valor = metricas_webhook.valor + ${String(num)},
               updated_at = NOW()
         `);
