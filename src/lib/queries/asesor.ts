@@ -343,10 +343,14 @@ export async function getAsesorData(
       const diff = (new Date(firstAgent.timestamp).getTime() - new Date(firstLead.timestamp).getTime()) / 1000;
       if (diff > 0) speedSeg = diff;
     }
+    // Intentar extraer nombre y email del primer mensaje del lead en el chat
+    const firstLeadMsg = msgs.find((m) => m.role === "lead");
+    const emailFromMsg = (firstLeadMsg as { email?: string })?.email ?? null;
+
     return {
       chatId: ch.chatid ?? String(ch.id_evento ?? ""),
-      leadName: null,
-      leadEmail: null,
+      leadName: ch.nombre_lead ?? null,
+      leadEmail: emailFromMsg ?? ch.id_lead ?? null,
       estado: ch.estado ?? "activo",
       fechaUltimoMensaje: ch.fecha_y_hora_z?.toISOString() ?? dateFrom,
       respondido,
