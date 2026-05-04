@@ -110,6 +110,8 @@ export async function getAsesorData(
     eq(logLlamadas.id_cuenta, idCuenta),
     gte(logLlamadas.ts, fromTs),
     lte(logLlamadas.ts, toTs),
+    // Excluir pdte/contacto_creado — son leads nuevos, no llamadas realizadas
+    sql`${logLlamadas.tipo_evento} NOT IN ('pdte', 'contacto_creado')`,
   ];
   if (emailsLower.length > 0) {
     callConditions.push(
