@@ -310,8 +310,8 @@ function TabLlamadas({
             color="blue"
             className="[&>p:nth-child(2)]:text-base [&>p:first-child]:text-[9px] [&>p:first-child]:mt-1 rounded-lg pl-3"
             tooltip={{
-              significado: 'Leads únicos con actividad en llamadas.',
-              calculo: 'Correos distintos en el log del período.',
+              significado: 'Leads únicos que el asesor contactó (llamó o tuvo videollamada) en el período.',
+              calculo: 'Diferente a "Leads generados" del panel ejecutivo: ese mide leads nuevos que llegaron al CRM. Este mide los que ya recibieron atención del asesor.',
             }}
             onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined}
           />

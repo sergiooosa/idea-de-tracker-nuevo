@@ -106,7 +106,7 @@ export const es = {
   asesor: {
     titulo: "Panel asesor",
     kpis: {
-      leadsAsignados: "Leads asignados",
+      leadsAsignados: "Leads contactados",
       llamadasRealizadas: "Llamadas realizadas",
       llamadasContestadas: "Llamadas contestadas",
       reunionesAgendadas: "Reuniones agendadas",

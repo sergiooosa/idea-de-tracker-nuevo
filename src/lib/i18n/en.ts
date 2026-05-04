@@ -108,7 +108,7 @@ export const en: Translations = {
   asesor: {
     titulo: "Advisor Panel",
     kpis: {
-      leadsAsignados: "Assigned leads",
+      leadsAsignados: "Contacted leads",
       llamadasRealizadas: "Calls made",
       llamadasContestadas: "Calls answered",
       reunionesAgendadas: "Meetings scheduled",
