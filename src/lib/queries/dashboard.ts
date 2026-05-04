@@ -340,7 +340,15 @@ export async function getDashboard(
     mail?.trim().toLowerCase() || phone?.trim() || String(id);
   const leadsFromCalls = new Set(filteredCalls.map((c) => normLeadKey(c.mail_lead, c.phone, c.id)));
   const leadsFromAgendas = new Set(filteredAgendas.map((a) => normLeadKey(a.email_lead, null, a.id_registro_agenda)));
-  const totalLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]).size;
+
+  // "Leads generados" = leads NUEVOS que llegaron al sistema en el período (pdte/contacto_creado)
+  // Si no hay eventos pdte (cuenta sin GHL o sin fuente de captación), fallback a leads con actividad
+  const leadsNuevosSet = new Set(
+    filteredNewLeadEvents.map((nl) => normLeadKey(nl.mail_lead, nl.phone, nl.id))
+  );
+  const leadsConActividad = new Set([...leadsFromCalls, ...leadsFromAgendas]);
+  // totalLeads: leads nuevos si los hay, sino leads con actividad (backward compat)
+  const totalLeads = leadsNuevosSet.size > 0 ? leadsNuevosSet.size : leadsConActividad.size;
 
   const speedVals = filteredCalls
     .filter((c) => c.speed_to_lead)
@@ -369,7 +377,10 @@ export async function getDashboard(
       .map((a) => a.idcliente?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
   );
   const meetingsBooked = uniqueBookedLeads.size;
-  const tasaAgendamiento = totalLeads > 0 ? meetingsBooked / totalLeads : 0;
+  // tasaAgendamiento usa leadsConActividad (leads que recibieron llamada/agenda)
+  // no el total de leads generados — la tasa mide del universo trabajado, cuántos agendaron
+  const leadsConActividadSize = leadsConActividad.size > 0 ? leadsConActividad.size : 1;
+  const tasaAgendamiento = leadsConActividadSize > 0 ? meetingsBooked / leadsConActividadSize : 0;
 
   const kpis: DashboardKpis & Record<string, number> = {
     totalLeads,
