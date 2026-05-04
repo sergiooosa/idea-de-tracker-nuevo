@@ -3,6 +3,16 @@ import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas } from "@/lib/
 import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
 
+export interface AcquisitionLeadDetail {
+  key: string;
+  nombre: string | null;
+  email: string | null;
+  phone: string | null;
+  ghlContactId: string | null;
+  closer: string | null;
+  estado: string | null;
+}
+
 export interface AcquisitionRow {
   origen: string;
   leads: number;
@@ -16,6 +26,7 @@ export interface AcquisitionRow {
   bookingRate: number;
   attendanceRate: number;
   closingRate: number;
+  leadsList: AcquisitionLeadDetail[]; // detalle de leads individuales para drill-down
 }
 
 export interface ByChannelStats {
@@ -136,6 +147,7 @@ export async function getAcquisition(
     attended: number;
     closed: number;
     revenue: number;
+    leadDetails: Map<string, AcquisitionLeadDetail>;
   }> = {};
 
   function getOrCreate(key: string) {
@@ -149,6 +161,7 @@ export async function getAcquisition(
         attended: 0,
         closed: 0,
         revenue: 0,
+        leadDetails: new Map(),
       };
     }
     return origenMap[k];
@@ -157,6 +170,18 @@ export async function getAcquisition(
   for (const a of agendas) {
     const bucket = getOrCreate(a.origen ?? "sin_origen");
     if (a.email_lead) bucket.leadEmails.add(a.email_lead);
+    const leadKey = a.email_lead?.trim() || a.ghl_contact_id?.trim() || `ag:${a.id_registro_agenda}`;
+    if (!bucket.leadDetails.has(leadKey)) {
+      bucket.leadDetails.set(leadKey, {
+        key: leadKey,
+        nombre: a.nombre_de_lead ?? null,
+        email: a.email_lead ?? null,
+        phone: null,
+        ghlContactId: a.ghl_contact_id ?? null,
+        closer: a.closer ?? null,
+        estado: a.categoria ?? null,
+      });
+    }
     bucket.booked++;
     if (attendedSet.has(a.categoria ?? "")) bucket.attended++;
     if (closedSet.has(a.categoria ?? "")) {
@@ -174,13 +199,45 @@ export async function getAcquisition(
       if (c.tipo_evento.startsWith("efectiva_")) {
         bucket.answeredEmails.add(leadKey);
       }
+      // Guardar detalle del lead (primera vez que aparece)
+      if (!bucket.leadDetails.has(leadKey)) {
+        bucket.leadDetails.set(leadKey, {
+          key: leadKey,
+          nombre: c.nombre_lead ?? null,
+          email: c.mail_lead ?? null,
+          phone: c.phone ?? null,
+          ghlContactId: c.contact_id_ghl ?? null,
+          closer: c.closer_mail ?? null,
+          estado: c.tipo_evento ?? null,
+        });
+      } else {
+        // Actualizar estado con la llamada más reciente si es efectiva
+        if (c.tipo_evento.startsWith("efectiva_")) {
+          const existing = bucket.leadDetails.get(leadKey)!;
+          existing.estado = c.tipo_evento;
+          existing.closer = c.closer_mail ?? existing.closer;
+        }
+      }
     }
   }
 
   for (const ch of chats) {
     if (!ch.origen) continue;
     const bucket = getOrCreate(ch.origen);
-    if (ch.id_lead) bucket.leadEmails.add(ch.id_lead);
+    if (ch.id_lead) {
+      bucket.leadEmails.add(ch.id_lead);
+      if (!bucket.leadDetails.has(ch.id_lead)) {
+        bucket.leadDetails.set(ch.id_lead, {
+          key: ch.id_lead,
+          nombre: ch.nombre_lead ?? null,
+          email: null,
+          phone: null,
+          ghlContactId: null,
+          closer: ch.notas_extra ?? null,
+          estado: ch.estado ?? null,
+        });
+      }
+    }
   }
 
   const rows: AcquisitionRow[] = Object.entries(origenMap)
@@ -201,6 +258,7 @@ export async function getAcquisition(
         bookingRate: answeredCount > 0 ? d.booked / answeredCount : 0,
         attendanceRate: d.booked > 0 ? d.attended / d.booked : 0,
         closingRate: d.attended > 0 ? d.closed / d.attended : 0,
+        leadsList: [...d.leadDetails.values()].slice(0, 200), // max 200 para no sobrecargar
       };
     })
     .sort((a, b) => b.leads - a.leads);

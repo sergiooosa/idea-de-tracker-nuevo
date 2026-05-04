@@ -16,10 +16,21 @@ const fm = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`;
 const defaultTo = new Date();
 const defaultFrom = subDays(defaultTo, 7);
 
+interface AcqLeadDetail {
+  key: string;
+  nombre: string | null;
+  email: string | null;
+  phone: string | null;
+  ghlContactId: string | null;
+  closer: string | null;
+  estado: string | null;
+}
+
 interface AcqRow {
   origen: string; leads: number; called: number; answered: number;
   booked: number; attended: number; closed: number; revenue: number;
   contactRate: number; bookingRate: number; attendanceRate: number; closingRate: number;
+  leadsList?: AcqLeadDetail[];
 }
 
 interface ByChannelStats {
@@ -51,6 +62,7 @@ export default function AcquisitionPage() {
   const [dateFrom, setDateFrom] = useState(format(defaultFrom, 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(defaultTo, 'yyyy-MM-dd'));
   const [filterSource, setFilterSource] = useState('');
+  const [expandedOrigen, setExpandedOrigen] = useState<string | null>(null);
 
   const { data, loading } = useApiData<AcqResponse>('/api/data/acquisition', { from: dateFrom, to: dateTo });
   const { data: adsData } = useApiData<AdsResponse>('/api/data/ads', { from: dateFrom, to: dateTo });
@@ -217,19 +229,53 @@ export default function AcquisitionPage() {
               </thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.origen} className="border-t border-surface-500 hover:bg-surface-700/50">
-                    <td className="px-2 py-2 text-white capitalize">{r.origen}</td>
-                    <td className="px-2 py-2 text-accent-cyan">{r.leads}</td>
-                    <td className="px-2 py-2 text-accent-cyan">{r.called}</td>
-                    <td className="px-2 py-2">{r.answered}</td>
-                    <td className="px-2 py-2 text-accent-purple">{r.booked}</td>
-                    <td className="px-2 py-2">{r.attended}</td>
-                    <td className="px-2 py-2 text-accent-green">{fm(r.revenue)}</td>
-                    <td className="px-2 py-2">{pct(r.contactRate)}</td>
-                    <td className="px-2 py-2">{pct(r.bookingRate)}</td>
-                    <td className="px-2 py-2">{pct(r.attendanceRate)}</td>
-                    <td className="px-2 py-2 text-accent-green">{pct(r.closingRate)}</td>
-                  </tr>
+                  <>
+                    <tr
+                      key={r.origen}
+                      className="border-t border-surface-500 hover:bg-surface-700/50 cursor-pointer"
+                      onClick={() => setExpandedOrigen(expandedOrigen === r.origen ? null : r.origen)}
+                    >
+                      <td className="px-2 py-2 text-white capitalize">
+                        <span className="flex items-center gap-1">
+                          <span className={`text-[10px] transition-transform ${expandedOrigen === r.origen ? 'rotate-90' : ''}`}>▶</span>
+                          {r.origen}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-accent-cyan">{r.leads}</td>
+                      <td className="px-2 py-2 text-accent-cyan">{r.called}</td>
+                      <td className="px-2 py-2">{r.answered}</td>
+                      <td className="px-2 py-2 text-accent-purple">{r.booked}</td>
+                      <td className="px-2 py-2">{r.attended}</td>
+                      <td className="px-2 py-2 text-accent-green">{fm(r.revenue)}</td>
+                      <td className="px-2 py-2">{pct(r.contactRate)}</td>
+                      <td className="px-2 py-2">{pct(r.bookingRate)}</td>
+                      <td className="px-2 py-2">{pct(r.attendanceRate)}</td>
+                      <td className="px-2 py-2 text-accent-green">{pct(r.closingRate)}</td>
+                    </tr>
+                    {expandedOrigen === r.origen && r.leadsList && r.leadsList.length > 0 && (
+                      <tr key={`${r.origen}-detail`} className="bg-surface-800/60">
+                        <td colSpan={11} className="px-4 py-3">
+                          <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-2 font-semibold">
+                            Leads de este origen ({r.leadsList.length})
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-64 overflow-y-auto">
+                            {r.leadsList.map((lead) => (
+                              <div key={lead.key} className="rounded-lg bg-surface-700 px-2.5 py-1.5 text-[10px] space-y-0.5">
+                                <div className="text-white font-medium truncate">{lead.nombre ?? '—'}</div>
+                                <div className="text-gray-400 truncate">{lead.email ?? lead.phone ?? '—'}</div>
+                                {lead.closer && <div className="text-gray-500 truncate">Asesor: {lead.closer}</div>}
+                                {lead.estado && (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[9px] bg-surface-600 text-gray-300">
+                                    {lead.estado.replace('efectiva_', '').replace(/_/g, ' ')}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
