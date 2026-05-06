@@ -70,7 +70,8 @@ export interface VideoMeeting {
   amountPaid?: number;
   cashCollected?: number;
   ticket?: number;
-  notes?: string;
+  notes?: string;           // Análisis IA (resumenIa)
+  transcript?: string;      // Transcripción real de Fathom
   tags: string[];
   source?: string;
   utm_source?: string;
@@ -221,6 +222,7 @@ export interface ApiVideollamada {
   facturacion: number;
   cashCollected: number;
   resumenIa: string | null;
+  transcripcionFathom: string | null;
   linkLlamada: string | null;
   objeciones: { objecion: string; categoria: string }[];
   reportmarketing: string | null;

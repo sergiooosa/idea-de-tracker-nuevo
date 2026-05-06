@@ -127,6 +127,7 @@ export async function getVideollamadas(
       facturacion: parseFloat(r.facturacion || "0") || 0,
       cashCollected: parseFloat(r.cash_collected || "0") || 0,
       resumenIa: r.resumen_ia,
+      transcripcionFathom: r.transcripcion_fathom ?? null,
       linkLlamada: r.link_llamada,
       objeciones: Array.isArray(r.objeciones_ia) ? r.objeciones_ia : [],
       reportmarketing: r.reportmarketing,

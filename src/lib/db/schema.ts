@@ -324,6 +324,7 @@ export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {
   objeciones_ia: jsonb("objeciones_ia").$type<ObjecionIA[]>(),
   reportmarketing: text("reportmarketing"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
+  transcripcion_fathom: text("transcripcion_fathom"),
 });
 
 /* ------------------------------------------------------------------ */

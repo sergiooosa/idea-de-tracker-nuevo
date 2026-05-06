@@ -21,10 +21,10 @@ export default function ModalTranscripcionIA({
 }) {
   const [tab, setTab] = useState<Tab>('transcripcion');
 
-  const transcriptContent =
-    meeting.notes ?? 'Transcripción de la videollamada. Se presentó la oferta y se resolvieron dudas.';
-  const iaContent =
-    meeting.notes ?? `Reunión ${meeting.attended ? 'asistida' : 'no asistida'}. Resultado: ${outcomeVideollamadaToSpanish(meeting.outcome)}.${meeting.amountBought ? ` Monto: $${meeting.amountBought.toLocaleString('es-CO')}` : ''}`;
+  // Transcripción real de Fathom (speaker: texto, por línea)
+  const transcriptContent = meeting.transcript ?? null;
+  // Análisis IA generado por el Cerebro
+  const iaContent = meeting.notes ?? null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -86,14 +86,34 @@ export default function ModalTranscripcionIA({
 
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {tab === 'transcripcion' && (
-            <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
-              {transcriptContent}
-            </div>
+            transcriptContent ? (
+              <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed font-mono text-[11px]">
+                {transcriptContent}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+                <FileText className="w-8 h-8 text-gray-600" />
+                <p className="text-sm text-gray-500">Transcripción no disponible</p>
+                <p className="text-[11px] text-gray-600">
+                  Las nuevas videollamadas procesadas por Fathom incluirán la transcripción aquí.
+                </p>
+              </div>
+            )
           )}
           {tab === 'ia' && (
-            <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
-              {iaContent}
-            </div>
+            iaContent ? (
+              <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
+                {iaContent}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+                <Sparkles className="w-8 h-8 text-gray-600" />
+                <p className="text-sm text-gray-500">Análisis IA no disponible</p>
+                <p className="text-[11px] text-gray-600">
+                  El análisis se genera automáticamente cuando Fathom procesa la videollamada.
+                </p>
+              </div>
+            )
           )}
         </div>
 

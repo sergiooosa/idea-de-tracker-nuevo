@@ -323,6 +323,7 @@ export function generateVideollamadas(): VideollamadasResponse {
       facturacion,
       cashCollected: Math.floor(facturacion * (0.5 + Math.random() * 0.4)),
       resumenIa: attended ? faker.lorem.sentences(2) : null,
+      transcripcionFathom: attended ? faker.lorem.paragraphs(3) : null,
       linkLlamada: attended ? `https://fathom.video/call/${faker.string.alphanumeric(10)}` : null,
       objeciones,
       reportmarketing: Math.random() > 0.7 ? faker.lorem.sentence() : null,

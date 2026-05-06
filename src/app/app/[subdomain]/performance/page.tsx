@@ -46,6 +46,7 @@ function apiToVideoMeeting(r: ApiVideollamada): VideoMeeting {
     amountBought: r.facturacion,
     cashCollected: r.cashCollected,
     notes: r.resumenIa ?? undefined,
+    transcript: r.transcripcionFathom ?? undefined,
     tags: r.tags ? r.tags.split(',').map((t) => t.trim()) : [],
     recordingUrl: r.linkLlamada ?? undefined,
     source: r.origen ?? undefined,
