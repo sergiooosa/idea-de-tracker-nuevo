@@ -292,7 +292,9 @@ export async function getAsesorData(
 
   const leadMap: Record<string, AsesorLeadCRM> = {};
   for (const r of regRows) {
-    const key = r.mail_lead?.trim() || r.phone_raw_format?.trim() || String(r.id_registro);
+    // Normalizar a lowercase para que "Juan@mail.com" y "juan@mail.com" no generen dos filas.
+    // Fallback a teléfono, y solo como último recurso al id_registro.
+    const key = r.mail_lead?.trim().toLowerCase() || r.phone_raw_format?.trim() || String(r.id_registro);
     if (leadMap[key]) continue;
 
     const notasArr: { date: string; text: string }[] = [];
