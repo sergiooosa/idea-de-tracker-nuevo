@@ -3,6 +3,11 @@ import { withAuthFull } from "@/lib/api-auth";
 import { getCuentaInternalApiKey, getVideoRecoveryCredential } from "@/lib/queries/video-recovery";
 import { forwardVideoRecoveryRequest, parseIdEvento } from "../shared";
 
+// Extender el timeout de Next.js para este route — el execute de video recovery
+// puede tardar varios minutos procesando múltiples grabaciones con IA
+export const maxDuration = 300; // 5 minutos
+export const dynamic = "force-dynamic";
+
 interface ExecuteBody {
   id_evento?: string;
   request_id?: string;

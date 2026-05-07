@@ -33,15 +33,23 @@ export async function forwardVideoRecoveryRequest(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${internalApiKey}`,
-          "X-Api-Key": internalApiKey,
-        },
-        body: JSON.stringify(payload),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 240_000); // 4 min timeout
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${internalApiKey}`,
+            "X-Api-Key": internalApiKey,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const parsedBody = (await response.json().catch(() => null)) ?? {
         success: response.ok,
@@ -55,9 +63,13 @@ export async function forwardVideoRecoveryRequest(
       lastStatus = response.status;
       lastBody = parsedBody;
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Error desconocido";
+      const isTimeout = error instanceof Error && error.name === "AbortError";
+      const message = isTimeout
+        ? "Tiempo de espera agotado (>4 min). Intenta con menos grabaciones seleccionadas."
+        : error instanceof Error ? error.message : "Error desconocido";
       lastBody = { success: false, message };
-      if (attempt === maxAttempts) {
+      if (attempt === maxAttempts || isTimeout) {
+        // No reintentar en timeout — el servidor tardó demasiado
         break;
       }
     }
