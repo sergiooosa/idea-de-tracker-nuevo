@@ -139,12 +139,23 @@ export async function getChats(
       leadName: r.nombre_lead,
       leadId: r.id_lead,
       agentName,
-      // Normalizar asesor: usar asesor_asignado primero, luego nombre del agente.
-      // Si el nombre es vacío, "Agente" genérico o solo espacios → null (Sin asignar)
+      // Normalizar asesor: prioridad asesor_asignado → notas_extra → agentName.
+      // notas_extra guarda el nombre real cuando closerName resolvió pero asesor_asignado
+      // falló (e.g. en cuentas donde el userId no llega en el payload de GHL).
+      // "Agente", "agent", "bot" se tratan como sin asignar.
       asesorAsignado: (() => {
-        const raw = (r.asesor_asignado?.trim() || agentName?.trim() || "").toLowerCase();
-        if (!raw || raw === "agente" || raw === "agent" || raw === "bot") return null;
-        return r.asesor_asignado?.trim() || agentName?.trim() || null;
+        const candidates = [
+          r.asesor_asignado?.trim(),
+          r.notas_extra?.trim() !== "por asignar" ? r.notas_extra?.trim() : undefined,
+          agentName?.trim(),
+        ];
+        for (const c of candidates) {
+          if (!c) continue;
+          const lower = c.toLowerCase();
+          if (lower === "agente" || lower === "agent" || lower === "bot" || lower === "por asignar") continue;
+          return c;
+        }
+        return null;
       })(),
       datetime: r.fecha_y_hora_z?.toISOString() ?? "",
       totalMessages: msgs.length,
