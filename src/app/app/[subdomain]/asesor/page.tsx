@@ -517,6 +517,60 @@ function TabLlamadas({
 // Tab: Videollamadas
 // ──────────────────────────────────────────────────────────────────────────────
 
+function VideoCard({ video }: { video: AsesorVideollamada }) {
+  const [expanded, setExpanded] = useState(false);
+  const cleanResumen = video.resumenIa
+    ? video.resumenIa.replace(/#{1,6}\s?/g, '').replace(/\*\*/g, '').replace(/\*/g, '').replace(/\n+/g, ' ').trim()
+    : null;
+
+  return (
+    <div className="rounded-lg border border-surface-500/80 bg-surface-700/60 hover:bg-surface-700/80 hover:border-accent-cyan/30 pl-2.5 pr-2 py-1.5 text-xs transition-all duration-200 border-l-[3px] border-l-accent-cyan/50 shadow-sm">
+      <div className="font-medium text-white text-[11px] leading-tight truncate" title={video.leadName ?? ''}>
+        {video.leadName ?? 'Sin nombre'}
+      </div>
+      <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+        {video.fechaReunion && (
+          <span>{format(new Date(video.fechaReunion), 'dd/MM HH:mm')}</span>
+        )}
+        {video.leadEmail && (
+          <span className="truncate text-gray-500 max-w-[120px]">{video.leadEmail}</span>
+        )}
+      </div>
+      {cleanResumen && (
+        <div className="mt-1">
+          <p className={`text-[10px] text-gray-400 leading-snug ${expanded ? '' : 'line-clamp-2'}`}>
+            {cleanResumen}
+          </p>
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="text-[9px] text-gray-500 hover:text-accent-cyan mt-0.5 transition-colors"
+          >
+            {expanded ? 'Ver menos ↑' : 'Ver más ↓'}
+          </button>
+        </div>
+      )}
+      {video.facturacion > 0 && (
+        <div className="mt-1 text-[10px] text-accent-green font-medium">
+          ${video.facturacion.toLocaleString()}
+        </div>
+      )}
+      {video.fathomUrl && (
+        <a
+          href={video.fathomUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors"
+          title="Ver grabación"
+        >
+          <ExternalLink className="w-3 h-3 shrink-0" />
+          <span>Grabación</span>
+        </a>
+      )}
+    </div>
+  );
+}
+
 function TabVideollamadas({
   kpis,
   videollamadas,
@@ -636,44 +690,7 @@ function TabVideollamadas({
                       <p className="text-[10px] text-gray-500 py-3 text-center">Ninguna</p>
                     ) : (
                       videosByEtapa[etapa.id].map((video) => (
-                        <div
-                          key={video.id}
-                          className="group rounded-lg border border-surface-500/80 bg-surface-700/60 hover:bg-surface-700/80 hover:border-accent-cyan/30 pl-2.5 pr-2 py-1.5 text-xs transition-all duration-200 border-l-[3px] border-l-accent-cyan/50 shadow-sm"
-                        >
-                          <div className="font-medium text-white text-[11px] leading-tight truncate" title={video.leadName ?? ''}>
-                            {video.leadName ?? 'Sin nombre'}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                            {video.fechaReunion && (
-                              <span>{format(new Date(video.fechaReunion), 'dd/MM HH:mm')}</span>
-                            )}
-                            {video.leadEmail && (
-                              <span className="truncate text-gray-500">{video.leadEmail}</span>
-                            )}
-                          </div>
-                          {video.resumenIa && (
-                            <p className="mt-1 text-[10px] text-gray-400 leading-snug line-clamp-2" title={video.resumenIa}>
-                              {video.resumenIa}
-                            </p>
-                          )}
-                          {video.facturacion > 0 && (
-                            <div className="mt-1 text-[10px] text-accent-green font-medium">
-                              ${video.facturacion.toLocaleString()}
-                            </div>
-                          )}
-                          {video.fathomUrl && (
-                            <a
-                              href={video.fathomUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-accent-cyan transition-colors"
-                              title="Ver grabación"
-                            >
-                              <ExternalLink className="w-3 h-3 shrink-0" />
-                              <span>Grabación</span>
-                            </a>
-                          )}
-                        </div>
+                        <VideoCard key={video.id} video={video} />
                       ))
                     )}
                   </div>
