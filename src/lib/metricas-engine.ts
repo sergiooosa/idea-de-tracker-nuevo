@@ -177,17 +177,11 @@ export function calcMetricaManual(
 }
 
 /**
- * Mapa de fallback: ID de métrica manual/configurada → KPI automático equivalente.
- * Si una métrica manual tiene valor 0 y existe este fallback, se usa el KPI automático.
- * Esto evita que el ticket promedio, ROAS, etc. aparezcan en 0 cuando el dato
- * está disponible automáticamente pero la métrica está configurada como manual.
+ * Mapa de fallback: solo para base-llamadas-pendientes (ahora automática).
+ * Las métricas manuales como facturación y cash NO se sobreescriben con datos automáticos —
+ * si el cliente las tiene como manual es porque quiere ingresar su propio valor.
  */
 const METRICA_FALLBACK_KPI: Record<string, KpiDefaultKey> = {
-  "base-facturacion": "revenue",
-  "base-cash-collected": "cashCollected",
-  "base-reuniones-cerradas": "meetingsClosed",
-  "base-reuniones-asistidas": "meetingsAttended",
-  "base-reuniones-agendadas": "meetingsBooked",
   "base-llamadas-pendientes": "pendientesLlamadas",
 };
 
@@ -209,7 +203,7 @@ export function calcMetricaAutomatica(
     }
     const m = metricasValores[key];
     const manualVal = typeof m === "number" ? m : parseFloat(String(m)) || 0;
-    // Si el valor manual es 0 y hay un KPI automático equivalente, usar el automático.
+    // Solo fallback para base-llamadas-pendientes (ahora automática)
     if (manualVal === 0 && METRICA_FALLBACK_KPI[key]) {
       const fallbackKey = METRICA_FALLBACK_KPI[key];
       const fallback = kpis[fallbackKey];
@@ -226,7 +220,7 @@ export function calcMetricaAutomatica(
     }
     const m = metricasValores[key];
     const manualVal = typeof m === "number" ? m : (typeof m === "string" ? parseFloat(m) || 0 : 0);
-    // Fallback a KPI automático si manual es 0
+    // Solo fallback para base-llamadas-pendientes
     if (manualVal === 0 && METRICA_FALLBACK_KPI[key]) {
       const fallbackKey = METRICA_FALLBACK_KPI[key];
       const fallback = kpis[fallbackKey];
