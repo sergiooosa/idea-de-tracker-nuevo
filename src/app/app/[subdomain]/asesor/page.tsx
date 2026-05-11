@@ -528,18 +528,39 @@ function TabVideollamadas({
 }) {
   const t = useT();
 
+  // IDs de etapas cerradas y asistidas (no excluidas)
+  const closedIds = useMemo(() => new Set(
+    embudoEtapas.filter((e) => (e as { es_cerrada?: boolean }).es_cerrada).map((e) => e.id)
+  ), [embudoEtapas]);
+
+  const EXCLUDED_CATS = new Set(["cancelada", "no_show", "noshow", "pdte", "pendiente"]);
+
   // Agrupar videollamadas por categoría (etapa del embudo)
   const videosByEtapa = useMemo(() => {
     const map: Record<string, AsesorVideollamada[]> = {};
     for (const etapa of embudoEtapas) {
       map[etapa.id] = videollamadas.filter((v) => v.categoria === etapa.id);
     }
+    // Columna virtual: asistidos no cerrados
+    // = leads que asistieron (categoria no es cancelada/no_show/pdte) pero tampoco están en etapa cerrada
+    map["__asistido_no_cerrado__"] = videollamadas.filter((v) => {
+      const cat = v.categoria.toLowerCase();
+      return !EXCLUDED_CATS.has(cat) && !closedIds.has(cat);
+    });
     return map;
-  }, [videollamadas, embudoEtapas]);
+  }, [videollamadas, embudoEtapas, closedIds]);
 
-  // Filtrar solo etapas con videollamadas
+  // Filtrar solo etapas con videollamadas + columna virtual si tiene contenido
   const etapasConVideos = useMemo(() => {
-    return embudoEtapas.filter((e) => videosByEtapa[e.id].length > 0);
+    const etapasReales = embudoEtapas.filter((e) => videosByEtapa[e.id].length > 0);
+    const asistidosNoCerrados = videosByEtapa["__asistido_no_cerrado__"] ?? [];
+    if (asistidosNoCerrados.length > 0) {
+      return [
+        ...etapasReales,
+        { id: "__asistido_no_cerrado__", nombre: "Asistido no cerrado", color: "#f59e0b" },
+      ];
+    }
+    return etapasReales;
   }, [embudoEtapas, videosByEtapa]);
 
   return (
@@ -626,7 +647,15 @@ function TabVideollamadas({
                             {video.fechaReunion && (
                               <span>{format(new Date(video.fechaReunion), 'dd/MM HH:mm')}</span>
                             )}
+                            {video.leadEmail && (
+                              <span className="truncate text-gray-500">{video.leadEmail}</span>
+                            )}
                           </div>
+                          {video.resumenIa && (
+                            <p className="mt-1 text-[10px] text-gray-400 leading-snug line-clamp-2" title={video.resumenIa}>
+                              {video.resumenIa}
+                            </p>
+                          )}
                           {video.facturacion > 0 && (
                             <div className="mt-1 text-[10px] text-accent-green font-medium">
                               ${video.facturacion.toLocaleString()}
