@@ -28,6 +28,7 @@ export const KPI_DEFAULT_KEYS = [
   "efectivas",
   "noShows",
   "ticket",
+  "pendientesLlamadas",
 ] as const;
 
 export type KpiDefaultKey = (typeof KPI_DEFAULT_KEYS)[number];
@@ -55,6 +56,7 @@ export const KPI_DEFAULT_LABELS: Record<string, string> = {
   efectivas: "Efectivas (videollamadas)",
   noShows: "No shows",
   ticket: "Ticket (videollamadas)",
+  pendientesLlamadas: "Llamadas pendientes",
 };
 
 /** Métricas por defecto para un CEO / líder comercial. Se usan si metricas_config está vacío. */
@@ -174,6 +176,21 @@ export function calcMetricaManual(
   return filtered.length;
 }
 
+/**
+ * Mapa de fallback: ID de métrica manual/configurada → KPI automático equivalente.
+ * Si una métrica manual tiene valor 0 y existe este fallback, se usa el KPI automático.
+ * Esto evita que el ticket promedio, ROAS, etc. aparezcan en 0 cuando el dato
+ * está disponible automáticamente pero la métrica está configurada como manual.
+ */
+const METRICA_FALLBACK_KPI: Record<string, KpiDefaultKey> = {
+  "base-facturacion": "revenue",
+  "base-cash-collected": "cashCollected",
+  "base-reuniones-cerradas": "meetingsClosed",
+  "base-reuniones-asistidas": "meetingsAttended",
+  "base-reuniones-agendadas": "meetingsBooked",
+  "base-llamadas-pendientes": "pendientesLlamadas",
+};
+
 /** Calcular valor de una métrica automática */
 export function calcMetricaAutomatica(
   config: MetricaConfig,
@@ -191,7 +208,15 @@ export function calcMetricaAutomatica(
       return typeof v === "number" ? v : parseFloat(String(v)) || 0;
     }
     const m = metricasValores[key];
-    return typeof m === "number" ? m : parseFloat(String(m)) || 0;
+    const manualVal = typeof m === "number" ? m : parseFloat(String(m)) || 0;
+    // Si el valor manual es 0 y hay un KPI automático equivalente, usar el automático.
+    if (manualVal === 0 && METRICA_FALLBACK_KPI[key]) {
+      const fallbackKey = METRICA_FALLBACK_KPI[key];
+      const fallback = kpis[fallbackKey];
+      const fallbackVal = typeof fallback === "number" ? fallback : parseFloat(String(fallback)) || 0;
+      if (fallbackVal > 0) return fallbackVal;
+    }
+    return manualVal;
   };
 
   const getValStr = (key: string): string | number => {
@@ -199,7 +224,16 @@ export function calcMetricaAutomatica(
       const v = kpis[key];
       return (typeof v === "string" || typeof v === "number") ? v : (v != null ? Number(v) : 0);
     }
-    return metricasValores[key] ?? 0;
+    const m = metricasValores[key];
+    const manualVal = typeof m === "number" ? m : (typeof m === "string" ? parseFloat(m) || 0 : 0);
+    // Fallback a KPI automático si manual es 0
+    if (manualVal === 0 && METRICA_FALLBACK_KPI[key]) {
+      const fallbackKey = METRICA_FALLBACK_KPI[key];
+      const fallback = kpis[fallbackKey];
+      const fallbackVal = typeof fallback === "number" ? fallback : parseFloat(String(fallback)) || 0;
+      if (fallbackVal > 0) return fallbackVal;
+    }
+    return m ?? 0;
   };
 
   if (f.tipo === "directo" && f.fuente) {

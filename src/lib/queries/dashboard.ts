@@ -116,6 +116,11 @@ export async function getDashboard(
   const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
   const embudoRaw = embudoRawArr.length > 0 ? embudoRawArr : DEFAULT_EMBUDO_CONFIG;
   const { attendedSet, closedSet, effectiveSet, qualifiedSet, etapas } = buildFunnelSets(embudoRaw);
+  // closedByFlag: el embudo tiene etapas cerradas explícitamente configuradas (es_cerrada=true o texto heurístico).
+  // Si closedSet tiene entradas que no son las default, hay configuración real.
+  const DEFAULT_CLOSED_HEURISTIC = new Set(["cerrada", "closed", "cerrado"]);
+  const closedByFlag = closedSet.size > 0 && ![...closedSet].every(k => DEFAULT_CLOSED_HEURISTIC.has(k))
+    || (embudoRaw ?? []).some((e: EmbudoEtapa) => e.es_cerrada === true);
   
   // Si cerradasCuentanComoCal=true, añadir las etapas cerradas al set de calificadas
   const effectiveQualifiedSet = cerradasCuentanComoCal
@@ -205,7 +210,18 @@ export async function getDashboard(
       `).then(r => (r.rows[0] ?? {}) as Record<string, unknown>)
     : Promise.resolve({} as Record<string, unknown>);
 
-  const [agendas, calls, newLeadEvents, adsAggRowEarly] = await Promise.all([
+  // Leads con llamada PDTE (pendiente de gestionar) — contacts que llegaron pero nadie ha llamado aún.
+  // Se lee de registros_de_llamada via SQL raw porque id_cuenta es varchar en esa tabla.
+  const pendientesPromise = db.execute(
+    sql`SELECT COUNT(*)::int AS total
+        FROM registros_de_llamada
+        WHERE id_cuenta = ${String(idCuenta)}
+          AND estado = 'pdte'
+          AND fecha_evento >= ${fromDate}
+          AND fecha_evento <= ${toDate}`,
+  ).then((r) => Number((r.rows[0] as { total?: number })?.total ?? 0));
+
+  const [agendas, calls, newLeadEvents, adsAggRowEarly, pendientesLlamadas] = await Promise.all([
     db
       .select()
       .from(resumenesDiariosAgendas)
@@ -227,6 +243,7 @@ export async function getDashboard(
       .from(logLlamadas)
       .where(and(...newLeadConditions)),
     adsAggPromise,
+    pendientesPromise,
   ]);
 
   // Parse ads fields for use in metricas tipo="ads" and adsSummary widget
@@ -276,12 +293,14 @@ export async function getDashboard(
     // newLeadEvents no tiene tags_internos en la query selectiva — no filtrar por tags
   }
 
-  // Un registro con cash_collected > 0 se considera cierre aunque la categoría no diga "Cerrada".
-  // Esto cubre casos como Serentis donde los agentes cobran pero no marcan la etapa correcta.
+  // hasCash: lead pagó aunque la categoría no diga "Cerrada".
+  // SOLO se usa como fallback de cierre cuando el embudo NO tiene etapas cerradas explícitas.
+  // Si el embudo sí define etapas cerradas, confiamos en esas y no en cash para no inflar
+  // artificialmente la tasa de cierre (un asistido con cash no es un cierre si el embudo lo dice).
   const hasCash = (a: (typeof filteredAgendas)[0]) =>
     (parseFloat(a.cash_collected || "0") || 0) > 0;
   const asistidas = filteredAgendas.filter((a) =>
-    attendedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)
+    attendedSet.has((a.categoria ?? "").toLowerCase().trim())
   ).length;
   // Deduplicar canceladas por lead único (GHL puede enviar el mismo evento múltiples veces)
   const canceladas = new Set(
@@ -289,9 +308,13 @@ export async function getDashboard(
       .filter((a) => (a.categoria ?? "").toLowerCase().includes("cancel"))
       .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
   ).size;
-  const cerradas = filteredAgendas.filter((a) =>
-    closedSet.has((a.categoria ?? "").toLowerCase().trim()) || hasCash(a)
-  ).length;
+  const cerradas = filteredAgendas.filter((a) => {
+    const cat = (a.categoria ?? "").toLowerCase().trim();
+    // Si el embudo tiene etapas cerradas definidas: usar solo esas
+    if (closedByFlag) return closedSet.has(cat);
+    // Sin embudo explícito: usar heurística de texto + cash como fallback
+    return closedSet.has(cat) || hasCash(a);
+  }).length;
   const efectivas = filteredAgendas.filter((a) => effectiveSet.has((a.categoria ?? "").toLowerCase().trim())).length;
   // revenue: sumar facturacion de agendas "cerradas". Si closedSet no captura nada
   // (embudo personalizado con nombres distintos), usar cualquier agenda con facturacion > 0.
@@ -411,6 +434,7 @@ export async function getDashboard(
         .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
     ).size,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
+    pendientesLlamadas,
   };
 
   // Advisor ranking
@@ -667,7 +691,7 @@ export async function getDashboard(
   }
   const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
   const metricasValores: Record<string, string | number> = {};
-  const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket"]);
+  const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket", "pendientesLlamadas"]);
 
   const getDeps = (m: MetricaConfig): string[] => {
     if (m.tipo === "fija") return [];
