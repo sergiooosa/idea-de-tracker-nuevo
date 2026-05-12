@@ -288,7 +288,12 @@ export async function getDashboard(
   let filteredNewLeadEvents = newLeadEvents;
   if (filterTags && filterTags.length > 0) {
     const tagSet = new Set(filterTags);
-    filteredAgendas = agendas.filter((a) => Array.isArray(a.tags_internos) && a.tags_internos.some((t) => tagSet.has(t)));
+    // Tags son propiedades de LLAMADAS — solo filtramos llamadas.
+    // Las agendas (videollamadas/citas) NO se filtran por tags de llamadas porque:
+    // 1. Los tags de llamadas no están en resumenes_diarios_agendas
+    // 2. Filtrar agendas por tags de llamadas causa que "Agendadas" muestre números
+    //    distintos en el panel ejecutivo vs panel de rendimiento para el mismo rango,
+    //    creando confusión (el mismo dato "agendas" debería ser siempre el mismo número).
     filteredCalls = calls.filter((c) => Array.isArray(c.tags_internos) && c.tags_internos.some((t) => tagSet.has(t)));
     // newLeadEvents no tiene tags_internos en la query selectiva — no filtrar por tags
   }

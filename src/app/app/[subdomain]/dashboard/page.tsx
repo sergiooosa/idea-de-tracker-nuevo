@@ -30,13 +30,13 @@ const defaultDateFrom = subDays(defaultDateTo, 7);
 const OBJECTION_PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6'];
 
 const RANKING_COLS = [
-  { key: 'leads', label: 'Leads' },
-  { key: 'generados', label: 'Generados' },
+  { key: 'leads', label: 'Leads trabajados' },
+  { key: 'generados', label: 'Leads nuevos' },
   { key: 'con_actividad', label: 'Con actividad' },
   { key: 'llamadas', label: 'Llamadas' },
   { key: 'tiempo_lead', label: 'Tiempo al lead' },
-  { key: 'agendadas', label: 'Agendadas' },
-  { key: 'asistidas', label: 'Asistidas' },
+  { key: 'agendadas', label: 'Citas agendadas' },
+  { key: 'asistidas', label: 'Citas asistidas' },
   { key: 'facturacion', label: 'Facturación' },
   { key: 'efectivo', label: 'Efectivo' },
   { key: 'tasa_contacto', label: 'Tasa contacto' },
@@ -749,13 +749,13 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium">Asesor</th>
-                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium">Leads</th>}
-                    {rankingColsVisible.includes('generados') && <th className="px-2 py-2 font-medium">Generados</th>}
-                    {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium">Con actividad</th>}
+                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium"><span title="Leads únicos con actividad (llamada o cita) en el período. Incluye leads de períodos anteriores que recibieron atención ahora.">Leads trabajados ⓘ</span></th>}
+                    {rankingColsVisible.includes('generados') && <th className="px-2 py-2 font-medium"><span title="Leads NUEVOS que llegaron al CRM en este período asignados a este asesor. Diferente a 'Leads trabajados' que incluye leads de períodos anteriores.">Leads nuevos ⓘ</span></th>}
+                    {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium"><span title="Leads únicos que recibieron al menos una llamada o cita en el período (incluyendo leads antiguos). Similar a 'Leads trabajados' pero contando también los que solo tienen teléfono sin email.">Con actividad ⓘ</span></th>}
                     {rankingColsVisible.includes('llamadas') && <th className="px-2 py-2 font-medium">Llamadas</th>}
                     {rankingColsVisible.includes('tiempo_lead') && <th className="px-2 py-2 font-medium">Tiempo al lead</th>}
-                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium">Agendadas</th>}
-                    {rankingColsVisible.includes('asistidas') && <th className="px-2 py-2 font-medium">Asistidas</th>}
+                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium"><span title="Citas/videollamadas agendadas únicas en el período (leads únicos, sin contar múltiples estados del mismo lead). Este número es el mismo que aparece en el panel ejecutivo.">Citas agendadas ⓘ</span></th>}
+                    {rankingColsVisible.includes('asistidas') && <th className="px-2 py-2 font-medium"><span title="Leads que se presentaron a su cita (asistieron).">Citas asistidas ⓘ</span></th>}
                     {rankingColsVisible.includes('facturacion') && <th className="px-2 py-2 font-medium">Facturación</th>}
                     {rankingColsVisible.includes('efectivo') && <th className="px-2 py-2 font-medium">Efectivo</th>}
                     {rankingColsVisible.includes('tasa_contacto') && <th className="px-2 py-2 font-medium">Tasa contacto</th>}
