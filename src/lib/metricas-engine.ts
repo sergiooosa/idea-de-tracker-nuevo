@@ -29,6 +29,7 @@ export const KPI_DEFAULT_KEYS = [
   "noShows",
   "ticket",
   "pendientesLlamadas",
+  "attemptsToFirstContactAvg",
 ] as const;
 
 export type KpiDefaultKey = (typeof KPI_DEFAULT_KEYS)[number];
@@ -57,6 +58,7 @@ export const KPI_DEFAULT_LABELS: Record<string, string> = {
   noShows: "No shows",
   ticket: "Ticket (videollamadas)",
   pendientesLlamadas: "Llamadas pendientes",
+  attemptsToFirstContactAvg: "Intentos a primer contacto",
 };
 
 /** Métricas por defecto para un CEO / líder comercial. Se usan si metricas_config está vacío. */
