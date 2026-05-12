@@ -65,7 +65,11 @@ export default function PerformanceLlamadasPage() {
     if (!data?.leads) return {} as Record<string, LlamadaLead[]>;
     const map: Record<string, LlamadaLead[]> = {};
     for (const l of data.leads) {
-      const key = l.closer_mail ?? 'Sin asignar';
+      // Normalizar igual que el backend: email lowercase tiene prioridad,
+      // luego nombre lowercase, sino 'sin asignar' (minúsculas para que coincida con advisorMetrics)
+      const email = l.closer_mail?.trim().toLowerCase();
+      const nombre = (l as { nombre_closer?: string | null }).nombre_closer?.trim().toLowerCase();
+      const key = email || nombre || 'sin asignar';
       if (!map[key]) map[key] = [];
       map[key].push(l);
     }

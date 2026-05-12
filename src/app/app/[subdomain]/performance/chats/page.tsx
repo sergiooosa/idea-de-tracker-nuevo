@@ -96,9 +96,14 @@ export default function PerformanceChatsPage() {
 
   const chatsByAgent = useMemo(() => {
     const map: Record<string, ApiChatLead[]> = {};
+    const INVALID = new Set(['', 'agente', 'agent', 'bot', 'por asignar']);
     for (const c of filteredChats) {
-      // Prioridad: asesorAsignado (dueño del contacto en GHL) > agentName (quien respondió) > Sin asignar
-      const key = c.asesorAsignado ?? c.agentName ?? 'Sin asignar';
+      // Prioridad: asesorAsignado → agentName → 'Sin asignar'
+      // Usar || en vez de ?? para que strings vacíos también caigan al siguiente fallback
+      const raw = (c.asesorAsignado?.trim() || c.agentName?.trim() || '').toLowerCase();
+      const key = (!raw || INVALID.has(raw))
+        ? 'Sin asignar'
+        : (c.asesorAsignado?.trim() || c.agentName?.trim())!;
       if (!map[key]) map[key] = [];
       map[key].push(c);
     }
