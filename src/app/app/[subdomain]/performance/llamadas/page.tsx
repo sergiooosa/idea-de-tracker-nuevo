@@ -6,7 +6,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Pencil, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import { FileText, Pencil, Phone, Search, Sparkles, User, X, Plus } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
@@ -75,6 +75,20 @@ export default function PerformanceLlamadasPage() {
     }
     return map;
   }, [data?.leads]);
+
+  /** Leads pendientes por llamar — estado PDTE, nadie los ha contactado aún */
+  const leadsPendientes = useMemo(() => {
+    if (!data?.leads) return [] as LlamadaLead[];
+    return data.leads.filter((l) => l.estado?.toUpperCase() === 'PDTE');
+  }, [data?.leads]);
+
+  const leadsPendientesFiltrados = useMemo(() => {
+    const q = leadSearch.trim().toLowerCase();
+    if (!q) return leadsPendientes;
+    return leadsPendientes.filter((l) =>
+      matchesLeadSearch(leadSearch.trim(), [l.nombre_lead, l.mail_lead, l.phone, l.closer_mail, String(l.id_registro)])
+    );
+  }, [leadsPendientes, leadSearch]);
 
   const leadsByAdvisorFiltered = useMemo(() => {
     const q = leadSearch.trim();
@@ -210,6 +224,72 @@ export default function PerformanceLlamadasPage() {
         <KPICard label={t.performance.llamadas.kpis.intentosPrimerContacto} value={agg.firstContactAttempts.toFixed(1)} color="purple" className={kpiCompact} tooltip={{ significado: 'Llamadas hasta que el lead contesta.', calculo: 'Promedio de intentos por lead.' }} />
         <KPICard label="Tasa de contestación" value={pct(agg.answerRate * 100)} color="green" className={kpiCompact} tooltip={{ significado: '% de llamadas contestadas.', calculo: '(Contestadas / Total) × 100.' }} />
       </div>
+
+      {/* ── Leads pendientes por llamar ─────────────────────────────────────── */}
+      {leadsPendientes.length > 0 && (
+        <section>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Phone className="w-3.5 h-3.5 text-accent-amber" />
+            Leads pendientes por llamar
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-accent-amber/20 border border-accent-amber/30 text-accent-amber text-[10px] font-medium">
+              {leadsPendientesFiltrados.length}
+            </span>
+          </h3>
+          <div className="rounded-lg border border-surface-500 overflow-hidden">
+            <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-surface-700">
+                  <tr className="text-left text-gray-400">
+                    <th className="px-2 py-2 font-medium">Lead</th>
+                    <th className="px-2 py-2 font-medium">Teléfono</th>
+                    <th className="px-2 py-2 font-medium">Asesor</th>
+                    <th className="px-2 py-2 font-medium">Llegó</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leadsPendientesFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-2 py-4 text-center text-gray-500 text-xs">
+                        Ningún lead pendiente coincide con la búsqueda.
+                      </td>
+                    </tr>
+                  ) : leadsPendientesFiltrados.map((lead) => (
+                    <tr key={lead.id_registro} className="border-t border-surface-500 hover:bg-surface-700/50">
+                      <td className="px-2 py-1.5">
+                        <span className="text-white font-medium text-[11px]">
+                          {lead.nombre_lead ?? '—'}
+                        </span>
+                        {lead.mail_lead && (
+                          <div className="text-[10px] text-gray-500 truncate max-w-[160px]">{lead.mail_lead}</div>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {lead.phone ? (
+                          <a
+                            href={`tel:${lead.phone}`}
+                            className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-accent-cyan transition-colors font-mono"
+                          >
+                            <Phone className="w-3 h-3 shrink-0" />
+                            {lead.phone}
+                          </a>
+                        ) : (
+                          <span className="text-gray-600 text-[10px]">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-[10px] text-gray-400">
+                        {lead.closer_mail ?? <span className="text-gray-600">Sin asignar</span>}
+                      </td>
+                      <td className="px-2 py-1.5 text-[10px] text-gray-500">
+                        {lead.fecha_evento ? format(new Date(lead.fecha_evento), 'dd/MM HH:mm') : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t.performance.llamadas.titulo}</h3>
