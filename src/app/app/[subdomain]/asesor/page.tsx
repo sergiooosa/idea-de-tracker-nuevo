@@ -310,8 +310,8 @@ function TabLlamadas({
             color="blue"
             className="[&>p:nth-child(2)]:text-base [&>p:first-child]:text-[9px] [&>p:first-child]:mt-1 rounded-lg pl-3"
             tooltip={{
-              significado: 'Leads únicos que el asesor contactó (llamó o tuvo videollamada) en el período.',
-              calculo: 'Diferente a "Leads generados" del panel ejecutivo: ese mide leads nuevos que llegaron al CRM. Este mide los que ya recibieron atención del asesor.',
+              significado: 'Leads únicos con los que el asesor tuvo actividad (llamada o videollamada) en el período — incluyendo leads que llegaron antes del rango pero recibieron atención ahora.',
+              calculo: '⚠️ ¿Por qué este número es mayor que "Leads generados" del panel ejecutivo?\n\n"Leads generados" (panel ejecutivo) = leads NUEVOS que llegaron al CRM en este período.\n\n"Leads trabajados" (este panel) = todos los leads con actividad en el período, sin importar cuándo llegaron.\n\nEjemplo: un lead que llegó en febrero pero recibió una llamada esta semana cuenta aquí, pero NO en "Leads generados".',
             }}
             onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined}
           />
@@ -391,9 +391,19 @@ function TabLlamadas({
       {/* Pipeline */}
       <section>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          Pipeline de llamadas
-          <SectionInfo text="Leads agrupados por estado del pipeline." />
+          Pipeline de llamadas — estado actual de cada lead
+          <SectionInfo text="Muestra el estado actual de todos los leads con actividad en el período, incluyendo leads que llegaron antes del rango pero recibieron atención ahora. Por eso el total puede ser mayor que 'Leads generados' del panel ejecutivo (que solo cuenta leads nuevos)." />
         </h2>
+        {/* Aviso contextual: explica la diferencia con el panel ejecutivo */}
+        <div className="mb-2 rounded-lg border border-accent-amber/30 bg-accent-amber/5 px-3 py-2 flex items-start gap-2 text-[10px] text-amber-300/80 leading-relaxed">
+          <span className="shrink-0 mt-0.5">💡</span>
+          <span>
+            <strong className="text-amber-200">¿Por qué hay más leads aquí que en el panel ejecutivo?</strong>
+            {' '}El panel ejecutivo cuenta leads <em>nuevos</em> que llegaron en el período.
+            Este pipeline muestra el <em>estado actual</em> de todos los leads trabajados, incluyendo los que llegaron antes del rango pero recibieron una llamada ahora.
+            {' '}<strong className="text-amber-200">Ejemplo:</strong> un lead que llegó en febrero pero fue llamado esta semana aparece aquí, pero no suma en "Leads generados".
+          </span>
+        </div>
         {leads.length === 0 ? (
           <div className="rounded-lg border border-surface-500 px-3 py-4 text-center text-gray-500 text-xs">
             No hay leads en el rango seleccionado.
