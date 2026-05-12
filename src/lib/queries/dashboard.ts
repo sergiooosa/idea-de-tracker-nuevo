@@ -549,12 +549,23 @@ export async function getDashboard(
         leadsConActividadDetalle,
         callsMade: ac.length,
         speedToLeadAvg: aSpeeds.length > 0 ? aSpeeds.reduce((s, v) => s + v, 0) / aSpeeds.length : null,
-        meetingsBooked: aa.length,
+        // Deduplicar agendas por lead único (igual que el KPI global meetingsBooked)
+        // Un lead puede tener múltiples registros (PDTE → ofertada → cerrada) → sin dedup
+        // la tabla de asesores mostraba más agendas que el panel ejecutivo para el mismo rango.
+        meetingsBooked: new Set(
+          aa
+            .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
+            .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+        ).size,
         meetingsAttended: aAsistidas,
         revenue: aRevenue,
         cashCollected: aCash,
         contactRate: ac.length > 0 ? aContestadas / ac.length : 0,
-        bookingRate: aLeads > 0 ? aa.length / aLeads : 0,
+        bookingRate: aLeads > 0 ? new Set(
+          aa
+            .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
+            .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+        ).size / aLeads : 0,
         metricasWebhook: webhookPorUsuario[ac[0]?.closer_mail ?? key] ?? {},
       };
     },
