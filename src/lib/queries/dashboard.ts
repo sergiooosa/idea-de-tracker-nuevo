@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta, metricasWebhook } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig } from "@/lib/metricas-engine";
+import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, KPI_DEFAULT_KEYS } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import type {
   DashboardKpis,
@@ -707,7 +707,8 @@ export async function getDashboard(
   }
   const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
   const metricasValores: Record<string, string | number> = {};
-  const kpiKeys = new Set(["totalLeads", "callsMade", "contestadas", "answerRate", "meetingsBooked", "meetingsAttended", "meetingsCanceled", "meetingsClosed", "effectiveAppointments", "tasaCierre", "tasaAgendamiento", "revenue", "cashCollected", "avgTicket", "speedToLeadAvg", "avgAttempts", "agendadas", "asistidas", "canceladas", "efectivas", "noShows", "ticket", "pendientesLlamadas"]);
+  // Usar KPI_DEFAULT_KEYS como fuente de verdad — nunca hardcodear aquí
+  const kpiKeys = new Set<string>([...KPI_DEFAULT_KEYS]);
 
   const getDeps = (m: MetricaConfig): string[] => {
     if (m.tipo === "fija") return [];
