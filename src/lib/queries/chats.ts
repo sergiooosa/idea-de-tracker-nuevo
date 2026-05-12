@@ -152,7 +152,8 @@ export async function getChats(
         for (const c of candidates) {
           if (!c) continue;
           const lower = c.toLowerCase();
-          if (lower === "agente" || lower === "agent" || lower === "bot" || lower === "por asignar") continue;
+          // Estos son mensajes automáticos de GHL, no de un humano real → tratar como sin asignar
+          if (lower === "agente" || lower === "agent" || lower === "bot" || lower === "por asignar" || lower === "workflow" || lower === "api/bot" || lower === "campaña" || lower === "campaign") continue;
           return c;
         }
         return null;
