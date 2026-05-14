@@ -310,6 +310,8 @@ export interface LlamadasResponse {
   registros: ApiLlamadaLog[];
   /** Leads desde registros_de_llamada (mismo rango y asesor); el listado expandido muestra esto */
   leads: LlamadaLead[];
+  /** Leads con estado PDTE (nunca llamados) cuya fecha_evento cae en el rango */
+  pendingLeads: LlamadaLead[];
   agg: {
     totalLeads: number;
     totalCalls: number;

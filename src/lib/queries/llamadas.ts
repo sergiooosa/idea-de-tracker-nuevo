@@ -259,7 +259,35 @@ export async function getLlamadas(
     id_user_ghl: r.id_user_ghl ?? null,
   }));
 
-  return { registros, leads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas };
+  // Leads pendientes por llamar: estado PDTE y fecha_evento en el rango de fechas.
+  // Estos NO aparecen en log_llamadas (solo tienen evento 'pdte'/'contacto_creado' que
+  // filtramos arriba), por lo que necesitan su propia consulta.
+  const pendingRows = await db
+    .select()
+    .from(registrosDeLlamada)
+    .where(
+      and(
+        eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+        sql`UPPER(TRIM(${registrosDeLlamada.estado})) = 'PDTE'`,
+        gte(registrosDeLlamada.fecha_evento, fromTs),
+        lte(registrosDeLlamada.fecha_evento, toTs),
+      ),
+    )
+    .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
+
+  const pendingLeads: LlamadaLead[] = pendingRows.map((r) => ({
+    id_registro: r.id_registro,
+    nombre_lead: r.nombre_lead,
+    mail_lead: r.mail_lead,
+    estado: r.estado,
+    phone: r.phone_raw_format,
+    speed_to_lead_min: null,
+    closer_mail: r.closer_mail,
+    fecha_evento: r.fecha_evento?.toISOString() ?? null,
+    id_user_ghl: r.id_user_ghl ?? null,
+  }));
+
+  return { registros, leads, pendingLeads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas };
 }
 
 export async function updateLlamada(
