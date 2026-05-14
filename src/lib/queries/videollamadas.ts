@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
-import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import type {
   ApiVideollamada,
   VideollamadasAdvisorMetrics,
@@ -77,14 +77,28 @@ export async function getVideollamadas(
     }
   }
 
-  // Filtrar siempre por `fecha` (date string asignado por Cerebro al procesar el webhook).
-  // No usar `fecha_reunion` para el rango de fechas porque es un timestamp UTC que puede
-  // caer en un día distinto al de la fecha local del cliente (ej: reunión 22:30 UTC = 00:30
-  // del día siguiente en UTC+2). `fecha` es la fecha canónica que ve el usuario.
+  // Mismo filtro de fecha que usa /dashboard para garantizar consistencia:
+  // Si fecha_reunion está disponible (timestamp UTC), filtrar por ella usando rango completo del día.
+  // Si fecha_reunion es NULL, usar `fecha` (date string canónico que asigna Cerebro).
+  // Esto resuelve la discrepancia AUT-116: eventos que tienen fecha_reunion en el rango
+  // pero `fecha` fuera de él (o viceversa) se contaban diferente en cada página.
+  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
+  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+  const fechaFilter = or(
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+      lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    ),
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+  )!;
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-    gte(resumenesDiariosAgendas.fecha, dateFrom),
-    lte(resumenesDiariosAgendas.fecha, dateTo),
+    fechaFilter,
   ];
   if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
