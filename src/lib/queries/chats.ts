@@ -44,11 +44,17 @@ function computeSpeedToLead(
   messages: ChatMessage[],
   emojiTomaAtencion?: string,
   tieneChatbot?: boolean,
+  fromDate?: Date,
 ): number | null {
   const firstLead = messages.find((m) => m.role === "lead");
   if (!firstLead?.timestamp) return null;
   const leadTime = new Date(firstLead.timestamp).getTime();
   if (isNaN(leadTime)) return null;
+
+  // Solo calcular speed-to-lead si el primer mensaje del lead cayó dentro del
+  // rango de fechas del filtro. Sin esto, conversaciones antiguas que reciben
+  // un nuevo mensaje dentro del rango inflan el promedio artificialmente.
+  if (fromDate && leadTime < fromDate.getTime()) return null;
 
   let agentTime: number | null = null;
 
@@ -122,7 +128,7 @@ export async function getChats(
     const agentMsgs = msgs.filter((m) => m.role === "agent");
     const leadMsgs = msgs.filter((m) => m.role === "lead");
     const agentName = extractAgentName(msgs);
-    const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot);
+    const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot, fromDate);
     const minutesSinceLastLeadMsg = computeMinutesSinceLastLeadMsg(msgs);
     // humanTookOver: con chatbot → solo true si el emoji de toma apareció (un humano intervino).
     // Sin chatbot → true si hay cualquier mensaje de agente (comportamiento normal).
