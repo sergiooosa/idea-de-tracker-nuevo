@@ -719,7 +719,22 @@ export async function getDashboard(
     return [];
   };
 
-  const sorted = [...configs].sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+  // Deduplicar por id: si hay duplicados, preferir tipo="ads" > tipo="webhook" > cualquier otro.
+  // Resuelve el caso donde una métrica tiene entrada "manual" (sin datos) Y "ads" para el mismo id.
+  const TYPE_PRIORITY: Record<string, number> = { ads: 10, webhook: 5 };
+  const configsDeduped = [
+    ...configs
+      .reduce((map, m) => {
+        const existing = map.get(m.id);
+        if (!existing || (TYPE_PRIORITY[m.tipo] ?? 0) > (TYPE_PRIORITY[existing.tipo] ?? 0)) {
+          map.set(m.id, m);
+        }
+        return map;
+      }, new Map<string, (typeof configs)[number]>())
+      .values(),
+  ];
+
+  const sorted = configsDeduped.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
   const computed = new Set<string>();
   let pass = 0;
   const maxPasses = sorted.length + 1;
