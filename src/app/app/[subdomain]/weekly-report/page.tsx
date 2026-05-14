@@ -42,8 +42,12 @@ export default function WeeklyReportPage() {
       pdf.text(new Date().toLocaleDateString('es-CO'), pdfWidth - 30, 8);
       pdf.addImage(imgData, 'PNG', 0, 14, pdfWidth, pdfHeight);
       pdf.save(`reporte-semanal-autokpi-${new Date().toISOString().slice(0, 10)}.pdf`);
-    } catch { /* ignore */ }
-    setGeneratingPdf(false);
+    } catch (err) {
+      console.error('Error al exportar PDF:', err);
+      alert('No se pudo exportar el PDF. Por favor intenta de nuevo.');
+    } finally {
+      setGeneratingPdf(false);
+    }
   }, []);
   const now = new Date();
   const weekEnd = subDays(now, weekOffset * 7);
