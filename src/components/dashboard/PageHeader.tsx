@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from 'lucide-react';
+import ReportProblemButton from "./ReportProblemButton";
 
 export default function PageHeader({
   title,
@@ -36,7 +37,10 @@ export default function PageHeader({
             )}
           </div>
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        <div className="flex items-center gap-2 shrink-0">
+          {action && <div>{action}</div>}
+          <ReportProblemButton />
+        </div>
       </div>
     </header>
   );
