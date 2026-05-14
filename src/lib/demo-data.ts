@@ -277,6 +277,7 @@ export function generateLlamadas(): LlamadasResponse {
   return {
     registros,
     leads,
+    pendingLeads: [],
     agg: {
       totalLeads: leads.length,
       totalCalls: count,
