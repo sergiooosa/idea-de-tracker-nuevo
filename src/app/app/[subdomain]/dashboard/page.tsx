@@ -14,15 +14,11 @@ import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCirc
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { formatCurrency, formatBigNumber, formatPct, formatMinutes } from '@/lib/format';
 
-const fm = (n: number) => {
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  if (n >= 1000) return `$${Math.round(n).toLocaleString('es-CO')}`;
-  // For values < 1000, use fixed 2 decimals to avoid es-CO locale ambiguity ($122,06 vs $122,055)
-  return `$${n.toFixed(2)}`;
-};
-const pctFmt = (n: number) => `${(n * 100).toFixed(1)}%`;
-const minFmt = (m: number) => (m < 1 ? `${Math.round(m * 60)}s` : `${m.toFixed(1)} min`);
+const fm = formatCurrency;
+const pctFmt = formatPct;
+const minFmt = formatMinutes;
 
 const defaultDateTo = new Date();
 const defaultDateFrom = subDays(defaultDateTo, 7);
@@ -222,8 +218,8 @@ export default function DashboardPage() {
             {/* Note: CTR = unique clicks ÷ reach (Meta campaign level, not page-level) */}
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {([
-                { label: 'Inversión', value: data.adsSummary.gastoTotal >= 1000 ? `$${(data.adsSummary.gastoTotal / 1000).toFixed(1)}k` : `$${data.adsSummary.gastoTotal.toFixed(0)}`, color: 'cyan', tooltip: 'Gasto total en Meta Ads en el período' },
-                { label: 'Impresiones', value: data.adsSummary.impresiones >= 1000 ? `${(data.adsSummary.impresiones / 1000).toFixed(1)}k` : String(data.adsSummary.impresiones), color: 'purple', tooltip: 'Veces que se mostró el anuncio' },
+                { label: 'Inversión', value: formatCurrency(data.adsSummary.gastoTotal), color: 'cyan', tooltip: 'Gasto total en Meta Ads en el período' },
+                { label: 'Impresiones', value: formatBigNumber(data.adsSummary.impresiones), color: 'purple', tooltip: 'Veces que se mostró el anuncio' },
                 { label: 'Clicks', value: String(data.adsSummary.clicks), color: 'blue', tooltip: 'Clicks totales en el anuncio' },
                 { label: 'CTR', value: `${Number(data.adsSummary.ctr).toFixed(2)}%`, color: 'green', tooltip: 'Click-Through Rate a nivel de campaña en Meta. Puede diferir del CTR de la página web.' },
                 { label: 'CPM', value: `$${Number(data.adsSummary.cpm).toFixed(2)}`, color: 'amber', tooltip: 'Costo por cada 1,000 impresiones' },

@@ -4,8 +4,9 @@ import { X, FileText, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import type { VideoMeeting } from '@/types';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
+import { formatCurrency } from '@/lib/format';
 
-const fm = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${n.toLocaleString('es-CO')}`);
+const fm = formatCurrency;
 
 export default function ModalRegistrosVideollamadas({
   registros,
