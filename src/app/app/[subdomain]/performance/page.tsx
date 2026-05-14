@@ -16,9 +16,9 @@ import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { VideollamadasResponse, ApiVideollamada, VideoMeeting, VideollamadasAdvisorMetrics } from '@/types';
 import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
+import { formatCurrency } from '@/lib/format';
 
-const fm = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${n.toLocaleString('es-CO')}`;
+const fm = formatCurrency;
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const kpiTooltips = {

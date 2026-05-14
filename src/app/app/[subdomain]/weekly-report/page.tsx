@@ -8,11 +8,11 @@ import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Download, Calendar, TrendingUp, Phone, Users, Video, DollarSign, Loader2, MessageSquare, Sparkles } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { formatCurrency, formatPct, formatMinutes } from '@/lib/format';
 
-const fm = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Number(n).toLocaleString('es-CO')}`;
-const pctFmt = (n: number) => `${(n * 100).toFixed(1)}%`;
-const minFmt = (m: number) => (m < 1 ? `${Math.round(m * 60)}s` : `${m.toFixed(1)} min`);
+const fm = formatCurrency;
+const pctFmt = formatPct;
+const minFmt = formatMinutes;
 
 export default function WeeklyReportPage() {
   const [weekOffset, setWeekOffset] = useState(0);

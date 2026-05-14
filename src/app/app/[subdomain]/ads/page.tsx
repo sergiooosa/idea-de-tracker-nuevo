@@ -8,8 +8,9 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { BarChart2, TrendingDown, DollarSign, Target, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { formatCurrency } from '@/lib/format';
 
-const fm = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+const fm = formatCurrency;
 const fmRoas = (n: number) => `${n.toFixed(2)}x`;
 
 const defaultTo = new Date();

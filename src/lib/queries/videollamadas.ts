@@ -177,7 +177,11 @@ export async function getVideollamadas(
   const noShows = uniqueNoShowLeads.size;
   const efectivas = registros.filter((r) => r.attended && r.qualified).length;
   const cerradas = registros.filter((r) => r.outcome === "cerrado").length;
-  const revenue = registros.reduce((s, r) => s + r.facturacion, 0);
+  // Solo sumar facturación de deals cerrados (consistente con /dashboard que usa closedSet)
+  const registrosCerrados = registros.filter((r) => r.outcome === "cerrada" || r.outcome === "cerrado");
+  const revenueFromClosed = registrosCerrados.reduce((s, r) => s + r.facturacion, 0);
+  // Fallback: si ningún registro tiene outcome cerrado pero hay facturación, usar todos
+  const revenue = revenueFromClosed > 0 ? revenueFromClosed : registros.reduce((s, r) => s + r.facturacion, 0);
   const cash = registros.reduce((s, r) => s + r.cashCollected, 0);
 
   // Leads únicos agendados: deduplicar por idcliente/email — mismo criterio que dashboard
@@ -227,7 +231,7 @@ export async function getVideollamadas(
       agendadas: uniqueBooked.size,
       asistencias: asist,
       pctCierre: asist > 0 ? (cerr / asist) * 100 : 0,
-      facturacion: meetings.reduce((s, m) => s + m.facturacion, 0),
+      facturacion: meetings.filter((m) => m.outcome === "cerrada" || m.outcome === "cerrado").reduce((s, m) => s + m.facturacion, 0) || meetings.reduce((s, m) => s + m.facturacion, 0),
       cashCollected: meetings.reduce((s, m) => s + m.cashCollected, 0),
     };
     advisors.push({ id: name, name });
