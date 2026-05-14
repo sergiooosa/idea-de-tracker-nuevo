@@ -7,11 +7,12 @@ import PageHeader from '@/components/dashboard/PageHeader';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
+import { formatCurrency } from '@/lib/format';
 
-const fmAds = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+const fmAds = formatCurrency;
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
-const fm = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n}`;
+const fm = formatCurrency;
 
 const defaultTo = new Date();
 const defaultFrom = subDays(defaultTo, 7);
