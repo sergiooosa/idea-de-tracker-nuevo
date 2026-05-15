@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useT } from '@/contexts/LocaleContext';
 import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
+import LeadsEnEspera from '@/components/dashboard/LeadsEnEspera';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
@@ -178,6 +179,8 @@ export default function DashboardPage() {
             onChange={setSelectedTags}
           />
         </section>
+
+        <LeadsEnEspera />
 
         <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
