@@ -691,6 +691,9 @@ export async function getDashboard(
   // seriesTiempo: campo → mapa de fecha → valor sumado
   const webhookSeriesPorCampo: Record<string, Record<string, number>> = {};
   for (const row of webhookRows) {
+    // Solo sumar filas globales (ghl_user_id IS NULL) para evitar doble conteo:
+    // las filas atribuidas (con ghl_user_id) ya están acumuladas en la fila global.
+    if (row.ghl_user_id !== null) continue;
     const key = row.campo;
     const fecha = toDateString(row.fecha);
     webhookSumas[key] = (webhookSumas[key] ?? 0) + parseFloat(String(row.valor ?? 0));
