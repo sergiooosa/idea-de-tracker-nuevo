@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { normalizeSubdominio } from "@/lib/subdomain";
 import { encode } from "@auth/core/jwt";
 import { PERMISOS_DISPONIBLES } from "@/lib/permisos";
@@ -49,7 +49,12 @@ export async function POST(req: Request) {
   const subdominio = body.subdominio?.trim();
   if (!subdominio) return NextResponse.json({ error: "subdominio requerido" }, { status: 400 });
 
+  // Normalizar: aceptar el slug o el dominio completo (ej. "tracker-credivit" o "tracker-credivit.autokpi.net")
+  const subdominioSlug = normalizeSubdominio(subdominio) ?? subdominio;
+  const subdominioFull = `${subdominioSlug}.${ROOT_DOMAIN}`;
+
   // Verificar que ese subdominio pertenece al email del usuario y obtener sus datos
+  // La condición OR cubre cuentas que almacenan el dominio completo en lugar del slug (ej. credivit id=25)
   const [row] = await db
     .select({
       id_evento: usuariosDashboard.id_evento,
@@ -62,7 +67,7 @@ export async function POST(req: Request) {
     })
     .from(usuariosDashboard)
     .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
-    .where(and(eq(usuariosDashboard.email, email), eq(cuentas.subdominio, subdominio)))
+    .where(and(eq(usuariosDashboard.email, email), or(eq(cuentas.subdominio, subdominioSlug), eq(cuentas.subdominio, subdominioFull))))
     .limit(1);
 
   if (!row) {
