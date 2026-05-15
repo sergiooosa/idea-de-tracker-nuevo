@@ -325,6 +325,8 @@ export interface LlamadasResponse {
   advisors: ApiAdvisor[];
   fuente_llamadas?: "twilio" | "ghl";
   embudoEtapas?: { id: string; nombre: string }[];
+  /** Tipos de llamada configurados — alimentan el selector de filtro en UI */
+  tipos_eventos_config?: { id: string; nombre: string; activo: boolean }[];
 }
 
 export interface ApiChatMessage {

@@ -22,10 +22,12 @@ export async function getLlamadas(
   dateFrom: string,
   dateTo: string,
   closerEmails?: string[],
+  tipoEvento?: string[],
 ): Promise<LlamadasResponse> {
   const fromTs = new Date(`${dateFrom}T00:00:00Z`);
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
+  const tipoEventos = (tipoEvento ?? []).map((t) => t.trim()).filter(Boolean);
 
   // Excluir "pdte" y "contacto_creado" — son eventos de lead nuevo, NO llamadas realizadas
   const conditions = [
@@ -34,6 +36,10 @@ export async function getLlamadas(
     lte(logLlamadas.ts, toTs),
     sql`${logLlamadas.tipo_evento} NOT IN ('pdte', 'contacto_creado')`,
   ];
+  // Filtro por tipo de evento aplicado ANTES del mapeo (mapTipoEvento colapsa efectiva_* en "answered")
+  if (tipoEventos.length > 0) {
+    conditions.push(inArray(logLlamadas.tipo_evento, tipoEventos));
+  }
   if (emails.length > 0) {
     conditions.push(
       sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`,
@@ -49,7 +55,7 @@ export async function getLlamadas(
       .where(and(...conditions))
       .orderBy(sql`${logLlamadas.ts} DESC`),
     db
-      .select({ fuente_llamadas: cuentas.fuente_llamadas, embudo_personalizado: cuentas.embudo_personalizado })
+      .select({ fuente_llamadas: cuentas.fuente_llamadas, embudo_personalizado: cuentas.embudo_personalizado, tipos_eventos_config: cuentas.tipos_eventos_config })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1)
@@ -64,6 +70,10 @@ export async function getLlamadas(
     id: String(e.id ?? ""),
     nombre: String((e as unknown as { name?: string }).name ?? e.nombre ?? e.id ?? ""),
   })).filter((e) => e.id);
+
+  const tiposEventosConfig = Array.isArray(cuentaRow?.tipos_eventos_config)
+    ? (cuentaRow.tipos_eventos_config as { id: string; nombre: string; activo: boolean }[])
+    : [];
 
   // Los registros a mostrar son los que tuvieron al menos una llamada en el rango de fechas
   // (se usa log_llamadas.ts como fecha de actividad, no fecha_evento del lead)
@@ -287,7 +297,7 @@ export async function getLlamadas(
     id_user_ghl: r.id_user_ghl ?? null,
   }));
 
-  return { registros, leads, pendingLeads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas };
+  return { registros, leads, pendingLeads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas, tipos_eventos_config: tiposEventosConfig };
 }
 
 export async function updateLlamada(

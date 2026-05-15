@@ -15,7 +15,9 @@ export async function GET(req: Request) {
     const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
     const requestedEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
     const closerEmails = enforceCloserFilter(requestedEmails, email, session?.user?.permisosArray ?? [], session?.user?.rol ?? "");
-    const data = await getLlamadas(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined);
+    const tipoEventoParam = searchParams.get("tipoEvento") || undefined;
+    const tipoEvento = tipoEventoParam ? tipoEventoParam.split(",").map((t) => t.trim()).filter(Boolean) : undefined;
+    const data = await getLlamadas(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined, tipoEvento?.length ? tipoEvento : undefined);
     return NextResponse.json(data);
   });
 }
