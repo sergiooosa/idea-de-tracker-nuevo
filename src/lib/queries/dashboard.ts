@@ -938,10 +938,16 @@ export async function getDashboard(
       if (firstLeadMsg?.timestamp && firstAgentMsg?.timestamp) {
         const leadTs = new Date(firstLeadMsg.timestamp).getTime();
         const agentTs = new Date(firstAgentMsg.timestamp).getTime();
-        const diffSecs = (agentTs - leadTs) / 1000;
-        if (diffSecs > 0) {
-          speedSum += diffSecs;
-          speedCount++;
+        // Solo contar si el primer mensaje del lead cayó dentro del rango de fechas.
+        // Sin esta guarda, chats históricos sincronizados recientemente (con mensajes
+        // de meses atrás en el JSONB) inflan el promedio artificialmente.
+        // Mismo patrón que computeSpeedToLead() en chats.ts línea 57.
+        if (leadTs >= fromDate.getTime()) {
+          const diffSecs = (agentTs - leadTs) / 1000;
+          if (diffSecs > 0) {
+            speedSum += diffSecs;
+            speedCount++;
+          }
         }
       }
 
