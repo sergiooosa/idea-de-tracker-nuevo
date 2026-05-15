@@ -66,7 +66,8 @@ export async function getLeadsEnEspera(
       });
     }
 
-    const grupo = mapaClosers.get(closerKey)!;
+    const grupo = mapaClosers.get(closerKey);
+    if (!grupo) continue;
     const minSinLlamar = Number(row.min_sin_llamar) || 0;
 
     grupo.leads.push({
