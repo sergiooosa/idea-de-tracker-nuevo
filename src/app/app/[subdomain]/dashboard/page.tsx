@@ -281,7 +281,7 @@ export default function DashboardPage() {
                       case 'moneda': display = fm(raw); break;
                       case 'porcentaje': display = pctFmt(raw); break;
                       case 'tiempo': display = minFmt(raw); break;
-                      case 'decimal': display = raw.toFixed(1); break;
+                      case 'decimal': display = raw.toFixed(2); break;
                       case 'numero': display = typeof m.valor === 'number' ? m.valor : raw; break;
                     }
                     return (
@@ -312,7 +312,7 @@ export default function DashboardPage() {
                         case 'moneda': displayTotal = fm(raw); break;
                         case 'porcentaje': displayTotal = pctFmt(raw); break;
                         case 'tiempo': displayTotal = minFmt(raw); break;
-                        case 'decimal': displayTotal = raw.toFixed(1); break;
+                        case 'decimal': displayTotal = raw.toFixed(2); break;
                         case 'numero': displayTotal = typeof m.valor === 'number' ? m.valor : raw; break;
                       }
                       return (
