@@ -838,6 +838,7 @@ export async function getDashboard(
       estado: chatsLogs.estado,
       notas_extra: chatsLogs.notas_extra,
       fecha_y_hora_z: chatsLogs.fecha_y_hora_z,
+      primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
     })
     .from(chatsLogs)
     .where(
@@ -935,13 +936,11 @@ export async function getDashboard(
       } else {
         firstAgentMsg = msgs.find((m) => m.role === "agent");
       }
-      if (firstLeadMsg?.timestamp && firstAgentMsg?.timestamp) {
-        const leadTs = new Date(firstLeadMsg.timestamp).getTime();
+      // Usar primer_msg_lead_at (calculado por Cerebro) en lugar del JSONB para el gate de fecha.
+      // NULL = chat sin mensajes inbound del lead → excluir del speed-to-lead (AUT-153).
+      if (row.primer_msg_lead_at != null && firstAgentMsg?.timestamp) {
+        const leadTs = row.primer_msg_lead_at.getTime();
         const agentTs = new Date(firstAgentMsg.timestamp).getTime();
-        // Solo contar si el primer mensaje del lead cayó dentro del rango de fechas.
-        // Sin esta guarda, chats históricos sincronizados recientemente (con mensajes
-        // de meses atrás en el JSONB) inflan el promedio artificialmente.
-        // Mismo patrón que computeSpeedToLead() en chats.ts línea 57.
         if (leadTs >= fromDate.getTime()) {
           const diffSecs = (agentTs - leadTs) / 1000;
           if (diffSecs > 0) {

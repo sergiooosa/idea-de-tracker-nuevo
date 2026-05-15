@@ -249,15 +249,17 @@ export async function getAsesorData(
     return Array.isArray(chatData) && chatData.some((m) => m?.role === "agent");
   }).length;
 
-  // Speed to lead en chats
+  // Speed to lead en chats — usar primer_msg_lead_at (AUT-153) en lugar de JSONB.
+  // NULL = sin mensajes inbound del lead → excluir. Fuera del rango → excluir.
   let speedChatSum = 0;
   let speedChatCount = 0;
   for (const ch of chatsRows) {
+    if (ch.primer_msg_lead_at == null) continue;
+    if (ch.primer_msg_lead_at < fromTs) continue;
     const msgs = (ch.chat as { role?: string; timestamp?: string }[] | null) ?? [];
-    const firstLead = msgs.find((m) => m.role === "lead");
     const firstAgent = msgs.find((m) => m.role === "agent");
-    if (firstLead?.timestamp && firstAgent?.timestamp) {
-      const diff = (new Date(firstAgent.timestamp).getTime() - new Date(firstLead.timestamp).getTime()) / 1000;
+    if (firstAgent?.timestamp) {
+      const diff = (new Date(firstAgent.timestamp).getTime() - ch.primer_msg_lead_at.getTime()) / 1000;
       if (diff > 0) { speedChatSum += diff; speedChatCount++; }
     }
   }
