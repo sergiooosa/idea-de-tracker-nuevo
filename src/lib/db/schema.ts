@@ -410,8 +410,6 @@ export const chatsLogs = pgTable("chats_logs", {
   // ── IA nocturna ──────────────────────────────────────────────────────────
   ia_categoria: text("ia_categoria"),
   ia_analizado_at: timestamp("ia_analizado_at", { withTimezone: true }),
-  // ── Timestamps de actividad ───────────────────────────────────────────────
-  primer_msg_lead_at: timestamp("primer_msg_lead_at", { withTimezone: true }),
 });
 
 /* ------------------------------------------------------------------ */
