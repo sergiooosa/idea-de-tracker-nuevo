@@ -55,7 +55,7 @@ export async function getLlamadas(
       .where(and(...conditions))
       .orderBy(sql`${logLlamadas.ts} DESC`),
     db
-      .select({ fuente_llamadas: cuentas.fuente_llamadas, embudo_personalizado: cuentas.embudo_personalizado })
+      .select({ fuente_llamadas: cuentas.fuente_llamadas, embudo_personalizado: cuentas.embudo_personalizado, tipos_eventos_config: cuentas.tipos_eventos_config })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1)
@@ -70,6 +70,10 @@ export async function getLlamadas(
     id: String(e.id ?? ""),
     nombre: String((e as unknown as { name?: string }).name ?? e.nombre ?? e.id ?? ""),
   })).filter((e) => e.id);
+
+  const tiposEventosConfig = Array.isArray(cuentaRow?.tipos_eventos_config)
+    ? (cuentaRow.tipos_eventos_config as { id: string; nombre: string; activo: boolean }[])
+    : [];
 
   // Los registros a mostrar son los que tuvieron al menos una llamada en el rango de fechas
   // (se usa log_llamadas.ts como fecha de actividad, no fecha_evento del lead)
@@ -293,7 +297,7 @@ export async function getLlamadas(
     id_user_ghl: r.id_user_ghl ?? null,
   }));
 
-  return { registros, leads, pendingLeads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas };
+  return { registros, leads, pendingLeads, agg, advisorMetrics, advisors, fuente_llamadas: fuenteLlamadas, embudoEtapas, tipos_eventos_config: tiposEventosConfig };
 }
 
 export async function updateLlamada(
