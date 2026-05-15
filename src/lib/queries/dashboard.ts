@@ -308,11 +308,12 @@ export async function getDashboard(
     attendedSet.has((a.categoria ?? "").toLowerCase().trim())
   ).length;
   // Deduplicar canceladas por lead único (GHL puede enviar el mismo evento múltiples veces)
-  const canceladas = new Set(
+  const uniqueCanceledLeadKeys = new Set(
     filteredAgendas
       .filter((a) => (a.categoria ?? "").toLowerCase().includes("cancel"))
       .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
-  ).size;
+  );
+  const canceladas = uniqueCanceledLeadKeys.size;
   const cerradas = filteredAgendas.filter((a) => {
     const cat = (a.categoria ?? "").toLowerCase().trim();
     // Si el embudo tiene etapas cerradas definidas: usar solo esas
@@ -432,15 +433,22 @@ export async function getDashboard(
     asistidas,
     canceladas,
     efectivas,
-    // Deduplicar no-shows por lead único (GHL puede enviar el mismo evento múltiples veces)
+    // Deduplicar no-shows por lead único. Excluir leads ya contados en canceladas para
+    // evitar double-counting: un lead con registro no_show Y cancelada (rescheduled)
+    // se cuenta solo en canceladas (estado más reciente/definitivo).
     noShows: new Set(
       filteredAgendas
         .filter((a) => (a.categoria ?? "").toLowerCase() === "no_show")
         .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+        .filter((key) => !uniqueCanceledLeadKeys.has(key))
     ).size,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
     pendientesLlamadas,
   };
+
+  // pendientesAgendas: leads agendados en el período sin clasificar todavía (PDTE/sin outcome).
+  // Garantiza la invariante: agendadas = asistidas + canceladas + noShows + cerradas + pendientes
+  kpis.pendientesAgendas = Math.max(0, kpis.agendadas - kpis.asistidas - kpis.canceladas - kpis.noShows - kpis.meetingsClosed);
 
   // Advisor ranking
   // Normalizar key de asesor: email lowercase tiene prioridad, luego nombre lowercase
