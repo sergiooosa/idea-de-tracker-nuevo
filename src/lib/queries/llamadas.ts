@@ -22,10 +22,12 @@ export async function getLlamadas(
   dateFrom: string,
   dateTo: string,
   closerEmails?: string[],
+  tipoEvento?: string[],
 ): Promise<LlamadasResponse> {
   const fromTs = new Date(`${dateFrom}T00:00:00Z`);
   const toTs = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
+  const tipoEventos = (tipoEvento ?? []).map((t) => t.trim()).filter(Boolean);
 
   // Excluir "pdte" y "contacto_creado" — son eventos de lead nuevo, NO llamadas realizadas
   const conditions = [
@@ -34,6 +36,10 @@ export async function getLlamadas(
     lte(logLlamadas.ts, toTs),
     sql`${logLlamadas.tipo_evento} NOT IN ('pdte', 'contacto_creado')`,
   ];
+  // Filtro por tipo de evento aplicado ANTES del mapeo (mapTipoEvento colapsa efectiva_* en "answered")
+  if (tipoEventos.length > 0) {
+    conditions.push(inArray(logLlamadas.tipo_evento, tipoEventos));
+  }
   if (emails.length > 0) {
     conditions.push(
       sql`LOWER(TRIM(COALESCE(${logLlamadas.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`,
