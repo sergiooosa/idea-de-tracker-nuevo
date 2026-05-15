@@ -11,7 +11,7 @@ export async function GET(req: Request) {
       console.error("[leads-en-espera] Error:", err);
       const message = err instanceof Error ? err.message : String(err);
       return NextResponse.json(
-        { error: "Error al cargar leads en espera", debug: message },
+        { error: "Error al cargar leads en espera" },
         { status: 500 },
       );
     }
