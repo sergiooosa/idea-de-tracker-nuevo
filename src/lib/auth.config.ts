@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { db } from "@/lib/db";
 import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import type { RolConfig } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { PERMISOS_DISPONIBLES } from "@/lib/permisos";
 import { normalizeSubdominio } from "@/lib/subdomain";
 
@@ -45,7 +45,11 @@ export const authConfig: NextAuthConfig = {
 
         const email = (credentials.email as string).trim().toLowerCase();
         const password = credentials.password as string;
-        const subdominioOverride = (credentials.subdominio_override as string | undefined)?.trim() || null;
+        const rawOverride = (credentials.subdominio_override as string | undefined)?.trim() || null;
+        // Normalizar: aceptar slug o dominio completo (ej. "tracker-credivit" o "tracker-credivit.autokpi.net")
+        const subdominioOverride = rawOverride ? (normalizeSubdominio(rawOverride) ?? rawOverride) : null;
+        const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "autokpi.net";
+        const subdominioOverrideFull = subdominioOverride ? `${subdominioOverride}.${rootDomain}` : null;
 
         // Usuario plataforma (super admin global): credenciales desde env
         const platformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim().toLowerCase();
@@ -70,10 +74,14 @@ export const authConfig: NextAuthConfig = {
           // (id_cuenta y pass) para esa cuenta específica. Sin este filtro, .limit(1)
           // puede devolver la cuenta equivocada, haciendo fallar la verificación de password
           // o almacenando un id_cuenta incorrecto en el JWT.
+          // La condición OR cubre cuentas que almacenan el dominio completo en lugar del slug (ej. credivit id=25)
           const whereClause = subdominioOverride
             ? and(
                 eq(usuariosDashboard.email, email),
-                eq(cuentas.subdominio, subdominioOverride),
+                or(
+                  eq(cuentas.subdominio, subdominioOverride),
+                  ...(subdominioOverrideFull ? [eq(cuentas.subdominio, subdominioOverrideFull)] : []),
+                ),
               )
             : eq(usuariosDashboard.email, email);
 
