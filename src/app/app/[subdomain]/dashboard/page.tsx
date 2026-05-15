@@ -370,6 +370,7 @@ export default function DashboardPage() {
               { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
               { label: 'No shows', value: kpis.noShows, color: 'amber' },
               { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
+              ...((kpis.pendientesAgenda ?? 0) > 0 ? [{ label: 'Pendientes', value: kpis.pendientesAgenda ?? 0, color: 'gray' as const, sub: 'Sin resultado aún' }] : []),
             ].map(({ label, value, color, sub }) => (
               <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
                 <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>

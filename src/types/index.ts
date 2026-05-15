@@ -402,6 +402,7 @@ export interface DashboardKpis {
   avgAttempts: number;
   attemptsToFirstContactAvg: number;
   noShows: number;
+  pendientesAgenda?: number;
 }
 
 export interface LeadDetailItem {

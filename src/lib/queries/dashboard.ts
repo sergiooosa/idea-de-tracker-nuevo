@@ -307,12 +307,14 @@ export async function getDashboard(
   const asistidas = filteredAgendas.filter((a) =>
     attendedSet.has((a.categoria ?? "").toLowerCase().trim())
   ).length;
-  // Deduplicar canceladas por lead único (GHL puede enviar el mismo evento múltiples veces)
-  const canceladas = new Set(
+  // Deduplicar canceladas por lead único (GHL puede enviar el mismo evento múltiples veces).
+  // Extraer como Set para reutilizarlo en no-shows y pendientes (evita double-counting).
+  const canceladasIdSet = new Set(
     filteredAgendas
       .filter((a) => (a.categoria ?? "").toLowerCase().includes("cancel"))
       .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
-  ).size;
+  );
+  const canceladas = canceladasIdSet.size;
   const cerradas = filteredAgendas.filter((a) => {
     const cat = (a.categoria ?? "").toLowerCase().trim();
     // Si el embudo tiene etapas cerradas definidas: usar solo esas
@@ -432,11 +434,30 @@ export async function getDashboard(
     asistidas,
     canceladas,
     efectivas,
-    // Deduplicar no-shows por lead único (GHL puede enviar el mismo evento múltiples veces)
+    // Deduplicar no-shows por lead único. Excluir leads que ya están en canceladas
+    // (prioridad: cancelada > no_show) para evitar double-counting en el invariante
+    // AGENDADAS = ASISTIDAS + CANCELADAS + NO_SHOWS + CERRADAS + PENDIENTES_AGENDA.
     noShows: new Set(
       filteredAgendas
         .filter((a) => (a.categoria ?? "").toLowerCase() === "no_show")
         .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+        .filter((key) => !canceladasIdSet.has(key))
+    ).size,
+    // Leads agendados sin outcome clasificado aún (PDTE u otra categoría desconocida).
+    // Garantiza que AGENDADAS = ASISTIDAS + CANCELADAS + NO_SHOWS + CERRADAS + PENDIENTES_AGENDA.
+    pendientesAgenda: new Set(
+      filteredAgendas
+        .filter((a) => {
+          const cat = (a.categoria ?? "").toLowerCase().trim();
+          const isCerrada = closedByFlag ? closedSet.has(cat) : (closedSet.has(cat) || hasCash(a));
+          return !attendedSet.has(cat)
+            && !cat.includes("cancel")
+            && cat !== "no_show"
+            && cat !== "noshow"
+            && !isCerrada;
+        })
+        .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+        .filter((key) => !canceladasIdSet.has(key))
     ).size,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
     pendientesLlamadas,
