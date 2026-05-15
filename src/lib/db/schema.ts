@@ -405,6 +405,8 @@ export const chatsLogs = pgTable("chats_logs", {
   origen: text("origen"),
   asesor_asignado: text("asesor_asignado"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
+  // ── Timestamps calculados por Cerebro ─────────────────────────────────────
+  primer_msg_lead_at: timestamp("primer_msg_lead_at", { withTimezone: true }),
   // ── IA nocturna ──────────────────────────────────────────────────────────
   ia_categoria: text("ia_categoria"),
   ia_analizado_at: timestamp("ia_analizado_at", { withTimezone: true }),
