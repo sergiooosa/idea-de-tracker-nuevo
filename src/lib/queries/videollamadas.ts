@@ -32,10 +32,11 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
       const label = match.nombre ?? (match as any).name ?? c;
       // Usar flags es_calificada, es_cerrada si están presentes
       const isCanceled = label.toLowerCase().includes("cancel");
+      const isPending = label.toLowerCase() === "pendiente" || label.toLowerCase() === "pdte";
       const isQualified = match.es_calificada !== undefined ? match.es_calificada : (label.toLowerCase().includes("cerrad") || label.toLowerCase().includes("closed"));
       const isClosed = match.es_cerrada !== undefined ? match.es_cerrada : (label.toLowerCase().includes("cerrad") || label.toLowerCase().includes("closed"));
       return {
-        attended: !isCanceled,
+        attended: !isCanceled && !isPending,
         qualified: isQualified || isClosed,
         canceled: isCanceled,
         outcome: label.toLowerCase(),
@@ -54,7 +55,7 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   if (cl === "closed") return { attended: true, qualified: true, canceled: false, outcome: "cerrada" };
   if (cl === "ofertada" || cl === "offered") return { attended: true, qualified: true, canceled: false, outcome: "calificada" };
   if (cl === "no_ofertada" || cl === "no ofertada") return { attended: true, qualified: false, canceled: false, outcome: "no_calificada" };
-  return { attended: true, qualified: false, canceled: false, outcome: cl };
+  return { attended: false, qualified: false, canceled: false, outcome: cl };
 }
 
 export async function getVideollamadas(
