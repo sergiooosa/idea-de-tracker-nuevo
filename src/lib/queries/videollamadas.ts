@@ -104,7 +104,7 @@ export async function getVideollamadas(
       gte(resumenesDiariosAgendas.fecha, dateFrom),
       lte(resumenesDiariosAgendas.fecha, dateTo),
     ),
-  )!;
+  ) ?? sql`TRUE`;
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
