@@ -35,7 +35,7 @@ const chatKpiTooltips = {
   contactados: { significado: 'Chats donde un asesor respondió al menos una vez.', calculo: 'Conteo de chats con agentMessages > 0 en el período.' },
   seguimientos: { significado: 'Total de mensajes en todas las conversaciones.', calculo: 'Suma de todos los mensajes del JSONB.' },
   speedToLead: { significado: 'Tiempo promedio desde primer mensaje del lead hasta primera respuesta del agente.', calculo: 'Promedio de (timestamp primer msg agente − timestamp primer msg lead).' },
-  sinRespuesta: { significado: 'Chats donde el lead esperó respuesta y aún no hubo una del agente.', calculo: 'Chats con minutesSinceLastLeadMsg > 0 (sin respuesta posterior del agente).' },
+  sinRespuesta: { significado: 'Chats donde el lead esperó respuesta y aún no hubo una del agente.', calculo: 'Chats con minutesSinceLastLeadMsg != null (el agente no respondió después del último mensaje del lead).' },
   sinContactar: { significado: '% de chats donde ningún humano respondió al lead.', calculo: 'Chats sin humanTookOver / total × 100.' },
 };
 
@@ -86,7 +86,7 @@ export default function PerformanceChatsPage() {
   // KPIs adicionales calculados en el cliente
   const extraKpis = useMemo(() => {
     if (!data) return { sinRespuesta: 0, pctSinContactar: 0 };
-    const sinRespuesta = data.chats.filter((c) => c.minutesSinceLastLeadMsg != null && c.minutesSinceLastLeadMsg > 0).length;
+    const sinRespuesta = data.chats.filter((c) => c.minutesSinceLastLeadMsg != null).length;
     const sinContactar = data.chats.filter((c) => !c.humanTookOver).length;
     const pctSinContactar = data.chats.length > 0 ? Math.round((sinContactar / data.chats.length) * 100) : 0;
     return { sinRespuesta, pctSinContactar };
