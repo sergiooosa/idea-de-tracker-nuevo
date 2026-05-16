@@ -73,16 +73,28 @@ function computeSpeedToLead(
 
   if (tieneChatbot && emojiTomaAtencion) {
     // Con chatbot: buscar primer mensaje de agente que contenga el emoji de toma de atención
+    // y que sea POSTERIOR al primer mensaje del lead (fix AUT-186: conversaciones outbound).
     const takeoverMsg = messages.find(
-      (m) => m.role === "agent" && (m.message ?? "").includes(emojiTomaAtencion),
+      (m) =>
+        m.role === "agent" &&
+        (m.message ?? "").includes(emojiTomaAtencion) &&
+        m.timestamp &&
+        new Date(m.timestamp).getTime() > leadTime,
     );
     if (takeoverMsg?.timestamp) {
       const ts = new Date(takeoverMsg.timestamp).getTime();
       if (!isNaN(ts)) agentTime = ts;
     }
   } else {
-    // Sin chatbot: primer mensaje de agente
-    const firstAgent = messages.find((m) => m.role === "agent");
+    // Sin chatbot: primer mensaje de agente POSTERIOR al primer mensaje del lead.
+    // Fix AUT-186: en modelos outbound el agente inicia la conv → su primer msg
+    // es anterior al primer inbound del lead → diffSec negativo → null incorrecto.
+    const firstAgent = messages.find(
+      (m) =>
+        m.role === "agent" &&
+        m.timestamp &&
+        new Date(m.timestamp).getTime() > leadTime,
+    );
     if (firstAgent?.timestamp) {
       const ts = new Date(firstAgent.timestamp).getTime();
       if (!isNaN(ts)) agentTime = ts;
