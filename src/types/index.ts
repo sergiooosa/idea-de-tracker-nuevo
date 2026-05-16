@@ -365,6 +365,8 @@ export interface ApiChatLead {
   humanTookOver: boolean;
   /** Categoría de interés detectada por la IA nocturna (ej: "precio", "producto", "soporte"). */
   iaCategoria?: string | null;
+  /** Objeciones detectadas por la IA nocturna en la conversación. */
+  iaObjeciones?: Array<{ objecion: string; categoria: string }> | null;
 }
 
 export interface ChatsAdvisorMetrics {
@@ -385,6 +387,8 @@ export interface ChatsResponse {
   };
   advisorMetrics: Record<string, ChatsAdvisorMetrics>;
   advisors: ApiAdvisor[];
+  /** Métricas custom tipo "chat" calculadas para el rango. Key = metrica id, Value = valor agregado. */
+  metricasCustom?: Record<string, number | null>;
 }
 
 export interface DashboardKpis {
