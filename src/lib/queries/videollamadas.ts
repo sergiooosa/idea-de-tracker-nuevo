@@ -58,6 +58,14 @@ function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   return { attended: false, qualified: false, canceled: false, outcome: cl };
 }
 
+async function isFathomConfigured(idCuenta: number): Promise<boolean> {
+  const usuarios = await db
+    .select({ fathom: usuariosDashboard.fathom, id_webhook: usuariosDashboard.id_webhook_fathom })
+    .from(usuariosDashboard)
+    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
+  return usuarios.some((u) => u.fathom && u.id_webhook);
+}
+
 export async function getVideollamadas(
   idCuenta: number,
   dateFrom: string,
@@ -103,6 +111,9 @@ export async function getVideollamadas(
   ];
   if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
+  // Guard: si la cuenta no tiene Fathom configurado, no retornar videollamadas.
+  const fathomHabilitado = await isFathomConfigured(idCuenta);
+
   const [[cuentaRow], rows] = await Promise.all([
     db
       .select({
@@ -113,11 +124,13 @@ export async function getVideollamadas(
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
-    db
-      .select()
-      .from(resumenesDiariosAgendas)
-      .where(and(...agendaConditions))
-      .orderBy(sql`${resumenesDiariosAgendas.fecha_reunion} DESC`),
+    fathomHabilitado
+      ? db
+          .select()
+          .from(resumenesDiariosAgendas)
+          .where(and(...agendaConditions))
+          .orderBy(sql`${resumenesDiariosAgendas.fecha_reunion} DESC`)
+      : Promise.resolve([]),
   ]);
 
   const embudo = Array.isArray(cuentaRow?.embudo_personalizado)

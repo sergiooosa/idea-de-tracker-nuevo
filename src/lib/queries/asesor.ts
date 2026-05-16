@@ -40,6 +40,16 @@ function normalizarEstado(estado: string | null): EstadoNormalizado {
   return "otro";
 }
 
+// ─── Guard: verificar si la cuenta tiene Fathom configurado ──────────────────
+
+async function isFathomConfigured(idCuenta: number): Promise<boolean> {
+  const usuarios = await db
+    .select({ fathom: usuariosDashboard.fathom, id_webhook: usuariosDashboard.id_webhook_fathom })
+    .from(usuariosDashboard)
+    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
+  return usuarios.some((u) => u.fathom && u.id_webhook);
+}
+
 // ─── Resolver nombre→email y email→nombre para matching cross-canal ──────────
 
 async function buildCloserMaps(idCuenta: number): Promise<{
@@ -151,20 +161,28 @@ export async function getAsesorData(
   })();
 
   // ── VIDEOLLAMADAS: resumenes_diarios_agendas ──────────────────────────────
-  const fechaFilterAgendas = or(
-    and(isNotNull(resumenesDiariosAgendas.fecha_reunion), gte(resumenesDiariosAgendas.fecha_reunion, fromTs), lte(resumenesDiariosAgendas.fecha_reunion, toTs)),
-    and(isNull(resumenesDiariosAgendas.fecha_reunion), gte(resumenesDiariosAgendas.fecha, dateFrom), lte(resumenesDiariosAgendas.fecha, dateTo)),
-  )!;
+  // Guard: si la cuenta no tiene Fathom configurado, no retornar videollamadas
+  // para evitar registros fantasma (e.g. big-capital, id_cuenta: 42).
+  const fathomHabilitado = await isFathomConfigured(idCuenta);
 
-  const agendaConditions = [eq(resumenesDiariosAgendas.id_cuenta, idCuenta), fechaFilterAgendas];
-  if (emailsLower.length > 0 || nombresFromEmails.length > 0) {
-    const allCloserValues = [...emailsLower, ...nombresFromEmails];
-    agendaConditions.push(
-      sql`LOWER(TRIM(COALESCE(${resumenesDiariosAgendas.closer}, ''))) IN (${sql.join(allCloserValues.map((v) => sql`${v}`), sql`, `)})`,
-    );
-  }
+  const agendaRows = await (async () => {
+    if (!fathomHabilitado) return [];
 
-  const agendaRows = await db.select().from(resumenesDiariosAgendas).where(and(...agendaConditions));
+    const fechaFilterAgendas = or(
+      and(isNotNull(resumenesDiariosAgendas.fecha_reunion), gte(resumenesDiariosAgendas.fecha_reunion, fromTs), lte(resumenesDiariosAgendas.fecha_reunion, toTs)),
+      and(isNull(resumenesDiariosAgendas.fecha_reunion), gte(resumenesDiariosAgendas.fecha, dateFrom), lte(resumenesDiariosAgendas.fecha, dateTo)),
+    )!;
+
+    const agendaConditions = [eq(resumenesDiariosAgendas.id_cuenta, idCuenta), fechaFilterAgendas];
+    if (emailsLower.length > 0 || nombresFromEmails.length > 0) {
+      const allCloserValues = [...emailsLower, ...nombresFromEmails];
+      agendaConditions.push(
+        sql`LOWER(TRIM(COALESCE(${resumenesDiariosAgendas.closer}, ''))) IN (${sql.join(allCloserValues.map((v) => sql`${v}`), sql`, `)})`,
+      );
+    }
+
+    return db.select().from(resumenesDiariosAgendas).where(and(...agendaConditions));
+  })();
 
   // ── CHATS: chats_logs ─────────────────────────────────────────────────────
   // notas_extra = nombre del closer (NO email) — resolver usando nombreFromEmails
