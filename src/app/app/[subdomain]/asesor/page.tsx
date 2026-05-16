@@ -9,6 +9,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { useUserFilter } from '@/contexts/UserFilterContext';
+import ModalConversacionChat from '@/components/dashboard/modals/ModalConversacionChat';
 import type {
   AsesorResponse,
   AsesorLeadCRM,
@@ -16,6 +17,7 @@ import type {
   AsesorChat,
   AsesorMetricaCustom,
   AsesorKpis,
+  ChatEvent,
 } from '@/types';
 import {
   Phone,
@@ -718,6 +720,22 @@ function TabVideollamadas({
 // Tab: Chats
 // ──────────────────────────────────────────────────────────────────────────────
 
+function chatMessagesToEvents(chat: AsesorChat): ChatEvent[] {
+  return chat.messages.map((m, i) => ({
+    id: `${chat.chatId}-${i}`,
+    leadId: chat.chatId,
+    advisorId: '',
+    datetime: m.timestamp,
+    assigned: false,
+    contacted: m.role === 'agent',
+    qualified: false,
+    interested: false,
+    bought: false,
+    notes: m.role === 'agent' ? `[Asesor] ${m.message}` : m.message,
+    tags: [],
+  }));
+}
+
 function TabChats({
   kpis,
   chats,
@@ -725,7 +743,7 @@ function TabChats({
   kpis: AsesorKpis;
   chats: AsesorChat[];
 }) {
-  const t = useT();
+  const [selectedChat, setSelectedChat] = useState<AsesorChat | null>(null);
 
   // Agrupar chats por estado
   const chatsByEstado = useMemo(() => {
@@ -786,7 +804,7 @@ function TabChats({
       <section>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           Lista de chats
-          <SectionInfo text="Chats agrupados por estado." />
+          <SectionInfo text="Chats agrupados por estado. Haz click en una tarjeta para ver la conversación." />
         </h2>
         {chats.length === 0 ? (
           <div className="rounded-lg border border-surface-500 px-3 py-4 text-center text-gray-500 text-xs">
@@ -804,9 +822,11 @@ function TabChats({
                 </h3>
                 <div className="space-y-1">
                   {chatsEnEstado.map((chat) => (
-                    <div
+                    <button
                       key={chat.chatId}
-                      className="rounded-lg border border-surface-500/80 bg-surface-700/60 hover:bg-surface-700/80 p-2.5 text-xs transition-all duration-200"
+                      type="button"
+                      onClick={() => setSelectedChat(chat)}
+                      className="w-full text-left rounded-lg border border-surface-500/80 bg-surface-700/60 hover:bg-surface-700/80 hover:border-accent-cyan/30 p-2.5 text-xs transition-all duration-200 cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
@@ -816,6 +836,12 @@ function TabChats({
                           <div className="text-[10px] text-gray-500 mt-0.5">
                             {chat.leadEmail || 'Sin email'}
                           </div>
+                          {chat.asesorName && (
+                            <div className="text-[10px] text-accent-cyan/70 mt-0.5 flex items-center gap-0.5">
+                              <User className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">{chat.asesorName}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {chat.respondido ? (
@@ -843,8 +869,14 @@ function TabChats({
                             </span>
                           </>
                         )}
+                        {chat.messages.length > 0 && (
+                          <>
+                            <span>·</span>
+                            <span className="text-gray-600">{chat.messages.length} msgs</span>
+                          </>
+                        )}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -852,6 +884,15 @@ function TabChats({
           </div>
         )}
       </section>
+
+      {/* Modal de conversación */}
+      {selectedChat && (
+        <ModalConversacionChat
+          leadName={selectedChat.leadName ?? 'Sin nombre'}
+          events={chatMessagesToEvents(selectedChat)}
+          onClose={() => setSelectedChat(null)}
+        />
+      )}
     </div>
   );
 }

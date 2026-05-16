@@ -369,14 +369,22 @@ export async function getAsesorData(
     const firstLeadMsg = msgs.find((m) => m.role === "lead");
     const emailFromMsg = (firstLeadMsg as { email?: string })?.email ?? null;
 
+    const asesorName = ch.asesor_asignado ?? ch.notas_extra ?? null;
+    const messages = msgs
+      .filter((m): m is { role: string; timestamp: string; message: string } =>
+        typeof m.role === "string" && typeof m.timestamp === "string" && typeof m.message === "string"
+      );
+
     return {
       chatId: ch.chatid ?? String(ch.id_evento ?? ""),
       leadName: ch.nombre_lead ?? null,
       leadEmail: emailFromMsg ?? ch.id_lead ?? null,
+      asesorName,
       estado: ch.estado ?? "activo",
       fechaUltimoMensaje: ch.fecha_y_hora_z?.toISOString() ?? dateFrom,
       respondido,
       speedToLeadSeg: speedSeg,
+      messages,
     };
   });
 

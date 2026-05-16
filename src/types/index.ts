@@ -580,14 +580,22 @@ export interface AsesorVideollamada {
 
 // ── Canal: Chats ──────────────────────────────────────────────────────────────
 
+export interface AsesorChatMessage {
+  role: string;
+  timestamp: string;
+  message: string;
+}
+
 export interface AsesorChat {
   chatId: string;
   leadName: string | null;
   leadEmail: string | null;
+  asesorName: string | null;
   estado: string | null;
   fechaUltimoMensaje: string;
   respondido: boolean;
   speedToLeadSeg: number | null;
+  messages: AsesorChatMessage[];
 }
 
 // ── Canal: Métricas personalizadas atribuibles ────────────────────────────────
