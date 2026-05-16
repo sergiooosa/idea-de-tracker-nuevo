@@ -69,7 +69,7 @@ export default function DashboardPage() {
     meetingsBooked: 0, meetingsAttended: 0, meetingsCanceled: 0, meetingsClosed: 0,
     effectiveAppointments: 0, tasaCierre: 0, tasaAgendamiento: 0,
     revenue: 0, cashCollected: 0, avgTicket: 0, speedToLeadAvg: 0,
-    avgAttempts: 0, attemptsToFirstContactAvg: 0, noShows: 0,
+    avgAttempts: 0, attemptsToFirstContactAvg: 0, noShows: 0, pendientesAgendas: 0,
   };
   const objeciones = data?.objeciones ?? [];
   const volumeByDay = data?.volumeByDay ?? [];
@@ -373,6 +373,7 @@ export default function DashboardPage() {
               { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
               { label: 'No shows', value: kpis.noShows, color: 'amber' },
               { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
+              ...((kpis.pendientesAgendas ?? 0) > 0 ? [{ label: 'Pendientes', value: kpis.pendientesAgendas ?? 0, color: 'blue' as const, sub: 'Sin clasificar aún' }] : []),
             ].map(({ label, value, color, sub }) => (
               <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
                 <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
