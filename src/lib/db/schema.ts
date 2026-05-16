@@ -135,12 +135,21 @@ export interface MetricaBarraConfig {
   label_y?: string;
 }
 
-/** Configuración de métrica (manual, automática, fija, webhook, ads, embudo_etapa) */
+/** Campos disponibles de chats_logs para métricas tipo "chat" */
+export type ChatMetricaCampo =
+  | "total_mensajes"
+  | "mensajes_agente"
+  | "mensajes_lead"
+  | "speed_to_lead"
+  | "humano_tomo_control"
+  | "objeciones_detectadas";
+
+/** Configuración de métrica (manual, automática, fija, webhook, ads, embudo_etapa, chat) */
 export interface MetricaConfig {
   id: string;
   nombre: string;
   descripcion?: string;
-  tipo: "manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa";
+  tipo: "manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa" | "chat";
   /** Deprecated: usar paneles[] para multi-panel. Se mantiene para backward compat. */
   ubicacion?: UbicacionPanel;
   /** Lista de paneles donde aparece esta métrica. Sustituye a ubicacion. */
@@ -152,6 +161,10 @@ export interface MetricaConfig {
   webhookCampo?: string;
   /** For tipo="ads": which field from adsSummary to use (gastoTotal, impresiones, clicks, ctr, cpm, cpc, or a camposExtra key like "frequency", "unique_ctr") */
   adsCampo?: string;
+  /** For tipo="chat": which field from chats_logs to aggregate */
+  chatCampo?: ChatMetricaCampo;
+  /** For tipo="chat": how to aggregate across chats ("suma" | "promedio" | "conteo") */
+  chatAgregacion?: "suma" | "promedio" | "conteo";
   formato?: "numero" | "moneda" | "porcentaje" | "tiempo" | "decimal";
   color?: string;
   /** Tipo de visualización del KPI */
@@ -410,6 +423,7 @@ export const chatsLogs = pgTable("chats_logs", {
   // ── IA nocturna ──────────────────────────────────────────────────────────
   ia_categoria: text("ia_categoria"),
   ia_analizado_at: timestamp("ia_analizado_at", { withTimezone: true }),
+  ia_objeciones: jsonb("ia_objeciones").$type<ObjecionIA[]>(),
 });
 
 /* ------------------------------------------------------------------ */
