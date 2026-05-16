@@ -193,6 +193,7 @@ export async function getChats(
       tagsInternos: Array.isArray(r.tags_internos) ? r.tags_internos : undefined,
       minutesSinceLastLeadMsg,
       humanTookOver,
+      iaCategoria: r.ia_categoria ?? null,
     };
   });
 

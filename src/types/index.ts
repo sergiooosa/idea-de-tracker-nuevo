@@ -363,6 +363,8 @@ export interface ApiChatLead {
    * - Sin chatbot: true si hay al menos un mensaje de role="agent".
    */
   humanTookOver: boolean;
+  /** Categoría de interés detectada por la IA nocturna (ej: "precio", "producto", "soporte"). */
+  iaCategoria?: string | null;
 }
 
 export interface ChatsAdvisorMetrics {
