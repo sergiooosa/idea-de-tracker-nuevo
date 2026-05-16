@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta, metricasWebhook } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, KPI_DEFAULT_KEYS } from "@/lib/metricas-engine";
 import { eq, and, or, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
@@ -443,12 +443,31 @@ export async function getDashboard(
   };
 
   // Advisor ranking
-  // Normalizar key de asesor: email lowercase tiene prioridad, luego nombre lowercase
+  // Cargar mapa nombre_closer → email desde usuarios_dashboard para normalizar
+  // closers que llegan como texto (ej: "Miguel Puga" → "miguel@serenthys.com")
+  const usuariosRows = await db
+    .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+    .from(usuariosDashboard)
+    .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), isNotNull(usuariosDashboard.nombre_closer)));
+
+  const nombreToEmail: Record<string, string> = {};
+  for (const u of usuariosRows) {
+    if (u.nombre_closer && u.email) {
+      nombreToEmail[u.nombre_closer.trim().toLowerCase()] = u.email.trim().toLowerCase();
+    }
+  }
+
+  // Normalizar key de asesor: email lowercase > nombre→email lookup > nombre lowercase
   const normAdvisorKey = (mail?: string | null, name?: string | null) => {
     const e = mail?.trim().toLowerCase();
     if (e) return e;
-    const n = name?.trim().toLowerCase();
-    return n || "sin asignar";
+    const n = name?.trim();
+    if (n) {
+      const resolved = nombreToEmail[n.toLowerCase()];
+      if (resolved) return resolved;
+      return n.toLowerCase();
+    }
+    return "sin asignar";
   };
 
   // Construir mapa de leads generados (nuevos contactos) por asesor
@@ -466,14 +485,15 @@ export async function getDashboard(
     advisorMap[key].calls.push(c);
   }
   for (const a of filteredAgendas) {
-    // agendas no tienen email — buscar si existe un key de llamada que coincida por nombre
-    const nameNorm = (a.closer ?? "").trim().toLowerCase();
-    // Intentar emparejar con key existente por nombre (para no crear duplicado)
-    const existingKey = Object.keys(advisorMap).find(
-      (k) => k === nameNorm || advisorMap[k].calls.some(
-        (c) => (c.nombre_closer ?? "").trim().toLowerCase() === nameNorm
-      )
-    ) ?? normAdvisorKey(null, a.closer);
+    // Normalizar el closer de la agenda: si es un email úsalo directo,
+    // si es un nombre resolverlo via nombreToEmail para unificarlo con las llamadas.
+    const closerRaw = (a.closer ?? "").trim();
+    const closerKey = normAdvisorKey(
+      closerRaw.includes("@") ? closerRaw : null,
+      closerRaw.includes("@") ? null : closerRaw,
+    );
+    // Intentar emparejar con key existente (por si llegó como nombre y las llamadas son por email)
+    const existingKey = Object.keys(advisorMap).find(k => k === closerKey) ?? closerKey;
     if (!advisorMap[existingKey]) advisorMap[existingKey] = { calls: [], agendas: [] };
     advisorMap[existingKey].agendas.push(a);
   }
