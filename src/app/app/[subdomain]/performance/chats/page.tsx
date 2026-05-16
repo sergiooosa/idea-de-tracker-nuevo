@@ -8,9 +8,10 @@ import { useApiData } from '@/hooks/useApiData';
 import type { ChatsResponse, ApiChatLead } from '@/types';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Pencil, User, X, Plus } from 'lucide-react';
+import { Pencil, User, X, Plus, Sparkles } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
+import InsightsChat from '@/components/dashboard/InsightsChat';
 
 const minFmt = (s: number | null) => {
   if (s == null || s === 0) return '—';
@@ -34,6 +35,8 @@ const chatKpiTooltips = {
   contactados: { significado: 'Chats donde un asesor respondió al menos una vez.', calculo: 'Conteo de chats con agentMessages > 0 en el período.' },
   seguimientos: { significado: 'Total de mensajes en todas las conversaciones.', calculo: 'Suma de todos los mensajes del JSONB.' },
   speedToLead: { significado: 'Tiempo promedio desde primer mensaje del lead hasta primera respuesta del agente.', calculo: 'Promedio de (timestamp primer msg agente − timestamp primer msg lead).' },
+  sinRespuesta: { significado: 'Chats donde el lead esperó respuesta y aún no hubo una del agente.', calculo: 'Chats con minutesSinceLastLeadMsg > 0 (sin respuesta posterior del agente).' },
+  sinContactar: { significado: '% de chats donde ningún humano respondió al lead.', calculo: 'Chats sin humanTookOver / total × 100.' },
 };
 
 type Canal = 'todos' | 'WhatsApp' | 'FB' | 'IG' | 'SMS' | 'Custom';
@@ -59,6 +62,11 @@ function detectCanal(chat: ApiChatLead): string {
   return 'Custom';
 }
 
+/** Convierte una categoría IA cruda a label capitalizada legible */
+function categoriaLabel(cat: string): string {
+  return cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
+}
+
 export default function PerformanceChatsPage() {
   const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
@@ -69,10 +77,36 @@ export default function PerformanceChatsPage() {
   const [canalActivo, setCanalActivo] = useState<Canal>('todos');
   const [soloSinContactar, setSoloSinContactar] = useState(false);
   const [showNuevoModal, setShowNuevoModal] = useState(false);
+  const [showInsightsChat, setShowInsightsChat] = useState(false);
 
   const { data, loading, refetch } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
 
   const agg = data?.agg ?? { assigned: 0, activos: 0, seguimientosTotal: 0, speedAvg: 0 };
+
+  // KPIs adicionales calculados en el cliente
+  const extraKpis = useMemo(() => {
+    if (!data) return { sinRespuesta: 0, pctSinContactar: 0 };
+    const sinRespuesta = data.chats.filter((c) => c.minutesSinceLastLeadMsg != null && c.minutesSinceLastLeadMsg > 0).length;
+    const sinContactar = data.chats.filter((c) => !c.humanTookOver).length;
+    const pctSinContactar = data.chats.length > 0 ? Math.round((sinContactar / data.chats.length) * 100) : 0;
+    return { sinRespuesta, pctSinContactar };
+  }, [data]);
+
+  // Distribución de ia_categoria (top 6 temas de interés)
+  const categoriasDistrib = useMemo(() => {
+    if (!data) return [];
+    const counts: Record<string, number> = {};
+    for (const c of data.chats) {
+      if (c.iaCategoria) {
+        counts[c.iaCategoria] = (counts[c.iaCategoria] ?? 0) + 1;
+      }
+    }
+    const total = Object.values(counts).reduce((s, v) => s + v, 0);
+    return Object.entries(counts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 6)
+      .map(([cat, count]) => ({ cat, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }));
+  }, [data]);
 
   // Compute canal counts for badges
   const canalCounts = useMemo(() => {
@@ -98,8 +132,6 @@ export default function PerformanceChatsPage() {
     const map: Record<string, ApiChatLead[]> = {};
     const INVALID = new Set(['', 'agente', 'agent', 'bot', 'por asignar', 'workflow', 'api/bot', 'campaña', 'campaign']);
     for (const c of filteredChats) {
-      // Prioridad: asesorAsignado → agentName → 'Sin asignar'
-      // Usar || en vez de ?? para que strings vacíos también caigan al siguiente fallback
       const raw = (c.asesorAsignado?.trim() || c.agentName?.trim() || '').toLowerCase();
       const key = (!raw || INVALID.has(raw))
         ? 'Sin asignar'
@@ -131,7 +163,15 @@ export default function PerformanceChatsPage() {
         >
           <Plus className="w-3.5 h-3.5" /> Nueva entrada
         </button>
-        
+
+        <button
+          type="button"
+          onClick={() => setShowInsightsChat(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple border border-accent-purple/40 text-xs font-semibold hover:bg-accent-purple/30 transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Habla con tus datos
+        </button>
+
         <span className="text-xs text-gray-400">Rango de fechas:</span>
         <DateRangePicker
           dateFrom={dateFrom}
@@ -142,13 +182,16 @@ export default function PerformanceChatsPage() {
         />
       </div>
 
-      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+      {/* ── KPIs principales ── */}
+      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[
           { label: t.performance.chats.kpis.asignados, value: agg.assigned, color: 'cyan', tip: chatKpiTooltips.asignados },
           { label: t.performance.chats.kpis.activos, value: agg.activos, color: 'cyan', tip: chatKpiTooltips.activos },
           { label: t.performance.chats.kpis.contactados, value: agg.activos, color: 'cyan', tip: chatKpiTooltips.contactados },
           { label: t.performance.chats.kpis.mensajes, value: agg.seguimientosTotal, color: 'purple', tip: chatKpiTooltips.seguimientos },
           { label: t.performance.chats.kpis.speedToLead, value: minFmt(agg.speedAvg), color: 'purple', tip: chatKpiTooltips.speedToLead },
+          { label: 'Sin respuesta', value: extraKpis.sinRespuesta, color: 'amber', tip: chatKpiTooltips.sinRespuesta },
+          { label: '% Sin contactar', value: `${extraKpis.pctSinContactar}%`, color: 'amber', tip: chatKpiTooltips.sinContactar },
         ].map(({ label, value, color, tip }) => (
           <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
             <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 flex items-center gap-0.5">
@@ -160,6 +203,26 @@ export default function PerformanceChatsPage() {
           </div>
         ))}
       </div>
+
+      {/* ── Panel de intereses IA (ia_categoria) ── */}
+      {categoriasDistrib.length > 0 && (
+        <section className="rounded-lg border border-surface-500 p-3 bg-surface-800/50">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-accent-purple" />
+            <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Top intereses detectados por IA</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {categoriasDistrib.map(({ cat, count, pct }) => (
+              <div key={cat} className="flex items-center gap-1.5 bg-surface-700 rounded-lg px-2.5 py-1.5">
+                <span className="text-xs font-semibold text-white">{categoriaLabel(cat)}</span>
+                <span className="text-[10px] text-accent-purple font-bold">{count}</span>
+                <span className="text-[10px] text-gray-500">({pct}%)</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">Basado en análisis nocturno de la IA sobre conversaciones del período seleccionado.</p>
+        </section>
+      )}
 
       {/* ── Filtro por canal ── */}
       <div className="space-y-1.5">
@@ -277,6 +340,7 @@ export default function PerformanceChatsPage() {
                                           <th className="px-2 py-2 font-medium">Speed</th>
                                           <th className="px-2 py-2 font-medium" title="Minutos desde último mensaje del lead sin respuesta del agente">⏳ Espera</th>
                                           <th className="px-2 py-2 font-medium">Estado</th>
+                                          <th className="px-2 py-2 font-medium">Interés IA</th>
                                           <th className="px-2 py-2 font-medium w-32" />
                                         </tr>
                                       </thead>
@@ -303,6 +367,15 @@ export default function PerformanceChatsPage() {
                                               <td className="px-2 py-2 text-gray-400">{minFmt(chat.speedToLeadSeconds)}</td>
                                               <td className="px-2 py-2">{waitBadge(chat.minutesSinceLastLeadMsg)}</td>
                                               <td className="px-2 py-2 text-gray-300">{chat.estado ?? '—'}</td>
+                                              <td className="px-2 py-2">
+                                                {chat.iaCategoria ? (
+                                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent-purple/10 text-accent-purple border border-accent-purple/20 font-medium">
+                                                    {categoriaLabel(chat.iaCategoria)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-600 text-[10px]">—</span>
+                                                )}
+                                              </td>
                                               <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                                                 <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.asesorAsignado ?? chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-2"><Pencil className="w-3 h-3" /> Editar</button>
                                                 <button type="button" onClick={() => setModalConversacion(chat)} className="text-accent-cyan text-[10px] font-medium hover:underline">
@@ -375,6 +448,7 @@ export default function PerformanceChatsPage() {
         onSuccess={() => refetch()}
         tipo="chat"
       />
+      {showInsightsChat && <InsightsChat onClose={() => setShowInsightsChat(false)} />}
     </div>
   );
 }
