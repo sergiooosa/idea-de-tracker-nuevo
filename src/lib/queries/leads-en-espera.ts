@@ -48,7 +48,7 @@ export async function getLeadsEnEspera(
         lt(registrosDeLlamada.fecha_evento, umbralTs),
       ),
     )
-    .orderBy(sql`min_sin_llamar DESC`);
+    .orderBy(sql`ROUND(EXTRACT(EPOCH FROM (NOW() - ${registrosDeLlamada.fecha_evento}))/60)::int DESC`);
 
   // Agrupar por closer
   const mapaClosers = new Map<string, CloserConLeadsEnEspera>();
