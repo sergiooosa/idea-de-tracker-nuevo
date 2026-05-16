@@ -379,7 +379,7 @@ export interface ChatsResponse {
     assigned: number;
     activos: number;
     seguimientosTotal: number;
-    speedAvg: number;
+    speedAvg: number | null;
   };
   advisorMetrics: Record<string, ChatsAdvisorMetrics>;
   advisors: ApiAdvisor[];

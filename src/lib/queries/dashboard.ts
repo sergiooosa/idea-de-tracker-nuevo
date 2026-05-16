@@ -1146,15 +1146,20 @@ export async function getDashboard(
         "%",
       );
       // Speed chat — invertido
-      const chatSpeedMin = chatKpis?.speedToLeadAvg != null ? chatKpis.speedToLeadAvg / 60 : 0;
-      addAlerta(
-        "💬 Speed to lead chat",
-        chatSpeedMin,
-        metasRow.meta_speed_chat_min ? parseFloat(String(metasRow.meta_speed_chat_min)) : null,
-        "chats",
-        "min",
-        true,
-      );
+      // Solo mostrar alerta si hay datos reales (speedToLeadAvg !== null).
+      // Null significa que no hay chats con primer_msg_lead_at en el período,
+      // no que el speed sea 0.0 min — mostrar 0 sería estadísticamente engañoso.
+      const chatSpeedMin = chatKpis?.speedToLeadAvg != null ? chatKpis.speedToLeadAvg / 60 : null;
+      if (chatSpeedMin != null) {
+        addAlerta(
+          "💬 Speed to lead chat",
+          chatSpeedMin,
+          metasRow.meta_speed_chat_min ? parseFloat(String(metasRow.meta_speed_chat_min)) : null,
+          "chats",
+          "min",
+          true,
+        );
+      }
     }
   }
 

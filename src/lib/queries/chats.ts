@@ -216,7 +216,8 @@ export async function getChats(
     assigned: chatsFinal.length,
     activos: contacted.length,
     seguimientosTotal: chatsFinal.reduce((s, c) => s + c.totalMessages, 0),
-    speedAvg: speedVals.length > 0 ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length : 0,
+    // null cuando no hay timestamps reales; evita mostrar "0.0 min" engañoso (AUT-181)
+    speedAvg: speedVals.length > 0 ? speedVals.reduce((s, v) => s + v, 0) / speedVals.length : null,
   };
 
   // Normalizar key: usar asesorAsignado primero, luego agentName, nunca vacío
