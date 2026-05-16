@@ -319,8 +319,9 @@ export function computeChatMetricas(
 
   const result: Record<string, number | null> = {};
   for (const metrica of chatMetricas) {
-    if (!metrica.chatCampo) continue;
-    const values = chats.map((c) => extractChatCampoValue(c, metrica.chatCampo!));
+    const campo = metrica.chatCampo;
+    if (!campo) continue;
+    const values = chats.map((c) => extractChatCampoValue(c, campo));
     result[metrica.id] = agregarChatValues(values, metrica.chatAgregacion);
   }
   return result;
