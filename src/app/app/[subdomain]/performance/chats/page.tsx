@@ -6,9 +6,10 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import type { ChatsResponse, ApiChatLead } from '@/types';
+import type { MetricaConfig } from '@/lib/db/schema';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Pencil, User, X, Plus, Sparkles } from 'lucide-react';
+import { Pencil, User, X, Plus, Sparkles, AlertTriangle } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import InsightsChat from '@/components/dashboard/InsightsChat';
@@ -67,6 +68,28 @@ function categoriaLabel(cat: string): string {
   return cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
 }
 
+/** Formatea el valor de una métrica custom según su formato */
+function fmtMetricaValue(value: number | null, formato: MetricaConfig["formato"]): string {
+  if (value === null || value === undefined) return '—';
+  switch (formato) {
+    case 'moneda': return `$${value.toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
+    case 'porcentaje': return `${value.toFixed(1)}%`;
+    case 'tiempo': return value < 60 ? `${Math.round(value)}s` : `${(value / 60).toFixed(1)} min`;
+    case 'decimal': return value.toFixed(2);
+    default: return value.toLocaleString('es-MX', { maximumFractionDigits: 1 });
+  }
+}
+
+const OBJECION_CATEGORIA_EMOJI: Record<string, string> = {
+  precio: '💰',
+  tiempo: '⏰',
+  confianza: '🤝',
+  competencia: '⚔️',
+  necesidad: '🤔',
+  autoridad: '👔',
+  otra: '💬',
+};
+
 export default function PerformanceChatsPage() {
   const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
@@ -106,6 +129,31 @@ export default function PerformanceChatsPage() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 6)
       .map(([cat, count]) => ({ cat, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }));
+  }, [data]);
+
+  // Distribución de objeciones IA (top 8)
+  const objecionesDistrib = useMemo(() => {
+    if (!data) return [];
+    const counts: Record<string, number> = {};
+    for (const c of data.chats) {
+      if (c.iaObjeciones) {
+        for (const obj of c.iaObjeciones) {
+          const key = obj.categoria ?? 'otra';
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+      }
+    }
+    const total = Object.values(counts).reduce((s, v) => s + v, 0);
+    return Object.entries(counts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 8)
+      .map(([cat, count]) => ({ cat, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }));
+  }, [data]);
+
+  // Total de objeciones detectadas
+  const totalObjeciones = useMemo(() => {
+    if (!data) return 0;
+    return data.chats.reduce((s, c) => s + (c.iaObjeciones?.length ?? 0), 0);
   }, [data]);
 
   // Compute canal counts for badges
@@ -204,6 +252,28 @@ export default function PerformanceChatsPage() {
         ))}
       </div>
 
+      {/* ── KPIs custom tipo "chat" ── */}
+      {data?.metricasChatConfig && data.metricasChatConfig.length > 0 && data.metricasCustom && (
+        <section>
+          <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Métricas custom de chats</h3>
+          <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 sm:gap-2">
+            {data.metricasChatConfig.map((m) => {
+              const valor = data.metricasCustom?.[m.id] ?? null;
+              const colorClass = m.color ?? 'purple';
+              return (
+                <div key={m.id} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${colorClass} kpi-card-fixed`} title={m.descripcion ?? m.nombre}>
+                  <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate pr-2">{m.nombre}</p>
+                  <p className={`text-base font-bold mt-0.5 text-accent-${colorClass}`}>
+                    {fmtMetricaValue(valor, m.formato as MetricaConfig["formato"])}
+                  </p>
+                  <div className="kpi-card-spacer" />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ── Panel de intereses IA (ia_categoria) ── */}
       {categoriasDistrib.length > 0 && (
         <section className="rounded-lg border border-surface-500 p-3 bg-surface-800/50">
@@ -221,6 +291,32 @@ export default function PerformanceChatsPage() {
             ))}
           </div>
           <p className="text-[10px] text-gray-500 mt-2">Basado en análisis nocturno de la IA sobre conversaciones del período seleccionado.</p>
+        </section>
+      )}
+
+      {/* ── Panel de objeciones IA ── */}
+      {objecionesDistrib.length > 0 && (
+        <section className="rounded-lg border border-surface-500 p-3 bg-surface-800/50">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-accent-amber" />
+            <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Objeciones detectadas por IA
+            </h3>
+            <span className="ml-auto text-[10px] text-accent-amber font-bold">{totalObjeciones} total</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {objecionesDistrib.map(({ cat, count, pct }) => (
+              <div key={cat} className="flex items-center gap-1.5 bg-surface-700 rounded-lg px-2.5 py-1.5">
+                <span className="text-base leading-none">{OBJECION_CATEGORIA_EMOJI[cat] ?? '💬'}</span>
+                <span className="text-xs font-semibold text-white">{categoriaLabel(cat)}</span>
+                <span className="text-[10px] text-accent-amber font-bold">{count}</span>
+                <span className="text-[10px] text-gray-500">({pct}%)</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">
+            Objeciones agrupadas por categoría. Basadas en análisis nocturno de la IA sobre las conversaciones del período.
+          </p>
         </section>
       )}
 
@@ -341,6 +437,7 @@ export default function PerformanceChatsPage() {
                                           <th className="px-2 py-2 font-medium" title="Minutos desde último mensaje del lead sin respuesta del agente">⏳ Espera</th>
                                           <th className="px-2 py-2 font-medium">Estado</th>
                                           <th className="px-2 py-2 font-medium">Interés IA</th>
+                                          <th className="px-2 py-2 font-medium" title="Objeciones detectadas por IA">Objeciones</th>
                                           <th className="px-2 py-2 font-medium w-32" />
                                         </tr>
                                       </thead>
@@ -372,6 +469,22 @@ export default function PerformanceChatsPage() {
                                                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent-purple/10 text-accent-purple border border-accent-purple/20 font-medium">
                                                     {categoriaLabel(chat.iaCategoria)}
                                                   </span>
+                                                ) : (
+                                                  <span className="text-gray-600 text-[10px]">—</span>
+                                                )}
+                                              </td>
+                                              <td className="px-2 py-2">
+                                                {chat.iaObjeciones && chat.iaObjeciones.length > 0 ? (
+                                                  <div className="flex flex-wrap gap-0.5">
+                                                    {chat.iaObjeciones.slice(0, 2).map((obj, i) => (
+                                                      <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-accent-amber/10 text-accent-amber border border-accent-amber/20 font-medium" title={obj.objecion}>
+                                                        {OBJECION_CATEGORIA_EMOJI[obj.categoria] ?? '💬'} {categoriaLabel(obj.categoria)}
+                                                      </span>
+                                                    ))}
+                                                    {chat.iaObjeciones.length > 2 && (
+                                                      <span className="text-[10px] text-gray-500">+{chat.iaObjeciones.length - 2}</span>
+                                                    )}
+                                                  </div>
                                                 ) : (
                                                   <span className="text-gray-600 text-[10px]">—</span>
                                                 )}

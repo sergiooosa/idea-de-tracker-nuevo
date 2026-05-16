@@ -389,6 +389,8 @@ export interface ChatsResponse {
   advisors: ApiAdvisor[];
   /** Métricas custom tipo "chat" calculadas para el rango. Key = metrica id, Value = valor agregado. */
   metricasCustom?: Record<string, number | null>;
+  /** Config de las métricas tipo "chat" para renderizar nombres y formatos en el frontend. */
+  metricasChatConfig?: Array<{ id: string; nombre: string; formato?: string; color?: string; descripcion?: string }>;
 }
 
 export interface DashboardKpis {

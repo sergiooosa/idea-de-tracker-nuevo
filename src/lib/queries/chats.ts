@@ -252,12 +252,16 @@ export async function getChats(
     advisors.push({ id: name, name });
   }
 
-  const metricasCustom = computeChatMetricas(
-    parseMetricasConfig(cuentaRow?.metricas_config),
-    chatsFinal,
-  );
+  const allMetricasConfig = parseMetricasConfig(cuentaRow?.metricas_config);
+  const chatMetricasConfig = allMetricasConfig.filter((m) => m.tipo === "chat");
 
-  return { chats: chatsFinal, agg, advisorMetrics, advisors, metricasCustom };
+  const metricasCustom = computeChatMetricas(chatMetricasConfig, chatsFinal);
+
+  const metricasChatConfig = chatMetricasConfig.length > 0
+    ? chatMetricasConfig.map((m) => ({ id: m.id, nombre: m.nombre, formato: m.formato, color: m.color, descripcion: m.descripcion }))
+    : undefined;
+
+  return { chats: chatsFinal, agg, advisorMetrics, advisors, metricasCustom, metricasChatConfig };
 }
 
 // ─── Cálculo de métricas custom tipo "chat" ───────────────────────────────────
