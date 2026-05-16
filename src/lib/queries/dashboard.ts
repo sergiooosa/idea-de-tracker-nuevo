@@ -624,9 +624,21 @@ export async function getDashboard(
     email: a.advisorEmail ?? undefined,
   }));
 
+  // Normalización de categoria contra IDs del embudo (case-insensitive).
+  // El AI classifier puede guardar "cerrada" (lowercase default) pero el embudo
+  // tiene stages con ID "Cerrada" (capitalizado). Sin normalización, el frontend
+  // ve distribucionEmbudo["Cerrada"] = undefined → 0, aunque haya datos reales.
+  const embudoIdNormMap: Record<string, string> = {};
+  for (const e of embudoRaw as EmbudoEtapa[]) {
+    if (e.id) embudoIdNormMap[e.id.toLowerCase()] = e.id;
+    if (e.nombre) embudoIdNormMap[e.nombre.toLowerCase()] = e.id;
+  }
+  const normalizeCategoria = (raw: string): string =>
+    embudoIdNormMap[raw.toLowerCase()] ?? raw;
+
   const distribucionEmbudo: Record<string, number> = {};
   for (const a of filteredAgendas) {
-    const cat = a.categoria ?? "sin_categoria";
+    const cat = normalizeCategoria(a.categoria ?? "sin_categoria");
     distribucionEmbudo[cat] = (distribucionEmbudo[cat] ?? 0) + 1;
   }
 
