@@ -177,7 +177,10 @@ export async function getVideollamadas(
       )
   );
   const canceladas = uniqueCanceledLeads.size;
-  // Deduplicar no-shows por lead único (GHL puede enviar el mismo evento múltiples veces)
+  // Deduplicar no-shows por lead único. Excluir leads ya contados en canceladas para
+  // evitar double-counting: un lead con registro no_show Y cancelada (rescheduled)
+  // se cuenta solo en canceladas (estado más reciente/definitivo).
+  // Mismo criterio que /dashboard para mantener consistencia entre vistas.
   const uniqueNoShowLeads = new Set(
     registros
       .filter((r) => r.outcome === "no_show")
@@ -187,6 +190,7 @@ export async function getVideollamadas(
         r.leadEmail?.trim().toLowerCase() ||
         `nokey_${r.id}`
       )
+      .filter((key) => !uniqueCanceledLeads.has(key))
   );
   const noShows = uniqueNoShowLeads.size;
   const efectivas = registros.filter((r) => r.attended && r.qualified).length;
