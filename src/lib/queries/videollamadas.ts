@@ -199,11 +199,11 @@ export async function getVideollamadas(
   const cash = registros.reduce((s, r) => s + r.cashCollected, 0);
 
   // Leads únicos agendados: deduplicar por idcliente/email — mismo criterio que dashboard
-  // IMPORTANTE: orden de clave idéntico a noShows/canceladas para garantizar consistencia
-  // entre agendadas y el desglose (noShows + canceladas + asistidas + pendientes = agendadas).
+  // IMPORTANTE: agendadas incluye TODOS los registros (asistidos, no-shows y cancelados)
+  // para que se cumpla: agendadas = asistidas + noShows + canceladas + pendientes.
+  // Antes excluíamos cancelados aquí, lo que causaba agendadas < suma de outcomes (AUT-208).
   const uniqueBookedLeads = new Set(
     registros
-      .filter((r) => !r.canceled)
       .map((r) =>
         r.idcliente?.trim() ||
         r.ghl_contact_id?.trim() ||
