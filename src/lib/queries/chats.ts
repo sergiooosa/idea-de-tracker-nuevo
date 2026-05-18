@@ -137,11 +137,11 @@ export async function getChats(
       .where(
         and(
           eq(chatsLogs.id_cuenta, idCuenta),
-          gte(chatsLogs.fecha_y_hora_z, fromDate),
-          lte(chatsLogs.fecha_y_hora_z, toDate),
+          gte(chatsLogs.primer_msg_lead_at, fromDate),
+          lte(chatsLogs.primer_msg_lead_at, toDate),
         ),
       )
-      .orderBy(sql`${chatsLogs.fecha_y_hora_z} DESC`),
+      .orderBy(sql`${chatsLogs.primer_msg_lead_at} DESC`),
   ]);
 
   const chatConfig = cuentaRow?.configuracion_ui?.chat_config ?? {};
