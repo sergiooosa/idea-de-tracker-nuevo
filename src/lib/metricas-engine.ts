@@ -100,6 +100,32 @@ export function parseMetricasConfig(raw: unknown): MetricaConfig[] {
   return [];
 }
 
+/**
+ * Formato canónico para fuentes KPI conocidas.
+ * Previene que métricas creadas manualmente con formato incorrecto muestren valores sin formatear.
+ * Ej: speedToLeadAvg siempre debe ser "tiempo" — si alguien la guardó como "numero" mostraría
+ * el float crudo (911.2777...) en lugar de "911.3 min".
+ */
+const KPI_CANONICAL_FORMAT: Partial<Record<string, MetricaConfig["formato"]>> = {
+  speedToLeadAvg: "tiempo",
+};
+
+/**
+ * Normaliza el campo `formato` de métricas automáticas que usan fuentes KPI con formato conocido.
+ * Debe aplicarse en la capa de presentación (dashboard, videollamadas) antes de renderizar valores.
+ */
+export function normalizeMetricasConfig(configs: MetricaConfig[]): MetricaConfig[] {
+  return configs.map((m) => {
+    if (m.tipo === "automatica" && m.formula?.fuente) {
+      const canonicalFormato = KPI_CANONICAL_FORMAT[m.formula.fuente];
+      if (canonicalFormato && m.formato !== canonicalFormato) {
+        return { ...m, formato: canonicalFormato };
+      }
+    }
+    return m;
+  });
+}
+
 /** Etapas por defecto del embudo. Se usan si embudo_personalizado está vacío. */
 // Etapas que la IA puede clasificar. No Show y Cancelada las determina el SISTEMA
 // (cron y webhook de GHL), no aparecen aquí ni se muestran en el embudo.
