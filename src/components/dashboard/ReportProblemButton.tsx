@@ -68,6 +68,21 @@ export default function ReportProblemButton() {
     }
   }
 
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = Array.from(e.clipboardData.items);
+    const imageFiles = items
+      .filter((item) => item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null && f.size <= 2 * 1024 * 1024);
+
+    if (imageFiles.length === 0) return;
+
+    setImages((prev) => {
+      const combined = [...prev, ...imageFiles];
+      return combined.slice(0, 3); // max 3
+    });
+  }
+
   function handleClose() {
     if (status === "submitting") return;
     setOpen(false);
@@ -92,7 +107,10 @@ export default function ReportProblemButton() {
       </button>
 
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="bg-[#141418] border-surface-500 text-white max-w-md">
+        <DialogContent
+          className="bg-[#141418] border-surface-500 text-white max-w-md"
+          onPaste={handlePaste}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-white">
               <AlertCircle className="w-5 h-5 text-red-400" />
@@ -173,6 +191,9 @@ export default function ReportProblemButton() {
                   className="hidden"
                   onChange={handleFileChange}
                 />
+                <p className="text-xs text-gray-500">
+                  También puedes pegar imágenes con Ctrl+V / ⌘+V
+                </p>
                 {images.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-1">
                     {images.map((img, idx) => (
