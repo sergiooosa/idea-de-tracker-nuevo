@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { chatsLogs, cuentas } from "@/lib/db/schema";
-import type { ChatMessage } from "@/lib/db/schema";
+import type { ChatMessage, MetricaConfig, ChatMetricaCampo } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type {
   ApiChatLead,
@@ -8,6 +8,7 @@ import type {
   ChatsResponse,
   ApiAdvisor,
 } from "@/types";
+import { parseMetricasConfig } from "@/lib/metricas-engine";
 
 function extractAgentName(messages: ChatMessage[]): string | null {
   const agent = messages.find((m) => m.role === "agent");
@@ -114,7 +115,7 @@ export async function getChats(
 
   const [[cuentaRow], rows] = await Promise.all([
     db
-      .select({ configuracion_ui: cuentas.configuracion_ui })
+      .select({ configuracion_ui: cuentas.configuracion_ui, metricas_config: cuentas.metricas_config })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
@@ -194,6 +195,7 @@ export async function getChats(
       minutesSinceLastLeadMsg,
       humanTookOver,
       iaCategoria: r.ia_categoria ?? null,
+      iaObjeciones: Array.isArray(r.ia_objeciones) ? r.ia_objeciones as Array<{ objecion: string; categoria: string }> : null,
     };
   });
 
@@ -250,7 +252,67 @@ export async function getChats(
     advisors.push({ id: name, name });
   }
 
-  return { chats: chatsFinal, agg, advisorMetrics, advisors };
+  const allMetricasConfig = parseMetricasConfig(cuentaRow?.metricas_config);
+  const chatMetricasConfig = allMetricasConfig.filter((m) => m.tipo === "chat");
+
+  const metricasCustom = computeChatMetricas(chatMetricasConfig, chatsFinal);
+
+  const metricasChatConfig = chatMetricasConfig.length > 0
+    ? chatMetricasConfig.map((m) => ({ id: m.id, nombre: m.nombre, formato: m.formato, color: m.color, descripcion: m.descripcion }))
+    : undefined;
+
+  return { chats: chatsFinal, agg, advisorMetrics, advisors, metricasCustom, metricasChatConfig };
+}
+
+// ─── Cálculo de métricas custom tipo "chat" ───────────────────────────────────
+
+/**
+ * Extrae el valor numérico de un campo de chat para una métrica tipo "chat".
+ * @internal — exportado para tests unitarios
+ */
+export function extractChatCampoValue(chat: ApiChatLead, campo: ChatMetricaCampo): number | null {
+  switch (campo) {
+    case "total_mensajes":      return chat.totalMessages;
+    case "mensajes_agente":     return chat.agentMessages;
+    case "mensajes_lead":       return chat.leadMessages;
+    case "speed_to_lead":       return chat.speedToLeadSeconds;
+    case "humano_tomo_control": return chat.humanTookOver ? 1 : 0;
+    case "objeciones_detectadas": return chat.iaObjeciones?.length ?? 0;
+    default:                    return null;
+  }
+}
+
+/**
+ * Calcula el valor agregado de una métrica tipo "chat" sobre todos los chats del período.
+ * @internal — exportado para tests unitarios
+ */
+export function agregarChatValues(values: (number | null)[], agregacion: MetricaConfig["chatAgregacion"]): number | null {
+  const nonNull = values.filter((v): v is number => v !== null);
+  if (nonNull.length === 0) return null;
+  switch (agregacion ?? "suma") {
+    case "suma":    return nonNull.reduce((s, v) => s + v, 0);
+    case "promedio": return nonNull.reduce((s, v) => s + v, 0) / nonNull.length;
+    case "conteo":  return nonNull.filter((v) => v > 0).length;
+    default:        return nonNull.reduce((s, v) => s + v, 0);
+  }
+}
+
+/** @internal — exportado para tests unitarios */
+export function computeChatMetricas(
+  metricasConfig: MetricaConfig[],
+  chats: ApiChatLead[],
+): Record<string, number | null> | undefined {
+  const chatMetricas = metricasConfig.filter((m) => m.tipo === "chat" && m.chatCampo);
+  if (chatMetricas.length === 0) return undefined;
+
+  const result: Record<string, number | null> = {};
+  for (const metrica of chatMetricas) {
+    const campo = metrica.chatCampo;
+    if (!campo) continue;
+    const values = chats.map((c) => extractChatCampoValue(c, campo));
+    result[metrica.id] = agregarChatValues(values, metrica.chatAgregacion);
+  }
+  return result;
 }
 
 export async function updateChat(

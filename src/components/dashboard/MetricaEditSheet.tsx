@@ -7,6 +7,7 @@ import type {
   MetricaCampoConfig,
   MetricaFormulaConfig,
   MetricaManualEntry,
+  ChatMetricaCampo,
 } from "@/lib/db/schema";
 import SelectorFuenteConBusqueda from "./SelectorFuenteConBusqueda";
 
@@ -59,11 +60,26 @@ const COLORES = [
   { value: "red", label: "Rojo", css: "bg-red-500" },
 ] as const;
 
+const CHAT_CAMPOS: { value: ChatMetricaCampo; label: string; desc: string }[] = [
+  { value: "total_mensajes", label: "Total mensajes", desc: "Suma de todos los mensajes en el chat" },
+  { value: "mensajes_agente", label: "Mensajes del agente", desc: "Mensajes enviados por el agente/asesor" },
+  { value: "mensajes_lead", label: "Mensajes del lead", desc: "Mensajes enviados por el lead" },
+  { value: "speed_to_lead", label: "Speed to lead (seg)", desc: "Segundos hasta la primera respuesta del agente" },
+  { value: "humano_tomo_control", label: "Humano tomó control", desc: "1 si un humano respondió, 0 si no" },
+  { value: "objeciones_detectadas", label: "Objeciones detectadas", desc: "Cantidad de objeciones detectadas por IA" },
+];
+
+const CHAT_AGREGACIONES: { value: NonNullable<MetricaConfig["chatAgregacion"]>; label: string }[] = [
+  { value: "suma", label: "Suma (total del período)" },
+  { value: "promedio", label: "Promedio por chat" },
+  { value: "conteo", label: "Conteo de chats con valor > 0" },
+];
+
 interface MetricaEditSheetProps {
   metricasConfig: MetricaConfig[];
   metricasManualData: Record<string, MetricaManualEntry[]>;
   editingMetric: MetricaConfig | null;
-  tipoInicial: "manual" | "automatica" | "fija" | "webhook" | "ads";
+  tipoInicial: "manual" | "automatica" | "fija" | "webhook" | "ads" | "chat";
   subdominio?: string;
   dashboardsPersonalizados?: import("@/lib/db/schema").DashboardPersonalizado[];
   onClose: () => void;
@@ -89,7 +105,7 @@ export default function MetricaEditSheet({
   // paneles: selección múltiple de dónde aparece esta métrica
   const [panelesSeleccionados, setPanelesSeleccionados] = useState<string[]>(["panel_ejecutivo"]);
   const [atribuibleUsuario, setAtribuibleUsuario] = useState(false);
-  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa">(tipoInicial);
+  const [tipo, setTipo] = useState<"manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa" | "chat">(tipoInicial);
 
   const [campos, setCampos] = useState<MetricaCampoConfig[]>([]);
 
@@ -110,6 +126,8 @@ export default function MetricaEditSheet({
   const [valorFijo, setValorFijo] = useState<string>("");
   const [webhookCampo, setWebhookCampo] = useState<string>("");
   const [webhookCamposDisponibles, setWebhookCamposDisponibles] = useState<string[]>([]);
+  const [chatCampo, setChatCampo] = useState<ChatMetricaCampo>("total_mensajes");
+  const [chatAgregacion, setChatAgregacion] = useState<NonNullable<MetricaConfig["chatAgregacion"]>>("suma");
   const [formato, setFormato] = useState<MetricaConfig["formato"]>("numero");
   const [color, setColor] = useState<string>("green");
 
@@ -177,6 +195,8 @@ export default function MetricaEditSheet({
       setColor(editingMetric.color ?? "green");
       setEntradas(metricasManualData[editingMetric.id] ?? []);
       setWebhookCampo(editingMetric.webhookCampo ?? "");
+      setChatCampo(editingMetric.chatCampo ?? "total_mensajes");
+      setChatAgregacion(editingMetric.chatAgregacion ?? "suma");
     } else {
       setNombre("");
       setDescripcion("");
@@ -200,6 +220,8 @@ export default function MetricaEditSheet({
       setColor("green");
       setEntradas([]);
       setWebhookCampo("");
+      setChatCampo("total_mensajes");
+      setChatAgregacion("suma");
     }
     setNuevaEntrada({});
   }, [editingMetric, tipoInicial, metricasManualData]);
@@ -269,7 +291,13 @@ export default function MetricaEditSheet({
       orden, formato, color,
     };
 
-    if (tipo === "webhook") {
+    if (tipo === "chat") {
+      config = { ...base, tipo: "chat" as const, chatCampo, chatAgregacion };
+      onSave(config);
+      setSaving(false);
+      onClose();
+      return;
+    } else if (tipo === "webhook") {
       config = { ...base, tipo: "webhook" as const, webhookCampo: webhookCampo.trim() };
       onSave(config);
       setSaving(false);
@@ -339,21 +367,23 @@ export default function MetricaEditSheet({
 
   const canSave =
     !!nombre.trim() &&
-    (tipo === "webhook"
-      ? !!webhookCampo.trim()
-      : tipo === "fija"
-        ? true
-        : tipo === "manual"
-          ? campos.some((c) => c.nombre.trim())
-          : tipo === "automatica"
-            ? (formulaTipo === "directo"
-                ? fuente.length === 1
-                : formulaTipo === "condicion"
+    (tipo === "chat"
+      ? !!chatCampo
+      : tipo === "webhook"
+        ? !!webhookCampo.trim()
+        : tipo === "fija"
+          ? true
+          : tipo === "manual"
+            ? campos.some((c) => c.nombre.trim())
+            : tipo === "automatica"
+              ? (formulaTipo === "directo"
                   ? fuente.length === 1
-                  : formulaTipo === "division" || formulaTipo === "resta"
-                    ? fuente.length === 2
-                    : fuente.length > 0)
-            : true);
+                  : formulaTipo === "condicion"
+                    ? fuente.length === 1
+                    : formulaTipo === "division" || formulaTipo === "resta"
+                      ? fuente.length === 2
+                      : fuente.length > 0)
+              : true);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -499,6 +529,7 @@ export default function MetricaEditSheet({
                 <option value="automatica">Automática (fórmula)</option>
                 <option value="fija">Fija (valor constante)</option>
                 <option value="webhook">Webhook (dato externo via API)</option>
+                <option value="chat">Chat (datos de conversaciones)</option>
               </select>
             </div>
           )}
@@ -576,6 +607,42 @@ export default function MetricaEditSheet({
               <p className="text-[10px] text-gray-500">
                 💡 El campo <code className="bg-surface-700 px-1 rounded text-accent-cyan">fecha</code> acepta fecha (<code>2026-04-08</code>) o fecha+hora con zona horaria (<code>2026-04-08T14:30:00-05:00</code>). El sistema convierte automáticamente a UTC.
               </p>
+            </div>
+          )}
+
+          {tipo === "chat" && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-1">
+                <p className="text-white font-medium">¿Cómo funciona?</p>
+                <p>Selecciona un campo de las conversaciones de chat y cómo quieres agregar ese valor en el período seleccionado.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-accent-cyan mb-1">Campo del chat *</label>
+                <select
+                  value={chatCampo}
+                  onChange={(e) => setChatCampo(e.target.value as ChatMetricaCampo)}
+                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+                >
+                  {CHAT_CAMPOS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {CHAT_CAMPOS.find((c) => c.value === chatCampo)?.desc}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-accent-cyan mb-1">Tipo de agregación</label>
+                <select
+                  value={chatAgregacion}
+                  onChange={(e) => setChatAgregacion(e.target.value as NonNullable<MetricaConfig["chatAgregacion"]>)}
+                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+                >
+                  {CHAT_AGREGACIONES.map((a) => (
+                    <option key={a.value} value={a.value}>{a.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
 
