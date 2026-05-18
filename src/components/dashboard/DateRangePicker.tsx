@@ -64,6 +64,17 @@ export default function DateRangePicker({
   const [selecting, setSelecting] = useState<'from' | 'to'>('from');
   const ref = useRef<HTMLDivElement>(null);
 
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const activeQuickDays = (() => {
+    if (dateTo !== today) return null;
+    if (dateFrom === today) return 0;
+    const diffs = [7, 14, 30];
+    for (const d of diffs) {
+      if (dateFrom === format(subDays(new Date(), d), 'yyyy-MM-dd')) return d;
+    }
+    return null;
+  })();
+
   useEffect(() => {
     if (!open) return;
     setTempFrom(dateFrom);
@@ -184,27 +195,28 @@ export default function DateRangePicker({
   return (
     <div className="relative flex flex-wrap items-center gap-2" ref={ref}>
       <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-surface-700/80 p-1 border border-surface-500">
-        <button
-          type="button"
-          onClick={() => setQuickRange(0)}
-          className="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-surface-600 text-gray-300 hover:text-white"
-        >
-          {t.comun.hoy}
-        </button>
-        <button
-          type="button"
-          onClick={() => setQuickRange(7)}
-          className="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-surface-600 text-gray-300 hover:text-white"
-        >
-          7 {t.comun.dia}s
-        </button>
-        <button
-          type="button"
-          onClick={() => setQuickRange(30)}
-          className="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-surface-600 text-gray-300 hover:text-white"
-        >
-          30 {t.comun.dia}s
-        </button>
+        {[
+          { days: 0, label: t.comun.hoy },
+          { days: 7, label: `7 ${t.comun.dia}s` },
+          { days: 14, label: `14 ${t.comun.dia}s` },
+          { days: 30, label: `30 ${t.comun.dia}s` },
+        ].map(({ days, label }) => {
+          const isActive = activeQuickDays === days;
+          return (
+            <button
+              key={days}
+              type="button"
+              onClick={() => setQuickRange(days)}
+              className={`px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                isActive
+                  ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/50'
+                  : 'hover:bg-surface-600 text-gray-300 hover:text-white border border-transparent'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       <div className="flex items-center gap-2 rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5">
         <input
