@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { chatsLogs, cuentas } from "@/lib/db/schema";
 import type { ChatMessage, MetricaConfig, ChatMetricaCampo } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull, or } from "drizzle-orm";
 import type {
   ApiChatLead,
   ChatsAdvisorMetrics,
@@ -137,11 +137,11 @@ export async function getChats(
       .where(
         and(
           eq(chatsLogs.id_cuenta, idCuenta),
-          gte(chatsLogs.primer_msg_lead_at, fromDate),
-          lte(chatsLogs.primer_msg_lead_at, toDate),
+          gte(sql`COALESCE(${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`, fromDate),
+          lte(sql`COALESCE(${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`, toDate),
         ),
       )
-      .orderBy(sql`${chatsLogs.primer_msg_lead_at} DESC`),
+      .orderBy(sql`COALESCE(${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z}) DESC`),
   ]);
 
   const chatConfig = cuentaRow?.configuracion_ui?.chat_config ?? {};
