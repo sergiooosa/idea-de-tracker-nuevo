@@ -161,6 +161,8 @@ export async function getVideollamadas(
       reportmarketing: r.reportmarketing,
       origen: r.origen,
       tags: r.tags,
+      fathomReingestAt: r.fathom_reingest_at?.toISOString() ?? null,
+      categoriaPrevia: r.categoria_previa ?? null,
     };
   });
 

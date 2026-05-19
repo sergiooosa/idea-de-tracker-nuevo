@@ -262,6 +262,18 @@ export interface ConfiguracionAds {
   };
 }
 
+// ─── Closer merge rules ───────────────────────────────────────────────────────
+
+export interface CloserMergeRule {
+  canonical_email: string;   // email canónico (the real one)
+  canonical_nombre: string;  // nombre canónico normalizado
+  aliases: Array<{
+    email?: string;           // emails que deben mapearse a este canonical
+    nombre?: string;          // nombres que deben mapearse a este canonical
+  }>;
+  created_at: string;        // ISO timestamp
+}
+
 export const cuentas = pgTable("cuentas", {
   id_cuenta: serial("id_cuenta").primaryKey(),
   nombre_cuenta: varchar("nombre_cuenta"),
@@ -286,6 +298,8 @@ export const cuentas = pgTable("cuentas", {
   configuracion_ads: jsonb("configuracion_ads").$type<ConfiguracionAds>(),
   ghl_location_id: text("ghl_location_id"),
   locationid: text("locationid"),  // GHL location ID (campo real de la tabla)
+  // ── V8: reglas de deduplicación inteligente de closers ────────────────────
+  closer_merge_rules: jsonb("closer_merge_rules").$type<CloserMergeRule[]>().default([]),
 });
 
 /* ------------------------------------------------------------------ */
@@ -338,6 +352,9 @@ export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {
   reportmarketing: text("reportmarketing"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
   transcripcion_fathom: text("transcripcion_fathom"),
+  // AUT-270: re-ingesta Fathom — corrección de categoría
+  fathom_reingest_at: timestamp("fathom_reingest_at", { withTimezone: true }),
+  categoria_previa: varchar("categoria_previa"),
 });
 
 /* ------------------------------------------------------------------ */
@@ -615,4 +632,27 @@ export const historialAcciones = pgTable("historial_acciones", {
 }, (table) => [
   index("idx_historial_id_cuenta").on(table.id_cuenta),
   index("idx_historial_fecha").on(table.fecha_y_hora_evento),
+]);
+
+/* ------------------------------------------------------------------ */
+/*  closer_merge_suggestions — sugerencias de deduplicación de closers */
+/* ------------------------------------------------------------------ */
+
+export interface CloserMergeCandidate {
+  email?: string;
+  nombre: string;
+  conteo: number;
+}
+
+export const closerMergeSuggestions = pgTable("closer_merge_suggestions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  candidatos: jsonb("candidatos").$type<CloserMergeCandidate[]>().notNull(),
+  canonical_email: text("canonical_email"),
+  canonical_nombre: text("canonical_nombre").notNull(),
+  status: text("status").notNull().default("pending"),
+  resuelto_at: timestamp("resuelto_at", { withTimezone: true }),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_cms_cuenta_status").on(table.id_cuenta, table.status),
 ]);

@@ -330,6 +330,8 @@ export function generateVideollamadas(): VideollamadasResponse {
       reportmarketing: Math.random() > 0.7 ? faker.lorem.sentence() : null,
       origen: FUENTES[rnd(0, FUENTES.length - 1)],
       tags: Math.random() > 0.6 ? ETIQUETAS[rnd(0, ETIQUETAS.length - 1)] : null,
+      fathomReingestAt: null,
+      categoriaPrevia: null,
     };
   });
 

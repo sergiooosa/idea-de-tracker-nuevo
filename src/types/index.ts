@@ -228,6 +228,10 @@ export interface ApiVideollamada {
   reportmarketing: string | null;
   origen: string | null;
   tags: string | null;
+  /** AUT-270: timestamp de la última re-ingesta de Fathom que cambió la categoría (null si no hubo) */
+  fathomReingestAt: string | null;
+  /** AUT-270: categoría anterior antes de la corrección de Fathom */
+  categoriaPrevia: string | null;
 }
 
 export interface VideollamadasAdvisorMetrics {
