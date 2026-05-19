@@ -5,6 +5,8 @@ import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import type { ChatsResponse, ApiChatLead } from '@/types';
 import type { MetricaConfig } from '@/lib/db/schema';
 import { format, subDays } from 'date-fns';
@@ -92,6 +94,9 @@ const OBJECION_CATEGORIA_EMOJI: Record<string, string> = {
 
 export default function PerformanceChatsPage() {
   const t = useT();
+  const pathname = usePathname();
+  // Ruta base del panel asesor — permite navegar directo al detalle de un agente
+  const asesorBasePath = pathname.replace('/performance/chats', '/asesor');
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 14), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedAdvisorId, setExpandedAdvisorId] = useState<string | null>(null);
@@ -386,12 +391,13 @@ export default function PerformanceChatsPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
-                    <th className="px-2 py-2 font-medium w-6" />
+                    <th className="px-2 py-2 font-medium w-6" title="Expandir chats del agente" />
                     <th className="px-2 py-2 font-medium">Agente</th>
                     <th className="px-2 py-2 font-medium">Asignados</th>
                     <th className="px-2 py-2 font-medium">Activos</th>
                     <th className="px-2 py-2 font-medium">Mensajes</th>
                     <th className="px-2 py-2 font-medium">Speed to lead</th>
+                    <th className="px-2 py-2 font-medium w-24" title="Ver detalle completo del asesor" />
                   </tr>
                 </thead>
                 <tbody>
@@ -402,11 +408,23 @@ export default function PerformanceChatsPage() {
                       const agentActivos = agentChats.filter((c) => c.humanTookOver).length;
                       const agentSpeeds = agentChats.filter((c) => c.speedToLeadSeconds != null).map((c) => c.speedToLeadSeconds!);
                       const agentSpeedAvg = agentSpeeds.length > 0 ? agentSpeeds.reduce((s, v) => s + v, 0) / agentSpeeds.length : null;
+                      // Buscar email del agente en data.advisors para link directo al panel asesor
+                      const advisorEmail = data?.advisors?.find(
+                        (a) => a.name === agentKey || a.email === agentKey
+                      )?.email ?? null;
+                      const asesorLink = advisorEmail && agentKey !== 'Sin asignar'
+                        ? `${asesorBasePath}?advisor=${encodeURIComponent(advisorEmail)}`
+                        : null;
+
                       return (
                         <Fragment key={agentKey}>
                           <tr className="border-t border-surface-500 hover:bg-surface-700/50 cursor-pointer" onClick={() => setExpandedAdvisorId(isExpanded ? null : agentKey)}>
                             <td className="px-1 py-2 text-gray-400">
-                              <span className="inline-block transition-transform" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>˅</span>
+                              <span
+                                className="inline-block transition-transform text-gray-500"
+                                style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}
+                                title={isExpanded ? 'Colapsar chats' : 'Expandir chats de este agente'}
+                              >˅</span>
                             </td>
                             <td className="px-2 py-2">
                               <span className="flex items-center gap-1.5 text-white font-medium">
@@ -418,10 +436,24 @@ export default function PerformanceChatsPage() {
                             <td className="px-2 py-2 text-accent-cyan">{agentActivos}</td>
                             <td className="px-2 py-2 text-accent-purple">{agentChats.reduce((s, c) => s + c.totalMessages, 0)}</td>
                             <td className="px-2 py-2 text-gray-300">{minFmt(agentSpeedAvg)}</td>
+                            <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                              {asesorLink ? (
+                                <Link
+                                  href={asesorLink}
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/10 transition-colors whitespace-nowrap"
+                                  title={`Ver panel completo de ${agentKey}: leads, pipeline, metas`}
+                                >
+                                  <User className="w-3 h-3" />
+                                  Ver asesor →
+                                </Link>
+                              ) : (
+                                <span className="text-[10px] text-gray-600">—</span>
+                              )}
+                            </td>
                           </tr>
                           {isExpanded && (
                             <tr className="bg-surface-800/90">
-                              <td colSpan={8} className="p-0">
+                              <td colSpan={7} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
                                   <div className="text-[10px] text-gray-400 mb-1.5">Chats de {agentKey}</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[360px] overflow-y-auto">

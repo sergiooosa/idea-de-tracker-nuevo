@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useT } from '@/contexts/LocaleContext';
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -792,6 +792,38 @@ function chatMessagesToEvents(chat: AsesorChat): ChatEvent[] {
   }));
 }
 
+// Configuración visual de estados de chat — define colores, iconos y descripciones accionables
+const CHAT_ESTADO_CONFIG: Record<string, {
+  icon: string;
+  label: string;
+  badgeClass: string;
+  description?: string;
+}> = {
+  sin_estado: {
+    icon: '⏳',
+    label: 'Sin analizar (IA pendiente)',
+    badgeClass: 'bg-amber-500/10 border border-amber-500/30 text-amber-400',
+    description: 'El análisis nocturno de IA aún no procesó estos chats. Se actualizarán automáticamente en el siguiente ciclo.',
+  },
+  interesado: { icon: '⭐', label: 'Interesado', badgeClass: 'bg-blue-500/10 border border-blue-500/30 text-blue-400' },
+  calificado: { icon: '✅', label: 'Calificado', badgeClass: 'bg-green-500/10 border border-green-500/30 text-green-400' },
+  cerrado: { icon: '🏆', label: 'Cerrado', badgeClass: 'bg-green-500/10 border border-green-500/30 text-green-400' },
+  no_interesado: { icon: '❌', label: 'No interesado', badgeClass: 'bg-red-500/10 border border-red-500/30 text-red-400' },
+  seguimiento: { icon: '🔄', label: 'Seguimiento', badgeClass: 'bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan' },
+  no_calificado: { icon: '🚫', label: 'No calificado', badgeClass: 'bg-red-500/10 border border-red-500/30 text-red-400' },
+  pendiente: { icon: '⏸️', label: 'Pendiente', badgeClass: 'bg-gray-500/10 border border-gray-500/30 text-gray-400' },
+  nutricion: { icon: '🌱', label: 'Nutrición', badgeClass: 'bg-purple-500/10 border border-purple-500/30 text-purple-400' },
+};
+
+function getChatEstadoConfig(estado: string) {
+  const key = estado.toLowerCase().replace(/\s+/g, '_');
+  return CHAT_ESTADO_CONFIG[key] ?? {
+    icon: '💬',
+    label: estado.charAt(0).toUpperCase() + estado.slice(1).replace(/_/g, ' '),
+    badgeClass: 'bg-surface-600/50 border border-surface-500 text-gray-300',
+  };
+}
+
 function TabChats({
   kpis,
   chats,
@@ -868,14 +900,24 @@ function TabChats({
           </div>
         ) : (
           <div className="space-y-2">
-            {Object.entries(chatsByEstado).map(([estado, chatsEnEstado]) => (
+            {Object.entries(chatsByEstado).map(([estado, chatsEnEstado]) => {
+              const estadoConfig = getChatEstadoConfig(estado);
+              return (
               <div key={estado} className="space-y-1.5">
-                <h3 className="text-xs font-medium text-gray-400 px-2 py-1">
-                  <span className="inline-block px-1.5 py-0.5 rounded-full bg-accent-cyan/10 border border-accent-cyan/20 text-accent-cyan text-[10px] mr-2">
-                    {chatsEnEstado.length}
-                  </span>
-                  {estado}
-                </h3>
+                <div className="px-2 py-1.5 flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${estadoConfig.badgeClass}`}>
+                      <span>{estadoConfig.icon}</span>
+                      <span>{estadoConfig.label}</span>
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-surface-600 border border-surface-500 text-gray-400 text-[10px] font-medium">
+                      {chatsEnEstado.length} chat{chatsEnEstado.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {estadoConfig.description && (
+                    <p className="text-[9px] text-gray-500 leading-relaxed pl-0.5">{estadoConfig.description}</p>
+                  )}
+                </div>
                 <div className="space-y-1">
                   {chatsEnEstado.map((chat) => (
                     <button
@@ -936,7 +978,8 @@ function TabChats({
                   ))}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -1009,6 +1052,30 @@ function TabPersonalizadas({
 // ──────────────────────────────────────────────────────────────────────────────
 // Página principal
 // ──────────────────────────────────────────────────────────────────────────────
+
+// Subcomponente que lee el parámetro ?advisor= de la URL y pre-selecciona el asesor.
+// Debe estar en Suspense porque useSearchParams lo requiere en Next.js 13+.
+function AdvisorUrlSync({
+  canViewAll,
+  sessionLoading,
+  asesorSeleccionado,
+  setAsesorSeleccionado,
+}: {
+  canViewAll: boolean;
+  sessionLoading: boolean;
+  asesorSeleccionado: string;
+  setAsesorSeleccionado: (val: string) => void;
+}) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const advisorParam = searchParams.get('advisor');
+    if (advisorParam && canViewAll && !asesorSeleccionado) {
+      setAsesorSeleccionado(advisorParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewAll, sessionLoading]);
+  return null;
+}
 
 const defaultTo = new Date();
 const defaultFrom = subDays(defaultTo, 7);
@@ -1092,6 +1159,15 @@ export default function AsesorPage() {
 
   return (
     <>
+      {/* Sincronización silenciosa del asesor desde URL — requiere Suspense */}
+      <Suspense fallback={null}>
+        <AdvisorUrlSync
+          canViewAll={canViewAll}
+          sessionLoading={sessionLoading}
+          asesorSeleccionado={asesorSeleccionado}
+          setAsesorSeleccionado={setAsesorSeleccionado}
+        />
+      </Suspense>
       <PageHeader
         title={t.asesor.titulo}
         subtitle="Métricas y leads del asesor"
