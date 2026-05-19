@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS } from "@/lib/metricas-engine";
-import { eq, and, or, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
+import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import type {
   DashboardKpis,
   DashboardAdvisorRow,
@@ -128,11 +128,23 @@ export async function getDashboard(
     : qualifiedSet;
 
   const fechaFilter = or(
+    // Caso 1: fecha_reunion conocida y dentro del rango (cita histórica o actual)
     and(
       isNotNull(resumenesDiariosAgendas.fecha_reunion),
       gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
       lte(resumenesDiariosAgendas.fecha_reunion, toDate),
     ),
+    // Caso 2: PDTE con fecha_reunion futura — insertada en el rango seleccionado.
+    // Una cita pendiente es prospectiva por naturaleza; excluirla por ser futura
+    // hace que el dashboard muestre 0 pendientes cuando el agendamiento acaba de ocurrir.
+    and(
+      eq(resumenesDiariosAgendas.categoria, 'PDTE'),
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gt(resumenesDiariosAgendas.fecha_reunion, sql`NOW()`),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+    // Caso 3: sin fecha_reunion → usa fecha de inserción
     and(
       isNull(resumenesDiariosAgendas.fecha_reunion),
       gte(resumenesDiariosAgendas.fecha, dateFrom),
@@ -827,6 +839,13 @@ export async function getDashboard(
                   isNotNull(resumenesDiariosAgendas.fecha_reunion),
                   gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
                   lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+                ),
+                and(
+                  eq(resumenesDiariosAgendas.categoria, 'PDTE'),
+                  isNotNull(resumenesDiariosAgendas.fecha_reunion),
+                  gt(resumenesDiariosAgendas.fecha_reunion, sql`NOW()`),
+                  gte(resumenesDiariosAgendas.fecha, dateFrom),
+                  lte(resumenesDiariosAgendas.fecha, dateTo),
                 ),
                 and(
                   isNull(resumenesDiariosAgendas.fecha_reunion),
