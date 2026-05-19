@@ -15,6 +15,7 @@ import { Pencil, User, X, Plus, Sparkles, AlertTriangle } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import InsightsChat from '@/components/dashboard/InsightsChat';
+import { useUserFilter } from '@/contexts/UserFilterContext';
 
 const minFmt = (s: number | null) => {
   if (s == null || s === 0) return '—';
@@ -107,7 +108,19 @@ export default function PerformanceChatsPage() {
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [showInsightsChat, setShowInsightsChat] = useState(false);
 
+  const { asesores: asesoresCtx } = useUserFilter();
   const { data, loading, refetch } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
+
+  // Mapa nombre → email usando asesores del contexto (tienen email real)
+  const nameToEmail = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of asesoresCtx) {
+      const email = a.email ?? a.id;
+      if (a.name) map[a.name.toLowerCase()] = email;
+      if (email) map[email.toLowerCase()] = email;
+    }
+    return map;
+  }, [asesoresCtx]);
 
   const agg = data?.agg ?? { assigned: 0, activos: 0, seguimientosTotal: 0, speedAvg: 0 };
 
@@ -408,11 +421,14 @@ export default function PerformanceChatsPage() {
                       const agentActivos = agentChats.filter((c) => c.humanTookOver).length;
                       const agentSpeeds = agentChats.filter((c) => c.speedToLeadSeconds != null).map((c) => c.speedToLeadSeconds!);
                       const agentSpeedAvg = agentSpeeds.length > 0 ? agentSpeeds.reduce((s, v) => s + v, 0) / agentSpeeds.length : null;
-                      // Buscar email del agente en data.advisors para link directo al panel asesor
-                      const advisorEmail = data?.advisors?.find(
-                        (a) => a.name === agentKey || a.email === agentKey
-                      )?.email ?? null;
-                      const asesorLink = advisorEmail && agentKey !== 'Sin asignar'
+                      // Resolver email del agente: primero buscar en asesores del contexto (tienen email real),
+                      // luego en data.advisors como fallback
+                      const advisorEmail = agentKey !== 'Sin asignar'
+                        ? (nameToEmail[agentKey.toLowerCase()]
+                          ?? data?.advisors?.find((a) => a.name === agentKey || a.email === agentKey)?.email
+                          ?? null)
+                        : null;
+                      const asesorLink = advisorEmail
                         ? `${asesorBasePath}?advisor=${encodeURIComponent(advisorEmail)}`
                         : null;
 

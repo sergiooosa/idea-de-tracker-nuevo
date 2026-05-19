@@ -941,7 +941,16 @@ function TabChats({
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {(() => {
+                            const cfg = getChatEstadoConfig(chat.estado || 'sin_estado');
+                            return (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium whitespace-nowrap ${cfg.badgeClass}`}>
+                                <span>{cfg.icon}</span>
+                                <span>{cfg.label}</span>
+                              </span>
+                            );
+                          })()}
                           {chat.respondido ? (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-accent-green/10 border border-accent-green/30 text-accent-green text-[9px] font-medium whitespace-nowrap">
                               ✓ Respondido
