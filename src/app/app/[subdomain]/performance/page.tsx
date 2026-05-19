@@ -7,9 +7,10 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
 import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripcionIA';
 import { useApiData } from '@/hooks/useApiData';
-import { format, subDays } from 'date-fns';
+import { format, subDays, formatDistanceToNow, isAfter, subDays as subDaysDate } from 'date-fns';
+import { es } from 'date-fns/locale';
 import Link from 'next/link';
-import { Pencil, Search, User, X, Plus } from 'lucide-react';
+import { Pencil, Search, User, X, Plus, RefreshCw } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
@@ -359,6 +360,8 @@ export default function PerformanceVideollamadasPage() {
                                         {(leadsByAdvisor[advisorKey] ?? []).map((lead) => {
                                           const last = lead.meetings[lead.meetings.length - 1];
                                           const outcomeLabel = last ? outcomeVideollamadaToSpanish(last.outcome) : '—';
+                                          const reingestDate = last?.fathomReingestAt ? new Date(last.fathomReingestAt) : null;
+                                          const showReingestBadge = reingestDate !== null && isAfter(reingestDate, subDaysDate(new Date(), 7));
                                           return (
                                             <tr
                                               key={lead.leadKey}
@@ -379,7 +382,36 @@ export default function PerformanceVideollamadasPage() {
                                               </td>
                                               <td className="px-2 py-2 text-gray-400">{lead.email ?? '—'}</td>
                                               <td className="px-2 py-2 text-accent-cyan">{lead.meetings.length}</td>
-                                              <td className="px-2 py-2 text-gray-300">{outcomeLabel}</td>
+                                              <td className="px-2 py-2 text-gray-300">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <span>{outcomeLabel}</span>
+                                                  {showReingestBadge && reingestDate && (
+                                                    <span className="relative group/reingest" onClick={(e) => e.stopPropagation()}>
+                                                      <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-1.5 py-0.5 rounded-md cursor-help select-none">
+                                                        <RefreshCw className="w-3 h-3" />
+                                                        Actualizado
+                                                      </span>
+                                                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-gray-900 border border-gray-700 text-gray-200 text-xs rounded-lg p-3 hidden group-hover/reingest:block z-20 shadow-xl pointer-events-none">
+                                                        <p className="font-medium text-white mb-1">
+                                                          Fathom actualizó este registro{' '}
+                                                          {formatDistanceToNow(reingestDate, { addSuffix: true, locale: es })}
+                                                        </p>
+                                                        {last.categoriaPrevia && (
+                                                          <p className="text-gray-400 mb-0.5">
+                                                            Categoría anterior: <span className="text-gray-200">{last.categoriaPrevia}</span>
+                                                          </p>
+                                                        )}
+                                                        <p className="text-gray-400 mb-2">
+                                                          Categoría actual: <span className="text-gray-200">{last.categoria}</span>
+                                                        </p>
+                                                        <p className="text-gray-500 leading-snug">
+                                                          Fathom envió una corrección automática al confirmar la asistencia de este lead.
+                                                        </p>
+                                                      </div>
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </td>
                                             </tr>
                                           );
                                         })}
