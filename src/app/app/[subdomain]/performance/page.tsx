@@ -67,6 +67,7 @@ export default function PerformanceVideollamadasPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [leadSearch, setLeadSearch] = useState('');
   const [showNuevoModal, setShowNuevoModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'todas' | 'cerradas' | 'no_cerradas' | 'no_calificadas'>('todas');
 
   const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
@@ -79,24 +80,35 @@ export default function PerformanceVideollamadasPage() {
 
   const agg = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
 
+  const isCerrada = (r: ApiVideollamada) =>
+    r.outcome === 'cerrada' || r.outcome === 'cerrado' || r.outcome === 'closed';
+
   const registrosFiltrados = useMemo(() => {
     if (!data?.registros) return [];
+    let records = data.registros;
+    // Search filter
     const q = leadSearch.trim();
-    if (!q) return data.registros;
-    return data.registros.filter((r) =>
-      matchesLeadSearch(q, [
-        r.leadName,
-        r.leadEmail,
-        r.idcliente,
-        r.ghl_contact_id,
-        r.tags,
-        r.origen,
-        String(r.id),
-        r.closer,
-        r.resumenIa,
-      ]),
-    );
-  }, [data?.registros, leadSearch]);
+    if (q) {
+      records = records.filter((r) =>
+        matchesLeadSearch(q, [
+          r.leadName,
+          r.leadEmail,
+          r.idcliente,
+          r.ghl_contact_id,
+          r.tags,
+          r.origen,
+          String(r.id),
+          r.closer,
+          r.resumenIa,
+        ]),
+      );
+    }
+    // Status filter (applies to list view only — KPI totals are server-side and unaffected)
+    if (statusFilter === 'cerradas') records = records.filter(isCerrada);
+    else if (statusFilter === 'no_cerradas') records = records.filter((r) => r.attended && !isCerrada(r));
+    else if (statusFilter === 'no_calificadas') records = records.filter((r) => r.attended && !r.qualified);
+    return records;
+  }, [data?.registros, leadSearch, statusFilter]);
 
   const meetingsByAdvisor = useMemo(() => {
     const map: Record<string, ApiVideollamada[]> = {};
@@ -201,6 +213,33 @@ export default function PerformanceVideollamadasPage() {
         selected={selectedTags}
         onChange={setSelectedTags}
       />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider">Filtrar lista:</span>
+        {([
+          { id: 'todas', label: 'Todas' },
+          { id: 'cerradas', label: 'Cerradas' },
+          { id: 'no_cerradas', label: 'No cerradas' },
+          { id: 'no_calificadas', label: 'No calificadas' },
+        ] as const).map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => setStatusFilter(opt.id)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+              statusFilter === opt.id
+                ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple'
+                : 'bg-surface-700 border-surface-500 text-gray-400 hover:border-accent-purple/30 hover:text-gray-300'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {statusFilter !== 'todas' && (
+          <span className="text-[10px] text-gray-500">
+            — {registrosFiltrados.length} reunión{registrosFiltrados.length !== 1 ? 'es' : ''} · los KPIs de arriba no cambian
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[

@@ -583,6 +583,19 @@ function VideoCard({ video }: { video: AsesorVideollamada }) {
   );
 }
 
+const CLOSED_CATS = new Set(["cerrada", "cerrado", "closed"]);
+const EXCLUDED_CATS_VIDEO = new Set(["cancelada", "no_show", "noshow", "pdte", "pendiente"]);
+const NO_CALIFICADA_CATS = new Set(["no_calificada", "no_ofertada", "no ofertada"]);
+
+type VideoStatusFilter = 'todas' | 'cerradas' | 'no_cerradas' | 'no_calificadas';
+
+const VIDEO_STATUS_OPTIONS: Array<{ id: VideoStatusFilter; label: string }> = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'cerradas', label: 'Cerradas' },
+  { id: 'no_cerradas', label: 'No cerradas' },
+  { id: 'no_calificadas', label: 'No calificadas' },
+];
+
 function TabVideollamadas({
   kpis,
   videollamadas,
@@ -593,28 +606,45 @@ function TabVideollamadas({
   embudoEtapas: Array<{ id: string; nombre: string; color: string }>;
 }) {
   const t = useT();
+  const [statusFilter, setStatusFilter] = useState<VideoStatusFilter>('todas');
 
   // IDs de etapas cerradas y asistidas (no excluidas)
   const closedIds = useMemo(() => new Set(
     embudoEtapas.filter((e) => (e as { es_cerrada?: boolean }).es_cerrada).map((e) => e.id)
   ), [embudoEtapas]);
 
-  const EXCLUDED_CATS = new Set(["cancelada", "no_show", "noshow", "pdte", "pendiente"]);
+  const isCerradaVideo = (v: AsesorVideollamada) =>
+    closedIds.has(v.categoria) || CLOSED_CATS.has(v.categoria.toLowerCase());
+
+  // Filtro de estado aplicado sobre el array de videollamadas (no afecta KPIs ni agrupación de etapas)
+  const videollamadasFiltradas = useMemo(() => {
+    if (statusFilter === 'todas') return videollamadas;
+    return videollamadas.filter((v) => {
+      const cat = v.categoria.toLowerCase();
+      const isExcluded = EXCLUDED_CATS_VIDEO.has(cat);
+      const isCerrada = isCerradaVideo(v);
+      if (statusFilter === 'cerradas') return isCerrada;
+      if (statusFilter === 'no_cerradas') return !isExcluded && !isCerrada;
+      if (statusFilter === 'no_calificadas') return !isExcluded && !isCerrada && NO_CALIFICADA_CATS.has(cat);
+      return true;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videollamadas, statusFilter, closedIds]);
 
   // Agrupar videollamadas por categoría (etapa del embudo)
   const videosByEtapa = useMemo(() => {
     const map: Record<string, AsesorVideollamada[]> = {};
     for (const etapa of embudoEtapas) {
-      map[etapa.id] = videollamadas.filter((v) => v.categoria === etapa.id);
+      map[etapa.id] = videollamadasFiltradas.filter((v) => v.categoria === etapa.id);
     }
     // Columna virtual: asistidos no cerrados
     // = leads que asistieron (categoria no es cancelada/no_show/pdte) pero tampoco están en etapa cerrada
-    map["__asistido_no_cerrado__"] = videollamadas.filter((v) => {
+    map["__asistido_no_cerrado__"] = videollamadasFiltradas.filter((v) => {
       const cat = v.categoria.toLowerCase();
-      return !EXCLUDED_CATS.has(cat) && !closedIds.has(cat);
+      return !EXCLUDED_CATS_VIDEO.has(cat) && !closedIds.has(cat);
     });
     return map;
-  }, [videollamadas, embudoEtapas, closedIds]);
+  }, [videollamadasFiltradas, embudoEtapas, closedIds]);
 
   // Filtrar solo etapas con videollamadas + columna virtual si tiene contenido
   const etapasConVideos = useMemo(() => {
@@ -677,9 +707,35 @@ function TabVideollamadas({
           Pipeline de videollamadas
           <SectionInfo text="Videollamadas agrupadas por etapa del embudo." />
         </h2>
+        {/* Filtros de estado */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+          {VIDEO_STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setStatusFilter(opt.id)}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                statusFilter === opt.id
+                  ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple'
+                  : 'bg-surface-700 border-surface-500 text-gray-400 hover:border-accent-purple/30 hover:text-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {statusFilter !== 'todas' && (
+            <span className="text-[10px] text-gray-500">
+              — {videollamadasFiltradas.length} de {videollamadas.length}
+            </span>
+          )}
+        </div>
         {videollamadas.length === 0 ? (
           <div className="rounded-lg border border-surface-500 px-3 py-4 text-center text-gray-500 text-xs">
             No hay videollamadas en el rango seleccionado.
+          </div>
+        ) : videollamadasFiltradas.length === 0 ? (
+          <div className="rounded-lg border border-surface-500 px-3 py-4 text-center text-gray-500 text-xs">
+            Ninguna videollamada coincide con el filtro seleccionado.
           </div>
         ) : (
           <div className="overflow-x-auto pb-2">
