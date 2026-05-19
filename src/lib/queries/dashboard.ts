@@ -127,12 +127,23 @@ export async function getDashboard(
     ? new Set([...qualifiedSet, ...closedSet])
     : qualifiedSet;
 
+  // PDTEs (citas futuras pendientes) se muestran siempre si fecha_reunion >= NOW(),
+  // independientemente del rango de fecha del dashboard.
+  // Razón: PDTE es un dato prospectivo; filtrarlo por rango histórico oculta citas reales.
   const fechaFilter = or(
+    // PDTE con fecha_reunion en el futuro → siempre visible
+    and(
+      eq(resumenesDiariosAgendas.categoria, "PDTE"),
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, sql`NOW()`),
+    ),
+    // Registros con fecha_reunion → filtrar por rango
     and(
       isNotNull(resumenesDiariosAgendas.fecha_reunion),
       gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
       lte(resumenesDiariosAgendas.fecha_reunion, toDate),
     ),
+    // Registros sin fecha_reunion → filtrar por fecha de inserción
     and(
       isNull(resumenesDiariosAgendas.fecha_reunion),
       gte(resumenesDiariosAgendas.fecha, dateFrom),
