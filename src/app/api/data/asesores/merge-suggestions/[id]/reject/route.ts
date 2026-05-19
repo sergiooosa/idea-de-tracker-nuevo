@@ -36,7 +36,7 @@ export async function POST(
     await db
       .update(closerMergeSuggestions)
       .set({ status: "rejected", resuelto_at: new Date() })
-      .where(eq(closerMergeSuggestions.id, id));
+      .where(and(eq(closerMergeSuggestions.id, id), eq(closerMergeSuggestions.id_cuenta, idCuenta)));
 
     return NextResponse.json({ ok: true });
   });

@@ -1128,12 +1128,11 @@ export default function AsesorPage() {
     '/api/data/asesores/merge-suggestions',
     { status: 'pending' },
   );
-  // Sync suggestions from API into local state (allows optimistic removal)
-  const [suggestionsSynced, setSuggestionsSynced] = useState(false);
-  if (suggestionsData && !suggestionsSynced) {
-    setMergeSuggestions(suggestionsData);
-    setSuggestionsSynced(true);
-  }
+  // Sync suggestions from API into local state; useEffect allows re-sync on revalidation
+  // while handleSuggestionResolved still provides optimistic removal between fetches
+  useEffect(() => {
+    if (suggestionsData) setMergeSuggestions(suggestionsData);
+  }, [suggestionsData]);
 
   const handleSuggestionResolved = (id: string) => {
     setMergeSuggestions((prev) => prev.filter((s) => s.id !== id));

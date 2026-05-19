@@ -125,7 +125,7 @@ export async function POST(
         canonical_email: toEmail,
         resuelto_at: new Date(),
       })
-      .where(eq(closerMergeSuggestions.id, id));
+      .where(and(eq(closerMergeSuggestions.id, id), eq(closerMergeSuggestions.id_cuenta, idCuenta)));
 
     return NextResponse.json({
       ok: true,
