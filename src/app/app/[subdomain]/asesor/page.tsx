@@ -10,6 +10,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { useUserFilter } from '@/contexts/UserFilterContext';
 import ModalConversacionChat from '@/components/dashboard/modals/ModalConversacionChat';
+import MergeSuggestionsModal, { type MergeSuggestion } from '@/components/asesores/MergeSuggestionsModal';
 import type {
   AsesorResponse,
   AsesorLeadCRM,
@@ -34,6 +35,7 @@ import {
   Search,
   HelpCircle,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
@@ -1119,6 +1121,24 @@ export default function AsesorPage() {
 
   const { data, loading } = useApiData<AsesorResponse>('/api/data/asesor', apiParams);
 
+  // Merge suggestions — only load when user can configure system (admin)
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeSuggestions, setMergeSuggestions] = useState<MergeSuggestion[]>([]);
+  const { data: suggestionsData } = useApiData<MergeSuggestion[]>(
+    '/api/data/asesores/merge-suggestions',
+    { status: 'pending' },
+  );
+  // Sync suggestions from API into local state (allows optimistic removal)
+  const [suggestionsSynced, setSuggestionsSynced] = useState(false);
+  if (suggestionsData && !suggestionsSynced) {
+    setMergeSuggestions(suggestionsData);
+    setSuggestionsSynced(true);
+  }
+
+  const handleSuggestionResolved = (id: string) => {
+    setMergeSuggestions((prev) => prev.filter((s) => s.id !== id));
+  };
+
   const kpis = data?.kpis ?? {
     leadsAsignados: 0,
     llamadasRealizadas: 0,
@@ -1193,6 +1213,39 @@ export default function AsesorPage() {
           </div>
         }
       />
+      {/* Merge suggestions banner */}
+      {mergeSuggestions.length > 0 && (
+        <div className="mx-3 md:mx-4 mt-3 rounded-lg border border-accent-amber/40 bg-accent-amber/5 px-3 py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-accent-amber shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-amber-200">
+                Asesores duplicados detectados
+              </p>
+              <p className="text-[11px] text-amber-300/70 mt-0.5">
+                Encontramos {mergeSuggestions.length} posible{mergeSuggestions.length !== 1 ? 's' : ''} duplicado{mergeSuggestions.length !== 1 ? 's' : ''}.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowMergeModal(true)}
+            className="shrink-0 text-xs font-medium text-accent-amber border border-accent-amber/40 rounded-lg px-2.5 py-1 hover:bg-accent-amber/10 transition-colors"
+          >
+            Revisar
+          </button>
+        </div>
+      )}
+
+      {/* Merge suggestions modal */}
+      {showMergeModal && mergeSuggestions.length > 0 && (
+        <MergeSuggestionsModal
+          suggestions={mergeSuggestions}
+          onClose={() => setShowMergeModal(false)}
+          onSuggestionResolved={handleSuggestionResolved}
+        />
+      )}
+
       <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
         {/* Date Range Picker */}
         <section className="flex flex-wrap items-center gap-2">
