@@ -12,6 +12,7 @@ import {
   boolean,
   uniqueIndex,
   index,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -642,7 +643,7 @@ export interface CloserMergeCandidate {
 }
 
 export const closerMergeSuggestions = pgTable("closer_merge_suggestions", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: uuid("id").primaryKey().defaultRandom(),
   id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
   candidatos: jsonb("candidatos").$type<CloserMergeCandidate[]>().notNull(),
   canonical_email: text("canonical_email"),
