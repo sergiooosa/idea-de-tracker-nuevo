@@ -49,7 +49,7 @@ export async function POST(
     const toEmail = body.canonical_email ?? suggestion.canonical_email ?? null;
 
     // For each duplicate candidate (that is NOT the canonical), merge it into canonical
-    const duplicates = suggestion.candidatos.filter(
+    const duplicates = suggestion.aliases.filter(
       (c) =>
         c.nombre.toLowerCase().trim() !== toNombre.toLowerCase().trim() ||
         (toEmail && c.email && c.email.toLowerCase().trim() !== toEmail.toLowerCase().trim()),

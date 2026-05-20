@@ -638,7 +638,7 @@ export const historialAcciones = pgTable("historial_acciones", {
 /*  closer_merge_suggestions — sugerencias de deduplicación de closers */
 /* ------------------------------------------------------------------ */
 
-export interface CloserMergeCandidate {
+export interface CloserMergeAlias {
   email?: string;
   nombre: string;
   conteo: number;
@@ -647,7 +647,7 @@ export interface CloserMergeCandidate {
 export const closerMergeSuggestions = pgTable("closer_merge_suggestions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
-  candidatos: jsonb("candidatos").$type<CloserMergeCandidate[]>().notNull(),
+  aliases: jsonb("aliases").$type<CloserMergeAlias[]>().notNull(),
   canonical_email: text("canonical_email"),
   canonical_nombre: text("canonical_nombre").notNull(),
   status: text("status").notNull().default("pending"),
