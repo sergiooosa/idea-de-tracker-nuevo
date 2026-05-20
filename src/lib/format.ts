@@ -33,8 +33,26 @@ export function formatPct(n: number): string {
 }
 
 /**
- * Format duration in minutes (< 1 min → seconds).
+ * Format duration in minutes with adaptive units (AUT-306).
+ *   < 1 min      → seconds (e.g. "45s")
+ *   < 60 min     → minutes (e.g. "12 min")
+ *   < 1440 min   → hours (e.g. "3 h")
+ *   < 10080 min  → days (e.g. "5 días")
+ *   < 43200 min  → weeks (e.g. "2 semanas")
+ *   >= 43200 min → months (e.g. "1 mes")
  */
 export function formatMinutes(m: number): string {
-  return m < 1 ? `${Math.round(m * 60)}s` : `${m.toFixed(1)} min`;
+  if (m < 1) return `${Math.round(m * 60)}s`;
+  if (m < 60) return `${Math.round(m)} min`;
+  if (m < 1440) return `${(m / 60).toFixed(1)} h`;
+  if (m < 10080) {
+    const dias = Math.round(m / 1440);
+    return `${dias} ${dias === 1 ? "día" : "días"}`;
+  }
+  if (m < 43200) {
+    const semanas = Math.round(m / 10080);
+    return `${semanas} ${semanas === 1 ? "semana" : "semanas"}`;
+  }
+  const meses = Math.round(m / 43200);
+  return `${meses} ${meses === 1 ? "mes" : "meses"}`;
 }

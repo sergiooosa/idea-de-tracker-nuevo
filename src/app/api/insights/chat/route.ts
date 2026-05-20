@@ -28,6 +28,9 @@ function buildSystemPrompt(nombreCuenta: string, from: string, to: string, data:
     (a: any, b: any) => (b.revenue + b.callsMade) - (a.revenue + a.callsMade),
   );
 
+  const totalAdvisors = sortedAdvisors.length;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allAdvisorNames = sortedAdvisors.map((a: any) => a.advisorName).join(", ");
   const top3Advisors = sortedAdvisors
     .slice(0, 3)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,7 +63,8 @@ LLAMADAS: ${kpis.callsMade} totales, ${kpis.contestadas} contestadas (${(kpis.an
 CITAS: ${kpis.meetingsBooked} agendadas, ${kpis.meetingsAttended} asistidas, ${kpis.meetingsClosed} cerradas (${kpis.tasaCierre.toFixed(1)}% cierre)
 REVENUE: ${fm(kpis.revenue)} facturado, ${fm(kpis.cashCollected)} cobrado
 ${chatSection}
-TOP ASESORES:
+EQUIPO (${totalAdvisors} asesores en total): ${allAdvisorNames || "Sin datos"}
+TOP ASESORES POR ACTIVIDAD:
 ${top3Advisors || "Sin datos de asesores"}
 OBJECIONES FRECUENTES:
 ${top5Objeciones || "Sin objeciones registradas"}
