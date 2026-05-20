@@ -5,7 +5,7 @@ import { X, ChevronLeft, ChevronRight, Merge, Users } from "lucide-react";
 
 export interface MergeSuggestion {
   id: string;
-  candidatos: Array<{ email?: string; nombre: string; conteo: number }>;
+  aliases: Array<{ email?: string; nombre: string; conteo: number }>;
   canonical_nombre: string;
   canonical_email: string | null;
   status: string;
@@ -155,7 +155,7 @@ export default function MergeSuggestionsModal({
 
           {/* Candidates list */}
           <div className="space-y-1.5">
-            {current.candidatos.map((c, i) => (
+            {current.aliases.map((c, i) => (
               <div
                 key={i}
                 className="flex items-center justify-between rounded-lg bg-surface-700/60 border border-surface-500/60 px-3 py-2"
