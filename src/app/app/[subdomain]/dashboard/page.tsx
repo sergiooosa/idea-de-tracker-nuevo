@@ -180,7 +180,7 @@ export default function DashboardPage() {
           />
         </section>
 
-        <LeadsEnEspera />
+        <LeadsEnEspera dateFrom={dateFrom} dateTo={dateTo} />
 
         <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

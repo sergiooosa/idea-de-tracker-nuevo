@@ -134,9 +134,10 @@ function CloserCard({ grupo }: { grupo: CloserConLeadsEnEspera }) {
   );
 }
 
-export default function LeadsEnEspera() {
+export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
   const { data, loading, error } = useApiData<LeadsEnEsperaResponse>(
     "/api/data/leads-en-espera",
+    { from: dateFrom, to: dateTo },
   );
 
   if (loading) {
