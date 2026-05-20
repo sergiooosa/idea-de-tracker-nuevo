@@ -229,9 +229,27 @@ export async function getVideollamadas(
     ticket: asistidas > 0 ? Math.round(revenue / asistidas) : 0,
   };
 
+  // Cargar mapa nombre_closer → email para normalizar asesores que Fathom a veces
+  // guarda como nombre y otras como email (mismo patrón que dashboard.ts:466-476).
+  const usuariosNorm = await db
+    .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+    .from(usuariosDashboard)
+    .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), isNotNull(usuariosDashboard.nombre_closer)));
+  const nombreToEmail: Record<string, string> = {};
+  const emailToNombre: Record<string, string> = {};
+  for (const u of usuariosNorm) {
+    if (u.nombre_closer && u.email) {
+      nombreToEmail[u.nombre_closer.trim().toLowerCase()] = u.email.trim().toLowerCase();
+      emailToNombre[u.email.trim().toLowerCase()] = u.nombre_closer.trim();
+    }
+  }
+
   const byAdvisor: Record<string, ApiVideollamada[]> = {};
   for (const r of registros) {
-    const key = r.closer ?? "Sin asignar";
+    const rawCloser = r.closer?.trim();
+    const key = rawCloser
+      ? (nombreToEmail[rawCloser.toLowerCase()] ?? rawCloser.toLowerCase())
+      : "Sin asignar";
     if (!byAdvisor[key]) byAdvisor[key] = [];
     byAdvisor[key].push(r);
   }
@@ -249,14 +267,14 @@ export async function getVideollamadas(
         .map((m) => m.idcliente?.trim() || m.leadEmail?.trim().toLowerCase() || m.ghl_contact_id?.trim() || `nokey_${m.id}`)
     );
     advisorMetrics[name] = {
-      advisorName: name,
+      advisorName: emailToNombre[name] ?? name,
       agendadas: uniqueBooked.size,
       asistencias: asist,
       pctCierre: asist > 0 ? (cerr / asist) * 100 : 0,
       facturacion: meetings.filter((m) => m.outcome === "cerrada" || m.outcome === "cerrado").reduce((s, m) => s + m.facturacion, 0) || meetings.reduce((s, m) => s + m.facturacion, 0),
       cashCollected: meetings.reduce((s, m) => s + m.cashCollected, 0),
     };
-    advisors.push({ id: name, name });
+    advisors.push({ id: name, name: emailToNombre[name] ?? name });
   }
 
   const configs: MetricaConfig[] = parseMetricasConfig(cuentaRow?.metricas_config);
