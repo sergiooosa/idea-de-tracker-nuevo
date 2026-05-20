@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { registrosDeLlamada, logLlamadas } from "@/lib/db/schema";
-import { eq, and, isNull, lt, gt, sql } from "drizzle-orm";
+import { eq, and, isNull, lt, gt, gte, lte, sql } from "drizzle-orm";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -28,9 +28,13 @@ const VENTANA_ACTIVIDAD_LLAMADAS_DIAS = 90;
 
 export async function getLeadsEnEspera(
   idCuenta: number,
+  dateFrom?: string,
+  dateTo?: string,
 ): Promise<LeadsEnEsperaResponse> {
   const umbralTs = new Date(Date.now() - UMBRAL_MINUTOS * 60 * 1000);
   const idCuentaStr = String(idCuenta);
+  const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00Z`) : undefined;
+  const toDate = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : undefined;
 
   // Si la cuenta no tiene llamadas en los últimos 90 días, es un cliente de canal
   // Chats/WhatsApp. La métrica "sin contacto inicial" usa fecha_primera_llamada
@@ -67,6 +71,8 @@ export async function getLeadsEnEspera(
         isNull(registrosDeLlamada.fecha_primera_llamada),
         eq(registrosDeLlamada.estado, "pdte"),
         lt(registrosDeLlamada.fecha_evento, umbralTs),
+        fromDate ? gte(registrosDeLlamada.fecha_evento, fromDate) : undefined,
+        toDate ? lte(registrosDeLlamada.fecha_evento, toDate) : undefined,
       ),
     )
     .orderBy(sql`ROUND(EXTRACT(EPOCH FROM (NOW() - ${registrosDeLlamada.fecha_evento}))/60)::int DESC`);
