@@ -155,10 +155,12 @@ export async function getChats(
     const agentName = extractAgentName(msgs);
     const speed = computeSpeedToLead(msgs, emojiTomaAtencion, tieneChatbot, fromDate, r.primer_msg_lead_at);
     const minutesSinceLastLeadMsg = computeMinutesSinceLastLeadMsg(msgs);
-    // humanTookOver: con chatbot → solo true si el emoji de toma apareció (un humano intervino).
+    // humanTookOver: con chatbot → true si el emoji de toma apareció O si hay mensajes de agente (fallback).
     // Sin chatbot → true si hay cualquier mensaje de agente (comportamiento normal).
+    // El fallback es necesario cuando los asesores no incluyen el emoji en sus mensajes.
+    // Alineado con la lógica de dashboard.ts líneas 975-984.
     const humanTookOver = tieneChatbot && emojiTomaAtencion
-      ? detectTakeoverEmoji(msgs, emojiTomaAtencion)
+      ? (detectTakeoverEmoji(msgs, emojiTomaAtencion) || agentMsgs.length > 0)
       : agentMsgs.length > 0;
 
     // Estado proviene de la IA (chats_logs.estado escrito por analyzeChatsNightly)
