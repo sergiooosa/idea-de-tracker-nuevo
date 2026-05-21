@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { withAuthAndPermission, withAuthAndAnyPermission } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, TramoEscalada } from "@/lib/db/schema";
+import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, cuentas, TramoEscalada } from "@/lib/db/schema";
 import type { SocioSplit } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { buildFunnelSets } from "@/lib/queries/dashboard";
+import { DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
 
 // ── Tipos del response ─────────────────────────────────────────────────────────
 interface SocioSplitCalculado extends SocioSplit {
@@ -49,13 +51,14 @@ function calcFromRows(
     cash_collected: string | null;
   }>,
   filterEmails: string[] | null,
+  closedSet: Set<string>,
 ): { cierres: number; cash_collected: number; facturacion: number } {
   const result = { cierres: 0, cash_collected: 0, facturacion: 0 };
   for (const row of rows) {
     const email = (row.closer ?? "").trim().toLowerCase();
     if (filterEmails !== null && !filterEmails.includes(email)) continue;
     const categoria = (row.categoria ?? "").toLowerCase().trim();
-    if (categoria === "cerrada") {
+    if (closedSet.has(categoria)) {
       result.cierres += 1;
       result.cash_collected += parseFloat(String(row.cash_collected ?? 0)) || 0;
       result.facturacion += parseFloat(String(row.facturacion ?? 0)) || 0;
@@ -74,6 +77,16 @@ export async function GET(req: Request) {
       .select()
       .from(comisionesConfig)
       .where(and(eq(comisionesConfig.id_cuenta, idCuenta), eq(comisionesConfig.activo, true)));
+
+    // Cargar embudo de la cuenta para determinar etapas cerradas correctamente
+    const [cuentaRow] = await db
+      .select({ embudo_personalizado: cuentas.embudo_personalizado })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+    const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
+    const embudoRaw = embudoRawArr.length > 0 ? embudoRawArr : DEFAULT_EMBUDO_CONFIG;
+    const { closedSet } = buildFunnelSets(embudoRaw);
 
     let resultados: ComisionResultado[] = [];
 
@@ -118,12 +131,12 @@ export async function GET(req: Request) {
         let data: { cierres: number; cash_collected: number; facturacion: number };
 
         if (tipoComision === "global") {
-          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), null);
+          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), null, closedSet);
         } else if (tipoComision === "equipo") {
           const emailsEquipo = asesoresEquipo.map((e) => e.trim().toLowerCase());
-          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), emailsEquipo);
+          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), emailsEquipo, closedSet);
         } else {
-          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), [emailKey]);
+          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), [emailKey], closedSet);
         }
 
         const revenueBase = aplica_sobre === "facturacion" ? data.facturacion : data.cash_collected;

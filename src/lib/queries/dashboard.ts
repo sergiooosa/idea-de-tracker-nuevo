@@ -32,7 +32,7 @@ function toDateString(value: Date | string | null | undefined): string {
   return String(value).slice(0, 10);
 }
 
-function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
+export function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   if (!embudo || embudo.length === 0) {
     return {
       attendedSet: new Set(DEFAULT_ATTENDED),
@@ -359,18 +359,22 @@ export async function getDashboard(
         ),
       );
 
-    let extRevenue = 0;
-    let extCash = 0;
-    let extIngresos = 0;
-    for (const row of kpisExt) {
-      const m = row.metricas ?? {};
-      extRevenue += m.facturacion ?? 0;
-      extCash += m.cash_collected ?? 0;
-      extIngresos += m.ingresos ?? 0;
+    // Solo reemplazar con datos externos si existen registros para el período.
+    // Si kpis_externos está vacío (sin datos externos para este período),
+    // mantenemos los datos nativos de resumenes_diarios_agendas como fallback.
+    if (kpisExt.length > 0) {
+      let extRevenue = 0;
+      let extCash = 0;
+      let extIngresos = 0;
+      for (const row of kpisExt) {
+        const m = row.metricas ?? {};
+        extRevenue += m.facturacion ?? 0;
+        extCash += m.cash_collected ?? 0;
+        extIngresos += m.ingresos ?? 0;
+      }
+      revenue = extRevenue || extIngresos;
+      cash = extCash;
     }
-
-    revenue = extRevenue || extIngresos;
-    cash = extCash;
   }
 
   const efectivasCalls = filteredCalls.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
