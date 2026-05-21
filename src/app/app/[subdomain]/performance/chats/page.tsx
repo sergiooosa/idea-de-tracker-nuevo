@@ -221,6 +221,21 @@ export default function PerformanceChatsPage() {
 
   return (
     <div className="p-3 md:p-4 space-y-3 text-sm min-w-0 max-w-full overflow-x-hidden">
+
+      {data?.ghl_app_desconectada && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-300">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+          <div className="space-y-1">
+            <p className="font-semibold text-red-200">Integración con GHL desconectada</p>
+            <p className="text-xs leading-relaxed">
+              La app de AutoKPI fue desinstalada de tu cuenta de GHL. No estamos recibiendo nuevos chats.
+              Escribe a <span className="font-semibold text-white">Sergio</span> para que te ayude a reinstalar la app.
+              El aviso desaparece automáticamente cuando la integración sea restaurada.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 mb-0">
         <button
           type="button"

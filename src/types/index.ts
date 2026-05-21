@@ -395,6 +395,8 @@ export interface ChatsResponse {
   metricasCustom?: Record<string, number | null>;
   /** Config de las métricas tipo "chat" para renderizar nombres y formatos en el frontend. */
   metricasChatConfig?: Array<{ id: string; nombre: string; formato?: string; color?: string; descripcion?: string }>;
+  /** true si el cliente desinstalaron la app de GHL — los chats no están llegando. */
+  ghl_app_desconectada?: boolean;
 }
 
 export interface DashboardKpis {

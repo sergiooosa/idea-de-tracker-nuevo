@@ -127,7 +127,7 @@ export async function getChats(
 
   const [[cuentaRow], rows] = await Promise.all([
     db
-      .select({ configuracion_ui: cuentas.configuracion_ui, metricas_config: cuentas.metricas_config })
+      .select({ configuracion_ui: cuentas.configuracion_ui, metricas_config: cuentas.metricas_config, ghl_app_uninstalled_at: cuentas.ghl_app_uninstalled_at })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
@@ -275,7 +275,7 @@ export async function getChats(
     ? chatMetricasConfig.map((m) => ({ id: m.id, nombre: m.nombre, formato: m.formato, color: m.color, descripcion: m.descripcion }))
     : undefined;
 
-  return { chats: chatsFinal, agg, advisorMetrics, advisors, metricasCustom, metricasChatConfig };
+  return { chats: chatsFinal, agg, advisorMetrics, advisors, metricasCustom, metricasChatConfig, ghl_app_desconectada: !!cuentaRow?.ghl_app_uninstalled_at };
 }
 
 // ─── Cálculo de métricas custom tipo "chat" ───────────────────────────────────
