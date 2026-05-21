@@ -259,7 +259,7 @@ export async function getVideollamadas(
 
   for (const [name, meetings] of Object.entries(byAdvisor)) {
     const asist = meetings.filter((m) => m.attended).length;
-    const cerr = meetings.filter((m) => m.outcome === "cerrado" || m.qualified).length;
+    const cerr = meetings.filter((m) => m.outcome === "cerrada" || m.outcome === "cerrado").length;
     // Deduplicar por asesor también
     const uniqueBooked = new Set(
       meetings
