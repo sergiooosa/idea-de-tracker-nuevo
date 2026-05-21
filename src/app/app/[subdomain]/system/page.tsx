@@ -1705,6 +1705,11 @@ export default function SystemPage() {
                 <strong className="text-accent-blue">Nota:</strong> Este cambio afecta cómo se muestran los KPIs de ingresos en el Dashboard.
                 Consulta la sección <em>Documentación</em> en el menú lateral para configurar el webhook.
               </div>
+              {fuenteFinanciera === 'api_externa' && (
+                <div className="rounded-lg border border-accent-amber/40 bg-accent-amber/5 px-3 py-2 text-sm text-amber-300">
+                  <strong className="text-accent-amber">⚠️ Importante sobre comisiones:</strong> Con API Externa activada, el panel ejecutivo mostrará los ingresos de tu sistema externo, pero el módulo de <strong>Comisiones</strong> siempre calcula sobre los datos nativos (llamadas y videollamadas registradas en el sistema). Si tus cierres se registran exclusivamente vía API externa, las comisiones aparecerán en $0.
+                </div>
+              )}
 
               {/* Toggle: Sección de Chats en Dashboard */}
               <div className="rounded-xl border border-surface-500 bg-surface-800/60 p-4 space-y-3">

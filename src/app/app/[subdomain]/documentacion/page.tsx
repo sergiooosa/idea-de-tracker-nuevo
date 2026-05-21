@@ -408,6 +408,10 @@ function FaqSection() {
       a: "El sistema toma los ingresos de las citas marcadas como 'cerradas' con su facturación registrada. Si el campo de facturación no se llenó en GHL al momento del cierre, o si la cita quedó en una etapa diferente a 'Cerrada/Ganada', los ingresos aparecen en $0. Verifica que al marcar una venta en GHL se esté enviando también el valor de facturación en el webhook.",
     },
     {
+      q: "Tengo la API Externa activada y el Panel Ejecutivo muestra ingresos, pero las comisiones aparecen en $0. ¿Por qué?",
+      a: "El módulo de comisiones siempre calcula sobre los datos nativos del sistema (videollamadas y llamadas registradas vía Fathom/Twilio), sin importar si tienes activada la fuente de datos externa. La API Externa solo afecta cómo se muestran los KPIs de ingresos en el Panel Ejecutivo, no la base de cálculo de comisiones. Para que las comisiones funcionen, los cierres deben estar registrados como reuniones en el sistema nativo con el valor de facturación correspondiente.",
+    },
+    {
       q: "¿Por qué el análisis de IA no siempre clasifica las llamadas?",
       a: "El análisis de IA solo se activa en llamadas efectivas (contestadas). Las llamadas muy cortas (menos de 80 caracteres de transcripción), los buzones de voz y las llamadas donde solo habla el asesor sin respuesta real del cliente se clasifican automáticamente como 'seguimiento' sin consumir IA. Esto es intencional para ahorrar costos.",
     },
@@ -600,6 +604,15 @@ function ApiSection() {
           <p>✅ Los campos de métricas son flexibles — usa los nombres que quieras: <code className="text-accent-cyan">ingresos</code>, <code className="text-accent-cyan">facturacion</code>, <code className="text-accent-cyan">cash_collected</code>, etc.</p>
           <p>✅ Si envías la misma fecha dos veces, se crea un registro adicional (no sobreescribe).</p>
           <p>⚠️ Activa la fuente de datos externa en <strong className="text-white">Control del sistema → paso 3</strong> para que el panel muestre estos datos en lugar de los nativos.</p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-accent-amber/5 border-accent-amber/30">
+        <CardContent className="pt-4 text-xs text-amber-300 space-y-1.5">
+          <p className="font-semibold text-accent-amber">⚠️ Limitación actual: Comisiones y API Externa</p>
+          <p>El módulo de <strong className="text-white">Comisiones</strong> siempre calcula sobre los datos nativos del sistema (llamadas y videollamadas de Fathom/Twilio), independientemente de si tienes API Externa activada.</p>
+          <p>Si tu equipo registra cierres <strong className="text-white">exclusivamente</strong> vía API externa, las comisiones aparecerán en $0. Para que las comisiones funcionen, los cierres deben estar registrados como videollamadas o llamadas en el sistema nativo.</p>
+          <p className="text-gray-500">Para ventas por closer vía API externa, contacta al equipo técnico.</p>
         </CardContent>
       </Card>
     </div>
