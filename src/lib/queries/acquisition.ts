@@ -195,7 +195,11 @@ export async function getAcquisition(
     const leadKey = c.mail_lead?.trim() || c.contact_id_ghl?.trim() || null;
     if (leadKey) {
       bucket.leadEmails.add(leadKey);
-      bucket.calledEmails.add(leadKey);
+      // Solo contar como "llamado" si no es evento administrativo (pdte/contacto_creado)
+      const TIPOS_ADMIN = ["pdte", "contacto_creado"];
+      if (!TIPOS_ADMIN.includes(c.tipo_evento)) {
+        bucket.calledEmails.add(leadKey);
+      }
       if (c.tipo_evento.startsWith("efectiva_")) {
         bucket.answeredEmails.add(leadKey);
       }

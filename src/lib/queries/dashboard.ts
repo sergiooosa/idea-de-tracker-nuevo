@@ -525,9 +525,11 @@ export async function getDashboard(
   const advisorRanking: DashboardAdvisorRow[] = Object.entries(advisorMap).map(
     ([key, { calls: ac, agendas: aa }]) => {
       const aContestadas = ac.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
+      // Deduplicar leads usando la misma clave que meetingsBooked (idcliente || ghl_contact_id || email || phone)
+      // Usar solo email causaba subestimar el denominador cuando leads llegan solo con phone o GHL ID
       const aLeads = new Set([
-        ...ac.map((c) => c.mail_lead).filter(Boolean),
-        ...aa.map((a) => a.email_lead).filter(Boolean),
+        ...ac.map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id)),
+        ...aa.map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`),
       ]).size;
       const aAsistidas = aa.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
       const aRevenueClosedSet = aa.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
