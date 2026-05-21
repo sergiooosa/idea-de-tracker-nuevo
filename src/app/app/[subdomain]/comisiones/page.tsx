@@ -5,7 +5,7 @@ import { useT } from '@/contexts/LocaleContext';
 import PageHeader from '@/components/dashboard/PageHeader';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { format, subDays } from 'date-fns';
-import { BadgeDollarSign, Plus, Trash2, Pencil, X, Loader2, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { BadgeDollarSign, Plus, Trash2, Pencil, X, Loader2, HelpCircle, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TramoEscalada, SocioSplit } from '@/lib/db/schema';
 
@@ -139,6 +139,14 @@ export default function ComisionesPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [usuarios, setUsuarios] = useState<UsuarioBasic[]>([]);
+  const [fuenteFinanciera, setFuenteFinanciera] = useState<'nativa' | 'api_externa'>('nativa');
+
+  useEffect(() => {
+    void fetch('/api/data/system-config')
+      .then(r => r.ok ? r.json() as Promise<{ fuente_datos_financieros?: 'nativa' | 'api_externa' }> : null)
+      .then(cfg => { if (cfg?.fuente_datos_financieros) setFuenteFinanciera(cfg.fuente_datos_financieros); })
+      .catch(() => {/* no crítico */});
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -322,6 +330,16 @@ export default function ComisionesPage() {
   return (
     <div className="p-3 md:p-4 space-y-4 text-sm min-w-0 max-w-full overflow-x-hidden">
       <PageHeader title={t.comisiones.titulo} />
+
+      {fuenteFinanciera === 'api_externa' && (
+        <div className="flex items-start gap-2 rounded-lg border border-accent-amber/40 bg-accent-amber/5 px-3 py-2.5 text-sm text-amber-300">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-accent-amber" />
+          <span>
+            <strong className="text-accent-amber">Tu cuenta usa &quot;API Externa&quot; como fuente de ingresos</strong>, pero las comisiones se calculan desde los datos nativos de GHL.
+            Si tus ventas no pasan por el pipeline de GHL, los montos de comisiones serán incorrectos.
+          </span>
+        </div>
+      )}
 
       {/* Filtro de fechas */}
       <div className="flex flex-wrap items-center gap-2">
