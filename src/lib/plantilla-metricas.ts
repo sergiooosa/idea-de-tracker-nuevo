@@ -47,15 +47,12 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
     id: "base-ctr",
     nombre: "CTR",
     descripcion: "Click-Through Rate de los anuncios",
-    tipo: "manual",
+    tipo: "ads",
+    adsCampo: "ctr",
     paneles: ["panel_ejecutivo"],
     orden: 2,
     formato: "porcentaje",
     color: "blue",
-    campos: [
-      { id: "fecha", nombre: "Fecha", tipo: "fecha", esClaveFiltro: true },
-      { id: "ctr", nombre: "CTR (%)", tipo: "numero" },
-    ],
   },
 
   // ─── BLOQUE 2: VSL ────────────────────────────────────────────────────────
