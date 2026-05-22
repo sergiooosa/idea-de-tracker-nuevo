@@ -247,7 +247,7 @@ export interface MetricaComputada {
   id: string;
   nombre: string;
   valor: string | number;
-  descripcion?: string;
+  descripcion?: string | null;
   ubicacion?: string;
 }
 
@@ -394,7 +394,7 @@ export interface ChatsResponse {
   /** Métricas custom tipo "chat" calculadas para el rango. Key = metrica id, Value = valor agregado. */
   metricasCustom?: Record<string, number | null>;
   /** Config de las métricas tipo "chat" para renderizar nombres y formatos en el frontend. */
-  metricasChatConfig?: Array<{ id: string; nombre: string; formato?: string; color?: string; descripcion?: string }>;
+  metricasChatConfig?: Array<{ id: string; nombre: string; formato?: string; color?: string; descripcion?: string | null }>;
   /** true si el cliente desinstalaron la app de GHL — los chats no están llegando. */
   ghl_app_desconectada?: boolean;
 }
@@ -545,8 +545,8 @@ export interface DashboardResponse {
   tagsDisponibles?: string[];
   tagCounts?: Record<string, number>;
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
-  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[];
-  dashboardsPersonalizados?: { id: string; nombre: string; icono?: string }[];
+  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[];
+  dashboardsPersonalizados?: { id: string; nombre: string; icono?: string | null }[];
   chatKpis?: ChatKpis;
   alertasMetas?: AlertaMeta[];
   adsSummary?: DashboardAdsSummary;
