@@ -284,7 +284,7 @@ export default function MetricaEditSheet({
         : panelesSeleccionados.find((p) => p === "panel_ejecutivo" || p === "rendimiento") as MetricaConfig["ubicacion"] ?? "panel_ejecutivo";
 
     const base = {
-      id, nombre: nombre.trim(), descripcion: descripcion.trim() || undefined,
+      id, nombre: nombre.trim(), descripcion: descripcion.trim() || null,
       ubicacion: ubicacionLegacy,
       paneles: panelesSeleccionados as MetricaConfig["paneles"],
       atribuible_a_usuario: atribuibleUsuario,

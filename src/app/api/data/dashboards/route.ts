@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     const nuevo: DashboardPersonalizado = {
       id: nuevoId,
       nombre,
-      icono: body.icono?.trim() || undefined,
+      icono: body.icono?.trim() || null,
       creado_en: new Date().toISOString(),
     };
 

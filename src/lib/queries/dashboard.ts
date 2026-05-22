@@ -780,7 +780,7 @@ export async function getDashboard(
     if (!webhookPorUsuario[uid]) webhookPorUsuario[uid] = {};
     webhookPorUsuario[uid][row.campo] = (webhookPorUsuario[uid][row.campo] ?? 0) + parseFloat(String(row.valor ?? 0));
   }
-  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
   const metricasValores: Record<string, string | number> = {};
   // Usar KPI_DEFAULT_KEYS como fuente de verdad — nunca hardcodear aquí
   const kpiKeys = new Set<string>([...KPI_DEFAULT_KEYS]);

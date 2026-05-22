@@ -110,7 +110,7 @@ export interface MetricaFormulaConfig {
 export interface DashboardPersonalizado {
   id: string;       // "dashboard-1" | "dashboard-2" | "dashboard-3"
   nombre: string;   // Nombre libre que pone el usuario
-  icono?: string;   // Emoji o similar
+  icono?: string | null;   // Emoji o similar
   creado_en: string; // ISO timestamp
 }
 
@@ -148,7 +148,7 @@ export type ChatMetricaCampo =
 export interface MetricaConfig {
   id: string;
   nombre: string;
-  descripcion?: string;
+  descripcion?: string | null;
   tipo: "manual" | "automatica" | "fija" | "webhook" | "ads" | "embudo_etapa" | "chat";
   /** Deprecated: usar paneles[] para multi-panel. Se mantiene para backward compat. */
   ubicacion?: UbicacionPanel;

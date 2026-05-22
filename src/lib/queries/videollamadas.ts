@@ -289,7 +289,7 @@ export async function getVideollamadas(
     : {};
   const kpiKeysVideollamadas = new Set(["agendadas", "asistidas", "canceladas", "efectivas", "noShows", "revenue", "cashCollected", "ticket"]);
   const metricasValores: Record<string, string | number> = {};
-  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string; ubicacion?: string }[] = [];
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string }[] = [];
 
   const getDeps = (m: MetricaConfig): string[] => {
     if (m.tipo === "fija") return [];
