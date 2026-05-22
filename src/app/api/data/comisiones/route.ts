@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { withAuthAndPermission, withAuthAndAnyPermission } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, cuentas, TramoEscalada } from "@/lib/db/schema";
+import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, cuentas, usuariosDashboard, TramoEscalada } from "@/lib/db/schema";
 import type { SocioSplit } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNotNull } from "drizzle-orm";
 import { buildFunnelSets } from "@/lib/queries/dashboard";
 import { DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
 
@@ -113,6 +113,25 @@ export async function GET(req: Request) {
           ),
         );
 
+      // Normalizar closer: Fathom a veces guarda nombre completo en lugar de email.
+      // Construimos un mapa nombre_closer → email desde usuarios_dashboard para resolver ambos casos.
+      const usuariosNorm = await db
+        .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+        .from(usuariosDashboard)
+        .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), isNotNull(usuariosDashboard.nombre_closer)));
+      const nombreToEmail: Record<string, string> = {};
+      for (const u of usuariosNorm) {
+        if (u.nombre_closer && u.email) {
+          nombreToEmail[u.nombre_closer.trim().toLowerCase()] = u.email.trim().toLowerCase();
+        }
+      }
+
+      // Normalizar agendaRows: si closer es un nombre, resolverlo al email correspondiente
+      const normalizedRows = agendaRows.map((r) => {
+        const raw = (r.closer ?? "").trim().toLowerCase();
+        return { ...r, closer: nombreToEmail[raw] ?? raw };
+      });
+
       const [metaRow] = await db
         .select()
         .from(metasCuenta)
@@ -131,12 +150,12 @@ export async function GET(req: Request) {
         let data: { cierres: number; cash_collected: number; facturacion: number };
 
         if (tipoComision === "global") {
-          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), null, closedSet);
+          data = calcFromRows(normalizedRows, null, closedSet);
         } else if (tipoComision === "equipo") {
           const emailsEquipo = asesoresEquipo.map((e) => e.trim().toLowerCase());
-          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), emailsEquipo, closedSet);
+          data = calcFromRows(normalizedRows, emailsEquipo, closedSet);
         } else {
-          data = calcFromRows(agendaRows.map(r => ({ closer: r.closer, categoria: r.categoria, facturacion: r.facturacion, cash_collected: r.cash_collected })), [emailKey], closedSet);
+          data = calcFromRows(normalizedRows, [emailKey], closedSet);
         }
 
         const revenueBase = aplica_sobre === "facturacion" ? data.facturacion : data.cash_collected;
