@@ -397,6 +397,13 @@ export async function getDashboard(
   // Usar email OR phone OR id para no perder leads sin email (igual que panel asesor)
   const normLeadKey = (mail: string | null | undefined, phone: string | null | undefined, id: string | number) =>
     mail?.trim().toLowerCase() || phone?.trim() || String(id);
+  // Leads únicos contactados: leads con al menos 1 llamada efectiva
+  // (numerador correcto para tasa de contestación: leads contactados / leads llegados)
+  const leadsContactados = new Set(
+    filteredCalls
+      .filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_"))
+      .map((c) => normLeadKey(c.mail_lead, c.phone, c.id))
+  ).size;
   const leadsFromCalls = new Set(filteredCalls.map((c) => normLeadKey(c.mail_lead, c.phone, c.id)));
   const leadsFromAgendas = new Set(filteredAgendas.map((a) => normLeadKey(a.email_lead, null, a.id_registro_agenda)));
 
@@ -445,7 +452,7 @@ export async function getDashboard(
     totalLeads,
     callsMade: filteredCalls.length,
     contestadas,
-    answerRate: filteredCalls.length > 0 ? contestadas / filteredCalls.length : 0,
+    answerRate: totalLeads > 0 ? leadsContactados / totalLeads : 0,
     meetingsBooked,
     meetingsAttended: asistidas,
     meetingsCanceled: canceladas,
@@ -543,6 +550,12 @@ export async function getDashboard(
   const advisorRanking: DashboardAdvisorRow[] = Object.entries(advisorMap).map(
     ([key, { calls: ac, agendas: aa }]) => {
       const aContestadas = ac.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
+      // Leads únicos contactados por este asesor (al menos 1 llamada efectiva)
+      const aLeadsContactados = new Set(
+        ac
+          .filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_"))
+          .map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id))
+      ).size;
       // Deduplicar leads usando la misma clave que meetingsBooked (idcliente || ghl_contact_id || email || phone)
       // Usar solo email causaba subestimar el denominador cuando leads llegan solo con phone o GHL ID
       const aLeads = new Set([
@@ -625,7 +638,7 @@ export async function getDashboard(
         meetingsAttended: aAsistidas,
         revenue: aRevenue,
         cashCollected: aCash,
-        contactRate: ac.length > 0 ? aContestadas / ac.length : 0,
+        contactRate: aLeads > 0 ? aLeadsContactados / aLeads : 0,
         bookingRate: aLeads > 0 ? new Set(
           aa
             .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
