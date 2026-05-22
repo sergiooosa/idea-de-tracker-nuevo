@@ -84,6 +84,15 @@ export function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   };
 }
 
+// Guard: verificar si la cuenta tiene Fathom configurado
+async function isFathomConfigured(idCuenta: number): Promise<boolean> {
+  const usuarios = await db
+    .select({ fathom: usuariosDashboard.fathom, id_webhook: usuariosDashboard.id_webhook_fathom })
+    .from(usuariosDashboard)
+    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
+  return usuarios.some((u) => u.fathom && u.id_webhook);
+}
+
 export async function getDashboard(
   idCuenta: number,
   dateFrom: string,
@@ -233,11 +242,16 @@ export async function getDashboard(
           AND fecha_evento <= ${toDate}`,
   ).then((r) => Number((r.rows[0] as { total?: number })?.total ?? 0));
 
+  // Guard: si la cuenta no tiene Fathom configurado, no retornar datos de agenda.
+  const fathomHabilitado = await isFathomConfigured(idCuenta);
+
   const [agendas, calls, newLeadEvents, adsAggRowEarly, pendientesLlamadas] = await Promise.all([
-    db
-      .select()
-      .from(resumenesDiariosAgendas)
-      .where(and(...agendaConditions)),
+    fathomHabilitado
+      ? db
+          .select()
+          .from(resumenesDiariosAgendas)
+          .where(and(...agendaConditions))
+      : Promise.resolve([] as (typeof resumenesDiariosAgendas.$inferSelect)[]),
     db
       .select()
       .from(logLlamadas)
