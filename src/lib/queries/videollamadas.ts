@@ -232,15 +232,18 @@ export async function getVideollamadas(
   // Cargar mapa nombre_closer → email para normalizar asesores que Fathom a veces
   // guarda como nombre y otras como email (mismo patrón que dashboard.ts:466-476).
   const usuariosNorm = await db
-    .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+    .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer, nombre: usuariosDashboard.nombre })
     .from(usuariosDashboard)
-    .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), isNotNull(usuariosDashboard.nombre_closer)));
+    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
   const nombreToEmail: Record<string, string> = {};
   const emailToNombre: Record<string, string> = {};
   for (const u of usuariosNorm) {
-    if (u.nombre_closer && u.email) {
-      nombreToEmail[u.nombre_closer.trim().toLowerCase()] = u.email.trim().toLowerCase();
-      emailToNombre[u.email.trim().toLowerCase()] = u.nombre_closer.trim();
+    if (!u.email) continue;
+    const emailKey = u.email.trim().toLowerCase();
+    const displayName = u.nombre_closer?.trim() ?? u.nombre?.trim();
+    if (displayName) {
+      emailToNombre[emailKey] = displayName;
+      nombreToEmail[displayName.toLowerCase()] = emailKey;
     }
   }
 
@@ -266,6 +269,9 @@ export async function getVideollamadas(
         .filter((m) => !m.canceled)
         .map((m) => m.idcliente?.trim() || m.leadEmail?.trim().toLowerCase() || m.ghl_contact_id?.trim() || `nokey_${m.id}`)
     );
+    // Omitir asesores sin actividad real (solo registros cancelados y sin asistencias)
+    if (uniqueBooked.size === 0 && asist === 0) continue;
+
     advisorMetrics[name] = {
       advisorName: emailToNombre[name] ?? name,
       agendadas: uniqueBooked.size,
