@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
-import { eq, and, or, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, or, gt, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import type {
   ApiVideollamada,
   VideollamadasAdvisorMetrics,
@@ -87,10 +87,11 @@ export async function getVideollamadas(
   }
 
   // Mismo filtro de fecha que usa /dashboard para garantizar consistencia:
-  // Si fecha_reunion está disponible (timestamp UTC), filtrar por ella usando rango completo del día.
-  // Si fecha_reunion es NULL, usar `fecha` (date string canónico que asigna Cerebro).
-  // Esto resuelve la discrepancia AUT-116: eventos que tienen fecha_reunion en el rango
-  // pero `fecha` fuera de él (o viceversa) se contaban diferente en cada página.
+  // Caso 1: fecha_reunion conocida y dentro del rango (cita histórica o actual)
+  // Caso 2: PDTE con fecha_reunion futura — insertada en el rango seleccionado.
+  //   Una cita pendiente es prospectiva; excluirla por ser futura hace que no aparezca
+  //   en el período en que se agendó. Mismo criterio que /dashboard (AUT-374).
+  // Caso 3: sin fecha_reunion → usa fecha de inserción
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
   const fechaFilter = or(
@@ -98,6 +99,13 @@ export async function getVideollamadas(
       isNotNull(resumenesDiariosAgendas.fecha_reunion),
       gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
       lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    ),
+    and(
+      eq(resumenesDiariosAgendas.categoria, 'PDTE'),
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gt(resumenesDiariosAgendas.fecha_reunion, sql`NOW()`),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
     ),
     and(
       isNull(resumenesDiariosAgendas.fecha_reunion),
