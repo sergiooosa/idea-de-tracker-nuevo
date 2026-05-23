@@ -34,7 +34,7 @@ export default function KPICard({
 }: {
   label: string;
   value: string | number;
-  subValue?: string;
+  subValue?: string | null;
   color?: Color;
   className?: string;
   tooltip?: { significado: string; calculo: string };
