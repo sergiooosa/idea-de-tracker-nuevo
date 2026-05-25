@@ -1,6 +1,7 @@
 // AUT-388 — Componente reutilizable: tarjeta individual de asesor
 // Usado en Bloque 2 (Llamadas), Bloque 3 (Chats) y Bloque 4 (Videollamadas)
 
+import type { ReactNode } from 'react';
 import { TrendingUp, TrendingDown, Minus, Star } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -37,7 +38,7 @@ export interface AdvisorCardProps {
   /** Up to 4 channel-specific metrics displayed in a grid */
   metrics?: AdvisorMetric[];
   /** Extra block-specific content (speed-to-lead row, category bars, cita progress) */
-  footer?: React.ReactNode;
+  footer?: ReactNode;
   className?: string;
 }
 

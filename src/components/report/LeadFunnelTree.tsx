@@ -1,6 +1,7 @@
 // AUT-389 — Bloque 5b: Funnel de Leads (árbol visual)
 // Árbol CONTACTADOS vs SIN CONTACTO con sub-estados y análisis narrativo
 
+import type { ElementType, ReactNode } from 'react';
 import { Users, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { formatPct } from '@/lib/format';
 import type { ReportLeadFunnelTreeData } from '@/types/report';
@@ -26,12 +27,12 @@ function TotalNode({ count }: { count: number }) {
 }
 
 interface BranchNodeProps {
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
   count: number;
   pct: number;
   variant: 'green' | 'red';
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 function BranchNode({ icon: Icon, label, count, pct, variant, children }: BranchNodeProps) {
