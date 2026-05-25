@@ -257,7 +257,16 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const empresa = body.account?.nombre ?? cuentaRow?.nombre_cuenta ?? "la empresa";
-    const prompt = buildPrompt(body, empresa);
+    let prompt: string;
+    try {
+      prompt = buildPrompt(body, empresa);
+    } catch (e) {
+      console.error("[report/summary] Error construyendo prompt:", e);
+      return NextResponse.json(
+        { error: "JSON del reporte inválido o incompleto para generar el resumen" },
+        { status: 400 },
+      );
+    }
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -293,12 +302,21 @@ export async function POST(req: Request): Promise<Response> {
 
     const rawContent = json.choices?.[0]?.message?.content ?? "{}";
 
+    const VALID_NIVELES = new Set<string>(["verde", "amarillo", "rojo"]);
+
     let parsed: ReportSummaryResponse;
     try {
       const raw = JSON.parse(rawContent) as Partial<ReportSummaryResponse>;
+      const rawAlertas = Array.isArray(raw.alertas) ? raw.alertas : [];
       parsed = {
         resumenEjecutivo: raw.resumenEjecutivo ?? "No se pudo generar el resumen.",
-        alertas: Array.isArray(raw.alertas) ? raw.alertas : [],
+        alertas: rawAlertas.filter(
+          (a): a is ReportAlerta =>
+            a != null &&
+            typeof a.bloque === "string" &&
+            typeof a.mensaje === "string" &&
+            VALID_NIVELES.has(a.nivel),
+        ),
         analisisConversaciones: raw.analisisConversaciones ?? null,
       };
     } catch {
