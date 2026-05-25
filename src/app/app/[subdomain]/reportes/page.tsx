@@ -8,18 +8,14 @@ import {
   startOfMonth,
   endOfDay,
 } from 'date-fns';
-import { es } from 'date-fns/locale';
 import {
   Phone,
-  Video,
   MessageSquare,
   TrendingUp,
   Users,
-  DollarSign,
   BarChart2,
   Target,
   Megaphone,
-  Loader2,
   Calendar,
   ChevronRight,
 } from 'lucide-react';
@@ -97,7 +93,7 @@ interface ReportChats {
   total: number;
   leadsUnicos: number;
   tasaRespuesta: number;
-  speedToLeadAvg: number | null;
+  speedToLeadAvg: number | null; // segundos
   topClosers: Array<{ name: string; count: number }>;
 }
 
@@ -512,7 +508,7 @@ export default function ReportesPage() {
                   <tbody>
                     {data.advisorRanking.map((a, i) => (
                       <tr
-                        key={a.email ?? a.nombre}
+                        key={`${i}-${a.email ?? a.nombre}`}
                         className="border-t border-surface-500/40 hover:bg-surface-700/40 transition-colors"
                       >
                         <td className="px-3 py-2 text-white font-medium whitespace-nowrap">
