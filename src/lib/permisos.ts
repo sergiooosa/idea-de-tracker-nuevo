@@ -21,6 +21,7 @@ export const PERMISOS_DISPONIBLES = [
   { id: "gestionar_roles", label: "Gestionar roles" },
   { id: "ver_comisiones", label: "Ver Comisiones" },
   { id: "ver_ads", label: "Ver Ads & Inversión" },
+  { id: "ver_reportes", label: "Ver Reportes" },
 ] as const;
 
 export type PermisoId = (typeof PERMISOS_DISPONIBLES)[number]["id"];
@@ -36,6 +37,7 @@ export const NAV_PERMISOS: Record<string, PermisoId> = {
   "/configuracion": "ver_configuracion",
   "/documentacion": "ver_documentacion",
   "/comisiones": "ver_comisiones",
+  "/reportes": "ver_reportes",
   // "/ads": "ver_ads",  // visible para todos — solo se activa si hay ads configurados
 };
 
