@@ -123,6 +123,33 @@ export interface ReportLeadFunnelData {
   analisis: string | null; // narrative paragraph
 }
 
+// ─── Bloque 5b — Lead Funnel Tree (árbol visual) ───────────────────────────
+
+export interface ReportLeadFunnelTreeContactados {
+  count: number;
+  pct: number;
+  seguimientoActivo: number;
+  agendasCita: number;
+  noInteresados: number;
+  noCalificados: number;
+}
+
+export interface ReportLeadFunnelTreeSinContacto {
+  count: number;
+  pct: number;
+  sinIntento: number;
+  intentaronSinRespuesta: number;
+  sinSeguimientoPostContacto: number;
+}
+
+export interface ReportLeadFunnelTreeData {
+  totalLeads: number;
+  contactados: ReportLeadFunnelTreeContactados;
+  sinContacto: ReportLeadFunnelTreeSinContacto;
+  presupuestoAdsDesperdiciadoPct: number | null;
+  asesorMayorAbandono: { nombre: string; pct: number } | null;
+}
+
 // ─── Bloque 6 — Higiene CRM ────────────────────────────────────────────────
 
 export interface ReportCrmHealthData {
