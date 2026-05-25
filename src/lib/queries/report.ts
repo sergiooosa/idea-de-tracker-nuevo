@@ -124,16 +124,16 @@ export async function getReportAds(
     cpc: r.cpc != null ? parseFloat(r.cpc) : null,
   }));
 
-  // Mapa de leads por creativo para enriquecer la tabla de creativos
+  // Mapa de leads por creativo — normalizado a lowercase+trim para tolerar diferencias de capitalización
   const leadsMap: Record<string, number> = {};
   for (const r of leadsPorCreativo.rows as LeadCreativoRow[]) {
-    leadsMap[r.creativo_origen] = r.leads_count;
+    leadsMap[r.creativo_origen.trim().toLowerCase()] = r.leads_count;
   }
 
   const porCreativo: ReportAdsCreativo[] = (creativoRows.rows as CreativoRow[]).map((r) => ({
     nombre: r.nombre_de_creativo,
     gastoTotal: parseFloat(r.gasto_total ?? "0") || 0,
-    leadsCount: leadsMap[r.nombre_de_creativo] ?? 0,
+    leadsCount: leadsMap[r.nombre_de_creativo.trim().toLowerCase()] ?? 0,
   }));
 
   const totalGasto = porCampana.reduce((s, r) => s + r.gastoTotal, 0);
@@ -190,8 +190,19 @@ export async function getReportCalls(
   const toTs = new Date(`${to}T23:59:59.999Z`);
 
   // Llamadas realizadas en el rango (excluir pdte y contacto_creado que son solo creación de lead)
+  // Proyección explícita para no cargar transcripcion (texto completo, caro en memoria con volumen alto)
   const rows = await db
-    .select()
+    .select({
+      id: logLlamadas.id,
+      id_registro: logLlamadas.id_registro,
+      tipo_evento: logLlamadas.tipo_evento,
+      closer_mail: logLlamadas.closer_mail,
+      nombre_closer: logLlamadas.nombre_closer,
+      contact_id_ghl: logLlamadas.contact_id_ghl,
+      mail_lead: logLlamadas.mail_lead,
+      phone: logLlamadas.phone,
+      speed_to_lead: logLlamadas.speed_to_lead,
+    })
     .from(logLlamadas)
     .where(
       and(
@@ -314,7 +325,7 @@ export async function getReportCalls(
   const totalContestadas = rows.filter((r) => r.tipo_evento.startsWith("efectiva_")).length;
   const allSpeeds = rows
     .filter((r) => r.speed_to_lead != null)
-    .map((r) => parseFloat(r.speed_to_lead!))
+    .map((r) => parseFloat(r.speed_to_lead as string))
     .filter((n) => !isNaN(n) && n >= 0);
 
   const uniqueLeads = new Set(
@@ -458,6 +469,9 @@ function clasificarCategoria(cat: string | null): {
   const cancelada = cl.includes("cancel");
   const noShow = cl === "no_show" || cl === "noshow" || cl === "no show";
   const cerrada = cl === "cerrada" || cl === "closed";
+  // "calificada" en este contexto significa "la videollamada ocurrió y fue evaluada" —
+  // incluye tanto calificadas como no_calificadas porque ambas representan una cita que SÍ se realizó.
+  // no_show y cancelada son las únicas que NO ocurrieron.
   const calificada =
     !cancelada &&
     !noShow &&
@@ -793,18 +807,9 @@ export async function getReportCrmHealth(
     ...v,
   }));
 
-  const sumField = (field: "sinEstado" | "sinAccion" | "enLimbo") =>
-    (sinEstadoResult.rows as AsesorRow[]).reduce(
-      (s, r) => s + (field === "sinEstado" ? r.total : 0),
-      0,
-    );
-
   const totalSinEstado = (sinEstadoResult.rows as AsesorRow[]).reduce((s, r) => s + r.total, 0);
   const totalSinAccion = (sinAccionResult.rows as AsesorRow[]).reduce((s, r) => s + r.total, 0);
   const totalEnLimbo = (enLimboResult.rows as AsesorRow[]).reduce((s, r) => s + r.total, 0);
-
-  // suppress unused variable warning
-  void sumField;
 
   return {
     sinEstado: totalSinEstado,
