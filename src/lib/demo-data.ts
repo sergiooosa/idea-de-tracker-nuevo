@@ -569,9 +569,4 @@ export const DEMO_GENERATORS: Record<string, () => unknown> = {
   "/api/data/comisiones": () => ({
     asesores: ASESORES.map((a) => ({ nombre: a.name, comision: rnd(500000, 3000000), cierres: rnd(1, 8) })),
   }),
-  "/api/data/weekly-report": () => ({
-    semana: "Semana demo",
-    resumen: "Este es un reporte demo generado automáticamente.",
-    metricas: {},
-  }),
 };
