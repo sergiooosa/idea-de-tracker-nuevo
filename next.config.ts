@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "i.postimg.cc" },
     ],
   },
+  async redirects() {
+    return [
+      // Redirect permanente: /weekly-report → /reportes (preserva bookmarks)
+      { source: "/weekly-report", destination: "/reportes", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {
