@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import {
   format,
   startOfDay,
@@ -18,6 +19,8 @@ import {
   Megaphone,
   Calendar,
   ChevronRight,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import {
   BarChart,
@@ -329,11 +332,27 @@ function LoadingSkeleton() {
 
 export default function ReportesPage() {
   const today = new Date();
+  const params = useParams();
+  const subdomain = typeof params?.subdomain === 'string' ? params.subdomain : '';
   const [period, setPeriod] = useState<PeriodType>('semana');
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(today), 'yyyy-MM-dd'));
   const [customTo, setCustomTo] = useState(format(today, 'yyyy-MM-dd'));
   // Loading state: simula fetch real — reemplazar con useApiData cuando exista la API
   const [loading] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  // Fetch company name for PDF header
+  useEffect(() => {
+    fetch('/api/data/mis-cuentas')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { accounts?: Array<{ subdominio: string; nombre_cuenta: string }> } | null) => {
+        const match = d?.accounts?.find((a) => a.subdominio === subdomain);
+        if (match) setCompanyName(match.nombre_cuenta);
+      })
+      .catch(() => {});
+  }, [subdomain]);
 
   const { from, to } = useMemo(
     () => getPeriodDates(period, customFrom, customTo),
@@ -345,6 +364,125 @@ export default function ReportesPage() {
   const data: ReportData | null = MOCK_DATA;
 
   const kpis = data?.kpis ?? null;
+
+  const downloadPdf = useCallback(async () => {
+    if (!reportRef.current) return;
+    setGeneratingPdf(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: '#0d1219',
+        useCORS: true,
+        logging: false,
+      });
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfW = pdf.internal.pageSize.getWidth();  // 210mm
+      const pdfH = pdf.internal.pageSize.getHeight(); // 297mm
+
+      const marginX = 10;
+      const headerH = 22;
+      const footerH = 12;
+      const gapAboveContent = 4; // mm between header bottom and content
+      const gapBelowContent = 4; // mm between content and footer top
+      const contentW = pdfW - marginX * 2;
+      const contentAreaH = pdfH - headerH - gapAboveContent - gapBelowContent - footerH;
+
+      // Scale: canvas px → mm
+      const pxToMm = contentW / canvas.width;
+      const totalContentH = canvas.height * pxToMm;
+      const pageCount = Math.ceil(totalContentH / contentAreaH);
+
+      const generatedDate = new Date().toLocaleDateString('es-CO', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+      const displayName = companyName ?? subdomain;
+      const periodStr = periodLabel(period, from, to);
+
+      for (let page = 0; page < pageCount; page++) {
+        if (page > 0) pdf.addPage();
+
+        // ── Header ──────────────────────────────────────────────
+        pdf.setFillColor(13, 18, 25);
+        pdf.rect(0, 0, pdfW, headerH, 'F');
+        // Cyan accent line at header bottom
+        pdf.setFillColor(0, 240, 255);
+        pdf.rect(0, headerH - 0.5, pdfW, 0.5, 'F');
+
+        // Company name
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(displayName, marginX, 9);
+
+        // Period label in cyan
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(0, 240, 255);
+        pdf.text(periodStr, marginX, 17);
+
+        // Generated date (right side, top)
+        pdf.setFontSize(7);
+        pdf.setTextColor(150, 150, 160);
+        const dateText = `Generado: ${generatedDate}`;
+        pdf.text(dateText, pdfW - marginX - pdf.getTextWidth(dateText), 9);
+
+        // Page number (right side, bottom of header)
+        if (pageCount > 1) {
+          const pageText = `Pág. ${page + 1} / ${pageCount}`;
+          pdf.text(pageText, pdfW - marginX - pdf.getTextWidth(pageText), 17);
+        }
+
+        // ── Content slice ────────────────────────────────────────
+        const srcYMm = page * contentAreaH;
+        const srcYPx = Math.round(srcYMm / pxToMm);
+        const sliceHeightMm = Math.min(contentAreaH, totalContentH - srcYMm);
+        const sliceHeightPx = Math.round(sliceHeightMm / pxToMm);
+
+        if (sliceHeightPx > 0) {
+          const slice = document.createElement('canvas');
+          slice.width = canvas.width;
+          slice.height = sliceHeightPx;
+          const ctx = slice.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#0d1219';
+            ctx.fillRect(0, 0, slice.width, slice.height);
+            ctx.drawImage(canvas, 0, -srcYPx);
+            const imgData = slice.toDataURL('image/jpeg', 0.92);
+            const contentY = headerH + gapAboveContent;
+            pdf.addImage(imgData, 'JPEG', marginX, contentY, contentW, sliceHeightMm);
+          }
+        }
+
+        // ── Footer ───────────────────────────────────────────────
+        pdf.setFillColor(13, 18, 25);
+        pdf.rect(0, pdfH - footerH, pdfW, footerH, 'F');
+        // Separator line
+        pdf.setFillColor(30, 42, 58);
+        pdf.rect(0, pdfH - footerH, pdfW, 0.4, 'F');
+
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(100, 115, 135);
+        pdf.text('Generado por AutoKPI — autokpi.net', marginX, pdfH - footerH + 7);
+
+        const confText = 'Reporte confidencial · uso interno';
+        pdf.text(confText, pdfW - marginX - pdf.getTextWidth(confText), pdfH - footerH + 7);
+      }
+
+      pdf.save(`reporte-${subdomain}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error('Error al exportar PDF:', err);
+      alert('No se pudo exportar el PDF. Por favor intenta de nuevo.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }, [companyName, subdomain, period, from, to]);
 
   const PERIODS: { id: PeriodType; label: string }[] = [
     { id: 'hoy', label: 'Hoy' },
@@ -401,6 +539,21 @@ export default function ReportesPage() {
                 </div>
               </div>
             )}
+
+            {/* PDF download button */}
+            <button
+              type="button"
+              onClick={() => void downloadPdf()}
+              disabled={generatingPdf || loading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:shadow-glow-cyan disabled:opacity-50 transition-all"
+            >
+              {generatingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {generatingPdf ? 'Generando...' : 'Descargar PDF'}
+            </button>
           </div>
         }
       />
@@ -412,7 +565,7 @@ export default function ReportesPage() {
           No hay datos para el periodo seleccionado.
         </div>
       ) : (
-        <div className="p-3 md:p-4 space-y-4 max-w-6xl mx-auto min-w-0 overflow-x-hidden text-sm">
+        <div ref={reportRef} className="p-3 md:p-4 space-y-4 max-w-6xl mx-auto min-w-0 overflow-x-hidden text-sm">
 
           {/* ── KPIs principales ─────────────────────────────────────────── */}
           <section>
