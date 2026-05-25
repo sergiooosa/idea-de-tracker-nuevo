@@ -119,129 +119,180 @@ interface ReportData {
   alertasMetas: ReportMeta[] | null;
 }
 
-// ─── Mock data (reemplazar con fetch real cuando la API esté lista) ─────────
+// ─── Tipos mínimos del response de la API (evitar importar módulos server-only) ──
 
-const MOCK_DATA: ReportData = {
-  kpis: {
-    totalLeads: 148,
-    callsMade: 312,
-    answerRate: 0.58,
-    meetingsBooked: 67,
-    meetingsAttended: 52,
-    meetingsClosed: 19,
-    tasaCierre: 0.365,
-    tasaAgendamiento: 0.453,
-    revenue: 47800,
-    cashCollected: 31200,
-    avgTicket: 2516,
-    speedToLeadAvg: 8.3,
-    noShows: 11,
-  },
-  volumeByDay: [
-    { date: 'Lu', llamadas: 48, citas: 12, cierres: 3 },
-    { date: 'Ma', llamadas: 55, citas: 10, cierres: 2 },
-    { date: 'Mi', llamadas: 61, citas: 14, cierres: 4 },
-    { date: 'Ju', llamadas: 43, citas: 9, cierres: 3 },
-    { date: 'Vi', llamadas: 52, citas: 11, cierres: 5 },
-    { date: 'Sá', llamadas: 28, citas: 6, cierres: 1 },
-    { date: 'Do', llamadas: 25, citas: 5, cierres: 1 },
-  ],
-  advisorRanking: [
-    {
-      nombre: 'Carlos M.',
-      email: 'carlos@ejemplo.com',
-      leads: 38,
-      llamadas: 87,
-      agendadas: 21,
-      asistidas: 17,
-      cierres: 7,
-      revenue: 16800,
-      tasaContacto: 0.68,
-      tasaAgendamiento: 0.55,
-    },
-    {
-      nombre: 'Ana R.',
-      email: 'ana@ejemplo.com',
-      leads: 31,
-      llamadas: 74,
-      agendadas: 18,
-      asistidas: 14,
-      cierres: 5,
-      revenue: 11900,
-      tasaContacto: 0.62,
-      tasaAgendamiento: 0.58,
-    },
-    {
-      nombre: 'Luis G.',
-      email: 'luis@ejemplo.com',
-      leads: 29,
-      llamadas: 68,
-      agendadas: 15,
-      asistidas: 12,
-      cierres: 4,
-      revenue: 9200,
-      tasaContacto: 0.59,
-      tasaAgendamiento: 0.52,
-    },
-    {
-      nombre: 'María T.',
-      email: 'maria@ejemplo.com',
-      leads: 26,
-      llamadas: 55,
-      agendadas: 9,
-      asistidas: 7,
-      cierres: 2,
-      revenue: 7100,
-      tasaContacto: 0.51,
-      tasaAgendamiento: 0.35,
-    },
-    {
-      nombre: 'Pedro H.',
-      email: 'pedro@ejemplo.com',
-      leads: 24,
-      llamadas: 28,
-      agendadas: 4,
-      asistidas: 2,
-      cierres: 1,
-      revenue: 2800,
-      tasaContacto: 0.44,
-      tasaAgendamiento: 0.17,
-    },
-  ],
-  objeciones: [
-    { name: 'Precio', count: 28, percent: 0.38 },
-    { name: 'No es el momento', count: 18, percent: 0.24 },
-    { name: 'Necesita consultar', count: 14, percent: 0.19 },
-    { name: 'Ya tiene proveedor', count: 9, percent: 0.12 },
-    { name: 'Otro', count: 5, percent: 0.07 },
-  ],
-  ads: {
-    gastoTotal: 3840,
-    impresiones: 124500,
-    clicks: 2380,
-    ctr: 0.0191,
-    cpm: 30.8,
-    cpc: 1.61,
-    plataformas: ['Meta Ads'],
-  },
+interface ApiReportResponse {
+  calls: {
+    totalLlamadas: number;
+    totalContestadas: number;
+    tasaContactoGlobal: number;
+    speedToLeadAvgMin: number | null;
+    intentosPromGlobal: number;
+    porCloser: Array<{
+      closerMail: string | null;
+      closerName: string | null;
+      totalLlamadas: number;
+      contestadas: number;
+      tasaContacto: number;
+      speedToLeadAvgMin: number | null;
+      intentosProm: number;
+      leadsNuevos: number;
+      leadsSeguimiento: number;
+    }>;
+  } | null;
+  videocalls: {
+    total: number;
+    calificadas: number;
+    noShows: number;
+    cerradas: number;
+    canceladas: number;
+    tasaCierre: number;
+    porCloser: Array<{
+      closer: string | null;
+      total: number;
+      calificadas: number;
+      noShows: number;
+      cerradas: number;
+      canceladas: number;
+    }>;
+  } | null;
   chats: {
-    total: 203,
-    leadsUnicos: 148,
-    tasaRespuesta: 0.82,
-    speedToLeadAvg: 142,
-    topClosers: [
-      { name: 'Carlos M.', count: 58 },
-      { name: 'Ana R.', count: 47 },
-      { name: 'Luis G.', count: 41 },
-    ],
-  },
-  alertasMetas: [
-    { label: 'Llamadas realizadas', actual: 312, meta: 300, cumple: true, pct: 1.04, unidad: 'llamadas' },
-    { label: 'Agendamiento', actual: 0.453, meta: 0.5, cumple: false, pct: 0.906, unidad: '%' },
-    { label: 'Tasa de cierre', actual: 0.365, meta: 0.35, cumple: true, pct: 1.043, unidad: '%' },
-    { label: 'Revenue', actual: 47800, meta: 50000, cumple: false, pct: 0.956, unidad: '$' },
-  ],
-};
+    totalChats: number;
+    speedToLeadAvgMin: number | null;
+    porAsesor: Array<{ asesor: string | null; totalChats: number }>;
+    porCategoria: Record<string, number>;
+  } | null;
+  ads: {
+    totalGasto: number;
+    totalImpresiones: number;
+    totalClicks: number;
+    avgCtr: number | null;
+    avgCpm: number | null;
+    avgCpc: number | null;
+    porCampana: Array<{ plataforma: string | null }>;
+  } | null;
+  funnel: {
+    llamadas: { contactados: number; sinContacto: number };
+    chats: { contactados: number; sinContacto: number };
+    videollamadas: { contactados: number; sinContacto: number };
+  } | null;
+  conversationAnalysis: {
+    objeciones: Array<{ objecion: string; categoria: string; count: number }>;
+  } | null;
+}
+
+// ─── Mapeo de API response → ReportData ─────────────────────────────────────
+
+function mapApiToReportData(r: ApiReportResponse): ReportData {
+  const calls = r.calls;
+  const videocalls = r.videocalls;
+  const chats = r.chats;
+  const ads = r.ads;
+  const funnel = r.funnel;
+
+  const totalLeadsLlamadas =
+    (funnel?.llamadas.contactados ?? 0) + (funnel?.llamadas.sinContacto ?? 0);
+  const totalLeadsChats =
+    (funnel?.chats.contactados ?? 0) + (funnel?.chats.sinContacto ?? 0);
+  const totalLeads = totalLeadsLlamadas || totalLeadsChats || videocalls?.total || chats?.totalChats || 0;
+
+  const totalLlamadas = calls?.totalLlamadas ?? 0;
+  const meetingsBooked = videocalls?.total ?? 0;
+  const tasaAgendamiento = totalLlamadas > 0 ? meetingsBooked / totalLlamadas : 0;
+
+  const speedToLeadAvg = calls?.speedToLeadAvgMin ?? chats?.speedToLeadAvgMin ?? 0;
+
+  // Ranking por asesor: base en calls, enriquecido con videocalls por nombre
+  const vcByCloser = new Map<string, { cerradas: number; calificadas: number; noShows: number; total: number }>();
+  for (const vc of videocalls?.porCloser ?? []) {
+    const key = (vc.closer ?? 'sin asignar').trim().toLowerCase();
+    vcByCloser.set(key, {
+      cerradas: vc.cerradas,
+      calificadas: vc.calificadas,
+      noShows: vc.noShows,
+      total: vc.total,
+    });
+  }
+
+  const advisorRanking: ReportAdvisorRow[] = (calls?.porCloser ?? []).map((c) => {
+    const nombre = c.closerName ?? c.closerMail ?? 'Sin asignar';
+    const vcKey = nombre.trim().toLowerCase();
+    const vc = vcByCloser.get(vcKey) ?? vcByCloser.get((c.closerMail ?? '').trim().toLowerCase());
+    return {
+      nombre,
+      email: c.closerMail,
+      leads: c.leadsNuevos + c.leadsSeguimiento,
+      llamadas: c.totalLlamadas,
+      agendadas: vc?.total ?? 0,
+      asistidas: vc?.calificadas ?? 0,
+      cierres: vc?.cerradas ?? 0,
+      revenue: 0,
+      tasaContacto: c.tasaContacto / 100,
+      tasaAgendamiento: c.totalLlamadas > 0 ? (vc?.total ?? 0) / c.totalLlamadas : 0,
+    };
+  });
+
+  // Objeciones
+  const totalObjeciones = r.conversationAnalysis?.objeciones.reduce((s, o) => s + o.count, 0) ?? 0;
+  const objeciones: ReportObjecion[] = (r.conversationAnalysis?.objeciones ?? []).map((o) => ({
+    name: o.objecion,
+    count: o.count,
+    percent: totalObjeciones > 0 ? (o.count / totalObjeciones) * 100 : 0,
+  }));
+
+  // Ads
+  const adsData: ReportAds | null = ads
+    ? {
+        gastoTotal: ads.totalGasto,
+        impresiones: ads.totalImpresiones,
+        clicks: ads.totalClicks,
+        ctr: ads.avgCtr ?? 0,
+        cpm: ads.avgCpm ?? 0,
+        cpc: ads.avgCpc ?? 0,
+        plataformas: [
+          ...new Set(ads.porCampana.map((c) => c.plataforma).filter((p): p is string => p != null)),
+        ],
+      }
+    : null;
+
+  // Chats
+  const chatsData: ReportChats | null = chats
+    ? {
+        total: chats.totalChats,
+        leadsUnicos: chats.porAsesor.length,
+        tasaRespuesta: 0,
+        speedToLeadAvg: chats.speedToLeadAvgMin,
+        topClosers: chats.porAsesor
+          .sort((a, b) => b.totalChats - a.totalChats)
+          .slice(0, 5)
+          .map((a) => ({ name: a.asesor ?? 'Sin asignar', count: a.totalChats })),
+      }
+    : null;
+
+  return {
+    kpis: {
+      totalLeads,
+      callsMade: totalLlamadas,
+      answerRate: (calls?.tasaContactoGlobal ?? 0) / 100,
+      meetingsBooked,
+      meetingsAttended: videocalls?.calificadas ?? 0,
+      meetingsClosed: videocalls?.cerradas ?? 0,
+      tasaCierre: (videocalls?.tasaCierre ?? 0) / 100,
+      tasaAgendamiento,
+      revenue: 0,
+      cashCollected: 0,
+      avgTicket: 0,
+      speedToLeadAvg,
+      noShows: videocalls?.noShows ?? 0,
+    },
+    volumeByDay: [],
+    advisorRanking,
+    objeciones,
+    ads: adsData,
+    chats: chatsData,
+    alertasMetas: null,
+  };
+}
 
 // ─── Period helpers ─────────────────────────────────────────────────────────
 
@@ -337,8 +388,8 @@ export default function ReportesPage() {
   const [period, setPeriod] = useState<PeriodType>('semana');
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(today), 'yyyy-MM-dd'));
   const [customTo, setCustomTo] = useState(format(today, 'yyyy-MM-dd'));
-  // Loading state: simula fetch real — reemplazar con useApiData cuando exista la API
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<ReportData | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -359,9 +410,19 @@ export default function ReportesPage() {
     [period, customFrom, customTo],
   );
 
-  // TODO (AUT-386 followup): reemplazar MOCK_DATA con:
-  // const { data, loading } = useApiData<ReportData>('/api/data/report', { from, to, period_type: period });
-  const data: ReportData | null = MOCK_DATA;
+  // Fetch real report data from API
+  useEffect(() => {
+    setLoading(true);
+    setData(null);
+    const params = new URLSearchParams({ from, to, period_type: period });
+    fetch(`/api/data/report?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r: ApiReportResponse | null) => {
+        if (r) setData(mapApiToReportData(r));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [from, to, period]);
 
   const kpis = data?.kpis ?? null;
 
