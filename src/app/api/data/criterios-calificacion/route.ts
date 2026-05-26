@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-auth";
+import { withAuth, withAuthFull } from "@/lib/api-auth";
 import { API_BASE_URL } from "@/lib/api-config";
 import { db } from "@/lib/db";
 import { chatsLogs, apiKeysCuenta } from "@/lib/db/schema";
@@ -71,7 +71,11 @@ export async function GET(req: Request) {
  * null clears criterios → all chats qualify (backward compat)
  */
 export async function PATCH(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthFull(req, async (ctx) => {
+    if (ctx.rol !== "superadmin") {
+      return NextResponse.json({ error: "Solo administradores pueden modificar criterios" }, { status: 403 });
+    }
+    const idCuenta = ctx.idCuenta;
     const body = await req.json().catch(() => null);
     if (!body || !("categorias" in body)) {
       return NextResponse.json({ error: "categorias requerido" }, { status: 400 });

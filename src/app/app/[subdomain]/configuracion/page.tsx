@@ -61,6 +61,7 @@ export default function ConfiguracionPage() {
   const [criteriosLoaded, setCriteriosLoaded] = useState(false);
 
   const loadCriterios = useCallback(async () => {
+    if (session?.rol !== "superadmin") return;
     try {
       const res = await fetch("/api/data/criterios-calificacion");
       if (res.ok) {
@@ -70,7 +71,7 @@ export default function ConfiguracionPage() {
         setCriteriosLoaded(true);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [session?.rol]);
 
   const loadUsers = useCallback(async () => {
     if (!puedeUsuarios) return;
@@ -453,7 +454,7 @@ export default function ConfiguracionPage() {
         )}
 
         {/* ── Criterios de Calificación ── */}
-        {criteriosLoaded && (
+        {criteriosLoaded && session?.rol === "superadmin" && (
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
