@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Fragment } from 'react';
+import React, { useState, useMemo, Fragment, useEffect } from 'react';
 import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -11,11 +11,16 @@ import type { ChatsResponse, ApiChatLead } from '@/types';
 import type { MetricaConfig } from '@/lib/db/schema';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Pencil, User, X, Plus, Sparkles, AlertTriangle } from 'lucide-react';
+import { Pencil, User, X, Plus, Sparkles, AlertTriangle, Settings, CheckCircle2 } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import InsightsChat from '@/components/dashboard/InsightsChat';
 import { useUserFilter } from '@/contexts/UserFilterContext';
+
+interface CriteriosData {
+  categorias: string[] | null;
+  categoriasDisponibles: string[];
+}
 
 const minFmt = (s: number | null) => {
   if (s == null || s === 0) return '—';
@@ -105,11 +110,23 @@ export default function PerformanceChatsPage() {
   const [editingRecord, setEditingRecord] = useState<{id: number; nombre_lead: string | null; closer: string | null; estado: string | null} | null>(null);
   const [canalActivo, setCanalActivo] = useState<Canal>('todos');
   const [soloSinContactar, setSoloSinContactar] = useState(false);
+  const [soloCalificados, setSoloCalificados] = useState(false);
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [showInsightsChat, setShowInsightsChat] = useState(false);
 
+  // Criterios de calificación — configurados por la cuenta
+  const [criteriosData, setCriteriosData] = useState<CriteriosData | null>(null);
+
   const { asesores: asesoresCtx } = useUserFilter();
   const { data, loading, refetch } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
+
+  // Cargar criterios de calificación
+  useEffect(() => {
+    fetch('/api/data/criterios-calificacion')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setCriteriosData(d as CriteriosData); })
+      .catch(() => undefined);
+  }, []);
 
   // Mapa nombre → email usando asesores del contexto (tienen email real)
   const nameToEmail = useMemo(() => {
@@ -126,12 +143,29 @@ export default function PerformanceChatsPage() {
 
   // KPIs adicionales calculados en el cliente
   const extraKpis = useMemo(() => {
-    if (!data) return { sinRespuesta: 0, pctSinContactar: 0 };
+    if (!data) return { sinRespuesta: 0, pctSinContactar: 0, calificados: 0 };
     const sinRespuesta = data.chats.filter((c) => c.minutesSinceLastLeadMsg != null).length;
     const sinContactar = data.chats.filter((c) => !c.humanTookOver).length;
     const pctSinContactar = data.chats.length > 0 ? Math.round((sinContactar / data.chats.length) * 100) : 0;
-    return { sinRespuesta, pctSinContactar };
-  }, [data]);
+    const criterios = criteriosData?.categorias;
+    const calificados = data.chats.filter((c) =>
+      criterios == null ? false : c.iaCategoria != null && criterios.includes(c.iaCategoria),
+    ).length;
+    return { sinRespuesta, pctSinContactar, calificados };
+  }, [data, criteriosData]);
+
+  /**
+   * Determina si un chat califica según los criterios configurados.
+   * criterios=null → no configurado (no se puede determinar).
+   * criterios=[] → ninguno califica.
+   */
+  const chatEsCalificado = (chat: ApiChatLead): boolean | null => {
+    if (!criteriosData) return null;
+    const criterios = criteriosData.categorias;
+    if (criterios === null) return null; // sin criterios → indeterminado
+    if (!chat.iaCategoria) return false;
+    return criterios.includes(chat.iaCategoria);
+  };
 
   // Distribución de ia_categoria (top 6 temas de interés)
   const categoriasDistrib = useMemo(() => {
@@ -186,13 +220,16 @@ export default function PerformanceChatsPage() {
     return counts;
   }, [data]);
 
-  // Filter chats by canal + sin contactar
+  // Filter chats by canal + sin contactar + solo calificados
   const filteredChats = useMemo(() => {
     if (!data) return [];
     let chats = canalActivo === 'todos' ? data.chats : data.chats.filter((c) => detectCanal(c) === canalActivo);
     if (soloSinContactar) chats = chats.filter((c) => !c.humanTookOver);
+    if (soloCalificados && criteriosData?.categorias != null) {
+      chats = chats.filter((c) => c.iaCategoria != null && criteriosData.categorias!.includes(c.iaCategoria));
+    }
     return chats;
-  }, [data, canalActivo, soloSinContactar]);
+  }, [data, canalActivo, soloSinContactar, soloCalificados, criteriosData]);
 
   const chatsByAgent = useMemo(() => {
     const map: Record<string, ApiChatLead[]> = {};
@@ -284,6 +321,39 @@ export default function PerformanceChatsPage() {
           </div>
         ))}
       </div>
+
+      {/* ── KPI Calificados (solo si hay criterios configurados) ── */}
+      {criteriosData?.categorias != null && criteriosData.categorias.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs font-medium text-gray-300">Leads calificados:</span>
+            <span className="text-base font-bold text-emerald-400">{extraKpis.calificados}</span>
+            <span className="text-[10px] text-gray-500">
+              de {agg.assigned} · categorías: {criteriosData.categorias.join(', ')}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Onboarding: criterios no configurados ── */}
+      {criteriosData && criteriosData.categorias === null && (
+        <div className="flex items-start gap-3 rounded-xl border border-accent-purple/30 bg-accent-purple/5 p-3">
+          <Settings className="mt-0.5 w-4 h-4 text-accent-purple shrink-0" />
+          <div className="space-y-0.5">
+            <p className="text-xs font-semibold text-accent-purple">
+              Define qué intereses califican como leads para tu negocio
+            </p>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Configura los criterios de calificación en{' '}
+              <Link href="../configuracion" className="text-accent-cyan underline hover:text-accent-cyan/80">
+                Configuración
+              </Link>{' '}
+              para identificar automáticamente cuáles chats detectados por la IA son leads calificados.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── KPIs custom tipo "chat" ── */}
       {data?.metricasChatConfig && data.metricasChatConfig.length > 0 && data.metricasCustom && (
@@ -400,6 +470,22 @@ export default function PerformanceChatsPage() {
             </span>
           )}
         </button>
+        {criteriosData?.categorias != null && criteriosData.categorias.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSoloCalificados(!soloCalificados)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+              soloCalificados
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
+                : 'bg-surface-700 text-gray-400 border-surface-500 hover:border-emerald-500/30 hover:text-gray-300'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" /> Solo calificados
+            <span className={`rounded-full px-1 text-[10px] ${soloCalificados ? 'bg-emerald-500/30' : 'bg-surface-600'}`}>
+              {extraKpis.calificados}
+            </span>
+          </button>
+        )}
         {(canalActivo !== 'todos' || soloSinContactar) && (
           <p className="text-[11px] text-gray-500">
             Mostrando {filteredChats.length} chat{filteredChats.length !== 1 ? 's' : ''}
@@ -484,7 +570,7 @@ export default function PerformanceChatsPage() {
                           </tr>
                           {isExpanded && (
                             <tr className="bg-surface-800/90">
-                              <td colSpan={7} className="p-0">
+                              <td colSpan={8} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
                                   <div className="text-[10px] text-gray-400 mb-1.5">Chats de {agentKey}</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[360px] overflow-y-auto">
@@ -500,6 +586,9 @@ export default function PerformanceChatsPage() {
                                           <th className="px-2 py-2 font-medium" title="Minutos desde último mensaje del lead sin respuesta del agente">⏳ Espera</th>
                                           <th className="px-2 py-2 font-medium">Estado</th>
                                           <th className="px-2 py-2 font-medium">Interés IA</th>
+                                          {criteriosData?.categorias != null && (
+                                            <th className="px-2 py-2 font-medium" title="¿Cumple los criterios de calificación configurados?">Calificado</th>
+                                          )}
                                           <th className="px-2 py-2 font-medium" title="Objeciones detectadas por IA">Objeciones</th>
                                           <th className="px-2 py-2 font-medium w-32" />
                                         </tr>
@@ -536,6 +625,22 @@ export default function PerformanceChatsPage() {
                                                   <span className="text-gray-600 text-[10px]">—</span>
                                                 )}
                                               </td>
+                                              {criteriosData?.categorias != null && (() => {
+                                                const calificado = chatEsCalificado(chat);
+                                                return (
+                                                  <td className="px-2 py-2">
+                                                    {calificado === true ? (
+                                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                                                        <CheckCircle2 className="w-3 h-3" /> Sí
+                                                      </span>
+                                                    ) : calificado === false ? (
+                                                      <span className="text-gray-600 text-[10px]">No</span>
+                                                    ) : (
+                                                      <span className="text-gray-600 text-[10px]">—</span>
+                                                    )}
+                                                  </td>
+                                                );
+                                              })()}
                                               <td className="px-2 py-2">
                                                 {chat.iaObjeciones && chat.iaObjeciones.length > 0 ? (
                                                   <div className="flex flex-wrap gap-0.5">

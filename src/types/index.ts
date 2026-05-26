@@ -371,6 +371,12 @@ export interface ApiChatLead {
   iaCategoria?: string | null;
   /** Objeciones detectadas por la IA nocturna en la conversación. */
   iaObjeciones?: Array<{ objecion: string; categoria: string }> | null;
+  /**
+   * true si el chat cumple los criterios de calificación configurados por la cuenta.
+   * Se computa en el cliente comparando iaCategoria contra los criterios configurados.
+   * null = criterios no configurados (backward compat: todos califican).
+   */
+  esCalificado?: boolean | null;
 }
 
 export interface ChatsAdvisorMetrics {

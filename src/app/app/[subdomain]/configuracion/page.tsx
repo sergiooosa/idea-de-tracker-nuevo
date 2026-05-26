@@ -2,12 +2,17 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
-import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download } from "lucide-react";
+import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download, CheckCircle2, Sparkles } from "lucide-react";
 import { useUserFilter } from "@/contexts/UserFilterContext";
 import { canManageUsers, canManageRoles } from "@/lib/permisos";
 import { PERMISOS_DISPONIBLES, type PermisoId } from "@/lib/permisos";
 import type { RolConfig } from "@/lib/db/schema";
 import { toast } from "sonner";
+
+interface CriteriosCalificacionData {
+  categorias: string[] | null;
+  categoriasDisponibles: string[];
+}
 
 interface UserRow {
   id: number;
@@ -49,6 +54,25 @@ export default function ConfiguracionPage() {
   const [editingRol, setEditingRol] = useState<RolConfig | null>(null);
   const [formRol, setFormRol] = useState<RolConfig>({ id: "", nombre: "", permisos: [] });
 
+  // Criterios de calificación
+  const [criteriosData, setCriteriosData] = useState<CriteriosCalificacionData | null>(null);
+  const [criteriosSeleccionados, setCriteriosSeleccionados] = useState<string[]>([]);
+  const [criteriosSaving, setCriteriosSaving] = useState(false);
+  const [criteriosLoaded, setCriteriosLoaded] = useState(false);
+
+  const loadCriterios = useCallback(async () => {
+    if (session?.rol !== "superadmin") return;
+    try {
+      const res = await fetch("/api/data/criterios-calificacion");
+      if (res.ok) {
+        const data = (await res.json()) as CriteriosCalificacionData;
+        setCriteriosData(data);
+        setCriteriosSeleccionados(data.categorias ?? []);
+        setCriteriosLoaded(true);
+      }
+    } catch { /* ignore */ }
+  }, [session?.rol]);
+
   const loadUsers = useCallback(async () => {
     if (!puedeUsuarios) return;
     try {
@@ -67,8 +91,8 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadUsers(), loadRoles()]).finally(() => setLoading(false));
-  }, [loadUsers, loadRoles]);
+    Promise.all([loadUsers(), loadRoles(), loadCriterios()]).finally(() => setLoading(false));
+  }, [loadUsers, loadRoles, loadCriterios]);
 
   const rolesParaSelect = [...ROLES_BUILTIN, ...roles.filter((r) => !["superadmin", "usuario"].includes(r.id))];
 
@@ -251,6 +275,29 @@ export default function ConfiguracionPage() {
     }
   };
 
+  const handleSaveCriterios = async () => {
+    setCriteriosSaving(true);
+    try {
+      const res = await fetch("/api/data/criterios-calificacion", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categorias: criteriosSeleccionados.length > 0 ? criteriosSeleccionados : null }),
+      });
+      if (!res.ok) throw new Error("Error al guardar");
+      toast.success("Criterios de calificación guardados");
+      await loadCriterios();
+    } catch {
+      toast.error("Error al guardar los criterios");
+    }
+    setCriteriosSaving(false);
+  };
+
+  const toggleCriterio = (cat: string) => {
+    setCriteriosSeleccionados((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  };
+
   if (!puedeUsuarios && !puedeRoles) {
     return (
       <>
@@ -402,6 +449,75 @@ export default function ConfiguracionPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+        )}
+
+        {/* ── Criterios de Calificación ── */}
+        {criteriosLoaded && session?.rol === "superadmin" && (
+          <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-accent-purple" />
+                <h2 className="text-sm font-semibold text-white">Criterios de Calificación</h2>
+              </div>
+            </div>
+
+            {criteriosData?.categoriasDisponibles.length === 0 ? (
+              /* Estado vacío: onboarding — aún no hay categorías IA en la cuenta */
+              <div className="rounded-xl border border-accent-purple/20 bg-accent-purple/5 p-4 space-y-2">
+                <p className="text-sm font-medium text-accent-purple">
+                  Define qué intereses detectados por IA califican como leads para tu negocio
+                </p>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Cuando la IA analice las conversaciones nocturnas, verás aquí las categorías detectadas y podrás seleccionar cuáles considerarás leads calificados.
+                  Por ahora no hay categorías disponibles — el análisis nocturno aún no ha procesado conversaciones.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+                  Selecciona las categorías de interés detectadas por la IA que consideras un lead calificado para tu negocio.
+                  Los chats con estas categorías se marcarán como <span className="text-emerald-400 font-medium">Calificado</span> en Performance.
+                  Dejar todo vacío = sin filtro (todos los chats calificados).
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {criteriosData?.categoriasDisponibles.map((cat) => {
+                    const selected = criteriosSeleccionados.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => toggleCriterio(cat)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                          selected
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
+                            : 'bg-surface-700 text-gray-400 border-surface-500 hover:border-emerald-500/30 hover:text-gray-300'
+                        }`}
+                      >
+                        {selected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        {cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveCriterios}
+                    disabled={criteriosSaving}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 transition-colors"
+                  >
+                    {criteriosSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Guardar criterios
+                  </button>
+                  {criteriosSeleccionados.length > 0 && (
+                    <span className="text-xs text-gray-400">
+                      {criteriosSeleccionados.length} categoría{criteriosSeleccionados.length !== 1 ? 's' : ''} seleccionada{criteriosSeleccionados.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </>
             )}
           </section>
         )}
