@@ -26,6 +26,7 @@ import {
   BarChart2,
   Building2,
   Check,
+  GitCompareArrows,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -111,7 +112,7 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
   );
 }
 
-type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "sistema" | "documentacion" | "configuracion" | "reportes";
+type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes";
 
 const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType }[] = [
   { path: "/dashboard", navKey: "dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
@@ -121,6 +122,7 @@ const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.Elem
   { path: "/bandeja", navKey: "bandeja", label: "Bandeja", icon: Inbox },
   { path: "/acquisition", navKey: "adquisicion", label: "Resumen adquisición", icon: TrendingUp },
   { path: "/ads", navKey: "ads", label: "Ads & Inversión", icon: BarChart2 },
+  { path: "/comparaciones", navKey: "comparaciones", label: "Comparaciones", icon: GitCompareArrows },
   { path: "/reportes", navKey: "reportes", label: "Reportes", icon: TrendingUp },
   { path: "/system", navKey: "sistema", label: "Control del sistema", icon: Target },
   { path: "/documentacion", navKey: "documentacion", label: "Documentación", icon: BookOpen },
