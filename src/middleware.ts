@@ -172,27 +172,27 @@ export default async function middleware(req: NextRequest) {
 
   if (needsLogin) {
     if (pathname !== "/login") {
-      // Redirigir siempre al login del dominio raíz (no al login del subdominio).
-      // El login de subdominio causaba bucles con usuarios multi-cuenta: la cookie
-      // se establecía para .autokpi.net pero el flujo de switch-account fallaba
-      // en ciertos contextos de subdominio. El parámetro `from` permite al login
-      // pre-seleccionar automáticamente la cuenta correcta.
+      // Sesión stale (cookie de otro tenant): intentar auto-switch antes de ir al login.
+      // El auto-switch valida que el usuario tiene acceso al subdomain destino y reescribe
+      // el JWT sin requerir contraseña. Si el usuario no tiene acceso, redirige al login.
+      // Esto permite que usuarios multi-cuenta (ej. monitor@autokpi.internal) naveguen
+      // directamente entre subdominios sin tener que re-autenticarse.
+      if (staleSession && subdomain) {
+        const protocol = req.nextUrl.protocol;
+        const port = req.nextUrl.port ? `:${req.nextUrl.port}` : "";
+        const isLocalDev = (req.headers.get("host") ?? "").includes("localhost");
+        const rootHost = isLocalDev ? `localhost${port}` : ROOT_DOMAIN;
+        const autoSwitchUrl = new URL(`${protocol}//${rootHost}/api/auth/auto-switch`);
+        autoSwitchUrl.searchParams.set("to", subdomain);
+        return NextResponse.redirect(autoSwitchUrl);
+      }
+
+      // Sin sesión: redirigir al login del dominio raíz.
+      // El parámetro `from` permite al login pre-seleccionar automáticamente la cuenta correcta.
       const loginUrlStr = buildLoginUrl();
       const loginUrl = new URL(loginUrlStr);
       if (subdomain) loginUrl.searchParams.set("from", subdomain);
-      const response = NextResponse.redirect(loginUrl);
-
-      // Cookie de otro tenant → limpiarla antes de ir al login
-      // Evita que el login post-redirect se confunda y redirija al subdominio equivocado
-      if (staleSession) {
-        response.cookies.delete({
-          name: COOKIE_NAME,
-          domain: isProduction ? `.${ROOT_DOMAIN}` : undefined,
-          path: "/",
-        });
-      }
-
-      return response;
+      return NextResponse.redirect(loginUrl);
     }
 
 
