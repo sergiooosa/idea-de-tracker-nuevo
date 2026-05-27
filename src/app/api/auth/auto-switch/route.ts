@@ -50,7 +50,7 @@ function resolvePermisos(rol: string, rolesConfig: RolConfig[] | null): string[]
   const config = Array.isArray(rolesConfig) && rolesConfig.length > 0 ? rolesConfig : DEFAULT_ROLES_CONFIG;
   const match = config.find((r) => r.id === rol);
   if (match) return match.permisos;
-  if (rol === "usuario") return DEFAULT_ROLES_CONFIG[1]!.permisos;
+  if (rol === "usuario") return DEFAULT_ROLES_CONFIG[1]?.permisos ?? [];
   return [];
 }
 
@@ -144,11 +144,17 @@ export async function GET(req: NextRequest) {
     exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
   };
 
+  const authSecret = process.env.AUTH_SECRET;
+  if (!authSecret) {
+    console.error("[auto-switch] AUTH_SECRET not configured");
+    return NextResponse.redirect(buildLoginUrl(subdominioSlug));
+  }
+
   let encodedToken: string;
   try {
     encodedToken = await encode({
       token: newToken,
-      secret: process.env.AUTH_SECRET!,
+      secret: authSecret,
       salt: COOKIE_NAME,
     });
   } catch (err) {
@@ -176,3 +182,4 @@ export async function GET(req: NextRequest) {
 
   return response;
 }
+
