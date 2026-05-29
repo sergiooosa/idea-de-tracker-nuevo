@@ -452,7 +452,10 @@ export async function getDashboard(
     totalLeads,
     callsMade: filteredCalls.length,
     contestadas,
-    answerRate: totalLeads > 0 ? leadsContactados / totalLeads : 0,
+    // contestadas / llamadas totales = tasa de contestación por llamada
+    // No usar leadsContactados/totalLeads: totalLeads solo cuenta leads NUEVOS del período,
+    // pero leadsContactados puede incluir leads más antiguos → resultado > 100% (bug: 400%)
+    answerRate: filteredCalls.length > 0 ? contestadas / filteredCalls.length : 0,
     meetingsBooked,
     meetingsAttended: asistidas,
     meetingsCanceled: canceladas,
