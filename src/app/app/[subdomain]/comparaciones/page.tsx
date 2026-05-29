@@ -119,7 +119,7 @@ function MetricMultiSelect({
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && metrics.length > 0 && (
+      {open && (
         <div className="absolute top-full left-0 mt-1 z-30 w-72 rounded-lg border border-surface-500 bg-surface-800 shadow-xl max-h-60 overflow-y-auto">
           <div className="p-2 flex items-center justify-between border-b border-surface-500/60 sticky top-0 bg-surface-800">
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">Métricas</p>
@@ -133,20 +133,24 @@ function MetricMultiSelect({
               </button>
             )}
           </div>
-          {metrics.map((m) => (
-            <label
-              key={m.id}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-surface-700 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(m.id)}
-                onChange={() => toggleMetric(m.id)}
-                className="accent-accent-cyan w-3.5 h-3.5 cursor-pointer"
-              />
-              <span className="text-xs text-gray-300 truncate">{m.nombre}</span>
-            </label>
-          ))}
+          {metrics.length > 0 ? (
+            metrics.map((m) => (
+              <label
+                key={m.id}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-surface-700 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(m.id)}
+                  onChange={() => toggleMetric(m.id)}
+                  className="accent-accent-cyan w-3.5 h-3.5 cursor-pointer"
+                />
+                <span className="text-xs text-gray-300 truncate">{m.nombre}</span>
+              </label>
+            ))
+          ) : (
+            <p className="px-3 py-4 text-xs text-gray-500 text-center">Sin métricas configuradas</p>
+          )}
         </div>
       )}
     </div>
