@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { registrosDeLlamada, logLlamadas } from "@/lib/db/schema";
-import { eq, and, isNull, lt, gt, gte, lte, sql } from "drizzle-orm";
+import { eq, and, isNull, lt, gt, gte, lte, sql, inArray } from "drizzle-orm";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -30,6 +30,7 @@ export async function getLeadsEnEspera(
   idCuenta: number,
   dateFrom?: string,
   dateTo?: string,
+  closerEmails?: string[],
 ): Promise<LeadsEnEsperaResponse> {
   const umbralTs = new Date(Date.now() - UMBRAL_MINUTOS * 60 * 1000);
   const idCuentaStr = String(idCuenta);
@@ -56,6 +57,7 @@ export async function getLeadsEnEspera(
     return { grupos: [], total: 0, umbral_min: UMBRAL_MINUTOS };
   }
 
+  const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
   const rows = await db
     .select({
       nombre_lead: registrosDeLlamada.nombre_lead,
@@ -73,6 +75,11 @@ export async function getLeadsEnEspera(
         lt(registrosDeLlamada.fecha_evento, umbralTs),
         fromDate ? gte(registrosDeLlamada.fecha_evento, fromDate) : undefined,
         toDate ? lte(registrosDeLlamada.fecha_evento, toDate) : undefined,
+        // Filtro por asesor: solo para usuarios sin permiso ver_todo.
+        // Previene que asesores vean pendientes de sus colegas.
+        emails.length > 0
+          ? inArray(registrosDeLlamada.closer_mail, emails)
+          : undefined,
       ),
     )
     .orderBy(sql`ROUND(EXTRACT(EPOCH FROM (NOW() - ${registrosDeLlamada.fecha_evento}))/60)::int DESC`);
