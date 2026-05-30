@@ -929,6 +929,16 @@ export async function getDashboard(
   // ----------------------------------------------------------------
   // Chat KPIs — consultar chats_logs en el mismo rango de fechas
   // ----------------------------------------------------------------
+  const chatConditions: Parameters<typeof and>[0][] = [
+    eq(chatsLogs.id_cuenta, idCuenta),
+    gte(chatsLogs.fecha_y_hora_z, fromDate),
+    lte(chatsLogs.fecha_y_hora_z, toDate),
+  ];
+  // Filtro por asesor en chats: usa asesor_asignado (equivalente a closer_mail en llamadas).
+  // Sin esto, usuarios sin ver_todo ven los chats de todo el account.
+  if (emails.length > 0) {
+    chatConditions.push(inArray(chatsLogs.asesor_asignado, emails));
+  }
   const chatRows = await db
     .select({
       chatid: chatsLogs.chatid,
@@ -939,13 +949,7 @@ export async function getDashboard(
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
     })
     .from(chatsLogs)
-    .where(
-      and(
-        eq(chatsLogs.id_cuenta, idCuenta),
-        gte(chatsLogs.fecha_y_hora_z, fromDate),
-        lte(chatsLogs.fecha_y_hora_z, toDate),
-      ),
-    );
+    .where(and(...chatConditions));
 
   // ----------------------------------------------------------------
   // Funnel unificado — agregar leads de chats al distribucionEmbudo

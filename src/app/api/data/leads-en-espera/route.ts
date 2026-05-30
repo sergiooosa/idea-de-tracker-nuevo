@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-auth";
+import { withAuthFull, enforceCloserFilter } from "@/lib/api-auth";
 import { getLeadsEnEspera } from "@/lib/queries/leads-en-espera";
 
 export async function GET(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthFull(req, async (ctx) => {
     try {
       const { searchParams } = new URL(req.url);
       const from = searchParams.get("from") ?? undefined;
       const to = searchParams.get("to") ?? undefined;
-      const data = await getLeadsEnEspera(idCuenta, from, to);
+      // Aplicar el mismo filtro de privacidad que los demás endpoints:
+      // asesores sin ver_todo solo ven sus propios leads en espera.
+      const closerEmails = enforceCloserFilter(
+        undefined,
+        ctx.email,
+        ctx.permisosArray,
+        ctx.rol,
+      );
+      const data = await getLeadsEnEspera(ctx.idCuenta, from, to, closerEmails);
       return NextResponse.json(data);
     } catch (err) {
       console.error("[leads-en-espera] Error:", err);
