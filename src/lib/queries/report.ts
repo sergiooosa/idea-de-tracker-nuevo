@@ -13,7 +13,7 @@ import {
   chatsLogs,
   resumenesDiariosAgendas,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, isNull, or } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull, isNotNull, or, gt } from "drizzle-orm";
 
 /* ------------------------------------------------------------------ */
 /*  1. getReportAds                                                    */
@@ -490,19 +490,65 @@ export async function getReportVideocalls(
   from: string,
   to: string,
 ): Promise<ReportVideocalls> {
+  // Use the same 3-condition date filter as getDashboard so both screens show
+  // consistent numbers. Dashboard filters by fecha_reunion (actual meeting date)
+  // with fallback to fecha (insertion date); filtering only by fecha caused a
+  // systematic 2-meeting discrepancy for records inserted outside the period but
+  // with a meeting date inside it (or vice-versa).
+  const fromDate = new Date(`${from}T00:00:00Z`);
+  const toDate = new Date(`${to}T23:59:59.999Z`);
+  const fechaFilter = or(
+    // Caso 1: fecha_reunion conocida y dentro del rango
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromDate),
+      lte(resumenesDiariosAgendas.fecha_reunion, toDate),
+    ),
+    // Caso 2: PDTE con fecha_reunion futura — insertada en el rango seleccionado
+    and(
+      eq(resumenesDiariosAgendas.categoria, 'PDTE'),
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gt(resumenesDiariosAgendas.fecha_reunion, sql`NOW()`),
+      gte(resumenesDiariosAgendas.fecha, from),
+      lte(resumenesDiariosAgendas.fecha, to),
+    ),
+    // Caso 3: sin fecha_reunion → usa fecha de inserción
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, from),
+      lte(resumenesDiariosAgendas.fecha, to),
+    ),
+  )!;
+
   const rows = await db
     .select({
       closer: resumenesDiariosAgendas.closer,
       categoria: resumenesDiariosAgendas.categoria,
+      idcliente: resumenesDiariosAgendas.idcliente,
+      ghl_contact_id: resumenesDiariosAgendas.ghl_contact_id,
+      email_lead: resumenesDiariosAgendas.email_lead,
+      id_registro_agenda: resumenesDiariosAgendas.id_registro_agenda,
     })
     .from(resumenesDiariosAgendas)
     .where(
       and(
         eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
-        gte(resumenesDiariosAgendas.fecha, from),
-        lte(resumenesDiariosAgendas.fecha, to),
+        fechaFilter,
       ),
     );
+
+  // Lead deduplication key — same priority as getDashboard
+  const getLeadKey = (r: { idcliente: string | null; ghl_contact_id: string | null; email_lead: string | null; id_registro_agenda: number }) =>
+    r.idcliente?.trim() || r.ghl_contact_id?.trim() || r.email_lead?.trim().toLowerCase() || `nokey_${r.id_registro_agenda}`;
+
+  // Build global cancelled-lead set first so no-show dedup can exclude them
+  // (matches getDashboard invariant: a rescheduled lead appears only in canceladas)
+  const uniqueCanceledLeadKeys = new Set<string>();
+  for (const r of rows) {
+    if ((r.categoria ?? "").toLowerCase().trim().includes("cancel")) {
+      uniqueCanceledLeadKeys.add(getLeadKey(r));
+    }
+  }
 
   const byCloser: Record<
     string,
@@ -518,9 +564,12 @@ export async function getReportVideocalls(
   > = {};
 
   let totalCalificadas = 0;
-  let totalNoShows = 0;
   let totalCerradas = 0;
   let totalCanceladas = 0;
+
+  // Global sets for dedup-based totals (mirrors getDashboard logic)
+  const uniqueBookedLeadKeys = new Set<string>(); // all non-cancelled leads
+  const uniqueNoShowLeadKeys = new Set<string>();  // no_show leads not in cancelled
 
   for (const r of rows) {
     const key = r.closer?.trim() ?? "__sin_closer__";
@@ -541,23 +590,31 @@ export async function getReportVideocalls(
 
     const cl = clasificarCategoria(r.categoria);
     if (cl.calificada) { entry.calificadas++; totalCalificadas++; }
-    if (cl.noShow) { entry.noShows++; totalNoShows++; }
-    if (cl.cerrada) { entry.cerradas++; totalCerradas++; }
-    if (cl.cancelada) { entry.canceladas++; totalCanceladas++; }
+    if (cl.noShow)     { entry.noShows++; }
+    if (cl.cerrada)    { entry.cerradas++; totalCerradas++; }
+    if (cl.cancelada)  { entry.canceladas++; totalCanceladas++; }
+
+    const lk = getLeadKey(r);
+    if (!cl.cancelada) uniqueBookedLeadKeys.add(lk);
+    if (cl.noShow && !uniqueCanceledLeadKeys.has(lk)) uniqueNoShowLeadKeys.add(lk);
 
     const catKey = r.categoria ?? "sin categoría";
     entry.porCategoria[catKey] = (entry.porCategoria[catKey] ?? 0) + 1;
   }
 
+  // Global totals use dedup counts to match getDashboard's meetingsBooked / noShows
+  const totalDeduped = uniqueBookedLeadKeys.size;
+  const totalNoShows = uniqueNoShowLeadKeys.size;
+
   const porCloser: ReportVideocallsCloser[] = Object.values(byCloser);
 
   return {
-    total: rows.length,
+    total: totalDeduped,
     calificadas: totalCalificadas,
     noShows: totalNoShows,
     cerradas: totalCerradas,
     canceladas: totalCanceladas,
-    tasaCierre: rows.length > 0 ? (totalCerradas / rows.length) * 100 : 0,
+    tasaCierre: totalDeduped > 0 ? (totalCerradas / totalDeduped) * 100 : 0,
     porCloser,
   };
 }
