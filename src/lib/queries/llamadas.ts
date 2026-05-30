@@ -272,17 +272,23 @@ export async function getLlamadas(
   // Leads pendientes por llamar: estado PDTE y fecha_evento en el rango de fechas.
   // Estos NO aparecen en log_llamadas (solo tienen evento 'pdte'/'contacto_creado' que
   // filtramos arriba), por lo que necesitan su propia consulta.
+  const pendingConditions: Parameters<typeof and>[0][] = [
+    eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+    sql`UPPER(TRIM(${registrosDeLlamada.estado})) = 'PDTE'`,
+    gte(registrosDeLlamada.fecha_evento, fromTs),
+    lte(registrosDeLlamada.fecha_evento, toTs),
+  ];
+  // Aplicar el mismo filtro de closer_mail que usamos en logLlamadas.
+  // Sin esto, asesores sin permiso ver_todo ven pendientes de todos sus colegas.
+  if (emails.length > 0) {
+    pendingConditions.push(
+      sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.closer_mail}, ''))) IN (${sql.join(emails.map((e) => sql`LOWER(TRIM(${e}))`), sql`, `)})`,
+    );
+  }
   const pendingRows = await db
     .select()
     .from(registrosDeLlamada)
-    .where(
-      and(
-        eq(registrosDeLlamada.id_cuenta, idCuentaStr),
-        sql`UPPER(TRIM(${registrosDeLlamada.estado})) = 'PDTE'`,
-        gte(registrosDeLlamada.fecha_evento, fromTs),
-        lte(registrosDeLlamada.fecha_evento, toTs),
-      ),
-    )
+    .where(and(...pendingConditions))
     .orderBy(sql`${registrosDeLlamada.fecha_evento} DESC`);
 
   const pendingLeads: LlamadaLead[] = pendingRows.map((r) => ({
