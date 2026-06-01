@@ -768,11 +768,18 @@ export interface ReportCrmHealthAdvisor {
   enLimbo: number;
 }
 
+export interface ReportCrmHealthLeadDetalle {
+  nombre: string;
+  asesor: string | null;
+  diasSinActividad: number;
+}
+
 export interface ReportCrmHealth {
   sinEstado: number;
   sinAccion: number;
   enLimbo: number;
   porAsesor: ReportCrmHealthAdvisor[];
+  leadsDetalle: ReportCrmHealthLeadDetalle[];
 }
 
 export async function getReportCrmHealth(
@@ -784,7 +791,7 @@ export async function getReportCrmHealth(
   const toTs = new Date(`${to}T23:59:59.999Z`);
   const limboThreshold = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // hace 5 días
 
-  const [sinEstadoResult, sinAccionResult, enLimboResult] = await Promise.all([
+  const [sinEstadoResult, sinAccionResult, enLimboResult, leadsDetalleResult] = await Promise.all([
     // Leads sin estado (estado null o vacío)
     db.execute(sql`
       SELECT
@@ -856,6 +863,29 @@ export async function getReportCrmHealth(
       GROUP BY COALESCE(rr.nombre_closer, rr.closer_mail, 'sin asignar')
       ORDER BY total DESC
     `),
+
+    // Top 10 leads individuales sin acción (más antiguos primero)
+    db.execute(sql`
+      SELECT
+        COALESCE(rr.nombre_lead, 'Lead sin nombre') AS nombre,
+        COALESCE(rr.nombre_closer, rr.closer_mail) AS asesor,
+        EXTRACT(EPOCH FROM (NOW() - rr.fecha_evento))::int / 86400 AS dias_sin_actividad
+      FROM registros_de_llamada rr
+      WHERE rr.id_cuenta = ${String(idCuenta)}
+        AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
+        AND NOT EXISTS (
+          SELECT 1 FROM log_llamadas ll
+          WHERE ll.id_registro = rr.id_registro
+            AND ll.id_cuenta = ${idCuenta}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM chats_logs cl
+          WHERE cl.id_lead = rr.id_user_ghl
+            AND cl.id_cuenta = ${idCuenta}
+        )
+      ORDER BY rr.fecha_evento ASC
+      LIMIT 10
+    `),
   ]);
 
   type AsesorRow = { asesor: string | null; total: number };
@@ -886,11 +916,19 @@ export async function getReportCrmHealth(
   const totalSinAccion = (sinAccionResult.rows as AsesorRow[]).reduce((s, r) => s + r.total, 0);
   const totalEnLimbo = (enLimboResult.rows as AsesorRow[]).reduce((s, r) => s + r.total, 0);
 
+  type LeadDetalleRow = { nombre: string; asesor: string | null; dias_sin_actividad: number };
+  const leadsDetalle: ReportCrmHealthLeadDetalle[] = (leadsDetalleResult.rows as LeadDetalleRow[]).map((r) => ({
+    nombre: r.nombre,
+    asesor: r.asesor ?? null,
+    diasSinActividad: r.dias_sin_actividad,
+  }));
+
   return {
     sinEstado: totalSinEstado,
     sinAccion: totalSinAccion,
     enLimbo: totalEnLimbo,
     porAsesor,
+    leadsDetalle,
   };
 }
 

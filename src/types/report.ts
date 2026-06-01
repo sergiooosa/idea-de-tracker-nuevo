@@ -149,6 +149,12 @@ export interface ReportLeadFunnelTreeData {
 
 // ─── Bloque 6 — Higiene CRM ────────────────────────────────────────────────
 
+export interface ReportCrmHealthLeadDetalle {
+  nombre: string;
+  asesor: string | null;
+  diasSinActividad: number;
+}
+
 export interface ReportCrmHealthData {
   puntajeHigiene: number; // 0-100
   leadsEnLimbo: number; // leads with last activity > 5 days
@@ -156,6 +162,7 @@ export interface ReportCrmHealthData {
   asignadosSinAccion: number; // assigned but 0 calls/chats
   asesorMasLimbo: { nombre: string; count: number } | null;
   diasLimboUmbral: number; // threshold used (e.g., 5)
+  leadsSinAccionDetalle: ReportCrmHealthLeadDetalle[];
 }
 
 // ─── Bloque 7 — Análisis de Conversaciones ─────────────────────────────────
