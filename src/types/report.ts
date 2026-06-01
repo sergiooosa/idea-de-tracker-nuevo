@@ -78,6 +78,7 @@ export interface ReportAsesorChats {
 
 export interface ReportAdvisorChatsData {
   asesores: ReportAsesorChats[];
+  sinAsignar: { chats: number; categorias: ReportAsesorChats['categorias'] } | null;
   speedToLeadUmbral: number; // recommended threshold in minutes (e.g., 5)
   totalChats: number;
   tasaRespuestaEquipo: number;

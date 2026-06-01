@@ -259,20 +259,40 @@ function mapAdvisorCalls(calls: ApiCalls): ReportAdvisorCallsData {
 }
 
 function mapAdvisorChats(chats: ApiChats): ReportAdvisorChatsData {
+  const sinAsignarEntry = chats.porAsesor.find((a) => a.asesor === null) ?? null;
   return {
-    asesores: chats.porAsesor.map((a) => ({
-      nombre: a.asesor ?? 'Sin asignar',
-      chats: a.totalChats,
-      leadsUnicos: a.totalChats,
-      tasaRespuesta: 0,
-      speedToLeadAvgMin: a.speedToLeadAvgMin,
-      categorias: {
-        cerrada: a.porCategoria['cerrada'] ?? 0,
-        noCalificada: a.porCategoria['no_calificada'] ?? 0,
-        enSeguimiento: a.porCategoria['en_seguimiento'] ?? a.porCategoria['seguimiento'] ?? 0,
-        sinCategoria: a.porCategoria['sin_categoria'] ?? a.porCategoria['sin categoria'] ?? 0,
-      },
-    })),
+    asesores: chats.porAsesor
+      .filter((a) => a.asesor !== null)
+      .map((a) => ({
+        nombre: a.asesor!,
+        chats: a.totalChats,
+        leadsUnicos: a.totalChats,
+        tasaRespuesta: 0,
+        speedToLeadAvgMin: a.speedToLeadAvgMin,
+        categorias: {
+          cerrada: a.porCategoria['cerrada'] ?? 0,
+          noCalificada: a.porCategoria['no_calificada'] ?? 0,
+          enSeguimiento: a.porCategoria['en_seguimiento'] ?? a.porCategoria['seguimiento'] ?? 0,
+          sinCategoria: a.porCategoria['sin_categoria'] ?? a.porCategoria['sin categoria'] ?? 0,
+        },
+      })),
+    sinAsignar: sinAsignarEntry
+      ? {
+          chats: sinAsignarEntry.totalChats,
+          categorias: {
+            cerrada: sinAsignarEntry.porCategoria['cerrada'] ?? 0,
+            noCalificada: sinAsignarEntry.porCategoria['no_calificada'] ?? 0,
+            enSeguimiento:
+              sinAsignarEntry.porCategoria['en_seguimiento'] ??
+              sinAsignarEntry.porCategoria['seguimiento'] ??
+              0,
+            sinCategoria:
+              sinAsignarEntry.porCategoria['sin_categoria'] ??
+              sinAsignarEntry.porCategoria['sin categoria'] ??
+              0,
+          },
+        }
+      : null,
     speedToLeadUmbral: 5,
     totalChats: chats.totalChats,
     tasaRespuestaEquipo: 0,
@@ -647,8 +667,11 @@ export default function ReportesPage() {
           .then((sr) => (sr.ok ? sr.json() : null))
           .then((sr: ApiSummaryResponse | null) => {
             if (sr) {
-              const bestAdvisor = r.calls?.porCloser[0]
-                ? (r.calls.porCloser[0].closerName ?? r.calls.porCloser[0].closerMail)
+              const validAdvisors = r.calls?.porCloser.filter(
+                (c) => c.closerName || c.closerMail,
+              );
+              const bestAdvisor = validAdvisors?.[0]
+                ? (validAdvisors[0].closerName ?? validAdvisors[0].closerMail)
                 : null;
               const bestAd = r.ads?.porCreativo[0]?.nombre ?? null;
 
