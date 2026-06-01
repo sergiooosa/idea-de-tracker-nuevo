@@ -255,12 +255,23 @@ export async function getVideollamadas(
     }
   }
 
+  // Canonical key: use email as the single source of truth.
+  // rawCloser can be stored as a name ("Angel Llobet") or as an email
+  // ("angel@serenthys.com") depending on the source system. We normalise
+  // both to the email key so that duplicate rows caused by format differences
+  // are merged into a single entry per advisor.
+  function getCanonicalKey(rawCloser: string): string {
+    const lc = rawCloser.toLowerCase().trim();
+    // Already an email → use directly as canonical key
+    if (lc.includes("@")) return lc;
+    // Name → resolve to email via the lookup map; fall back to name itself
+    return nombreToEmail[lc] ?? lc;
+  }
+
   const byAdvisor: Record<string, ApiVideollamada[]> = {};
   for (const r of registros) {
     const rawCloser = r.closer?.trim();
-    const key = rawCloser
-      ? (nombreToEmail[rawCloser.toLowerCase()] ?? rawCloser.toLowerCase())
-      : "Sin asignar";
+    const key = rawCloser ? getCanonicalKey(rawCloser) : "Sin asignar";
     if (!byAdvisor[key]) byAdvisor[key] = [];
     byAdvisor[key].push(r);
   }
