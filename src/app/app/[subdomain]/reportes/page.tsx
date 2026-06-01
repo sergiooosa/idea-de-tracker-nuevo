@@ -262,9 +262,9 @@ function mapAdvisorChats(chats: ApiChats): ReportAdvisorChatsData {
   const sinAsignarEntry = chats.porAsesor.find((a) => a.asesor === null) ?? null;
   return {
     asesores: chats.porAsesor
-      .filter((a) => a.asesor !== null)
+      .filter((a): a is ApiChatsAdvisor & { asesor: string } => a.asesor !== null)
       .map((a) => ({
-        nombre: a.asesor!,
+        nombre: a.asesor,
         chats: a.totalChats,
         leadsUnicos: a.totalChats,
         tasaRespuesta: 0,
