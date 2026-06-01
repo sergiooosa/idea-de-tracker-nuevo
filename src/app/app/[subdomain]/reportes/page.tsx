@@ -26,6 +26,7 @@ import ReportLeadFunnel from '@/components/report/ReportLeadFunnel';
 import ReportCrmHealth from '@/components/report/ReportCrmHealth';
 import ReportConversationAnalysis from '@/components/report/ReportConversationAnalysis';
 import ReportComparison from '@/components/report/ReportComparison';
+import ReportContactabilidadCanal from '@/components/report/ReportContactabilidadCanal';
 import type {
   ReportExecutiveSummaryData,
   ReportAdsPerformanceData,
@@ -36,6 +37,7 @@ import type {
   ReportCrmHealthData,
   ReportConversationAnalysisData,
   ReportComparisonData,
+  ReportContactabilidadCanalData,
 } from '@/types/report';
 
 // ─── API types (minimal — avoid importing server-only modules) ──────────────
@@ -155,6 +157,26 @@ interface ApiConversationAnalysis {
   porCategoria: Record<string, number>;
 }
 
+interface ApiCanalContactabilidad {
+  canal: 'llamadas' | 'chats';
+  total: number;
+  contesto: number;
+  noContesto: number;
+  califico: number;
+  noCalifco: number;
+  tasaRespuesta: number;
+  tasaCalificacion: number;
+}
+
+interface ApiContactabilidadCanal {
+  canales: ApiCanalContactabilidad[];
+  totalGeneral: number;
+  contestoGeneral: number;
+  calificoGeneral: number;
+  tasaRespuestaGlobal: number;
+  tasaCalificacionGlobal: number;
+}
+
 interface ApiComparison {
   ads: { variacion_gasto: number | null; variacion_leads: number | null } | null;
   calls: { variacion_llamadas: number | null; variacion_tasa_contacto: number | null } | null;
@@ -173,6 +195,7 @@ interface ApiReportResponse {
   funnel: ApiFunnel | null;
   crmHealth: ApiCrmHealth | null;
   conversationAnalysis: ApiConversationAnalysis | null;
+  contactabilidadCanal: ApiContactabilidadCanal | null;
   comparison: ApiComparison;
   previo: {
     ads: ApiAds | null;
@@ -420,6 +443,28 @@ function mapConversationAnalysis(
   };
 }
 
+function mapContactabilidadCanal(
+  data: ApiContactabilidadCanal,
+): ReportContactabilidadCanalData {
+  return {
+    canales: data.canales.map((c) => ({
+      canal: c.canal,
+      total: c.total,
+      contesto: c.contesto,
+      noContesto: c.noContesto,
+      califico: c.califico,
+      noCalifco: c.noCalifco,
+      tasaRespuesta: c.tasaRespuesta,
+      tasaCalificacion: c.tasaCalificacion,
+    })),
+    totalGeneral: data.totalGeneral,
+    contestoGeneral: data.contestoGeneral,
+    calificoGeneral: data.calificoGeneral,
+    tasaRespuestaGlobal: data.tasaRespuestaGlobal,
+    tasaCalificacionGlobal: data.tasaCalificacionGlobal,
+  };
+}
+
 function mapComparison(
   comparison: ApiComparison,
   periodoActual: string,
@@ -586,6 +631,7 @@ export default function ReportesPage() {
   const [crmHealthData, setCrmHealthData] = useState<ReportCrmHealthData | null>(null);
   const [conversationData, setConversationData] = useState<ReportConversationAnalysisData | null>(null);
   const [comparisonData, setComparisonData] = useState<ReportComparisonData | null>(null);
+  const [contactabilidadData, setContactabilidadData] = useState<ReportContactabilidadCanalData | null>(null);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -615,6 +661,7 @@ export default function ReportesPage() {
     setCrmHealthData(null);
     setConversationData(null);
     setComparisonData(null);
+    setContactabilidadData(null);
 
     const qs = new URLSearchParams({ from, to, period_type: period });
     fetch(`/api/data/report?${qs.toString()}`)
@@ -629,6 +676,9 @@ export default function ReportesPage() {
         if (r.videocalls) setVideocallsData(mapAdvisorVideocalls(r.videocalls));
         if (r.funnel) setFunnelData(mapLeadFunnel(r.funnel));
         if (r.crmHealth) setCrmHealthData(mapCrmHealth(r.crmHealth));
+        if (r.contactabilidadCanal && r.contactabilidadCanal.totalGeneral > 0) {
+          setContactabilidadData(mapContactabilidadCanal(r.contactabilidadCanal));
+        }
 
         // Compute comparison if there's any comparison data
         const hasComparison =
@@ -833,7 +883,8 @@ export default function ReportesPage() {
     videocallsData !== null ||
     funnelData !== null ||
     crmHealthData !== null ||
-    conversationData !== null;
+    conversationData !== null ||
+    contactabilidadData !== null;
 
   return (
     <>
@@ -934,7 +985,10 @@ export default function ReportesPage() {
           {/* Bloque 6 — Higiene CRM */}
           <ReportCrmHealth data={crmHealthData} />
 
-          {/* Bloque 7 — Análisis de conversaciones */}
+          {/* Bloque 7 — Contactabilidad por Canal (AUT-493) */}
+          <ReportContactabilidadCanal data={contactabilidadData} />
+
+          {/* Bloque 8 — Análisis de conversaciones */}
           <ReportConversationAnalysis data={conversationData} />
 
           {/* Bloque 8 — Comparativo */}
