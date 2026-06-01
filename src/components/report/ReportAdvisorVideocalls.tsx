@@ -133,6 +133,8 @@ function VideoAdvisorCard({
 
 export default function ReportAdvisorVideocalls({ data }: Props) {
   if (data === null) return null;
+  // AUT-484 — Ocultar sección si no hay videollamadas en el período
+  if (data.totalCitas === 0) return null;
 
   // Sort by cierres desc
   const sorted = [...data.asesores].sort((a, b) => b.cerradas - a.cerradas);

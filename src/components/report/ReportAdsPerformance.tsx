@@ -36,6 +36,8 @@ function cplColor(cpl: number, gastoTotal: number, leads: number) {
 
 export default function ReportAdsPerformance({ data }: Props) {
   if (data === null) return null;
+  // AUT-484 — Ocultar sección si no hay gasto ni actividad en anuncios
+  if (data.gastoTotal === 0 && data.impresiones === 0 && data.clicks === 0) return null;
 
   const totalLeadsAnuncios = data.top3Anuncios.reduce((s, a) => s + a.leads, 0);
 
