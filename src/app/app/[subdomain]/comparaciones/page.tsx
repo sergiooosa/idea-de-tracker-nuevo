@@ -237,6 +237,23 @@ export default function ComparacionesPage() {
       />
 
       <div className="p-3 md:p-4 space-y-4 min-w-0 max-w-full overflow-x-hidden text-sm">
+        {!metricsLoading && metrics.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="text-4xl mb-4">📊</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Sin métricas configuradas para comparar
+            </h3>
+            <p className="text-gray-500 max-w-md">
+              La sección de comparativos funciona con métricas personalizadas.
+              Tu cuenta tiene métricas automáticas (leads, llamadas, reuniones)
+              que estarán disponibles aquí próximamente.
+            </p>
+            <p className="text-sm text-gray-400 mt-4">
+              ¿Necesitas métricas personalizadas? Contacta a tu administrador.
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Controls */}
         <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-3">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -412,6 +429,8 @@ export default function ComparacionesPage() {
             </div>
           )}
         </section>
+          </>
+        )}
       </div>
     </>
   );
