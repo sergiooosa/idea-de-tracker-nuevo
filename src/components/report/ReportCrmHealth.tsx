@@ -52,7 +52,7 @@ function HigieneGauge({ score }: { score: number }) {
   );
 }
 
-function LeadsTooltip({ leads }: { leads: ReportCrmHealthLeadDetalle[] }) {
+function LeadsTooltip({ leads, title }: { leads: ReportCrmHealthLeadDetalle[]; title: string }) {
   const [open, setOpen] = useState(false);
 
   if (leads.length === 0) return null;
@@ -66,14 +66,14 @@ function LeadsTooltip({ leads }: { leads: ReportCrmHealthLeadDetalle[] }) {
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         className="flex items-center justify-center w-4 h-4 rounded-full text-gray-500 hover:text-gray-300 transition-colors"
-        aria-label="Ver contactos sin acción"
+        aria-label={`Ver ${title.toLowerCase()}`}
       >
         <HelpCircle className="w-3.5 h-3.5" />
       </button>
       {open && (
         <div className="absolute right-0 bottom-6 z-50 w-72 rounded-lg border border-surface-500/60 bg-surface-800 shadow-xl p-3 space-y-1.5">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Sin contactar ({leads.length}{leads.length === 10 ? '+' : ''})
+            {title} ({leads.length}{leads.length === 10 ? '+' : ''})
           </p>
           {leads.map((lead, i) => (
             <div key={i} className="flex items-center justify-between gap-2">
@@ -130,7 +130,7 @@ function IssueRow({
         <span className={`text-base font-bold ${color}`}>{count.toLocaleString('es')}</span>
         {suffix && <span className="text-[10px] text-gray-500">{suffix}</span>}
       </div>
-      {leads && leads.length > 0 && <LeadsTooltip leads={leads} />}
+      {leads && leads.length > 0 && <LeadsTooltip leads={leads} title={label} />}
     </div>
   );
 }
@@ -167,6 +167,7 @@ export default function ReportCrmHealth({ data }: Props) {
             count={data.leadsEnLimbo}
             suffix="leads"
             severity={limboSeverity}
+            leads={data.leadsEnLimboDetalle}
           />
           <IssueRow
             icon={AlertTriangle}

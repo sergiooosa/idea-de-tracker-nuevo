@@ -163,6 +163,7 @@ export interface ReportCrmHealthData {
   asesorMasLimbo: { nombre: string; count: number } | null;
   diasLimboUmbral: number; // threshold used (e.g., 5)
   leadsSinAccionDetalle: ReportCrmHealthLeadDetalle[];
+  leadsEnLimboDetalle: ReportCrmHealthLeadDetalle[];
 }
 
 // ─── Bloque 7 — Análisis de Conversaciones ─────────────────────────────────

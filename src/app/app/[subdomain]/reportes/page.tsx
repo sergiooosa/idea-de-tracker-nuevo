@@ -155,6 +155,7 @@ interface ApiCrmHealth {
   enLimbo: number;
   porAsesor: ApiCrmHealthAdvisor[];
   leadsDetalle: ApiCrmHealthLeadDetalle[];
+  leadsEnLimboDetalle: ApiCrmHealthLeadDetalle[];
 }
 
 interface ApiConversationAnalysis {
@@ -431,6 +432,7 @@ function mapCrmHealth(crmHealth: ApiCrmHealth): ReportCrmHealthData {
     asesorMasLimbo,
     diasLimboUmbral: 5,
     leadsSinAccionDetalle: crmHealth.leadsDetalle ?? [],
+    leadsEnLimboDetalle: crmHealth.leadsEnLimboDetalle ?? [],
   };
 }
 
