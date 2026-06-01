@@ -40,16 +40,6 @@ function normalizarEstado(estado: string | null): EstadoNormalizado {
   return "otro";
 }
 
-// ─── Guard: verificar si la cuenta tiene Fathom configurado ──────────────────
-
-async function isFathomConfigured(idCuenta: number): Promise<boolean> {
-  const usuarios = await db
-    .select({ fathom: usuariosDashboard.fathom, id_webhook: usuariosDashboard.id_webhook_fathom })
-    .from(usuariosDashboard)
-    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
-  return usuarios.some((u) => u.fathom && u.id_webhook);
-}
-
 // ─── Resolver nombre→email y email→nombre para matching cross-canal ──────────
 
 async function buildCloserMaps(idCuenta: number): Promise<{
@@ -161,12 +151,10 @@ export async function getAsesorData(
   })();
 
   // ── VIDEOLLAMADAS: resumenes_diarios_agendas ──────────────────────────────
-  // Guard: si la cuenta no tiene Fathom configurado, no retornar videollamadas
-  // para evitar registros fantasma (e.g. big-capital, id_cuenta: 42).
-  const fathomHabilitado = await isFathomConfigured(idCuenta);
+  // Mostrar agendas si hay datos, independientemente de si Fathom está configurado.
+  // Las agendas pueden provenir de GHL webhooks, Twilio, u otras fuentes (no solo Fathom).
 
   const agendaRows = await (async () => {
-    if (!fathomHabilitado) return [];
 
     const fechaFilterAgendas = or(
       and(isNotNull(resumenesDiariosAgendas.fecha_reunion), gte(resumenesDiariosAgendas.fecha_reunion, fromTs), lte(resumenesDiariosAgendas.fecha_reunion, toTs)),
