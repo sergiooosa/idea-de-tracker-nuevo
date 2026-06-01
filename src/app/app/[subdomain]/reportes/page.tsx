@@ -187,7 +187,11 @@ interface ApiComparison {
 interface ApiReportResponse {
   periodo: { from: string; to: string; type: string; dias: number };
   periodoPrevio: { from: string; to: string; type: string; dias: number };
-  account: { nombre: string | null; subdominio: string };
+  account: {
+    nombre: string | null;
+    subdominio: string;
+    configuracion_ads: { meta?: { activo: boolean }; google?: { activo: boolean } } | null;
+  };
   ads: ApiAds | null;
   calls: ApiCalls | null;
   chats: ApiChats | null;
@@ -670,7 +674,11 @@ export default function ReportesPage() {
         if (!r) return;
 
         // Map all blocks
-        if (r.ads) setAdsData(mapAdsPerformance(r.ads, r.previo?.ads ?? null));
+        // AUT-482: ocultar Ads si el módulo no está habilitado (meta.activo o google.activo)
+        const adsModuloActivo =
+          r.account.configuracion_ads?.meta?.activo === true ||
+          r.account.configuracion_ads?.google?.activo === true;
+        if (r.ads && adsModuloActivo) setAdsData(mapAdsPerformance(r.ads, r.previo?.ads ?? null));
         if (r.calls) setCallsData(mapAdvisorCalls(r.calls));
         if (r.chats) setChatsData(mapAdvisorChats(r.chats));
         if (r.videocalls) setVideocallsData(mapAdvisorVideocalls(r.videocalls));
