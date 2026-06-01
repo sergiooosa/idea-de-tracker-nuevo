@@ -1035,3 +1035,124 @@ export async function getReportConversationAnalysis(
     porCategoria,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/*  8. getReportContactabilidadCanal                                    */
+/* ------------------------------------------------------------------ */
+
+export interface ReportContactabilidadCanal {
+  canal: 'llamadas' | 'chats';
+  total: number;
+  contesto: number;
+  noContesto: number;
+  califico: number;
+  noCalifco: number;
+  tasaRespuesta: number; // 0-1
+  tasaCalificacion: number; // 0-1 relative to total canal
+}
+
+export interface ReportContactabilidadCanales {
+  canales: ReportContactabilidadCanal[];
+  totalGeneral: number;
+  contestoGeneral: number;
+  calificoGeneral: number;
+  tasaRespuestaGlobal: number;
+  tasaCalificacionGlobal: number;
+}
+
+export async function getReportContactabilidadCanal(
+  idCuenta: number,
+  from: string,
+  to: string,
+): Promise<ReportContactabilidadCanales> {
+  const fromTs = new Date(`${from}T00:00:00Z`);
+  const toTs = new Date(`${to}T23:59:59.999Z`);
+
+  const [llamadasResult, chatsResult] = await Promise.all([
+    // Llamadas: contar por tipo_evento (excluir pdte y contacto_creado que no son intentos reales)
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total,
+        SUM(CASE WHEN tipo_evento LIKE 'efectiva_%' THEN 1 ELSE 0 END)::int AS contesto,
+        SUM(CASE WHEN tipo_evento NOT LIKE 'efectiva_%' THEN 1 ELSE 0 END)::int AS no_contesto,
+        SUM(CASE WHEN tipo_evento = 'efectiva_calificada' THEN 1 ELSE 0 END)::int AS califico,
+        SUM(CASE WHEN tipo_evento = 'efectiva_no_calificada' THEN 1 ELSE 0 END)::int AS no_califco
+      FROM log_llamadas
+      WHERE id_cuenta = ${idCuenta}
+        AND ts BETWEEN ${fromTs} AND ${toTs}
+        AND tipo_evento NOT IN ('pdte', 'contacto_creado')
+    `),
+
+    // Chats: contestó = lead respondió (primer_msg_lead_at NOT NULL)
+    // calificó = ia_categoria = 'calificada' OR estado = 'calificada'
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total,
+        SUM(CASE WHEN primer_msg_lead_at IS NOT NULL THEN 1 ELSE 0 END)::int AS contesto,
+        SUM(CASE WHEN primer_msg_lead_at IS NULL THEN 1 ELSE 0 END)::int AS no_contesto,
+        SUM(CASE
+          WHEN ia_categoria = 'calificada' OR estado = 'calificada' THEN 1
+          ELSE 0
+        END)::int AS califico,
+        SUM(CASE
+          WHEN ia_categoria = 'no_calificada' OR estado = 'no_calificada' THEN 1
+          ELSE 0
+        END)::int AS no_califco
+      FROM chats_logs
+      WHERE id_cuenta = ${idCuenta}
+        AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
+    `),
+  ]);
+
+  type CanalRow = {
+    total: number;
+    contesto: number;
+    no_contesto: number;
+    califico: number;
+    no_califco: number;
+  };
+
+  const ll = llamadasResult.rows[0] as CanalRow | undefined;
+  const ch = chatsResult.rows[0] as CanalRow | undefined;
+
+  function buildCanal(
+    canal: 'llamadas' | 'chats',
+    row: CanalRow | undefined,
+  ): ReportContactabilidadCanal {
+    const total = Number(row?.total ?? 0);
+    const contesto = Number(row?.contesto ?? 0);
+    const noContesto = Number(row?.no_contesto ?? 0);
+    const califico = Number(row?.califico ?? 0);
+    const noCalifco = Number(row?.no_califco ?? 0);
+    return {
+      canal,
+      total,
+      contesto,
+      noContesto,
+      califico,
+      noCalifco,
+      tasaRespuesta: total > 0 ? contesto / total : 0,
+      tasaCalificacion: total > 0 ? califico / total : 0,
+    };
+  }
+
+  const canales: ReportContactabilidadCanal[] = [];
+  const llCanal = buildCanal('llamadas', ll);
+  const chCanal = buildCanal('chats', ch);
+
+  if (llCanal.total > 0) canales.push(llCanal);
+  if (chCanal.total > 0) canales.push(chCanal);
+
+  const totalGeneral = llCanal.total + chCanal.total;
+  const contestoGeneral = llCanal.contesto + chCanal.contesto;
+  const calificoGeneral = llCanal.califico + chCanal.califico;
+
+  return {
+    canales,
+    totalGeneral,
+    contestoGeneral,
+    calificoGeneral,
+    tasaRespuestaGlobal: totalGeneral > 0 ? contestoGeneral / totalGeneral : 0,
+    tasaCalificacionGlobal: totalGeneral > 0 ? calificoGeneral / totalGeneral : 0,
+  };
+}

@@ -23,6 +23,7 @@ import {
   getReportFunnel,
   getReportCrmHealth,
   getReportConversationAnalysis,
+  getReportContactabilidadCanal,
   type ReportAds,
   type ReportCalls,
   type ReportChats,
@@ -30,6 +31,7 @@ import {
   type ReportFunnel,
   type ReportCrmHealth,
   type ReportConversationAnalysis,
+  type ReportContactabilidadCanales,
 } from "@/lib/queries/report";
 
 /* ------------------------------------------------------------------ */
@@ -68,6 +70,7 @@ export interface ReportResponse {
   funnel: ReportFunnel | null;
   crmHealth: ReportCrmHealth | null;
   conversationAnalysis: ReportConversationAnalysis | null;
+  contactabilidadCanal: ReportContactabilidadCanales | null;
   comparison: ReportComparison;
   previo: {
     ads: ReportAds | null;
@@ -246,6 +249,7 @@ export async function GET(req: Request): Promise<Response> {
       funnelResult,
       crmHealthResult,
       conversationResult,
+      contactabilidadResult,
       adsPrevResult,
       callsPrevResult,
       chatsPrevResult,
@@ -258,6 +262,7 @@ export async function GET(req: Request): Promise<Response> {
       getReportFunnel(idCuenta, from, to),
       getReportCrmHealth(idCuenta, from, to),
       getReportConversationAnalysis(idCuenta, from, to),
+      getReportContactabilidadCanal(idCuenta, from, to),
       getReportAds(idCuenta, prevPeriod.from, prevPeriod.to),
       getReportCalls(idCuenta, prevPeriod.from, prevPeriod.to),
       getReportChats(idCuenta, prevPeriod.from, prevPeriod.to),
@@ -276,6 +281,7 @@ export async function GET(req: Request): Promise<Response> {
     const funnel = settle(funnelResult);
     const crmHealth = settle(crmHealthResult);
     const conversationAnalysis = settle(conversationResult);
+    const contactabilidadCanal = settle(contactabilidadResult);
 
     const adsPrev = settle(adsPrevResult);
     const callsPrev = settle(callsPrevResult);
@@ -306,6 +312,7 @@ export async function GET(req: Request): Promise<Response> {
       funnel,
       crmHealth,
       conversationAnalysis,
+      contactabilidadCanal,
       comparison: buildComparison(currBlocks, prevBlocks),
       previo: prevBlocks,
     };

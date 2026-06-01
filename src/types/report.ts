@@ -180,7 +180,29 @@ export interface ReportConversationAnalysisData {
   fuentesDatos: string[]; // e.g., ["Llamadas (58% fill rate)", "Chats (100%)"]
 }
 
-// ─── Bloque 8 — Comparativo ────────────────────────────────────────────────
+// ─── Bloque 8 — Desglose por Canal de Contactabilidad ──────────────────────
+
+export interface ReportCanalContactabilidad {
+  canal: 'llamadas' | 'chats';
+  total: number;
+  contesto: number;
+  noContesto: number;
+  califico: number;
+  noCalifco: number;
+  tasaRespuesta: number; // 0-1
+  tasaCalificacion: number; // 0-1 relative to canal total
+}
+
+export interface ReportContactabilidadCanalData {
+  canales: ReportCanalContactabilidad[];
+  totalGeneral: number;
+  contestoGeneral: number;
+  calificoGeneral: number;
+  tasaRespuestaGlobal: number;
+  tasaCalificacionGlobal: number;
+}
+
+// ─── Bloque 9 — Comparativo ────────────────────────────────────────────────
 
 export interface ReportComparacionRow {
   label: string;
