@@ -1162,26 +1162,26 @@ export default function AsesorPage() {
   const metricasCustom = data?.metricasCustom ?? [];
   const embudoEtapas = data?.embudoEtapas ?? [];
   const canales = data?.canales ?? { llamadas: false, videollamadas: false, chats: false, metricasCustom: false };
+  const modulosHabilitados = data?.modulosHabilitados ?? canales;
   const breakdown = data?.breakdown;
   const advisorsList = data?.advisorsList ?? data?.advisors ?? asesoresContext;
 
   const systemPath = pathname.split('/asesor')[0] + '/system';
 
-  // Determinar primer tab disponible
+  // Determinar tabs disponibles según módulos del tenant (no datos del asesor)
   const availableTabs = useMemo(() => {
     const tabs: TabType[] = [];
-    if (canales.llamadas) tabs.push('llamadas');
-    if (canales.videollamadas) tabs.push('videollamadas');
-    if (canales.chats) tabs.push('chats');
-    if (canales.metricasCustom) tabs.push('personalizadas');
+    if (modulosHabilitados.llamadas) tabs.push('llamadas');
+    if (modulosHabilitados.videollamadas) tabs.push('videollamadas');
+    if (modulosHabilitados.chats) tabs.push('chats');
+    if (modulosHabilitados.metricasCustom) tabs.push('personalizadas');
     return tabs;
-  }, [canales]);
+  }, [modulosHabilitados]);
 
-  // Si el tab activo no está disponible, seleccionar el primero
+  // Preservar el tab activo siempre — cambiar de asesor no redirige al tab
   const validActiveTab = useMemo(() => {
-    if (!availableTabs.includes(activeTab) && availableTabs.length > 0) {
-      return availableTabs[0];
-    }
+    if (availableTabs.includes(activeTab)) return activeTab;
+    if (availableTabs.length > 0) return availableTabs[0];
     return activeTab;
   }, [activeTab, availableTabs]);
 
