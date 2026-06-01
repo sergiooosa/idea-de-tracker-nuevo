@@ -180,7 +180,6 @@ export default function ReportAdvisorChats({ data }: Props) {
         <div className="flex items-center gap-2 rounded-lg bg-surface-600/30 border border-surface-500/40 px-3 py-2">
           <AlertTriangle className="w-3.5 h-3.5 text-accent-amber shrink-0" />
           <span className="text-xs text-gray-400">
-            Sin asesor asignado:{' '}
             <span className="font-semibold text-gray-200">
               {data.sinAsignar.chats.toLocaleString('es')} leads
             </span>{' '}

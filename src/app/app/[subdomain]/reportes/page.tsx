@@ -262,9 +262,9 @@ function mapAdvisorChats(chats: ApiChats): ReportAdvisorChatsData {
   const sinAsignarEntry = chats.porAsesor.find((a) => a.asesor === null) ?? null;
   return {
     asesores: chats.porAsesor
-      .filter((a) => a.asesor !== null)
+      .filter((a): a is ApiChatsAdvisor & { asesor: string } => a.asesor !== null)
       .map((a) => ({
-        nombre: a.asesor!,
+        nombre: a.asesor,
         chats: a.totalChats,
         leadsUnicos: a.totalChats,
         tasaRespuesta: 0,
@@ -703,9 +703,10 @@ export default function ReportesPage() {
                   alertasCriticas: sinContactoPct >= 30
                     ? [`${sinContactoPct}% de leads sin contacto efectivo`]
                     : [],
-                  mejorAsesor: r.calls?.porCloser[0]
-                    ? (r.calls.porCloser[0].closerName ?? r.calls.porCloser[0].closerMail)
-                    : null,
+                  mejorAsesor:
+                    r.calls?.porCloser.find((c) => c.closerName || c.closerMail)?.closerName ??
+                    r.calls?.porCloser.find((c) => c.closerName || c.closerMail)?.closerMail ??
+                    null,
                   mejorAnuncio: r.ads?.porCreativo[0]?.nombre ?? null,
                   totalLeads,
                   contactados,
