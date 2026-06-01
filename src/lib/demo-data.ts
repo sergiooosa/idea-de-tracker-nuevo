@@ -539,6 +539,7 @@ export function generateAsesor(): AsesorResponse {
       { id: "cancelada", nombre: "Cancelada", color: "#ef4444", es_fija: true },
     ],
     canales: { llamadas: true, videollamadas: true, chats: true, metricasCustom: false },
+    modulosHabilitados: { llamadas: true, videollamadas: true, chats: true, metricasCustom: false },
     advisors: ASESORES.map((a, i) => ({ id: String(i + 1), name: a.name, email: a.email })),
     advisorsList: ASESORES.map((a, i) => ({ id: String(i + 1), name: a.name, email: a.email })),
     fuente_llamadas: "twilio",

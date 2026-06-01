@@ -407,6 +407,16 @@ export async function getAsesorData(
     metricasCustom: metricasCustom.length > 0,
   };
 
+  // ── Módulos habilitados a nivel de tenant ─────────────────────────────────
+  // Determina qué tabs mostrar independientemente del asesor seleccionado.
+  // Llamadas siempre está habilitado; los demás dependen de config del tenant.
+  const modulosHabilitados: AsesorCanales = {
+    llamadas: true,
+    videollamadas: !!modulosActivos.videollamadas_fathom,
+    chats: !!modulosActivos.chats,
+    metricasCustom: metricasAtribuibles.length > 0,
+  };
+
   // ── Etapas del embudo para el pipeline de videollamadas ──────────────────
   const DEFAULT_ETAPAS = [
     { id: "calificada", nombre: "Calificada", color: "#22c55e", es_fija: true },
@@ -462,6 +472,7 @@ export async function getAsesorData(
     metricasCustom,
     embudoEtapas,
     canales,
+    modulosHabilitados,
     advisors,
     breakdown,
     fuente_llamadas: fuenteLlamadas,

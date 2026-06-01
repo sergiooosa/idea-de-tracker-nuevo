@@ -692,8 +692,10 @@ export interface AsesorResponse {
   metricasCustom: AsesorMetricaCustom[];
   // Etapas del embudo de la cuenta para el pipeline de videollamadas
   embudoEtapas: { id: string; nombre: string; color: string; es_fija?: boolean }[];
-  // Canales disponibles en la cuenta
+  // Canales disponibles en la cuenta (basado en datos del asesor seleccionado)
   canales: AsesorCanales;
+  // Módulos habilitados a nivel de tenant (no depende del asesor seleccionado)
+  modulosHabilitados: AsesorCanales;
   advisors: ApiAdvisor[];
   advisorsList?: ApiAdvisor[];
   breakdown?: AsesorBreakdown;
