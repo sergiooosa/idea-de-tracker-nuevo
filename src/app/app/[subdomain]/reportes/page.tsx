@@ -689,15 +689,19 @@ export default function ReportesPage() {
         }
 
         // Compute comparison if there's any comparison data
+        // AUT-482: strip ads comparison rows when module is not enabled
+        const effectiveComparison = adsModuloActivo
+          ? r.comparison
+          : { ...r.comparison, ads: null };
         const hasComparison =
-          r.comparison.calls?.variacion_llamadas != null ||
-          r.comparison.chats?.variacion_chats != null ||
-          r.comparison.videocalls?.variacion_total != null ||
-          r.comparison.ads?.variacion_gasto != null;
+          effectiveComparison.calls?.variacion_llamadas != null ||
+          effectiveComparison.chats?.variacion_chats != null ||
+          effectiveComparison.videocalls?.variacion_total != null ||
+          effectiveComparison.ads?.variacion_gasto != null;
         if (hasComparison) {
           setComparisonData(
             mapComparison(
-              r.comparison,
+              effectiveComparison,
               `${r.periodo.from} → ${r.periodo.to}`,
               `${r.periodoPrevio.from} → ${r.periodoPrevio.to}`,
             ),
