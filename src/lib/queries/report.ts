@@ -811,6 +811,11 @@ export async function getReportCrmHealth(
           WHERE ll.id_registro = rr.id_registro
             AND ll.id_cuenta = ${idCuenta}
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM chats_logs cl
+          WHERE cl.id_lead = rr.id_user_ghl
+            AND cl.id_cuenta = ${idCuenta}
+        )
       GROUP BY COALESCE(rr.nombre_closer, rr.closer_mail, 'sin asignar')
       ORDER BY total DESC
     `),
@@ -824,16 +829,29 @@ export async function getReportCrmHealth(
       WHERE rr.id_cuenta = ${String(idCuenta)}
         AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
         AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('cerrado', 'vendido', 'ganado', 'done')
-        AND EXISTS (
-          SELECT 1 FROM log_llamadas ll
-          WHERE ll.id_registro = rr.id_registro
-            AND ll.id_cuenta = ${idCuenta}
+        AND (
+          EXISTS (
+            SELECT 1 FROM log_llamadas ll
+            WHERE ll.id_registro = rr.id_registro
+              AND ll.id_cuenta = ${idCuenta}
+          )
+          OR EXISTS (
+            SELECT 1 FROM chats_logs cl
+            WHERE cl.id_lead = rr.id_user_ghl
+              AND cl.id_cuenta = ${idCuenta}
+          )
         )
         AND NOT EXISTS (
           SELECT 1 FROM log_llamadas ll2
           WHERE ll2.id_registro = rr.id_registro
             AND ll2.id_cuenta = ${idCuenta}
             AND ll2.ts >= ${limboThreshold}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM chats_logs cl2
+          WHERE cl2.id_lead = rr.id_user_ghl
+            AND cl2.id_cuenta = ${idCuenta}
+            AND cl2.fecha_y_hora_z >= ${limboThreshold}
         )
       GROUP BY COALESCE(rr.nombre_closer, rr.closer_mail, 'sin asignar')
       ORDER BY total DESC
