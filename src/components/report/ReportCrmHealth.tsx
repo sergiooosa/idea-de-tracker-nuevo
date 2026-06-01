@@ -66,7 +66,7 @@ function LeadsTooltip({ leads }: { leads: ReportCrmHealthLeadDetalle[] }) {
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         className="flex items-center justify-center w-4 h-4 rounded-full text-gray-500 hover:text-gray-300 transition-colors"
-        aria-label="Ver contactos sin acción"
+        aria-label="Ver contactos pendientes"
       >
         <HelpCircle className="w-3.5 h-3.5" />
       </button>
@@ -167,6 +167,7 @@ export default function ReportCrmHealth({ data }: Props) {
             count={data.leadsEnLimbo}
             suffix="leads"
             severity={limboSeverity}
+            leads={data.leadsEnLimboDetalle}
           />
           <IssueRow
             icon={AlertTriangle}

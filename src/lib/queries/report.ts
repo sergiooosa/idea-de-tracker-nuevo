@@ -780,6 +780,7 @@ export interface ReportCrmHealth {
   enLimbo: number;
   porAsesor: ReportCrmHealthAdvisor[];
   leadsDetalle: ReportCrmHealthLeadDetalle[];
+  leadsEnLimboDetalle: ReportCrmHealthLeadDetalle[];
 }
 
 export async function getReportCrmHealth(
@@ -791,7 +792,7 @@ export async function getReportCrmHealth(
   const toTs = new Date(`${to}T23:59:59.999Z`);
   const limboThreshold = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // hace 5 días
 
-  const [sinEstadoResult, sinAccionResult, enLimboResult, leadsDetalleResult] = await Promise.all([
+  const [sinEstadoResult, sinAccionResult, enLimboResult, leadsDetalleResult, leadsEnLimboDetalleResult] = await Promise.all([
     // Leads sin estado (estado null o vacío)
     db.execute(sql`
       SELECT
@@ -886,6 +887,51 @@ export async function getReportCrmHealth(
       ORDER BY rr.fecha_evento ASC
       LIMIT 10
     `),
+
+    // Top 10 leads individuales en limbo (más tiempo sin actividad primero)
+    db.execute(sql`
+      SELECT
+        COALESCE(rr.nombre_lead, 'Lead sin nombre') AS nombre,
+        COALESCE(rr.nombre_closer, rr.closer_mail) AS asesor,
+        EXTRACT(EPOCH FROM (NOW() - GREATEST(
+          COALESCE((
+            SELECT MAX(ll2.ts) FROM log_llamadas ll2
+            WHERE ll2.id_registro = rr.id_registro AND ll2.id_cuenta = ${idCuenta}
+          ), rr.fecha_evento),
+          COALESCE((
+            SELECT MAX(cl2.fecha_y_hora_z) FROM chats_logs cl2
+            WHERE cl2.id_lead = rr.id_user_ghl AND cl2.id_cuenta = ${idCuenta}
+          ), rr.fecha_evento)
+        )))::int / 86400 AS dias_sin_actividad
+      FROM registros_de_llamada rr
+      WHERE rr.id_cuenta = ${String(idCuenta)}
+        AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
+        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('cerrado', 'vendido', 'ganado', 'done')
+        AND (
+          EXISTS (
+            SELECT 1 FROM log_llamadas ll
+            WHERE ll.id_registro = rr.id_registro AND ll.id_cuenta = ${idCuenta}
+          )
+          OR EXISTS (
+            SELECT 1 FROM chats_logs cl
+            WHERE cl.id_lead = rr.id_user_ghl AND cl.id_cuenta = ${idCuenta}
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM log_llamadas ll2
+          WHERE ll2.id_registro = rr.id_registro
+            AND ll2.id_cuenta = ${idCuenta}
+            AND ll2.ts >= ${limboThreshold}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM chats_logs cl2
+          WHERE cl2.id_lead = rr.id_user_ghl
+            AND cl2.id_cuenta = ${idCuenta}
+            AND cl2.fecha_y_hora_z >= ${limboThreshold}
+        )
+      ORDER BY dias_sin_actividad DESC
+      LIMIT 10
+    `),
   ]);
 
   type AsesorRow = { asesor: string | null; total: number };
@@ -923,12 +969,19 @@ export async function getReportCrmHealth(
     diasSinActividad: r.dias_sin_actividad,
   }));
 
+  const leadsEnLimboDetalle: ReportCrmHealthLeadDetalle[] = (leadsEnLimboDetalleResult.rows as LeadDetalleRow[]).map((r) => ({
+    nombre: r.nombre,
+    asesor: r.asesor ?? null,
+    diasSinActividad: r.dias_sin_actividad,
+  }));
+
   return {
     sinEstado: totalSinEstado,
     sinAccion: totalSinAccion,
     enLimbo: totalEnLimbo,
     porAsesor,
     leadsDetalle,
+    leadsEnLimboDetalle,
   };
 }
 
