@@ -143,11 +143,18 @@ interface ApiCrmHealthAdvisor {
   count: number;
 }
 
+interface ApiCrmHealthLeadDetalle {
+  nombre: string;
+  asesor: string | null;
+  diasSinActividad: number;
+}
+
 interface ApiCrmHealth {
   sinEstado: number;
   sinAccion: number;
   enLimbo: number;
   porAsesor: ApiCrmHealthAdvisor[];
+  leadsDetalle: ApiCrmHealthLeadDetalle[];
 }
 
 interface ApiConversationAnalysis {
@@ -419,6 +426,7 @@ function mapCrmHealth(crmHealth: ApiCrmHealth): ReportCrmHealthData {
     asignadosSinAccion: crmHealth.sinAccion,
     asesorMasLimbo,
     diasLimboUmbral: 5,
+    leadsSinAccionDetalle: crmHealth.leadsDetalle ?? [],
   };
 }
 

@@ -1,8 +1,11 @@
 // AUT-387 — Bloque 6: Higiene CRM
 // Porcentaje de higiene, leads en limbo, leads sin estado
 
-import { Shield, AlertTriangle, User, Clock } from 'lucide-react';
-import type { ReportCrmHealthData } from '@/types/report';
+'use client';
+
+import { useState } from 'react';
+import { Shield, AlertTriangle, User, Clock, HelpCircle } from 'lucide-react';
+import type { ReportCrmHealthData, ReportCrmHealthLeadDetalle } from '@/types/report';
 
 interface Props {
   data: ReportCrmHealthData | null;
@@ -49,18 +52,62 @@ function HigieneGauge({ score }: { score: number }) {
   );
 }
 
+function LeadsTooltip({ leads }: { leads: ReportCrmHealthLeadDetalle[] }) {
+  const [open, setOpen] = useState(false);
+
+  if (leads.length === 0) return null;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="flex items-center justify-center w-4 h-4 rounded-full text-gray-500 hover:text-gray-300 transition-colors"
+        aria-label="Ver contactos sin acción"
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 bottom-6 z-50 w-72 rounded-lg border border-surface-500/60 bg-surface-800 shadow-xl p-3 space-y-1.5">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Sin contactar ({leads.length}{leads.length === 10 ? '+' : ''})
+          </p>
+          {leads.map((lead, i) => (
+            <div key={i} className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-white truncate">{lead.nombre}</p>
+                {lead.asesor && (
+                  <p className="text-[10px] text-gray-500 truncate">{lead.asesor}</p>
+                )}
+              </div>
+              <span className="text-[10px] text-accent-amber shrink-0 font-semibold whitespace-nowrap">
+                {lead.diasSinActividad}d
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function IssueRow({
   icon: Icon,
   label,
   count,
   suffix,
   severity,
+  leads,
 }: {
   icon: React.ElementType;
   label: string;
   count: number;
   suffix?: string;
   severity: 'ok' | 'warning' | 'critical';
+  leads?: ReportCrmHealthLeadDetalle[];
 }) {
   const color =
     severity === 'ok'
@@ -83,6 +130,7 @@ function IssueRow({
         <span className={`text-base font-bold ${color}`}>{count.toLocaleString('es')}</span>
         {suffix && <span className="text-[10px] text-gray-500">{suffix}</span>}
       </div>
+      {leads && leads.length > 0 && <LeadsTooltip leads={leads} />}
     </div>
   );
 }
@@ -133,6 +181,7 @@ export default function ReportCrmHealth({ data }: Props) {
             count={data.asignadosSinAccion}
             suffix="leads"
             severity={sinAccionSeverity}
+            leads={data.leadsSinAccionDetalle}
           />
         </div>
       </div>
