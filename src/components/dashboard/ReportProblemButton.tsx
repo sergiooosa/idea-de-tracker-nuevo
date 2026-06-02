@@ -21,6 +21,7 @@ export default function ReportProblemButton() {
   const [images, setImages] = useState<File[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [ticketRef, setTicketRef] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -58,6 +59,8 @@ export default function ReportProblemButton() {
         throw new Error(data.error ?? "Error desconocido");
       }
 
+      const data = await res.json() as { ok: boolean; ticketRef?: string };
+      setTicketRef(data.ticketRef ?? "");
       setStatus("success");
       setTitulo("");
       setDescripcion("");
@@ -89,6 +92,7 @@ export default function ReportProblemButton() {
     setTimeout(() => {
       setStatus("idle");
       setErrorMsg("");
+      setTicketRef("");
       setTitulo("");
       setDescripcion("");
       setImages([]);
@@ -122,8 +126,14 @@ export default function ReportProblemButton() {
             <div className="flex flex-col items-center gap-3 py-6 text-center">
               <CheckCircle2 className="w-10 h-10 text-green-400" />
               <p className="font-semibold text-white">Reporte enviado</p>
+              {ticketRef && (
+                <p className="text-sm font-mono bg-surface-700 border border-surface-500 rounded-md px-3 py-1.5 text-accent-purple">
+                  Ticket: {ticketRef}
+                </p>
+              )}
               <p className="text-sm text-gray-400">
                 Nuestro equipo técnico lo revisará pronto.
+                {ticketRef && " Guarda tu número de ticket como referencia."}
               </p>
               <Button
                 onClick={handleClose}

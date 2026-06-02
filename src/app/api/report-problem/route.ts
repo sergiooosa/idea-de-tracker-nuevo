@@ -92,5 +92,13 @@ export async function POST(req: Request) {
   }
 
   const result = await webhookRes.json() as { linkedIssueId?: string };
-  return NextResponse.json({ ok: true, issueId: result.linkedIssueId });
+
+  // Generate a short human-readable ticket reference from the UUID
+  let ticketRef = "";
+  if (result.linkedIssueId) {
+    const hex = result.linkedIssueId.replace(/-/g, "").slice(0, 8).toUpperCase();
+    ticketRef = `TK-${hex}`;
+  }
+
+  return NextResponse.json({ ok: true, issueId: result.linkedIssueId, ticketRef });
 }
