@@ -316,6 +316,7 @@ export function generateVideollamadas(): VideollamadasResponse {
       idcliente: faker.string.alphanumeric(12),
       ghl_contact_id: faker.string.alphanumeric(16),
       closer: asesor.name,
+      closerCanonicalKey: asesor.email ?? null,
       categoria: closed ? "cerrado" : attended ? "asistio" : canceled ? "cancelado" : "agendado",
       attended,
       qualified: attended && Math.random() > 0.4,

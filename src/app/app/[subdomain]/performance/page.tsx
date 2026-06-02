@@ -114,7 +114,8 @@ export default function PerformanceVideollamadasPage() {
   const meetingsByAdvisor = useMemo(() => {
     const map: Record<string, ApiVideollamada[]> = {};
     for (const r of registrosFiltrados) {
-      const key = r.closer ?? 'Sin asignar';
+      // Usar closerCanonicalKey para que la clave coincida con advisorMetrics del servidor
+      const key = r.closerCanonicalKey ?? r.closer ?? 'Sin asignar';
       if (!map[key]) map[key] = [];
       map[key].push(r);
     }
@@ -332,7 +333,7 @@ export default function PerformanceVideollamadasPage() {
                             <td className="px-2 py-2">
                               <span className="flex items-center gap-1.5 text-white font-medium">
                                 <User className="w-3.5 h-3.5 text-accent-purple" />
-                                {advisorKey}
+                                {metrics?.advisorName ?? advisorMeetings[0]?.closer ?? advisorKey}
                               </span>
                             </td>
                             <td className="px-2 py-2 text-accent-purple">{metrics?.agendadas ?? 0}</td>
@@ -345,7 +346,7 @@ export default function PerformanceVideollamadasPage() {
                             <tr className="bg-surface-800/90">
                               <td colSpan={7} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
-                                  <div className="text-[10px] text-gray-400 mb-1.5">Leads de {advisorKey} (clic en la fila abre reuniones)</div>
+                                  <div className="text-[10px] text-gray-400 mb-1.5">Leads de {metrics?.advisorName ?? advisorMeetings[0]?.closer ?? advisorKey} (clic en la fila abre reuniones)</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[400px] overflow-y-auto">
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-surface-700">

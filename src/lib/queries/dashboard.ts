@@ -91,7 +91,7 @@ export async function getDashboard(
   closerEmails?: string[],
   filterTags?: string[],
 ): Promise<DashboardResponse> {
-  const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
+  const emails = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
   const fromDate = new Date(`${dateFrom}T00:00:00Z`);
   const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 

@@ -209,6 +209,8 @@ export interface ApiVideollamada {
   id: number;
   datetime: string;
   leadName: string;
+  /** Clave canónica del asesor (email lowercase o nombre lowercase) — misma que advisorMetrics usa como key */
+  closerCanonicalKey: string | null;
   leadEmail: string | null;
   /** IDs en GHL / CRM — útiles para búsqueda */
   idcliente: string | null;
