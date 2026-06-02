@@ -334,6 +334,10 @@ function PermissionGuard({ children }: { children: React.ReactNode }) {
 
 function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  const isFullscreen = pathname.includes("/enfoque");
+  if (isFullscreen) return <>{children}</>;
+
   const params = useParams();
   const currentSubdominio = typeof params?.subdomain === "string" ? params.subdomain : "";
   const [sidebarOpen, setSidebarOpen] = useState(false);
