@@ -158,7 +158,7 @@ export default function EnfoquePantalla() {
           <span className="text-sm text-gray-400 font-medium">{sesion?.nombre ?? "Enfoque"}</span>
         </div>
         <div className="text-sm text-gray-500">
-          {completados} completado{completados !== 1 ? "s" : ""} hoy
+          {completados} completado{completados !== 1 ? "s" : ""}
         </div>
       </header>
 

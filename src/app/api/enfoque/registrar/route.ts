@@ -90,7 +90,12 @@ export async function POST(req: Request) {
         estado: resultado,
         intentos_contacto: sql`COALESCE(${registrosDeLlamada.intentos_contacto}, 0) + 1`,
       })
-      .where(eq(registrosDeLlamada.id_registro, id_registro));
+      .where(
+        and(
+          eq(registrosDeLlamada.id_registro, id_registro),
+          eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+        ),
+      );
 
     const siguienteLead = await getSiguienteLead(idCuenta, email, id_sesion);
 

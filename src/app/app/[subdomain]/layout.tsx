@@ -350,7 +350,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [ghlRetryResult, setGhlRetryResult] = useState<{ success: number; failed: number } | null>(null);
   const { session } = useUserFilter();
 
-  const isFullscreen = pathname.includes("/enfoque");
+  const isFullscreen = pathname.endsWith("/enfoque");
 
   useEffect(() => {
     if (isFullscreen) return;
