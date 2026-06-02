@@ -350,7 +350,10 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [ghlRetryResult, setGhlRetryResult] = useState<{ success: number; failed: number } | null>(null);
   const { session } = useUserFilter();
 
+  const isFullscreen = pathname.endsWith("/enfoque");
+
   useEffect(() => {
+    if (isFullscreen) return;
     fetch("/api/data/locale")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
@@ -358,16 +361,16 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
         if (typeof d?.hasAds === "boolean") setHasAds(d.hasAds);
       })
       .catch(() => { /* fallback */ });
-  }, []);
+  }, [isFullscreen]);
 
-  // Check GHL token status — only for admins/superadmins with configurar_sistema perm
   useEffect(() => {
+    if (isFullscreen) return;
     const perms = session?.permisosArray ?? [];
     const canConfigure = session?.rol === "superadmin" || perms.includes("configurar_sistema");
-    if (!canConfigure) return; // asesores no necesitan esto
+    if (!canConfigure) return;
 
     const controller = new AbortController();
-    const tId = setTimeout(() => controller.abort(), 5000); // 5s max
+    const tId = setTimeout(() => controller.abort(), 5000);
 
     fetch("/api/data/ghl-token", { signal: controller.signal })
       .then((r) => r.ok ? r.json() : null)
@@ -378,14 +381,17 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
         if (typeof d?.pending_count === "number") setGhlPendingCount(d.pending_count);
       })
       .catch(() => { clearTimeout(tId); });
-  }, [session?.rol, JSON.stringify(session?.permisosArray)]);
+  }, [isFullscreen, session?.rol, JSON.stringify(session?.permisosArray)]);
 
   useEffect(() => {
+    if (isFullscreen) return;
     fetch("/api/data/dashboards")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.dashboards) setDashboardsNav(d.dashboards); })
       .catch(() => {});
-  }, []);
+  }, [isFullscreen]);
+
+  if (isFullscreen) return <>{children}</>;
 
   const isActive = (path: string) => {
     if (path === "/dashboard") return pathname.endsWith("/dashboard");
