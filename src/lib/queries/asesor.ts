@@ -397,9 +397,9 @@ export async function getAsesorData(
 
   // ── Módulos habilitados a nivel de tenant ─────────────────────────────────
   // Determina qué tabs mostrar independientemente del asesor seleccionado.
-  // Llamadas siempre está habilitado; los demás dependen de config del tenant.
+  // Llamadas se habilita si el tenant tiene Twilio/GHL configurado o tiene datos reales.
   const modulosHabilitados: AsesorCanales = {
-    llamadas: true,
+    llamadas: callRows.length > 0 || regRows.length > 0 || !!cuentaRow?.fuente_llamadas,
     videollamadas: !!modulosActivos.videollamadas_fathom,
     chats: !!modulosActivos.chats,
     metricasCustom: metricasAtribuibles.length > 0,
