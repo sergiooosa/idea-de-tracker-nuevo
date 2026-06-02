@@ -658,3 +658,51 @@ export const closerMergeSuggestions = pgTable("closer_merge_suggestions", {
 }, (table) => [
   index("idx_cms_cuenta_status").on(table.id_cuenta, table.status),
 ]);
+
+/* ------------------------------------------------------------------ */
+/*  Modo Enfoque — sesiones y resultados (Fase 1)                     */
+/* ------------------------------------------------------------------ */
+
+export type ResultadoCanonicoEnfoque =
+  | "contesto"
+  | "no_contesto"
+  | "buzon"
+  | "seguimiento"
+  | "interesado"
+  | "programado"
+  | "calificada"
+  | "no_calificada"
+  | "cerrada"
+  | "no_interesado";
+
+export type OrdenEnfoque = "mas_antiguo" | "menos_intentos";
+
+export const sesionesEnfoque = pgTable("sesiones_enfoque", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  nombre: text("nombre").notNull(),
+  modo: text("modo").notNull().default("llamada"),
+  filtro_estado: jsonb("filtro_estado").$type<string[]>(),
+  filtro_asesores: jsonb("filtro_asesores").$type<string[]>(),
+  orden: text("orden").$type<OrdenEnfoque>().notNull().default("mas_antiguo"),
+  activa: boolean("activa").notNull().default(true),
+  created_by: text("created_by").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_sesiones_enfoque_cuenta").on(table.id_cuenta),
+]);
+
+export const enfoqueResultado = pgTable("enfoque_resultado", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id_sesion: text("id_sesion").notNull().references(() => sesionesEnfoque.id, { onDelete: "cascade" }),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  closer_mail: text("closer_mail").notNull(),
+  id_registro: integer("id_registro").notNull().references(() => registrosDeLlamada.id_registro),
+  resultado_canonico: text("resultado_canonico").$type<ResultadoCanonicoEnfoque>().notNull(),
+  nota: text("nota"),
+  duracion_seg: integer("duracion_seg"),
+  ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_enfoque_resultado_sesion").on(table.id_sesion),
+  index("idx_enfoque_resultado_cuenta").on(table.id_cuenta),
+]);
