@@ -72,7 +72,7 @@ export async function getVideollamadas(
   dateTo: string,
   closerEmails?: string[],
 ): Promise<VideollamadasResponse> {
-  const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
+  const emails = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
 
   // Resolver nombre_closer para cada email — Fathom a veces guarda nombre en lugar de email
   let closerValues: string[] = [...emails];
@@ -155,6 +155,7 @@ export async function getVideollamadas(
       idcliente: r.idcliente ?? null,
       ghl_contact_id: r.ghl_contact_id ?? null,
       closer: r.closer,
+      closerCanonicalKey: null, // se rellena después de construir getCanonicalKey
       categoria: r.categoria,
       attended: m.attended,
       qualified: m.qualified,
@@ -266,6 +267,11 @@ export async function getVideollamadas(
     if (lc.includes("@")) return lc;
     // Name → resolve to email via the lookup map; fall back to name itself
     return nombreToEmail[lc] ?? lc;
+  }
+
+  // Rellenar closerCanonicalKey ahora que getCanonicalKey está definido
+  for (const r of registros) {
+    r.closerCanonicalKey = r.closer?.trim() ? getCanonicalKey(r.closer.trim()) : null;
   }
 
   const byAdvisor: Record<string, ApiVideollamada[]> = {};
