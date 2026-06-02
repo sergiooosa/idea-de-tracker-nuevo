@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import PageHeader from '@/components/dashboard/PageHeader';
+import ReportNarrativoEjecutivo from '@/components/report/ReportNarrativoEjecutivo';
 import ReportExecutiveSummary from '@/components/report/ReportExecutiveSummary';
 import ReportAdsPerformance from '@/components/report/ReportAdsPerformance';
 import ReportAdvisorCalls from '@/components/report/ReportAdvisorCalls';
@@ -978,6 +979,9 @@ export default function ReportesPage() {
         </div>
       ) : (
         <div ref={reportRef} className="p-3 md:p-4 space-y-4 max-w-6xl mx-auto min-w-0 overflow-x-hidden">
+
+          {/* Bloque Narrativo — Reporte Ejecutivo Narrativo (AUT-487) */}
+          <ReportNarrativoEjecutivo />
 
           {/* Bloque 0 — Resumen Ejecutivo (AI) */}
           {summaryLoading && !execSummary ? (
