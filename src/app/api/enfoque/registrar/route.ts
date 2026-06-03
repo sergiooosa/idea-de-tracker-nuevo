@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { enfoqueResultado, registrosDeLlamada, sesionesEnfoque } from "@/lib/db/schema";
+import { enfoqueResultado, registrosDeLlamada, sesionesEnfoque, enfoqueLock } from "@/lib/db/schema";
 import type { ResultadoCanonicoEnfoque } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getSiguienteLead } from "@/lib/queries/enfoque";
@@ -83,6 +83,16 @@ export async function POST(req: Request) {
       resultado_canonico: resultado as ResultadoCanonicoEnfoque,
       nota: nota?.trim() || null,
     });
+
+    await db
+      .delete(enfoqueLock)
+      .where(
+        and(
+          eq(enfoqueLock.id_sesion, id_sesion),
+          eq(enfoqueLock.id_registro, id_registro),
+          eq(enfoqueLock.en_progreso_por, email),
+        ),
+      );
 
     await db
       .update(registrosDeLlamada)
