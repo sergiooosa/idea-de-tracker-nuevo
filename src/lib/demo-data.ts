@@ -548,6 +548,189 @@ export function generateAsesor(): AsesorResponse {
   };
 }
 
+// ─── ADS ─────────────────────────────────────────────────────────────────────
+
+export function generateAds() {
+  const PLATAFORMAS: ("meta" | "google" | "tiktok")[] = ["meta", "google"];
+  const CAMPANAS = [
+    "Campaña Captación Leads Q2",
+    "Retargeting Interesados",
+    "Lookalike Compradores",
+    "Branding Inmobiliaria Demo",
+    "Promo Especial Junio",
+  ];
+
+  const porPlataforma = PLATAFORMAS.map((plat) => {
+    const gasto = rnd(800000, 5000000);
+    const impresiones = rnd(20000, 200000);
+    const clicks = Math.floor(impresiones * (0.01 + Math.random() * 0.04));
+    const ctr = (clicks / impresiones) * 100;
+    const cpm = (gasto / impresiones) * 1000;
+    const cpc = gasto / Math.max(clicks, 1);
+    const agendamientos = rnd(5, 30);
+    return {
+      plataforma: plat,
+      gasto,
+      impresiones,
+      clicks,
+      ctr,
+      cpm,
+      cpc,
+      agendamientos,
+      camposExtra: { frequency: 1.5 + Math.random() * 2, unique_ctr: ctr * (0.6 + Math.random() * 0.3) },
+    };
+  });
+
+  const gastoTotal = porPlataforma.reduce((s, p) => s + p.gasto, 0);
+  const leads = rnd(60, 200);
+  const asistidas = Math.floor(leads * (0.3 + Math.random() * 0.3));
+  const cierres = Math.floor(asistidas * (0.15 + Math.random() * 0.25));
+  const revenue = cierres * rnd(2000000, 8000000);
+  const cashCollected = Math.floor(revenue * (0.5 + Math.random() * 0.4));
+
+  const porCampana = CAMPANAS.map((campana) => {
+    const plat = PLATAFORMAS[rnd(0, PLATAFORMAS.length - 1)];
+    const gasto = rnd(200000, 2000000);
+    const campLeads = rnd(5, 40);
+    const campCierres = rnd(0, Math.min(5, campLeads));
+    return {
+      campana,
+      plataforma: plat,
+      gasto,
+      leads: campLeads,
+      cierres: campCierres,
+      cpl: campLeads > 0 ? gasto / campLeads : 0,
+      costoPorCierre: campCierres > 0 ? gasto / campCierres : 0,
+    };
+  });
+
+  return {
+    hasAds: true,
+    plataformas: PLATAFORMAS,
+    resumen: {
+      gastoTotal,
+      leads,
+      asistidas,
+      cierres,
+      cpl: leads > 0 ? gastoTotal / leads : 0,
+      costoPorCierre: cierres > 0 ? gastoTotal / cierres : 0,
+      costoPorShow: asistidas > 0 ? gastoTotal / asistidas : 0,
+      showRate: leads > 0 ? asistidas / leads : 0,
+      roas: gastoTotal > 0 ? revenue / gastoTotal : 0,
+      roasCash: gastoTotal > 0 ? cashCollected / gastoTotal : 0,
+    },
+    porPlataforma,
+    porCampana,
+  };
+}
+
+// ─── COMISIONES (full) ───────────────────────────────────────────────────────
+
+export function generateComisiones() {
+  const configs = ASESORES.map((a, i) => ({
+    id: i + 1,
+    id_cuenta: 999,
+    closer_email: a.email,
+    closer_nombre: a.name,
+    tipo: "porcentaje",
+    valor: String(rnd(3, 10)),
+    aplica_sobre: "cash_collected",
+    activo: true,
+    tipo_comision: "individual" as const,
+    asesores_equipo: [] as string[],
+    tramos_escalada: [] as { meta_pct: number; comision_pct: number }[],
+  }));
+
+  const resultados = ASESORES.map((a, i) => {
+    const cierres = rnd(2, 12);
+    const revenueBase = cierres * rnd(2000000, 8000000);
+    const valorPct = rnd(3, 10);
+    return {
+      id: i + 1,
+      closer_email: a.email,
+      closer_nombre: a.name,
+      tipo_comision: "individual" as const,
+      tipo_valor: "porcentaje",
+      valor: String(valorPct),
+      aplica_sobre: "cash_collected",
+      activo: true,
+      asesores_equipo: [] as string[],
+      tramos_escalada: [] as { meta_pct: number; comision_pct: number }[],
+      cierres,
+      revenue_base: revenueBase,
+      comision_calculada: Math.floor(revenueBase * valorPct / 100),
+    };
+  });
+
+  return { configs, resultados };
+}
+
+// ─── COMPARACIONES (métricas + monthly-summary) ─────────────────────────────
+
+const DEMO_METRICS = [
+  { id: "leads", nombre: "Leads totales", formato: "numero" },
+  { id: "llamadas", nombre: "Llamadas realizadas", formato: "numero" },
+  { id: "agendadas", nombre: "Citas agendadas", formato: "numero" },
+  { id: "asistidas", nombre: "Citas asistidas", formato: "numero" },
+  { id: "cerradas", nombre: "Cierres", formato: "numero" },
+  { id: "revenue", nombre: "Facturación", formato: "moneda" },
+  { id: "cash", nombre: "Cash Collected", formato: "moneda" },
+  { id: "tasa_cierre", nombre: "Tasa de cierre", formato: "porcentaje" },
+  { id: "speed", nombre: "Speed to lead", formato: "tiempo" },
+  { id: "tasa_contacto", nombre: "Tasa de contacto", formato: "porcentaje" },
+];
+
+export function generateMetricas() {
+  return DEMO_METRICS;
+}
+
+export function generateMonthlySummary() {
+  return {
+    rows: DEMO_METRICS.map((m) => {
+      let mesA: number;
+      let mesB: number;
+      switch (m.formato) {
+        case "moneda":
+          mesA = rnd(10000000, 80000000);
+          mesB = rnd(10000000, 80000000);
+          break;
+        case "porcentaje":
+          mesA = 0.1 + Math.random() * 0.6;
+          mesB = 0.1 + Math.random() * 0.6;
+          break;
+        case "tiempo":
+          mesA = rnd(5, 60);
+          mesB = rnd(5, 60);
+          break;
+        default:
+          mesA = rnd(30, 300);
+          mesB = rnd(30, 300);
+      }
+      return { metricId: m.id, nombre: m.nombre, formato: m.formato, mesA, mesB };
+    }),
+  };
+}
+
+// ─── BANDEJA (huérfanos) ─────────────────────────────────────────────────────
+
+export function generateHuerfanos() {
+  return Array.from({ length: rnd(3, 8) }, (_, i) => ({
+    id_huerfano: i + 1,
+    id_cuenta: 999,
+    origen: ["fathom", "twilio", "reasignacion"][rnd(0, 2)],
+    motivo: ["closer_no_encontrado", "email_invalido", "sin_match"][rnd(0, 2)],
+    payload_original: {
+      nombre_lead: faker.person.fullName(),
+      phone: faker.phone.number(),
+      email: faker.internet.email(),
+      datetime: faker.date.recent({ days: 7 }).toISOString(),
+    },
+    estado: "pendiente",
+    created_at: faker.date.recent({ days: 14 }).toISOString(),
+    updated_at: null,
+  }));
+}
+
 // ─── API ROUTES MAP ───────────────────────────────────────────────────────────
 // Mapea cada endpoint a su generador
 
@@ -558,17 +741,16 @@ export const DEMO_GENERATORS: Record<string, () => unknown> = {
   "/api/data/chats": generateChats,
   "/api/data/acquisition": generateAcquisition,
   "/api/data/asesor": generateAsesor,
+  "/api/data/ads": generateAds,
+  "/api/data/comisiones": generateComisiones,
+  "/api/data/huerfanos": generateHuerfanos,
+  "/api/data/metricas": generateMetricas,
+  "/api/data/metricas/monthly-summary": generateMonthlySummary,
+  "/api/data/system-config": () => ({ fuente_datos_financieros: "nativa" }),
+  "/api/data/mis-cuentas": () => ([{ id: 999, nombre: "Empresa Demo", subdominio: "demo-tracker-saas" }]),
   "/api/data/asesores": () => ({ advisors: ASESORES.map((a, i) => ({ id: String(i + 1), name: a.name, email: a.email })) }),
   "/api/data/locale": () => ({ idioma: "es" }),
   "/api/data/metas": () => ({ metas: [] }),
   "/api/data/roles": () => ({ rol: "admin", permisos: [] }),
   "/api/data/usuarios": () => ({ usuarios: ASESORES.map((a, i) => ({ id: String(i + 1), name: a.name, email: a.email, rol: "closer" })) }),
-  "/api/data/ads": () => ({
-    rows: [],
-    totales: { inversion: 0, leads: 0, cpm: 0, cpl: 0, ctr: 0 },
-    cuentas: [],
-  }),
-  "/api/data/comisiones": () => ({
-    asesores: ASESORES.map((a) => ({ nombre: a.name, comision: rnd(500000, 3000000), cierres: rnd(1, 8) })),
-  }),
 };

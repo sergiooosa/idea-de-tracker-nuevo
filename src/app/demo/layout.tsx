@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LocaleProvider } from "@/contexts/LocaleContext";
+import { DEMO_GENERATORS } from "@/lib/demo-data";
 import {
   LayoutDashboard,
   BarChart3,
@@ -14,6 +15,9 @@ import {
   BadgeDollarSign,
   BarChart2,
   RefreshCw,
+  Megaphone,
+  GitCompareArrows,
+  Inbox,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -24,11 +28,38 @@ const NAV_ITEMS = [
   { path: "/demo/performance/chats", label: "Chats", icon: BadgeDollarSign },
   { path: "/demo/asesor", label: "Panel asesor", icon: UserCheck },
   { path: "/demo/acquisition", label: "Adquisición", icon: TrendingUp },
+  { path: "/demo/ads", label: "Ads & Inversión", icon: Megaphone },
+  { path: "/demo/comparaciones", label: "Comparaciones", icon: GitCompareArrows },
+  { path: "/demo/comisiones", label: "Comisiones", icon: BadgeDollarSign },
+  { path: "/demo/bandeja", label: "Bandeja", icon: Inbox },
 ];
 
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const patchedRef = useRef(false);
+
+  useEffect(() => {
+    if (patchedRef.current) return;
+    patchedRef.current = true;
+
+    const originalFetch = window.fetch;
+    window.fetch = async function demoFetch(input: RequestInfo | URL, init?: RequestInit) {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const path = url.split("?")[0];
+      const gen = DEMO_GENERATORS[path];
+      if (gen && (!init?.method || init.method === "GET" || init.method === "POST")) {
+        const body = JSON.stringify(gen());
+        return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path.startsWith("/api/data/")) {
+        return new Response(JSON.stringify({}), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return originalFetch(input, init);
+    } as typeof fetch;
+
+    return () => { window.fetch = originalFetch; };
+  }, []);
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
 
