@@ -692,6 +692,18 @@ export const sesionesEnfoque = pgTable("sesiones_enfoque", {
   index("idx_sesiones_enfoque_cuenta").on(table.id_cuenta),
 ]);
 
+export const enfoqueLock = pgTable("enfoque_lock", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id_sesion: text("id_sesion").notNull().references(() => sesionesEnfoque.id, { onDelete: "cascade" }),
+  id_cuenta: integer("id_cuenta").notNull().references(() => cuentas.id_cuenta, { onDelete: "cascade" }),
+  id_registro: integer("id_registro").notNull().references(() => registrosDeLlamada.id_registro),
+  en_progreso_por: text("en_progreso_por").notNull(),
+  lock_ts: timestamp("lock_ts", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_enfoque_lock_sesion_registro").on(table.id_sesion, table.id_registro),
+  index("idx_enfoque_lock_sesion_closer").on(table.id_sesion, table.en_progreso_por),
+]);
+
 export const enfoqueResultado = pgTable("enfoque_resultado", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   id_sesion: text("id_sesion").notNull().references(() => sesionesEnfoque.id, { onDelete: "cascade" }),

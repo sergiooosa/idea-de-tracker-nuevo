@@ -3,9 +3,12 @@ import {
   registrosDeLlamada,
   sesionesEnfoque,
   enfoqueResultado,
+  enfoqueLock,
 } from "@/lib/db/schema";
 import type { ResultadoCanonicoEnfoque } from "@/lib/db/schema";
-import { eq, and, sql, inArray, notInArray, asc } from "drizzle-orm";
+import { eq, and, sql, inArray, notInArray, asc, ne } from "drizzle-orm";
+
+export const LOCK_EXPIRATION_MINUTES = 15;
 
 export interface SiguienteLead {
   id_registro: number;
@@ -20,11 +23,6 @@ export interface SiguienteLead {
   creativo_origen: string | null;
 }
 
-/**
- * Normaliza un estado crudo de `registros_de_llamada` al set canónico de enfoque.
- * Misma lógica que normalizarEstado() en asesor.ts, pero sin "pendiente"/"otro"
- * ya que esos estados no son resultados de una llamada realizada.
- */
 function estadoToCanonicoEnfoque(estado: string | null): ResultadoCanonicoEnfoque | null {
   if (!estado) return null;
   const limpio = estado.replace(/^\{(.+)\}$/, "$1").trim().toLowerCase();
@@ -45,6 +43,23 @@ function estadoToCanonicoEnfoque(estado: string | null): ResultadoCanonicoEnfoqu
 }
 
 export { estadoToCanonicoEnfoque };
+
+/**
+ * Subquery: IDs de registros con lock vigente de OTRO asesor en esta sesión.
+ * Locks expirados (>15 min) se ignoran — el lead se considera libre.
+ */
+function lockedByOtherSubquery(idSesion: string, closerMail: string) {
+  return db
+    .select({ id_registro: enfoqueLock.id_registro })
+    .from(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_sesion, idSesion),
+        ne(enfoqueLock.en_progreso_por, closerMail),
+        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'`,
+      ),
+    );
+}
 
 export async function getSiguienteLead(
   idCuenta: number,
@@ -74,6 +89,40 @@ export async function getSiguienteLead(
     return null;
   }
 
+  // Check if this closer already has a vigent lock — reconnection returns the same lead
+  const [existingLock] = await db
+    .select({ id_registro: enfoqueLock.id_registro })
+    .from(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_sesion, idSesion),
+        eq(enfoqueLock.en_progreso_por, closerMail),
+        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'`,
+      ),
+    )
+    .limit(1);
+
+  if (existingLock) {
+    const [lockedLead] = await db
+      .select({
+        id_registro: registrosDeLlamada.id_registro,
+        nombre_lead: registrosDeLlamada.nombre_lead,
+        mail_lead: registrosDeLlamada.mail_lead,
+        phone: registrosDeLlamada.phone_raw_format,
+        closer_mail: registrosDeLlamada.closer_mail,
+        nombre_closer: registrosDeLlamada.nombre_closer,
+        estado: registrosDeLlamada.estado,
+        intentos_contacto: sql<number>`COALESCE(${registrosDeLlamada.intentos_contacto}, 0)`,
+        fecha_evento: registrosDeLlamada.fecha_evento,
+        creativo_origen: registrosDeLlamada.creativo_origen,
+      })
+      .from(registrosDeLlamada)
+      .where(eq(registrosDeLlamada.id_registro, existingLock.id_registro))
+      .limit(1);
+
+    if (lockedLead) return lockedLead;
+  }
+
   const registrosYaGestionados = db
     .select({ id_registro: enfoqueResultado.id_registro })
     .from(enfoqueResultado)
@@ -93,6 +142,7 @@ export async function getSiguienteLead(
     eq(registrosDeLlamada.id_cuenta, idCuentaStr),
     eq(registrosDeLlamada.closer_mail, closerMail),
     notInArray(registrosDeLlamada.id_registro, registrosYaGestionados),
+    notInArray(registrosDeLlamada.id_registro, lockedByOtherSubquery(idSesion, closerMail)),
   ];
 
   if (filtroEstado.length > 0) {
@@ -115,6 +165,92 @@ export async function getSiguienteLead(
     .from(registrosDeLlamada)
     .where(and(...conditions))
     .orderBy(orderBy)
+    .limit(1);
+
+  return lead ?? null;
+}
+
+export interface TomarLeadResult {
+  ok: boolean;
+  lockId: string | null;
+  lead: SiguienteLead | null;
+  error?: string;
+}
+
+/**
+ * Atomic lock via UNIQUE(id_sesion, id_registro) + ON CONFLICT upsert.
+ * - Fresh lead: INSERT succeeds, closer gets lock.
+ * - Expired lock by other: ON CONFLICT updates en_progreso_por + lock_ts.
+ * - Vigent lock by same closer (reconnection): ON CONFLICT refreshes lock_ts, returns same lead.
+ * - Vigent lock by other closer: ON CONFLICT WHERE fails, no update → race prevented.
+ */
+export async function tomarLead(
+  idCuenta: number,
+  closerMail: string,
+  idSesion: string,
+): Promise<TomarLeadResult> {
+  const lead = await getSiguienteLead(idCuenta, closerMail, idSesion);
+  if (!lead) {
+    return { ok: false, lockId: null, lead: null, error: "no_leads" };
+  }
+
+  const lockId = crypto.randomUUID();
+  const result = await db.execute(sql`
+    INSERT INTO enfoque_lock (id, id_sesion, id_cuenta, id_registro, en_progreso_por, lock_ts)
+    VALUES (${lockId}, ${idSesion}, ${idCuenta}, ${lead.id_registro}, ${closerMail}, now())
+    ON CONFLICT (id_sesion, id_registro) DO UPDATE
+      SET en_progreso_por = ${closerMail},
+          lock_ts = now()
+      WHERE enfoque_lock.en_progreso_por = ${closerMail}
+         OR enfoque_lock.lock_ts <= now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'
+    RETURNING id
+  `);
+
+  const rows = result.rows as Array<{ id: string }>;
+  if (!rows.length) {
+    return { ok: false, lockId: null, lead: null, error: "lock_race" };
+  }
+
+  return { ok: true, lockId: rows[0].id, lead };
+}
+
+/**
+ * Release a lock explicitly (closer finished or abandoned the lead).
+ */
+export async function liberarLead(
+  idSesion: string,
+  closerMail: string,
+  idRegistro?: number,
+): Promise<{ ok: boolean }> {
+  const conditions = [
+    eq(enfoqueLock.id_sesion, idSesion),
+    eq(enfoqueLock.en_progreso_por, closerMail),
+  ];
+
+  if (idRegistro !== undefined) {
+    conditions.push(eq(enfoqueLock.id_registro, idRegistro));
+  }
+
+  await db.delete(enfoqueLock).where(and(...conditions));
+  return { ok: true };
+}
+
+async function getLeadById(idRegistro: number): Promise<SiguienteLead | null> {
+  const [lead] = await db
+    .select({
+      id_registro: registrosDeLlamada.id_registro,
+      nombre_lead: registrosDeLlamada.nombre_lead,
+      mail_lead: registrosDeLlamada.mail_lead,
+      phone: registrosDeLlamada.phone_raw_format,
+      closer_mail: registrosDeLlamada.closer_mail,
+      nombre_closer: registrosDeLlamada.nombre_closer,
+      estado: registrosDeLlamada.estado,
+      intentos_contacto: sql<number>`COALESCE(${registrosDeLlamada.intentos_contacto}, 0)`,
+      fecha_evento: registrosDeLlamada.fecha_evento,
+      creativo_origen: registrosDeLlamada.creativo_origen,
+    })
+    .from(registrosDeLlamada)
+    .where(eq(registrosDeLlamada.id_registro, idRegistro))
     .limit(1);
 
   return lead ?? null;
