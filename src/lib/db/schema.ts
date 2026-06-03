@@ -700,7 +700,7 @@ export const enfoqueLock = pgTable("enfoque_lock", {
   en_progreso_por: text("en_progreso_por").notNull(),
   lock_ts: timestamp("lock_ts", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  index("idx_enfoque_lock_sesion_registro").on(table.id_sesion, table.id_registro),
+  uniqueIndex("uq_enfoque_lock_sesion_registro").on(table.id_sesion, table.id_registro),
   index("idx_enfoque_lock_sesion_closer").on(table.id_sesion, table.en_progreso_por),
 ]);
 

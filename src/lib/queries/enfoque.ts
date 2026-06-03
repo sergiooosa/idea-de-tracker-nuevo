@@ -178,59 +178,40 @@ export interface TomarLeadResult {
 }
 
 /**
- * Atomic lock: takes the next lead for this closer in this session.
- * Race-safe: uses INSERT ... SELECT with WHERE en_progreso_por IS NULL OR expired.
+ * Atomic lock via UNIQUE(id_sesion, id_registro) + ON CONFLICT upsert.
+ * - Fresh lead: INSERT succeeds, closer gets lock.
+ * - Expired lock by other: ON CONFLICT updates en_progreso_por + lock_ts.
+ * - Vigent lock by same closer (reconnection): ON CONFLICT refreshes lock_ts, returns same lead.
+ * - Vigent lock by other closer: ON CONFLICT WHERE fails, no update → race prevented.
  */
 export async function tomarLead(
   idCuenta: number,
   closerMail: string,
   idSesion: string,
 ): Promise<TomarLeadResult> {
-  // If closer already holds a vigent lock, return that lead (reconnection)
-  const [existingLock] = await db
-    .select({
-      id: enfoqueLock.id,
-      id_registro: enfoqueLock.id_registro,
-    })
-    .from(enfoqueLock)
-    .where(
-      and(
-        eq(enfoqueLock.id_sesion, idSesion),
-        eq(enfoqueLock.en_progreso_por, closerMail),
-        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'`,
-      ),
-    )
-    .limit(1);
-
-  if (existingLock) {
-    const lead = await getLeadById(existingLock.id_registro);
-    return { ok: true, lockId: existingLock.id, lead };
-  }
-
   const lead = await getSiguienteLead(idCuenta, closerMail, idSesion);
   if (!lead) {
     return { ok: false, lockId: null, lead: null, error: "no_leads" };
   }
 
-  // Atomic: only insert if no vigent lock exists for this registro in this sesion
   const lockId = crypto.randomUUID();
-  const inserted = await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO enfoque_lock (id, id_sesion, id_cuenta, id_registro, en_progreso_por, lock_ts)
-    SELECT ${lockId}, ${idSesion}, ${idCuenta}, ${lead.id_registro}, ${closerMail}, now()
-    WHERE NOT EXISTS (
-      SELECT 1 FROM enfoque_lock
-      WHERE id_sesion = ${idSesion}
-        AND id_registro = ${lead.id_registro}
-        AND lock_ts > now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'
-    )
+    VALUES (${lockId}, ${idSesion}, ${idCuenta}, ${lead.id_registro}, ${closerMail}, now())
+    ON CONFLICT (id_sesion, id_registro) DO UPDATE
+      SET en_progreso_por = ${closerMail},
+          lock_ts = now()
+      WHERE enfoque_lock.en_progreso_por = ${closerMail}
+         OR enfoque_lock.lock_ts <= now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'
+    RETURNING id
   `);
 
-  const rowCount = (inserted as unknown as { rowCount: number }).rowCount ?? 0;
-  if (rowCount === 0) {
+  const rows = result.rows as Array<{ id: string }>;
+  if (!rows.length) {
     return { ok: false, lockId: null, lead: null, error: "lock_race" };
   }
 
-  return { ok: true, lockId, lead };
+  return { ok: true, lockId: rows[0].id, lead };
 }
 
 /**
