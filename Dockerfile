@@ -25,8 +25,14 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Migraciones determinísticas en el arranque (AUT-576): el runner usa `pg`,
+# que ya viene trazado en el output standalone de Next (lo usa src/lib/db).
+COPY --from=builder --chown=nextjs:nodejs /app/migrations ./migrations
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
