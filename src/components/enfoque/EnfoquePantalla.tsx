@@ -62,12 +62,18 @@ export default function EnfoquePantalla() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  const procesandoRef = useRef(false);
+  const notaRef = useRef("");
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    notaRef.current = nota;
+  }, [nota]);
 
   const limpiarIntervalos = useCallback(() => {
     if (pollingRef.current) {
@@ -87,6 +93,7 @@ export default function EnfoquePantalla() {
     setResultadoSeleccionado(null);
     setAutoAvanceMsg(null);
     estadoSnapshotRef.current = null;
+    procesandoRef.current = false;
     limpiarIntervalos();
   }, [limpiarIntervalos]);
 
@@ -134,7 +141,9 @@ export default function EnfoquePantalla() {
   }, [limpiarIntervalos]);
 
   const avanzarConResultado = useCallback(async (resultado: string, esAutoAvance: boolean) => {
+    if (procesandoRef.current) return;
     if (!lead || !sesion) return;
+    procesandoRef.current = true;
     setGuardando(true);
     limpiarIntervalos();
 
@@ -150,7 +159,7 @@ export default function EnfoquePantalla() {
           id_sesion: sesion.id,
           id_registro: lead.id_registro,
           resultado,
-          nota: nota.trim() || undefined,
+          nota: notaRef.current.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -168,10 +177,11 @@ export default function EnfoquePantalla() {
       // user can retry
     } finally {
       if (mountedRef.current) {
+        procesandoRef.current = false;
         setGuardando(false);
       }
     }
-  }, [lead, sesion, nota, limpiarIntervalos, resetLeadState]);
+  }, [lead, sesion, limpiarIntervalos, resetLeadState]);
 
   const iniciarLlamada = useCallback(async () => {
     if (!lead || !sesion) return;
