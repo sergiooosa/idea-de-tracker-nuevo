@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Phone, ChevronRight, Loader2, PhoneCall, Timer } from "lucide-react";
+import { Phone, ChevronRight, Loader2, PhoneCall, Timer, BarChart3, TrendingUp } from "lucide-react";
 
 interface Lead {
   id_registro: number;
@@ -20,6 +20,14 @@ interface SesionActiva {
   orden: string;
 }
 
+interface MetricasEnfoque {
+  trabajadosHoy: number;
+  contactados: number;
+  tasaContacto: number;
+  resumen: Array<{ resultado: string; cantidad: number }>;
+  duracionPromedio: number;
+}
+
 type ModoLead = "idle" | "en_llamada";
 
 const RESULTADOS = [
@@ -36,6 +44,10 @@ const RESULTADOS = [
 ] as const;
 
 const POLL_INTERVAL_MS = 4000;
+
+const RESULTADO_LABELS: Record<string, string> = Object.fromEntries(
+  RESULTADOS.map((r) => [r.valor, r.label]),
+);
 
 function formatTimer(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -57,6 +69,7 @@ export default function EnfoquePantalla() {
   const [modo, setModo] = useState<ModoLead>("idle");
   const [timerSeg, setTimerSeg] = useState(0);
   const [autoAvanceMsg, setAutoAvanceMsg] = useState<string | null>(null);
+  const [metricas, setMetricas] = useState<MetricasEnfoque | null>(null);
 
   const estadoSnapshotRef = useRef<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -64,6 +77,10 @@ export default function EnfoquePantalla() {
   const mountedRef = useRef(true);
   const procesandoRef = useRef(false);
   const notaRef = useRef("");
+  const sesionRef = useRef<SesionActiva | null>(null);
+  const leadRef = useRef<Lead | null>(null);
+  const avanzarRef = useRef<((resultado: string, esAutoAvance: boolean) => Promise<void>) | null>(null);
+  const timerSegRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -74,6 +91,14 @@ export default function EnfoquePantalla() {
   useEffect(() => {
     notaRef.current = nota;
   }, [nota]);
+
+  useEffect(() => {
+    sesionRef.current = sesion;
+  }, [sesion]);
+
+  useEffect(() => {
+    leadRef.current = lead;
+  }, [lead]);
 
   const limpiarIntervalos = useCallback(() => {
     if (pollingRef.current) {
@@ -89,6 +114,7 @@ export default function EnfoquePantalla() {
   const resetLeadState = useCallback(() => {
     setModo("idle");
     setTimerSeg(0);
+    timerSegRef.current = 0;
     setNota("");
     setResultadoSeleccionado(null);
     setAutoAvanceMsg(null);
@@ -96,6 +122,18 @@ export default function EnfoquePantalla() {
     procesandoRef.current = false;
     limpiarIntervalos();
   }, [limpiarIntervalos]);
+
+  const cargarMetricas = useCallback(async (idSesion: string) => {
+    try {
+      const res = await fetch(`/api/enfoque/metricas?sesion=${encodeURIComponent(idSesion)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (mountedRef.current) setMetricas(data);
+      }
+    } catch {
+      // non-critical
+    }
+  }, []);
 
   const cargarSesion = useCallback(async () => {
     try {
@@ -115,19 +153,61 @@ export default function EnfoquePantalla() {
     }
   }, []);
 
+  const iniciarModoLlamada = useCallback((leadActual: Lead) => {
+    setModo("en_llamada");
+    setTimerSeg(0);
+
+    timerRef.current = setInterval(() => {
+      if (mountedRef.current) {
+        setTimerSeg((prev) => {
+          timerSegRef.current = prev + 1;
+          return prev + 1;
+        });
+      }
+    }, 1000);
+
+    pollingRef.current = setInterval(async () => {
+      if (!mountedRef.current) return;
+      try {
+        const pollRes = await fetch(
+          `/api/enfoque/estado-lead?id_registro=${leadActual.id_registro}`,
+        );
+        const pollData = await pollRes.json();
+        const nuevoCanonico: string | null = pollData.estado_canonico ?? null;
+        const snapshotActual = estadoSnapshotRef.current;
+
+        if (nuevoCanonico !== null && nuevoCanonico !== snapshotActual) {
+          avanzarRef.current?.(nuevoCanonico, true);
+        }
+      } catch {
+        // poll failed, retry on next tick
+      }
+    }, POLL_INTERVAL_MS);
+  }, []);
+
   const cargarSiguiente = useCallback(async (idSesion: string) => {
     try {
       const res = await fetch(`/api/enfoque/siguiente?sesion=${encodeURIComponent(idSesion)}`);
       const data = await res.json();
       setLead(data.lead ?? null);
       setCompletados(data.completados ?? 0);
-      if (!data.lead) setSinLeads(true);
+      if (!data.lead) {
+        setSinLeads(true);
+        cargarMetricas(idSesion);
+      } else if (data.reconexion) {
+        const snapshotRes = await fetch(
+          `/api/enfoque/estado-lead?id_registro=${data.lead.id_registro}`,
+        );
+        const snapshotData = await snapshotRes.json();
+        estadoSnapshotRef.current = snapshotData.estado_canonico ?? null;
+        iniciarModoLlamada(data.lead);
+      }
     } catch {
       setLead(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cargarMetricas, iniciarModoLlamada]);
 
   useEffect(() => {
     (async () => {
@@ -140,12 +220,34 @@ export default function EnfoquePantalla() {
     return () => limpiarIntervalos();
   }, [limpiarIntervalos]);
 
+  // Abandonment: release lock on tab close/navigate away
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const s = sesionRef.current;
+      const l = leadRef.current;
+      if (!s || !l) return;
+
+      const payload = new Blob(
+        [JSON.stringify({ id_sesion: s.id, id_registro: l.id_registro })],
+        { type: "application/json" },
+      );
+      navigator.sendBeacon("/api/enfoque/liberar", payload);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
   const avanzarConResultado = useCallback(async (resultado: string, esAutoAvance: boolean) => {
     if (procesandoRef.current) return;
-    if (!lead || !sesion) return;
+    if (!leadRef.current || !sesionRef.current) return;
     procesandoRef.current = true;
     setGuardando(true);
     limpiarIntervalos();
+
+    const currentLead = leadRef.current;
+    const currentSesion = sesionRef.current;
+    const currentTimer = timerSegRef.current;
 
     if (esAutoAvance) {
       setAutoAvanceMsg(`Auto-detectado: ${RESULTADOS.find((r) => r.valor === resultado)?.label ?? resultado}`);
@@ -156,10 +258,11 @@ export default function EnfoquePantalla() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id_sesion: sesion.id,
-          id_registro: lead.id_registro,
+          id_sesion: currentSesion.id,
+          id_registro: currentLead.id_registro,
           resultado,
           nota: notaRef.current.trim() || undefined,
+          duracion_seg: currentTimer > 0 ? currentTimer : undefined,
         }),
       });
       const data = await res.json();
@@ -171,7 +274,10 @@ export default function EnfoquePantalla() {
         resetLeadState();
         setLead(data.lead ?? null);
         setCompletados(data.completados ?? 0);
-        if (!data.lead) setSinLeads(true);
+        if (!data.lead) {
+          setSinLeads(true);
+          cargarMetricas(currentSesion.id);
+        }
       }
     } catch {
       // user can retry
@@ -181,7 +287,9 @@ export default function EnfoquePantalla() {
         setGuardando(false);
       }
     }
-  }, [lead, sesion, limpiarIntervalos, resetLeadState]);
+  }, [limpiarIntervalos, resetLeadState, cargarMetricas]);
+
+  avanzarRef.current = avanzarConResultado;
 
   const iniciarLlamada = useCallback(async () => {
     if (!lead || !sesion) return;
@@ -208,32 +316,7 @@ export default function EnfoquePantalla() {
       const snapshotData = await snapshotRes.json();
       estadoSnapshotRef.current = snapshotData.estado_canonico ?? null;
 
-      setModo("en_llamada");
-      setTimerSeg(0);
-
-      timerRef.current = setInterval(() => {
-        if (mountedRef.current) {
-          setTimerSeg((prev) => prev + 1);
-        }
-      }, 1000);
-
-      pollingRef.current = setInterval(async () => {
-        if (!mountedRef.current) return;
-        try {
-          const pollRes = await fetch(
-            `/api/enfoque/estado-lead?id_registro=${lead.id_registro}`,
-          );
-          const pollData = await pollRes.json();
-          const nuevoCanonico: string | null = pollData.estado_canonico ?? null;
-          const snapshotActual = estadoSnapshotRef.current;
-
-          if (nuevoCanonico !== null && nuevoCanonico !== snapshotActual) {
-            avanzarConResultado(nuevoCanonico, true);
-          }
-        } catch {
-          // poll failed, retry on next tick
-        }
-      }, POLL_INTERVAL_MS);
+      iniciarModoLlamada(lead);
     } catch {
       // network error
     } finally {
@@ -241,7 +324,7 @@ export default function EnfoquePantalla() {
         setGuardando(false);
       }
     }
-  }, [lead, sesion, cargarSiguiente, avanzarConResultado]);
+  }, [lead, sesion, cargarSiguiente, iniciarModoLlamada]);
 
   const registrarManual = useCallback(async () => {
     if (!resultadoSeleccionado) return;
@@ -273,13 +356,61 @@ export default function EnfoquePantalla() {
   if (sinLeads) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-lg">
           <div className="text-6xl mb-4">🎉</div>
-          <h1 className="text-2xl font-bold text-white mb-2">¡Todo listo!</h1>
-          <p className="text-gray-400 mb-2">
+          <h1 className="text-2xl font-bold text-white mb-2">¡No hay más leads — buen trabajo!</h1>
+          <p className="text-gray-400 mb-6">
             Completaste {completados} lead{completados !== 1 ? "s" : ""} en esta sesión.
           </p>
-          <p className="text-gray-500 text-sm">No hay más leads pendientes por gestionar.</p>
+
+          {metricas && metricas.trabajadosHoy > 0 && (
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-left space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-semibold text-white">Resumen del día</h2>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-white">{metricas.trabajadosHoy}</p>
+                  <p className="text-xs text-gray-500">Trabajados</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-400">{metricas.contactados}</p>
+                  <p className="text-xs text-gray-500">Contactados</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <TrendingUp className="w-4 h-4 text-blue-400" />
+                    <p className="text-2xl font-bold text-blue-400">{metricas.tasaContacto}%</p>
+                  </div>
+                  <p className="text-xs text-gray-500">Tasa contacto</p>
+                </div>
+              </div>
+
+              {metricas.duracionPromedio > 0 && (
+                <p className="text-sm text-gray-400 text-center">
+                  Duración promedio: {formatTimer(metricas.duracionPromedio)}
+                </p>
+              )}
+
+              {metricas.resumen.length > 0 && (
+                <div className="border-t border-gray-800 pt-3">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {metricas.resumen.map((r) => (
+                      <span
+                        key={r.resultado}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-800 text-xs text-gray-300"
+                      >
+                        {RESULTADO_LABELS[r.resultado] ?? r.resultado}
+                        <span className="font-bold text-white">{r.cantidad}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

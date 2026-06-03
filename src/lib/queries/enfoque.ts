@@ -61,11 +61,16 @@ function lockedByOtherSubquery(idSesion: string, closerMail: string) {
     );
 }
 
+export interface SiguienteLeadResult {
+  lead: SiguienteLead | null;
+  reconexion: boolean;
+}
+
 export async function getSiguienteLead(
   idCuenta: number,
   closerMail: string,
   idSesion: string,
-): Promise<SiguienteLead | null> {
+): Promise<SiguienteLeadResult> {
   const idCuentaStr = String(idCuenta);
 
   const [sesion] = await db
@@ -80,13 +85,13 @@ export async function getSiguienteLead(
     )
     .limit(1);
 
-  if (!sesion) return null;
+  if (!sesion) return { lead: null, reconexion: false };
 
   const filtroEstado = sesion.filtro_estado ?? [];
   const filtroAsesores = sesion.filtro_asesores ?? [];
 
   if (filtroAsesores.length > 0 && !filtroAsesores.includes(closerMail)) {
-    return null;
+    return { lead: null, reconexion: false };
   }
 
   // Check if this closer already has a vigent lock — reconnection returns the same lead
@@ -120,7 +125,7 @@ export async function getSiguienteLead(
       .where(eq(registrosDeLlamada.id_registro, existingLock.id_registro))
       .limit(1);
 
-    if (lockedLead) return lockedLead;
+    if (lockedLead) return { lead: lockedLead, reconexion: true };
   }
 
   const registrosYaGestionados = db
@@ -167,7 +172,7 @@ export async function getSiguienteLead(
     .orderBy(orderBy)
     .limit(1);
 
-  return lead ?? null;
+  return { lead: lead ?? null, reconexion: false };
 }
 
 export interface TomarLeadResult {
@@ -189,7 +194,7 @@ export async function tomarLead(
   closerMail: string,
   idSesion: string,
 ): Promise<TomarLeadResult> {
-  const lead = await getSiguienteLead(idCuenta, closerMail, idSesion);
+  const { lead } = await getSiguienteLead(idCuenta, closerMail, idSesion);
   if (!lead) {
     return { ok: false, lockId: null, lead: null, error: "no_leads" };
   }
@@ -233,6 +238,55 @@ export async function liberarLead(
 
   await db.delete(enfoqueLock).where(and(...conditions));
   return { ok: true };
+}
+
+export interface MetricasEnfoque {
+  trabajadosHoy: number;
+  contactados: number;
+  tasaContacto: number;
+  resumen: Array<{ resultado: string; cantidad: number }>;
+  duracionPromedio: number;
+}
+
+export async function getMetricasSesion(
+  idSesion: string,
+  closerMail: string,
+): Promise<MetricasEnfoque> {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const resultados = await db
+    .select({
+      resultado_canonico: enfoqueResultado.resultado_canonico,
+      cantidad: sql<number>`count(*)::int`,
+      duracion_total: sql<number>`COALESCE(sum(${enfoqueResultado.duracion_seg}), 0)::int`,
+    })
+    .from(enfoqueResultado)
+    .where(
+      and(
+        eq(enfoqueResultado.id_sesion, idSesion),
+        eq(enfoqueResultado.closer_mail, closerMail),
+        sql`${enfoqueResultado.ts} >= ${hoy.toISOString()}::timestamptz`,
+      ),
+    )
+    .groupBy(enfoqueResultado.resultado_canonico);
+
+  const trabajadosHoy = resultados.reduce((sum, r) => sum + r.cantidad, 0);
+  const contactados = resultados
+    .filter((r) => r.resultado_canonico === "contesto" || r.resultado_canonico === "interesado" || r.resultado_canonico === "programado" || r.resultado_canonico === "calificada" || r.resultado_canonico === "cerrada")
+    .reduce((sum, r) => sum + r.cantidad, 0);
+  const duracionTotal = resultados.reduce((sum, r) => sum + r.duracion_total, 0);
+
+  return {
+    trabajadosHoy,
+    contactados,
+    tasaContacto: trabajadosHoy > 0 ? Math.round((contactados / trabajadosHoy) * 100) : 0,
+    resumen: resultados.map((r) => ({
+      resultado: r.resultado_canonico,
+      cantidad: r.cantidad,
+    })),
+    duracionPromedio: trabajadosHoy > 0 ? Math.round(duracionTotal / trabajadosHoy) : 0,
+  };
 }
 
 async function getLeadById(idRegistro: number): Promise<SiguienteLead | null> {

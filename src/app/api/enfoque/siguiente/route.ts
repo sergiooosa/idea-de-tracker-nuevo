@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-auth";
 import { getSiguienteLead } from "@/lib/queries/enfoque";
 import { db } from "@/lib/db";
-import { sesionesEnfoque, enfoqueResultado } from "@/lib/db/schema";
+import { enfoqueResultado } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export async function GET(req: Request) {
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Falta sesion" }, { status: 400 });
     }
 
-    const lead = await getSiguienteLead(idCuenta, email, idSesion);
+    const { lead, reconexion } = await getSiguienteLead(idCuenta, email, idSesion);
 
     const [progreso] = await db
       .select({
@@ -30,6 +30,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       lead,
+      reconexion,
       completados: progreso?.completados ?? 0,
     });
   });

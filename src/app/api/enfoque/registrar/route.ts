@@ -27,11 +27,13 @@ export async function POST(req: Request) {
       id_registro,
       resultado,
       nota,
+      duracion_seg,
     } = body as {
       id_sesion: string;
       id_registro: number;
       resultado: string;
       nota?: string;
+      duracion_seg?: number;
     };
 
     if (!id_sesion || !id_registro || !resultado) {
@@ -82,6 +84,7 @@ export async function POST(req: Request) {
       id_registro,
       resultado_canonico: resultado as ResultadoCanonicoEnfoque,
       nota: nota?.trim() || null,
+      duracion_seg: duracion_seg ?? null,
     });
 
     await db
@@ -107,7 +110,7 @@ export async function POST(req: Request) {
         ),
       );
 
-    const siguienteLead = await getSiguienteLead(idCuenta, email, id_sesion);
+    const siguiente = await getSiguienteLead(idCuenta, email, id_sesion);
 
     const [progreso] = await db
       .select({
@@ -123,7 +126,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      lead: siguienteLead,
+      lead: siguiente.lead,
       completados: progreso?.completados ?? 0,
     });
   });
