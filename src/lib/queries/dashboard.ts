@@ -920,8 +920,8 @@ export async function getDashboard(
   // ----------------------------------------------------------------
   const chatConditions: Parameters<typeof and>[0][] = [
     eq(chatsLogs.id_cuenta, idCuenta),
-    gte(chatsLogs.fecha_y_hora_z, fromDate),
-    lte(chatsLogs.fecha_y_hora_z, toDate),
+    gte(chatsLogs.primer_msg_at, fromDate),
+    lte(chatsLogs.primer_msg_at, toDate),
   ];
   // Filtro por asesor en chats: usa asesor_asignado (equivalente a closer_mail en llamadas).
   // Sin esto, usuarios sin ver_todo ven los chats de todo el account.
@@ -936,6 +936,7 @@ export async function getDashboard(
       notas_extra: chatsLogs.notas_extra,
       fecha_y_hora_z: chatsLogs.fecha_y_hora_z,
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
+      primer_msg_at: chatsLogs.primer_msg_at,
     })
     .from(chatsLogs)
     .where(and(...chatConditions));
@@ -979,6 +980,8 @@ export async function getDashboard(
         conRespuesta: 0,
         tasaRespuesta: 0,
         speedToLeadAvg: null,
+        speedToLeadMedian: null,
+        speedToLeadCount: 0,
         distribucionCanales: {},
         topClosers: [],
       };
@@ -986,8 +989,7 @@ export async function getDashboard(
 
     const uniqueChatIds = new Set(chatRows.map((r) => r.chatid).filter(Boolean));
     let chatsConAgente = 0;
-    let speedSum = 0;
-    let speedCount = 0;
+    const speedValues: number[] = [];
     const distribucionCanales: Record<string, number> = {};
     const closerCounts: Record<string, number> = {};
 
@@ -1035,8 +1037,7 @@ export async function getDashboard(
         if (leadTs >= fromDate.getTime()) {
           const diffSecs = (agentTs - leadTs) / 1000;
           if (diffSecs > 0) {
-            speedSum += diffSecs;
-            speedCount++;
+            speedValues.push(diffSecs);
           }
         }
       }
@@ -1060,12 +1061,23 @@ export async function getDashboard(
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    const speedCount = speedValues.length;
+    const speedAvgChat = speedCount > 0 ? speedValues.reduce((s, v) => s + v, 0) / speedCount : null;
+    const speedMedian = (() => {
+      if (speedCount === 0) return null;
+      const sorted = [...speedValues].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    })();
+
     return {
       total: totalChats,
       leadsUnicos: uniqueChatIds.size,
       conRespuesta: chatsConAgente,
       tasaRespuesta: totalChats > 0 ? (chatsConAgente / totalChats) * 100 : 0,
-      speedToLeadAvg: speedCount > 0 ? speedSum / speedCount : null,
+      speedToLeadAvg: speedAvgChat,
+      speedToLeadMedian: speedMedian,
+      speedToLeadCount: speedCount,
       distribucionCanales,
       topClosers,
     };
@@ -1237,7 +1249,10 @@ export async function getDashboard(
       // Solo mostrar alerta si hay datos reales (speedToLeadAvg !== null).
       // Null significa que no hay chats con primer_msg_lead_at en el período,
       // no que el speed sea 0.0 min — mostrar 0 sería estadísticamente engañoso.
-      const chatSpeedMin = chatKpis?.speedToLeadAvg != null ? chatKpis.speedToLeadAvg / 60 : null;
+      const chatSpeedRaw = chatKpis && chatKpis.speedToLeadCount > 0 && chatKpis.speedToLeadCount < 5
+        ? chatKpis.speedToLeadMedian
+        : chatKpis?.speedToLeadAvg;
+      const chatSpeedMin = chatSpeedRaw != null ? chatSpeedRaw / 60 : null;
       if (chatSpeedMin != null) {
         addAlerta(
           "💬 Speed to lead chat",

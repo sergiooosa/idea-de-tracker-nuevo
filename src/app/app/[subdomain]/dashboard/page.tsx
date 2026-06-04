@@ -544,14 +544,22 @@ export default function DashboardPage() {
                 {
                   label: 'Speed to lead',
                   value: (() => {
-                    const s = data!.chatKpis!.speedToLeadAvg;
+                    const n = data!.chatKpis!.speedToLeadCount;
+                    const s = n > 0 && n < 5 && data!.chatKpis!.speedToLeadMedian != null
+                      ? data!.chatKpis!.speedToLeadMedian
+                      : data!.chatKpis!.speedToLeadAvg;
                     if (s == null) return '—';
                     if (s < 60) return `${Math.round(s)}s`;
                     if (s < 3600) return `${(s / 60).toFixed(1)} min`;
                     return `${(s / 3600).toFixed(1)} h`;
                   })(),
                   color: 'amber',
-                  sub: 'promedio',
+                  sub: (() => {
+                    const n = data!.chatKpis!.speedToLeadCount;
+                    if (n === 0) return 'sin datos';
+                    const tipo = n < 5 ? 'mediana' : 'promedio';
+                    return `${tipo} (n=${n})`;
+                  })(),
                 },
               ].map(({ label, value, color, sub }) => (
                 <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
