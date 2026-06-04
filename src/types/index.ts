@@ -503,6 +503,8 @@ export interface ChatKpis {
   conRespuesta: number;
   tasaRespuesta: number;
   speedToLeadAvg: number | null; // segundos
+  speedToLeadMedian: number | null; // segundos
+  speedToLeadCount: number;
   distribucionCanales: Record<string, number>;
   topClosers: Array<{ name: string; count: number }>;
 }
