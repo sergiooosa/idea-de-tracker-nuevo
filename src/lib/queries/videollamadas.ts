@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, cuentas, usuariosDashboard } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, cuentas, usuariosDashboard, logLlamadas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
 import { eq, and, or, gt, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
@@ -122,7 +122,7 @@ export async function getVideollamadas(
   // Guard: si la cuenta no tiene Fathom configurado, no retornar videollamadas.
   const fathomHabilitado = await isFathomConfigured(idCuenta);
 
-  const [[cuentaRow], rows] = await Promise.all([
+  const [[cuentaRow], rows, effectiveCalls] = await Promise.all([
     db
       .select({
         embudo_personalizado: cuentas.embudo_personalizado,
@@ -139,14 +139,42 @@ export async function getVideollamadas(
           .where(and(...agendaConditions))
           .orderBy(sql`${resumenesDiariosAgendas.fecha_reunion} DESC`)
       : Promise.resolve([]),
+    db
+      .select({ mail_lead: logLlamadas.mail_lead, phone: logLlamadas.phone, contact_id_ghl: logLlamadas.contact_id_ghl })
+      .from(logLlamadas)
+      .where(and(
+        eq(logLlamadas.id_cuenta, idCuenta),
+        gte(logLlamadas.ts, fromDate),
+        lte(logLlamadas.ts, toDate),
+        sql`${logLlamadas.tipo_evento} LIKE 'efectiva_%'`,
+      )),
   ]);
+
+  // AUT-603: Build set of lead keys with effective calls for real-interaction check
+  const effectiveCallLeadKeys = new Set<string>();
+  for (const c of effectiveCalls) {
+    if (c.mail_lead?.trim()) effectiveCallLeadKeys.add(c.mail_lead.trim().toLowerCase());
+    if (c.phone?.trim()) effectiveCallLeadKeys.add(c.phone.trim());
+    if (c.contact_id_ghl?.trim()) effectiveCallLeadKeys.add(c.contact_id_ghl.trim());
+  }
 
   const embudo = Array.isArray(cuentaRow?.embudo_personalizado)
     ? cuentaRow.embudo_personalizado
     : null;
 
+  // AUT-603: Check if a row has real interaction (Fathom or effective call)
+  const rowHasRealInteraction = (r: (typeof rows)[0]): boolean => {
+    if (r.transcripcion_fathom && r.transcripcion_fathom.trim() !== "") return true;
+    if (r.link_llamada && r.link_llamada.trim() !== "") return true;
+    if (r.email_lead?.trim() && effectiveCallLeadKeys.has(r.email_lead.trim().toLowerCase())) return true;
+    if (r.idcliente?.trim() && effectiveCallLeadKeys.has(r.idcliente.trim())) return true;
+    if (r.ghl_contact_id?.trim() && effectiveCallLeadKeys.has(r.ghl_contact_id.trim())) return true;
+    return false;
+  };
+
   const registros: ApiVideollamada[] = rows.map((r) => {
     const m = mapCategoria(r.categoria, embudo);
+    const realInteraction = rowHasRealInteraction(r);
     return {
       id: r.id_registro_agenda,
       datetime: r.fecha_reunion?.toISOString() ?? r.fecha,
@@ -155,9 +183,9 @@ export async function getVideollamadas(
       idcliente: r.idcliente ?? null,
       ghl_contact_id: r.ghl_contact_id ?? null,
       closer: r.closer,
-      closerCanonicalKey: null, // se rellena después de construir getCanonicalKey
+      closerCanonicalKey: null,
       categoria: r.categoria,
-      attended: m.attended,
+      attended: m.attended && realInteraction,
       qualified: m.qualified,
       canceled: m.canceled,
       outcome: m.outcome,

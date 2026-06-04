@@ -313,6 +313,24 @@ export async function getDashboard(
     // newLeadEvents no tiene tags_internos en la query selectiva — no filtrar por tags
   }
 
+  // AUT-603: Build set of lead identifiers with effective calls — used to verify real interaction.
+  // An attendance only counts if there's a Fathom signal OR an effective call for the same lead.
+  const effectiveCallLeadKeys = new Set<string>();
+  for (const c of filteredCalls) {
+    if (!(c.tipo_evento ?? "").startsWith("efectiva_")) continue;
+    if (c.mail_lead?.trim()) effectiveCallLeadKeys.add(c.mail_lead.trim().toLowerCase());
+    if (c.phone?.trim()) effectiveCallLeadKeys.add(c.phone.trim());
+    if (c.contact_id_ghl?.trim()) effectiveCallLeadKeys.add(c.contact_id_ghl.trim());
+  }
+  const hasRealInteraction = (a: (typeof filteredAgendas)[0]): boolean => {
+    if (a.transcripcion_fathom && a.transcripcion_fathom.trim() !== "") return true;
+    if (a.link_llamada && a.link_llamada.trim() !== "") return true;
+    if (a.email_lead?.trim() && effectiveCallLeadKeys.has(a.email_lead.trim().toLowerCase())) return true;
+    if (a.idcliente?.trim() && effectiveCallLeadKeys.has(a.idcliente.trim())) return true;
+    if (a.ghl_contact_id?.trim() && effectiveCallLeadKeys.has(a.ghl_contact_id.trim())) return true;
+    return false;
+  };
+
   // hasCash: lead pagó aunque la categoría no diga "Cerrada".
   // SOLO se usa como fallback de cierre cuando el embudo NO tiene etapas cerradas explícitas.
   // Si el embudo sí define etapas cerradas, confiamos en esas y no en cash para no inflar
@@ -320,7 +338,7 @@ export async function getDashboard(
   const hasCash = (a: (typeof filteredAgendas)[0]) =>
     (parseFloat(a.cash_collected || "0") || 0) > 0;
   const asistidas = filteredAgendas.filter((a) =>
-    attendedSet.has((a.categoria ?? "").toLowerCase().trim())
+    attendedSet.has((a.categoria ?? "").toLowerCase().trim()) && hasRealInteraction(a)
   ).length;
   // Deduplicar canceladas por lead único (GHL puede enviar el mismo evento múltiples veces)
   const uniqueCanceledLeadKeys = new Set(
@@ -554,7 +572,7 @@ export async function getDashboard(
         ...ac.map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id)),
         ...aa.map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`),
       ]).size;
-      const aAsistidas = aa.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim())).length;
+      const aAsistidas = aa.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim()) && hasRealInteraction(a)).length;
       const aRevenueClosedSet = aa.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
         .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
       const aRevenueAny = aa.reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
