@@ -1,6 +1,8 @@
 /**
  * POST /api/data/asesores/merge-suggestions/[id]/accept
  * Accepts a merge suggestion: runs the merge then marks the suggestion as accepted.
+ * Also persists the rule to cuentas.closer_merge_rules so Cerebro's applyMergeRules()
+ * normalizes future ingestion events.
  * Body: { canonical_nombre?: string; canonical_email?: string }
  */
 import { NextResponse } from "next/server";
@@ -8,12 +10,18 @@ import { withAuthAndPermission } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import {
   closerMergeSuggestions,
+  cuentas,
   logLlamadas,
   registrosDeLlamada,
   resumenesDiariosAgendas,
   chatsLogs,
+  type CloserMergeRule,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+
+function normalizeStr(s: string): string {
+  return s.toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
 
 export async function POST(
   req: Request,
@@ -47,9 +55,62 @@ export async function POST(
 
     const toNombre = body.canonical_nombre ?? suggestion.canonical_nombre;
     const toEmail = body.canonical_email ?? suggestion.canonical_email ?? null;
+    const aliases = suggestion.aliases;
 
-    // For each duplicate candidate (that is NOT the canonical), merge it into canonical
-    const duplicates = suggestion.aliases.filter(
+    // ── Conflict validation against existing rules ──────────────────────────
+    const [cuentaRow] = await db
+      .select({ closer_merge_rules: cuentas.closer_merge_rules })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+
+    const existingRules: CloserMergeRule[] = cuentaRow?.closer_merge_rules ?? [];
+
+    for (const alias of aliases) {
+      for (const rule of existingRules) {
+        const alreadyInRule = rule.aliases.some(
+          (r) =>
+            r.nombre && alias.nombre &&
+            normalizeStr(r.nombre) === normalizeStr(alias.nombre) &&
+            ((!r.email && !alias.email) ||
+              (!!r.email && !!alias.email &&
+                normalizeStr(r.email) === normalizeStr(alias.email))),
+        );
+        if (alreadyInRule) {
+          return NextResponse.json(
+            { error: `El alias "${alias.nombre}" ya pertenece a otra regla de merge` },
+            { status: 409 },
+          );
+        }
+
+        if (
+          toEmail &&
+          rule.aliases.some(
+            (r) => r.email && normalizeStr(r.email) === normalizeStr(toEmail),
+          )
+        ) {
+          return NextResponse.json(
+            { error: `El canonical_email "${toEmail}" ya es alias en otra regla — merge circular` },
+            { status: 409 },
+          );
+        }
+
+        if (
+          !toEmail &&
+          rule.aliases.some(
+            (r) => normalizeStr(r.nombre ?? "") === normalizeStr(toNombre),
+          )
+        ) {
+          return NextResponse.json(
+            { error: `El canonical_nombre "${toNombre}" ya es alias en otra regla — merge circular` },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
+    // ── Backfill: rewrite historical records ────────────────────────────────
+    const duplicates = aliases.filter(
       (c) =>
         c.nombre.toLowerCase().trim() !== toNombre.toLowerCase().trim() ||
         (toEmail && c.email && c.email.toLowerCase().trim() !== toEmail.toLowerCase().trim()),
@@ -115,6 +176,24 @@ export async function POST(
       totalAgendas += r3.length;
       totalChats += (r4 as { id: number }[]).length;
     }
+
+    // ── Persist merge rule to cuentas.closer_merge_rules ────────────────────
+    const newRule: CloserMergeRule = {
+      canonical_email: toEmail ?? "",
+      canonical_nombre: toNombre,
+      aliases: aliases.map((a) => ({
+        nombre: a.nombre,
+        ...(a.email ? { email: a.email } : {}),
+      })),
+      created_at: new Date().toISOString(),
+    };
+
+    await db
+      .update(cuentas)
+      .set({
+        closer_merge_rules: sql`COALESCE(${cuentas.closer_merge_rules}, '[]'::jsonb) || ${JSON.stringify([newRule])}::jsonb`,
+      })
+      .where(eq(cuentas.id_cuenta, idCuenta));
 
     // Mark suggestion as accepted
     await db
