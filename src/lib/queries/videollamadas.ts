@@ -12,6 +12,21 @@ import type {
 
 const DEFAULT_ATTENDED_CATS = new Set(["Cerrada", "Ofertada", "No_Ofertada"]);
 
+const PHONE_CALL_IA_PREFIX = "# Análisis de la Llamada Telefónica";
+
+export function isPhoneCallRow(row: {
+  fathom_recording_id: string | null;
+  fathom_ingestion_source: string | null;
+  resumen_ia: string | null;
+}): boolean {
+  return (
+    row.fathom_recording_id === null &&
+    row.fathom_ingestion_source === null &&
+    row.resumen_ia !== null &&
+    row.resumen_ia.startsWith(PHONE_CALL_IA_PREFIX)
+  );
+}
+
 function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   if (!cat) return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
   const c = cat.trim();
@@ -113,9 +128,13 @@ export async function getVideollamadas(
       lte(resumenesDiariosAgendas.fecha, dateTo),
     ),
   ) ?? sql`TRUE`;
+  // AUT-632: exclude phone calls injected into agendas by the telephony pipeline
+  const excludePhoneCalls = sql`NOT (${resumenesDiariosAgendas.fathom_recording_id} IS NULL AND ${resumenesDiariosAgendas.fathom_ingestion_source} IS NULL AND ${resumenesDiariosAgendas.resumen_ia} LIKE ${PHONE_CALL_IA_PREFIX + "%"})`;
+
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
+    excludePhoneCalls,
   ];
   if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
