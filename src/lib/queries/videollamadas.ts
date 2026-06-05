@@ -129,7 +129,7 @@ export async function getVideollamadas(
     ),
   ) ?? sql`TRUE`;
   // AUT-632: exclude phone calls injected into agendas by the telephony pipeline
-  const excludePhoneCalls = sql`NOT (${resumenesDiariosAgendas.fathom_recording_id} IS NULL AND ${resumenesDiariosAgendas.fathom_ingestion_source} IS NULL AND ${resumenesDiariosAgendas.resumen_ia} LIKE ${PHONE_CALL_IA_PREFIX + "%"})`;
+  const excludePhoneCalls = sql`NOT (${resumenesDiariosAgendas.fathom_recording_id} IS NULL AND ${resumenesDiariosAgendas.fathom_ingestion_source} IS NULL AND ${resumenesDiariosAgendas.resumen_ia} IS NOT NULL AND ${resumenesDiariosAgendas.resumen_ia} LIKE ${PHONE_CALL_IA_PREFIX + "%"})`;
 
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
