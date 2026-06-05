@@ -446,8 +446,7 @@ export async function getDashboard(
   // meetingsBooked debe contar leads únicos, no registros totales
   const uniqueBookedLeads = new Set(
     filteredAgendas
-      .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
-      .map((a) => a.idcliente?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+      .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
   );
   const meetingsBooked = uniqueBookedLeads.size;
   // tasaAgendamiento usa leadsConActividad (leads que recibieron llamada/agenda)
