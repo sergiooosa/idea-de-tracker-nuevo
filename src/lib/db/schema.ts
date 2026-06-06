@@ -407,6 +407,7 @@ export const registrosDeLlamada = pgTable("registros_de_llamada", {
   callsid: varchar("callsid"),
   iadescripcion: text("iadescripcion"),
   id_user_ghl: text("id_user_ghl"),
+  ghl_contact_id: text("ghl_contact_id"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
 });
 

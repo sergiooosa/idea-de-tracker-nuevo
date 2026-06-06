@@ -317,7 +317,7 @@ export async function getAsesorData(
       name: r.nombre_lead ?? key,
       email: r.mail_lead ?? null,
       phone: r.phone_raw_format ?? phoneFromCallsMap[r.id_registro] ?? null,
-      ghlContactId: ghlContactMap[r.id_registro] ?? null,
+      ghlContactId: ghlContactMap[r.id_registro] ?? r.ghl_contact_id ?? null,
       estado: r.estado,
       estadoNormalizado: estadoNorm,
       intentosContacto: r.intentos_contacto ?? 0,
