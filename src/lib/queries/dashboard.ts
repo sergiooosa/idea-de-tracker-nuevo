@@ -822,6 +822,14 @@ export async function getDashboard(
     return [];
   };
 
+  // Fallback: métricas de Ads persistidas como tipo="manual" sin datos cargados
+  // → resolver desde resumenes_diarios_ads cuando el tenant tiene canal Ads conectado.
+  const ADS_MANUAL_FALLBACK: Record<string, string> = {
+    "base-inversion-publicidad": "gastoTotal",
+    "base-impresiones": "impresiones",
+    "base-ctr": "ctr",
+  };
+
   // Deduplicar por id: si hay duplicados, preferir tipo="ads" > tipo="webhook" > cualquier otro.
   // Resuelve el caso donde una métrica tiene entrada "manual" (sin datos) Y "ads" para el mismo id.
   const TYPE_PRIORITY: Record<string, number> = { ads: 10, webhook: 5 };
@@ -858,6 +866,10 @@ export async function getDashboard(
       } else if (m.tipo === "manual") {
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
+        const adsFallbackCampo = ADS_MANUAL_FALLBACK[m.id];
+        if (valor === 0 && adsFallbackCampo && hasAdsConfigEarly && entries.length === 0) {
+          valor = ADS_CAMPO_MAP[adsFallbackCampo] ?? 0;
+        }
       } else if (m.tipo === "webhook") {
         // Suma del campo webhook en el período (fuente API externa)
         let baseWebhook = m.webhookCampo ? (webhookSumas[m.webhookCampo] ?? 0) : 0;
