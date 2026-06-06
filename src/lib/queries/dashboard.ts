@@ -444,10 +444,15 @@ export async function getDashboard(
   // Leads únicos agendados: deduplicar por idcliente (GHL contact ID) o email_lead
   // Un mismo lead puede tener múltiples registros (PDTE → ofertada → cerrada)
   // meetingsBooked debe contar leads únicos, no registros totales
+  // IMPORTANTE: agendadas incluye TODOS los registros (asistidos, no-shows y cancelados)
+  // para que se cumpla la invariante: agendadas = asistidas + canceladas + noShows + cerradas + pendientes.
+  // Antes excluíamos cancelados aquí, lo que causaba agendadas < suma de outcomes — una cita
+  // cancelada estuvo agendada (AUT-701; mismo fix ya aplicado en videollamadas.ts bajo AUT-208).
+  // Usamos la misma clave de dedup que canceladas/no_show (idcliente|ghl_contact_id|email)
+  // para garantizar consistencia entre los contadores.
   const uniqueBookedLeads = new Set(
     filteredAgendas
-      .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
-      .map((a) => a.idcliente?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+      .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
   );
   const meetingsBooked = uniqueBookedLeads.size;
   // tasaAgendamiento usa leadsConActividad (leads que recibieron llamada/agenda)
