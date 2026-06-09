@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Pause, Play, Users, ListFilter, ArrowUpDown, Loader2 } from "lucide-react";
+import { Plus, Pencil, Pause, Play, Users, ListFilter, ArrowUpDown, Loader2, Settings2, Clock, Radio } from "lucide-react";
 
 interface Sesion {
   id: string;
@@ -18,6 +18,8 @@ interface Sesion {
   filtro_estado: string[] | null;
   filtro_asesores: string[] | null;
   orden: string;
+  lock_expiracion_min: number;
+  poll_intervalo_seg: number;
   activa: boolean;
   created_at: string;
   created_by: string;
@@ -61,6 +63,8 @@ export default function SesionesEditor() {
 
   const [nombre, setNombre] = useState("");
   const [orden, setOrden] = useState<string>("mas_antiguo");
+  const [lockExpMin, setLockExpMin] = useState(15);
+  const [pollIntSeg, setPollIntSeg] = useState(4);
   const [selectedEstados, setSelectedEstados] = useState<string[]>([]);
   const [selectedAsesores, setSelectedAsesores] = useState<string[]>([]);
 
@@ -133,6 +137,8 @@ export default function SesionesEditor() {
     setEditing(null);
     setNombre("");
     setOrden("mas_antiguo");
+    setLockExpMin(15);
+    setPollIntSeg(4);
     setSelectedEstados([]);
     setSelectedAsesores([]);
     setPreview(null);
@@ -144,6 +150,8 @@ export default function SesionesEditor() {
     setEditing(sesion);
     setNombre(sesion.nombre);
     setOrden(sesion.orden);
+    setLockExpMin(sesion.lock_expiracion_min ?? 15);
+    setPollIntSeg(sesion.poll_intervalo_seg ?? 4);
     setSelectedEstados(sesion.filtro_estado ?? []);
     setSelectedAsesores(sesion.filtro_asesores ?? []);
     setPreview(null);
@@ -162,6 +170,8 @@ export default function SesionesEditor() {
         filtro_estado: selectedEstados.length > 0 ? selectedEstados : null,
         filtro_asesores: selectedAsesores.length > 0 ? selectedAsesores : null,
         orden,
+        lock_expiracion_min: lockExpMin,
+        poll_intervalo_seg: pollIntSeg,
       };
 
       const res = await fetch("/api/enfoque/sesiones", {
@@ -283,6 +293,14 @@ export default function SesionesEditor() {
                       {s.filtro_asesores.length} asesor{s.filtro_asesores.length !== 1 && "es"}
                     </span>
                   )}
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Lock {s.lock_expiracion_min ?? 15} min
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Radio className="w-3 h-3" />
+                    Poll {s.poll_intervalo_seg ?? 4}s
+                  </span>
                 </div>
               </div>
 
@@ -358,6 +376,62 @@ export default function SesionesEditor() {
                     {ORDEN_LABELS[o]}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Reglas de avance */}
+            <div>
+              <label className="flex items-center gap-1.5 text-sm font-medium text-gray-300 mb-3">
+                <Settings2 className="w-4 h-4" />
+                Reglas de avance
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-surface-900 rounded-lg border border-surface-600 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-medium text-gray-300">Lock de lead</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={5}
+                      max={60}
+                      step={5}
+                      value={lockExpMin}
+                      onChange={(e) => setLockExpMin(Number(e.target.value))}
+                      className="flex-1 accent-accent-cyan h-1.5"
+                    />
+                    <span className="text-sm font-mono text-white min-w-[3.5rem] text-right">
+                      {lockExpMin} min
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1.5">
+                    Tiempo antes de liberar un lead sin actividad
+                  </p>
+                </div>
+                <div className="bg-surface-900 rounded-lg border border-surface-600 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Radio className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-medium text-gray-300">Intervalo de poll</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={3}
+                      max={10}
+                      step={1}
+                      value={pollIntSeg}
+                      onChange={(e) => setPollIntSeg(Number(e.target.value))}
+                      className="flex-1 accent-accent-cyan h-1.5"
+                    />
+                    <span className="text-sm font-mono text-white min-w-[2.5rem] text-right">
+                      {pollIntSeg}s
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1.5">
+                    Frecuencia de verificación de cambios externos
+                  </p>
+                </div>
               </div>
             </div>
 

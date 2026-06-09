@@ -18,6 +18,7 @@ interface SesionActiva {
   nombre: string;
   modo: string;
   orden: string;
+  poll_intervalo_seg?: number;
 }
 
 interface MetricasEnfoque {
@@ -43,7 +44,7 @@ const RESULTADOS = [
   { valor: "no_interesado", label: "No interesado", color: "bg-gray-600 hover:bg-gray-500" },
 ] as const;
 
-const POLL_INTERVAL_MS = 4000;
+const POLL_INTERVAL_MS_DEFAULT = 4000;
 
 const RESULTADO_LABELS: Record<string, string> = Object.fromEntries(
   RESULTADOS.map((r) => [r.valor, r.label]),
@@ -182,7 +183,7 @@ export default function EnfoquePantalla() {
       } catch {
         // poll failed, retry on next tick
       }
-    }, POLL_INTERVAL_MS);
+    }, (sesionRef.current?.poll_intervalo_seg ?? 4) * 1000 || POLL_INTERVAL_MS_DEFAULT);
   }, []);
 
   const cargarSiguiente = useCallback(async (idSesion: string) => {

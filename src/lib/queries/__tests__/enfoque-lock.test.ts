@@ -39,15 +39,15 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/db/schema", () => ({
   registrosDeLlamada: { id_registro: "id_registro", id_cuenta: "id_cuenta", closer_mail: "closer_mail", estado: "estado", intentos_contacto: "intentos_contacto", fecha_evento: "fecha_evento", nombre_lead: "nombre_lead", mail_lead: "mail_lead", phone_raw_format: "phone_raw_format", nombre_closer: "nombre_closer", creativo_origen: "creativo_origen" },
-  sesionesEnfoque: { id: "id", id_cuenta: "id_cuenta", activa: "activa" },
+  sesionesEnfoque: { id: "id", id_cuenta: "id_cuenta", activa: "activa", lock_expiracion_min: "lock_expiracion_min", poll_intervalo_seg: "poll_intervalo_seg" },
   enfoqueResultado: { id_sesion: "id_sesion", closer_mail: "closer_mail", id_registro: "id_registro" },
   enfoqueLock: { id: "id", id_sesion: "id_sesion", id_cuenta: "id_cuenta", id_registro: "id_registro", en_progreso_por: "en_progreso_por", lock_ts: "lock_ts" },
 }));
 
-describe("LOCK_EXPIRATION_MINUTES", () => {
+describe("LOCK_EXPIRATION_MINUTES_DEFAULT", () => {
   it("es 15 minutos", async () => {
-    const { LOCK_EXPIRATION_MINUTES } = await import("../enfoque");
-    expect(LOCK_EXPIRATION_MINUTES).toBe(15);
+    const { LOCK_EXPIRATION_MINUTES_DEFAULT } = await import("../enfoque");
+    expect(LOCK_EXPIRATION_MINUTES_DEFAULT).toBe(15);
   });
 });
 

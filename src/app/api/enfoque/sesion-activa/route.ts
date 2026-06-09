@@ -12,6 +12,7 @@ export async function GET(req: Request) {
         nombre: sesionesEnfoque.nombre,
         modo: sesionesEnfoque.modo,
         orden: sesionesEnfoque.orden,
+        poll_intervalo_seg: sesionesEnfoque.poll_intervalo_seg,
       })
       .from(sesionesEnfoque)
       .where(
