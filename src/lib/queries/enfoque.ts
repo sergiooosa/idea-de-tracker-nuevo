@@ -8,7 +8,8 @@ import {
 import type { ResultadoCanonicoEnfoque } from "@/lib/db/schema";
 import { eq, and, sql, inArray, notInArray, asc, ne } from "drizzle-orm";
 
-export const LOCK_EXPIRATION_MINUTES = 15;
+export const LOCK_EXPIRATION_MINUTES_DEFAULT = 15;
+export const POLL_INTERVALO_SEG_DEFAULT = 4;
 
 export interface SiguienteLead {
   id_registro: number;
@@ -48,7 +49,7 @@ export { estadoToCanonicoEnfoque };
  * Subquery: IDs de registros con lock vigente de OTRO asesor en esta sesión.
  * Locks expirados (>15 min) se ignoran — el lead se considera libre.
  */
-function lockedByOtherSubquery(idSesion: string, closerMail: string) {
+function lockedByOtherSubquery(idSesion: string, closerMail: string, lockMinutes: number) {
   return db
     .select({ id_registro: enfoqueLock.id_registro })
     .from(enfoqueLock)
@@ -56,7 +57,7 @@ function lockedByOtherSubquery(idSesion: string, closerMail: string) {
       and(
         eq(enfoqueLock.id_sesion, idSesion),
         ne(enfoqueLock.en_progreso_por, closerMail),
-        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'`,
+        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(lockMinutes))} minutes'`,
       ),
     );
 }
@@ -89,6 +90,7 @@ export async function getSiguienteLead(
 
   const filtroEstado = sesion.filtro_estado ?? [];
   const filtroAsesores = sesion.filtro_asesores ?? [];
+  const lockMin = sesion.lock_expiracion_min ?? LOCK_EXPIRATION_MINUTES_DEFAULT;
 
   if (filtroAsesores.length > 0 && !filtroAsesores.includes(closerMail)) {
     return { lead: null, reconexion: false };
@@ -102,7 +104,7 @@ export async function getSiguienteLead(
       and(
         eq(enfoqueLock.id_sesion, idSesion),
         eq(enfoqueLock.en_progreso_por, closerMail),
-        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'`,
+        sql`${enfoqueLock.lock_ts} > now() - interval '${sql.raw(String(lockMin))} minutes'`,
       ),
     )
     .limit(1);
@@ -147,7 +149,7 @@ export async function getSiguienteLead(
     eq(registrosDeLlamada.id_cuenta, idCuentaStr),
     eq(registrosDeLlamada.closer_mail, closerMail),
     notInArray(registrosDeLlamada.id_registro, registrosYaGestionados),
-    notInArray(registrosDeLlamada.id_registro, lockedByOtherSubquery(idSesion, closerMail)),
+    notInArray(registrosDeLlamada.id_registro, lockedByOtherSubquery(idSesion, closerMail, lockMin)),
   ];
 
   if (filtroEstado.length > 0) {
@@ -189,6 +191,15 @@ export interface TomarLeadResult {
  * - Vigent lock by same closer (reconnection): ON CONFLICT refreshes lock_ts, returns same lead.
  * - Vigent lock by other closer: ON CONFLICT WHERE fails, no update → race prevented.
  */
+async function getLockMinutesForSession(idSesion: string): Promise<number> {
+  const [row] = await db
+    .select({ lock_expiracion_min: sesionesEnfoque.lock_expiracion_min })
+    .from(sesionesEnfoque)
+    .where(eq(sesionesEnfoque.id, idSesion))
+    .limit(1);
+  return row?.lock_expiracion_min ?? LOCK_EXPIRATION_MINUTES_DEFAULT;
+}
+
 export async function tomarLead(
   idCuenta: number,
   closerMail: string,
@@ -199,6 +210,7 @@ export async function tomarLead(
     return { ok: false, lockId: null, lead: null, error: "no_leads" };
   }
 
+  const lockMin = await getLockMinutesForSession(idSesion);
   const lockId = crypto.randomUUID();
   const result = await db.execute(sql`
     INSERT INTO enfoque_lock (id, id_sesion, id_cuenta, id_registro, en_progreso_por, lock_ts)
@@ -207,7 +219,7 @@ export async function tomarLead(
       SET en_progreso_por = ${closerMail},
           lock_ts = now()
       WHERE enfoque_lock.en_progreso_por = ${closerMail}
-         OR enfoque_lock.lock_ts <= now() - interval '${sql.raw(String(LOCK_EXPIRATION_MINUTES))} minutes'
+         OR enfoque_lock.lock_ts <= now() - interval '${sql.raw(String(lockMin))} minutes'
     RETURNING id
   `);
 

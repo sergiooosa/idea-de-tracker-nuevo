@@ -335,6 +335,7 @@ export function generateVideollamadas(): VideollamadasResponse {
       tags: Math.random() > 0.6 ? ETIQUETAS[rnd(0, ETIQUETAS.length - 1)] : null,
       fathomReingestAt: null,
       categoriaPrevia: null,
+      excludedFromDashboard: false,
     };
   });
 
