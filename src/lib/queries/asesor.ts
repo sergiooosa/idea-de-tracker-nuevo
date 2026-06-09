@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs, cuentas, usuariosDashboard, metricasWebhook } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, isNull, isNotNull, inArray } from "drizzle-orm";
+import { agendaDedupKey } from "./agenda-dedup-key";
 import type {
   AsesorKpis,
   AsesorLeadCRM,
@@ -223,8 +224,8 @@ export async function getAsesorData(
   // leadsAsignados = leads únicos incluyendo pdte (son leads asignados)
   const leadKeyFromCall = (c: { mail_lead: string | null; phone: string | null; id: number }) =>
     c.mail_lead?.trim() || c.phone?.trim() || `id:${c.id}`;
-  const leadKeyFromAgenda = (a: { email_lead: string | null; nombre_de_lead: string | null; id_registro_agenda: number }) =>
-    a.email_lead?.trim() || a.nombre_de_lead?.trim() || `ag:${a.id_registro_agenda}`;
+  const leadKeyFromAgenda = (a: { idcliente?: string | null; ghl_contact_id?: string | null; email_lead: string | null; id_registro_agenda: number }) =>
+    agendaDedupKey(a);
   const leadKeyFromReg = (r: { mail_lead: string | null; phone_raw_format: string | null; id_registro: number }) =>
     r.mail_lead?.trim() || r.phone_raw_format?.trim() || `reg:${r.id_registro}`;
 
@@ -275,13 +276,13 @@ export async function getAsesorData(
     llamadasRealizadas: callRows.length,
     llamadasContestadas: contestadas,
     tasaContacto: callRows.length > 0 ? (contestadas / callRows.length) * 100 : 0,
-    reunionesAgendadas: agendaRows.length,
+    reunionesAgendadas: new Set(agendaRows.map(agendaDedupKey)).size,
     reunionesAsistidas: videoAsistidas,
     reunionesCalificadas: videoCalificadas,
     reunionesCerradas: videoCerradas,
     reunionesNoShow: videoNoShows,
     reunionesCanceladas: videoCanceladas,
-    tasaAgendamiento: contestadas > 0 ? (agendaRows.length / contestadas) * 100 : 0,
+    tasaAgendamiento: contestadas > 0 ? (new Set(agendaRows.map(agendaDedupKey)).size / contestadas) * 100 : 0,
     totalChats: chatsRows.length,
     chatsConRespuesta,
     tasaRespuestaChats: chatsRows.length > 0 ? (chatsConRespuesta / chatsRows.length) * 100 : 0,
@@ -443,7 +444,7 @@ export async function getAsesorData(
     },
     llamadasRealizadas: { total: callRows.length, porTipo },
     llamadasContestadas: { total: contestadas },
-    reunionesAgendadas: { total: agendaRows.length },
+    reunionesAgendadas: { total: new Set(agendaRows.map(agendaDedupKey)).size },
   };
 
   // ── Advisors list ─────────────────────────────────────────────────────────

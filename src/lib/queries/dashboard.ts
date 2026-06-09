@@ -3,6 +3,7 @@ import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs,
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS } from "@/lib/metricas-engine";
 import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
+import { agendaDedupKey } from "./agenda-dedup-key";
 import type {
   DashboardKpis,
   DashboardAdvisorRow,
@@ -350,7 +351,7 @@ export async function getDashboard(
   const uniqueCanceledLeadKeys = new Set(
     filteredAgendas
       .filter((a) => (a.categoria ?? "").toLowerCase().includes("cancel"))
-      .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+      .map((a) => agendaDedupKey(a))
   );
   const canceladas = uniqueCanceledLeadKeys.size;
   const cerradas = filteredAgendas.filter((a) => {
@@ -458,7 +459,7 @@ export async function getDashboard(
   // para garantizar consistencia entre los contadores.
   const uniqueBookedLeads = new Set(
     filteredAgendas
-      .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+      .map((a) => agendaDedupKey(a))
   );
   const meetingsBooked = uniqueBookedLeads.size;
   // tasaAgendamiento usa leadsConActividad (leads que recibieron llamada/agenda)
@@ -497,7 +498,7 @@ export async function getDashboard(
     noShows: new Set(
       filteredAgendas
         .filter((a) => (a.categoria ?? "").toLowerCase() === "no_show")
-        .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+        .map((a) => agendaDedupKey(a))
         .filter((key) => !uniqueCanceledLeadKeys.has(key))
     ).size,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
@@ -581,7 +582,7 @@ export async function getDashboard(
       // Usar solo email causaba subestimar el denominador cuando leads llegan solo con phone o GHL ID
       const aLeads = new Set([
         ...ac.map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id)),
-        ...aa.map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`),
+        ...aa.map((a) => agendaDedupKey(a)),
       ]).size;
       const aAsistidas = aa.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim()) && hasRealInteraction(a)).length;
       const aRevenueClosedSet = aa.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
@@ -654,7 +655,7 @@ export async function getDashboard(
         meetingsBooked: new Set(
           aa
             .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
-            .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+            .map((a) => agendaDedupKey(a))
         ).size,
         meetingsAttended: aAsistidas,
         revenue: aRevenue,
@@ -663,7 +664,7 @@ export async function getDashboard(
         bookingRate: aLeads > 0 ? new Set(
           aa
             .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
-            .map((a) => a.idcliente?.trim() || a.ghl_contact_id?.trim() || a.email_lead?.trim().toLowerCase() || `nokey_${a.id_registro_agenda}`)
+            .map((a) => agendaDedupKey(a))
         ).size / aLeads : 0,
         metricasWebhook: webhookPorUsuario[ac[0]?.closer_mail ?? key] ?? {},
       };
