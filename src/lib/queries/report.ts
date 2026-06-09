@@ -14,6 +14,7 @@ import {
   resumenesDiariosAgendas,
 } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, isNull, isNotNull, or, gt } from "drizzle-orm";
+import { agendaDedupKey } from "./agenda-dedup-key";
 
 /* ------------------------------------------------------------------ */
 /*  1. getReportAds                                                    */
@@ -537,9 +538,7 @@ export async function getReportVideocalls(
       ),
     );
 
-  // Lead deduplication key — same priority as getDashboard
-  const getLeadKey = (r: { idcliente: string | null; ghl_contact_id: string | null; email_lead: string | null; id_registro_agenda: number }) =>
-    r.idcliente?.trim() || r.ghl_contact_id?.trim() || r.email_lead?.trim().toLowerCase() || `nokey_${r.id_registro_agenda}`;
+  const getLeadKey = agendaDedupKey;
 
   // Build global cancelled-lead set first so no-show dedup can exclude them
   // (matches getDashboard invariant: a rescheduled lead appears only in canceladas)

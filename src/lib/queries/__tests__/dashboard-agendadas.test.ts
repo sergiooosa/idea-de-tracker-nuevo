@@ -1,14 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-/**
- * Validates the agendadas counting logic from dashboard.ts:
- * - uniqueBookedLeads must include ALL agenda records (including cancelled)
- * - Dedup key: idcliente || ghl_contact_id || email_lead || nokey_id
- * - Invariant: agendadas = asistidas + canceladas + noShows + cerradas + pendientes
- *   with pendientes >= 0
- *
- * This mirrors the pure computation in getDashboard without the DB layer.
- */
+import { agendaDedupKey } from "../agenda-dedup-key";
 
 interface AgendaRecord {
   id_registro_agenda: number;
@@ -19,14 +10,7 @@ interface AgendaRecord {
   cash?: number | null;
 }
 
-function agendaKey(a: AgendaRecord): string {
-  return (
-    a.idcliente?.trim() ||
-    a.ghl_contact_id?.trim() ||
-    a.email_lead?.trim().toLowerCase() ||
-    `nokey_${a.id_registro_agenda}`
-  );
-}
+const agendaKey = agendaDedupKey;
 
 function computeAgendaKpis(filteredAgendas: AgendaRecord[]) {
   const uniqueBookedLeads = new Set(filteredAgendas.map(agendaKey));
