@@ -373,6 +373,7 @@ export default function DashboardPage() {
               { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
               { label: 'No shows', value: kpis.noShows, color: 'amber' },
               { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
+              { label: t.dashboard.kpis.efectivoCobrado, value: fm(kpis.cashCollected), color: 'green' },
               ...((kpis.pendientesAgendas ?? 0) > 0 ? [{ label: 'Pendientes', value: kpis.pendientesAgendas ?? 0, color: 'blue' as const, sub: 'Sin clasificar aún' }] : []),
             ].map(({ label, value, color, sub }) => (
               <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
