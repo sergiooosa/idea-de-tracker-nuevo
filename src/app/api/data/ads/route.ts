@@ -113,23 +113,29 @@ export async function GET(req: Request) {
     `);
 
     // Campaign-leads matching by origen ILIKE campana
+    // Pre-aggregate gasto in CTE to avoid fan-out from the LEFT JOIN to agendas
     const campanaLeadsRows = await db.execute(sql`
+      WITH campaign_spend AS (
+        SELECT campana, plataforma, SUM(gasto_total_ad) AS gasto
+        FROM resumenes_diarios_ads
+        WHERE id_cuenta = ${idCuenta}
+          AND fecha BETWEEN ${from}::date AND ${to}::date
+          AND campana IS NOT NULL
+        GROUP BY campana, plataforma
+      )
       SELECT
-        a.campana,
-        a.plataforma,
-        SUM(a.gasto_total_ad) AS gasto,
+        cs.campana,
+        cs.plataforma,
+        cs.gasto,
         COUNT(DISTINCT ag.email_lead) AS leads,
         COUNT(DISTINCT ag.email_lead) FILTER (WHERE ag.categoria ILIKE '%cerr%' OR ag.categoria ILIKE '%close%') AS cierres
-      FROM resumenes_diarios_ads a
+      FROM campaign_spend cs
       LEFT JOIN resumenes_diarios_agendas ag
-        ON ag.id_cuenta = a.id_cuenta
+        ON ag.id_cuenta = ${idCuenta}
         AND ag.fecha BETWEEN ${from}::date AND ${to}::date
-        AND ag.origen ILIKE ('%' || a.campana || '%')
-      WHERE a.id_cuenta = ${idCuenta}
-        AND a.fecha BETWEEN ${from}::date AND ${to}::date
-        AND a.campana IS NOT NULL
-      GROUP BY a.campana, a.plataforma
-      ORDER BY gasto DESC
+        AND ag.origen ILIKE ('%' || cs.campana || '%')
+      GROUP BY cs.campana, cs.plataforma, cs.gasto
+      ORDER BY cs.gasto DESC
       LIMIT 50
     `);
 
