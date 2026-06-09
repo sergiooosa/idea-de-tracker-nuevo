@@ -282,7 +282,8 @@ export async function getVideollamadas(
     noShows,
     revenue,
     cashCollected: cash,
-    ticket: asistidas > 0 ? Math.round(revenue / asistidas) : 0,
+    // Denominador = cerradas para ser coherente con revenue (que suma solo facturación de cerradas)
+    ticket: registrosCerrados.length > 0 ? Math.round(revenue / registrosCerrados.length) : 0,
   };
 
   // Cargar mapa nombre_closer → email para normalizar asesores que Fathom a veces
