@@ -301,6 +301,176 @@ export async function getMetricasSesion(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/*  Tablero de operación en vivo — Fase 4d                             */
+/* ------------------------------------------------------------------ */
+
+const CONTACTO_RESULTADOS: string[] = [
+  "contesto",
+  "interesado",
+  "programado",
+  "calificada",
+  "cerrada",
+];
+
+export interface AsesorEnVivo {
+  closerMail: string;
+  nombreCloser: string | null;
+  idSesion: string;
+  nombreSesion: string;
+  leadActual: string | null;
+  lockDesde: string;
+}
+
+export interface MetricasAsesor {
+  closerMail: string;
+  nombreCloser: string | null;
+  trabajadosHoy: number;
+  contactados: number;
+  tasaContacto: number;
+  duracionPromedio: number;
+  resumen: Array<{ resultado: string; cantidad: number }>;
+}
+
+export interface TableroEnfoqueData {
+  asesoresActivos: AsesorEnVivo[];
+  metricasPorAsesor: MetricasAsesor[];
+  sesionesActivas: number;
+  totalTrabajadosHoy: number;
+  totalContactados: number;
+  tasaContactoGlobal: number;
+}
+
+export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqueData> {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const idCuentaStr = String(idCuenta);
+
+  const sesionesActivasRows = await db
+    .select({ id: sesionesEnfoque.id, nombre: sesionesEnfoque.nombre, lock_expiracion_min: sesionesEnfoque.lock_expiracion_min })
+    .from(sesionesEnfoque)
+    .where(and(eq(sesionesEnfoque.id_cuenta, idCuenta), eq(sesionesEnfoque.activa, true)));
+
+  const sesionMap = new Map(sesionesActivasRows.map((s) => [s.id, s]));
+
+  let asesoresActivos: AsesorEnVivo[] = [];
+  if (sesionesActivasRows.length > 0) {
+    const locksVigentes = await db.execute(sql`
+      SELECT l.en_progreso_por, l.id_sesion, l.lock_ts, r.nombre_lead
+      FROM enfoque_lock l
+      JOIN registros_de_llamada r ON r.id_registro = l.id_registro
+      JOIN sesiones_enfoque s ON s.id = l.id_sesion
+      WHERE l.id_cuenta = ${idCuenta}
+        AND s.activa = true
+        AND l.lock_ts > now() - (s.lock_expiracion_min || ' minutes')::interval
+    `);
+    const lockRows = locksVigentes.rows as Array<{
+      en_progreso_por: string;
+      id_sesion: string;
+      lock_ts: string;
+      nombre_lead: string | null;
+    }>;
+
+    asesoresActivos = lockRows.map((r) => ({
+      closerMail: r.en_progreso_por,
+      nombreCloser: null,
+      idSesion: r.id_sesion,
+      nombreSesion: sesionMap.get(r.id_sesion)?.nombre ?? "",
+      leadActual: r.nombre_lead,
+      lockDesde: r.lock_ts,
+    }));
+  }
+
+  const resultadosHoy = await db
+    .select({
+      closer_mail: enfoqueResultado.closer_mail,
+      resultado_canonico: enfoqueResultado.resultado_canonico,
+      cantidad: sql<number>`count(*)::int`,
+      duracion_total: sql<number>`COALESCE(sum(${enfoqueResultado.duracion_seg}), 0)::int`,
+    })
+    .from(enfoqueResultado)
+    .where(
+      and(
+        eq(enfoqueResultado.id_cuenta, idCuenta),
+        sql`${enfoqueResultado.ts} >= ${hoy.toISOString()}::timestamptz`,
+      ),
+    )
+    .groupBy(enfoqueResultado.closer_mail, enfoqueResultado.resultado_canonico);
+
+  const porAsesor = new Map<string, {
+    trabajados: number;
+    contactados: number;
+    duracionTotal: number;
+    resumen: Map<string, number>;
+  }>();
+
+  for (const row of resultadosHoy) {
+    let entry = porAsesor.get(row.closer_mail);
+    if (!entry) {
+      entry = { trabajados: 0, contactados: 0, duracionTotal: 0, resumen: new Map() };
+      porAsesor.set(row.closer_mail, entry);
+    }
+    entry.trabajados += row.cantidad;
+    entry.duracionTotal += row.duracion_total;
+    if (CONTACTO_RESULTADOS.includes(row.resultado_canonico)) {
+      entry.contactados += row.cantidad;
+    }
+    entry.resumen.set(row.resultado_canonico, row.cantidad);
+  }
+
+  const closerEmails = [...new Set([...porAsesor.keys(), ...asesoresActivos.map((a) => a.closerMail)])];
+  const nombreMap = new Map<string, string | null>();
+  if (closerEmails.length > 0) {
+    const nombres = await db
+      .select({
+        closer_mail: registrosDeLlamada.closer_mail,
+        nombre_closer: registrosDeLlamada.nombre_closer,
+      })
+      .from(registrosDeLlamada)
+      .where(
+        and(
+          eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+          inArray(registrosDeLlamada.closer_mail, closerEmails),
+        ),
+      )
+      .groupBy(registrosDeLlamada.closer_mail, registrosDeLlamada.nombre_closer);
+    for (const n of nombres) {
+      if (n.closer_mail && n.nombre_closer) nombreMap.set(n.closer_mail, n.nombre_closer);
+    }
+  }
+
+  for (const a of asesoresActivos) {
+    a.nombreCloser = nombreMap.get(a.closerMail) ?? null;
+  }
+
+  const metricasPorAsesor: MetricasAsesor[] = [];
+  for (const [email, data] of porAsesor) {
+    metricasPorAsesor.push({
+      closerMail: email,
+      nombreCloser: nombreMap.get(email) ?? null,
+      trabajadosHoy: data.trabajados,
+      contactados: data.contactados,
+      tasaContacto: data.trabajados > 0 ? Math.round((data.contactados / data.trabajados) * 100) : 0,
+      duracionPromedio: data.trabajados > 0 ? Math.round(data.duracionTotal / data.trabajados) : 0,
+      resumen: [...data.resumen.entries()].map(([resultado, cantidad]) => ({ resultado, cantidad })),
+    });
+  }
+
+  metricasPorAsesor.sort((a, b) => b.trabajadosHoy - a.trabajadosHoy);
+
+  const totalTrabajadosHoy = metricasPorAsesor.reduce((s, m) => s + m.trabajadosHoy, 0);
+  const totalContactados = metricasPorAsesor.reduce((s, m) => s + m.contactados, 0);
+
+  return {
+    asesoresActivos,
+    metricasPorAsesor,
+    sesionesActivas: sesionesActivasRows.length,
+    totalTrabajadosHoy,
+    totalContactados,
+    tasaContactoGlobal: totalTrabajadosHoy > 0 ? Math.round((totalContactados / totalTrabajadosHoy) * 100) : 0,
+  };
+}
+
 async function getLeadById(idRegistro: number): Promise<SiguienteLead | null> {
   const [lead] = await db
     .select({

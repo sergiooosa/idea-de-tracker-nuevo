@@ -15,6 +15,10 @@ export const es = {
     sistema: "Control del sistema",
     documentacion: "Documentación",
     configuracion: "Configuración",
+    sesiones: "Sesiones de enfoque",
+    "tablero-enfoque": "Tablero de operación",
+    asignacion: "Asignación de leads",
+    reportes: "Reportes",
   },
   dashboard: {
     titulo: "Panel ejecutivo",
