@@ -359,6 +359,8 @@ export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {
   // AUT-632: discriminador videollamada vs llamada telefónica
   fathom_recording_id: text("fathom_recording_id"),
   fathom_ingestion_source: text("fathom_ingestion_source"),
+  // AUT-774: exclusión reversible de reuniones del dashboard de Videollamadas
+  excluida_dashboard: boolean("excluida_dashboard").notNull().default(false),
 });
 
 /* ------------------------------------------------------------------ */
@@ -689,6 +691,8 @@ export const sesionesEnfoque = pgTable("sesiones_enfoque", {
   filtro_estado: jsonb("filtro_estado").$type<string[]>(),
   filtro_asesores: jsonb("filtro_asesores").$type<string[]>(),
   orden: text("orden").$type<OrdenEnfoque>().notNull().default("mas_antiguo"),
+  lock_expiracion_min: integer("lock_expiracion_min").notNull().default(15),
+  poll_intervalo_seg: integer("poll_intervalo_seg").notNull().default(4),
   activa: boolean("activa").notNull().default(true),
   created_by: text("created_by").notNull(),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

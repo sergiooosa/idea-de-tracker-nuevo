@@ -10,7 +10,7 @@ import { useApiData } from '@/hooks/useApiData';
 import { format, subDays, formatDistanceToNow, isAfter, subDays as subDaysDate } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Link from 'next/link';
-import { Pencil, Search, User, X, Plus, RefreshCw } from 'lucide-react';
+import { Pencil, Search, User, X, Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
@@ -69,8 +69,9 @@ export default function PerformanceVideollamadasPage() {
   const [leadSearch, setLeadSearch] = useState('');
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'todas' | 'cerradas' | 'no_cerradas' | 'no_calificadas'>('todas');
+  const [showExcluded, setShowExcluded] = useState(false);
 
-  const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
+  const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined, includeExcluded: showExcluded ? 'true' : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[], apiMeetings?: ApiVideollamada[]) => {
@@ -84,9 +85,19 @@ export default function PerformanceVideollamadasPage() {
   const isCerrada = (r: ApiVideollamada) =>
     r.outcome === 'cerrada' || r.outcome === 'cerrado' || r.outcome === 'closed';
 
+  const handleToggleExclude = async (id: number, excluir: boolean) => {
+    await fetch('/api/data/videollamadas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, excluida_dashboard: excluir }),
+    });
+    refetch();
+  };
+
   const registrosFiltrados = useMemo(() => {
     if (!data?.registros) return [];
     let records = data.registros;
+    if (!showExcluded) records = records.filter((r) => !r.excludedFromDashboard);
     // Search filter
     const q = leadSearch.trim();
     if (q) {
@@ -109,7 +120,7 @@ export default function PerformanceVideollamadasPage() {
     else if (statusFilter === 'no_cerradas') records = records.filter((r) => r.attended && !isCerrada(r));
     else if (statusFilter === 'no_calificadas') records = records.filter((r) => r.attended && !r.qualified);
     return records;
-  }, [data?.registros, leadSearch, statusFilter]);
+  }, [data?.registros, leadSearch, statusFilter, showExcluded]);
 
   const meetingsByAdvisor = useMemo(() => {
     const map: Record<string, ApiVideollamada[]> = {};
@@ -241,6 +252,19 @@ export default function PerformanceVideollamadasPage() {
             — {registrosFiltrados.length} reunión{registrosFiltrados.length !== 1 ? 'es' : ''} · los KPIs de arriba no cambian
           </span>
         )}
+        <span className="ml-auto" />
+        <button
+          type="button"
+          onClick={() => setShowExcluded(!showExcluded)}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+            showExcluded
+              ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+              : 'bg-surface-700 border-surface-500 text-gray-400 hover:border-amber-500/30 hover:text-gray-300'
+          }`}
+        >
+          {showExcluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+          {showExcluded ? 'Mostrando excluidas' : 'Mostrar excluidas'}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
@@ -355,6 +379,7 @@ export default function PerformanceVideollamadasPage() {
                                           <th className="px-2 py-2 font-medium">Correo</th>
                                           <th className="px-2 py-2 font-medium">Reuniones realizadas</th>
                                           <th className="px-2 py-2 font-medium">Resultado</th>
+                                          <th className="px-2 py-2 font-medium w-8" />
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -363,10 +388,11 @@ export default function PerformanceVideollamadasPage() {
                                           const outcomeLabel = last ? outcomeVideollamadaToSpanish(last.outcome) : '—';
                                           const reingestDate = last?.fathomReingestAt ? new Date(last.fathomReingestAt) : null;
                                           const showReingestBadge = reingestDate !== null && isAfter(reingestDate, subDaysDate(new Date(), 7));
+                                          const anyExcluded = lead.meetings.some((m) => m.excludedFromDashboard);
                                           return (
                                             <tr
                                               key={lead.leadKey}
-                                              className="border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer"
+                                              className={`border-t border-surface-500 hover:bg-surface-600/50 cursor-pointer${anyExcluded ? ' opacity-50' : ''}`}
                                               onClick={() => openTranscripcionIA(lead.meetings.map(apiToVideoMeeting), lead.meetings)}
                                             >
                                               <td className="px-2 py-2 text-white">
@@ -412,6 +438,21 @@ export default function PerformanceVideollamadasPage() {
                                                     </span>
                                                   )}
                                                 </div>
+                                              </td>
+                                              <td className="px-1 py-2">
+                                                <button
+                                                  type="button"
+                                                  title={anyExcluded ? 'Restaurar al dashboard' : 'Excluir del dashboard'}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    for (const m of lead.meetings) {
+                                                      handleToggleExclude(m.id, !anyExcluded);
+                                                    }
+                                                  }}
+                                                  className="p-1 rounded hover:bg-surface-500/80 text-gray-400 hover:text-white transition-colors"
+                                                >
+                                                  {anyExcluded ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                                </button>
                                               </td>
                                             </tr>
                                           );

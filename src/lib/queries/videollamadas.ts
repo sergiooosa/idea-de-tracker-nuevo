@@ -86,6 +86,7 @@ export async function getVideollamadas(
   dateFrom: string,
   dateTo: string,
   closerEmails?: string[],
+  includeExcluded?: boolean,
 ): Promise<VideollamadasResponse> {
   const emails = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
 
@@ -136,6 +137,9 @@ export async function getVideollamadas(
     fechaFilter,
     excludePhoneCalls,
   ];
+  if (!includeExcluded) {
+    agendaConditions.push(eq(resumenesDiariosAgendas.excluida_dashboard, false));
+  }
   if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
   // Guard: si la cuenta no tiene Fathom configurado, no retornar videollamadas.
@@ -219,6 +223,7 @@ export async function getVideollamadas(
       tags: r.tags,
       fathomReingestAt: r.fathom_reingest_at?.toISOString() ?? null,
       categoriaPrevia: r.categoria_previa ?? null,
+      excludedFromDashboard: r.excluida_dashboard,
     };
   });
 
@@ -435,6 +440,27 @@ export async function updateVideollamada(
       .set(setClause)
       .where(eq(resumenesDiariosAgendas.id_registro_agenda, id));
   }
+
+  return true;
+}
+
+export async function toggleExcluirVideollamada(
+  id: number,
+  idCuenta: number,
+  excluir: boolean,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: resumenesDiariosAgendas.id_registro_agenda, id_cuenta: resumenesDiariosAgendas.id_cuenta })
+    .from(resumenesDiariosAgendas)
+    .where(eq(resumenesDiariosAgendas.id_registro_agenda, id))
+    .limit(1);
+
+  if (!row || row.id_cuenta !== idCuenta) return false;
+
+  await db
+    .update(resumenesDiariosAgendas)
+    .set({ excluida_dashboard: excluir })
+    .where(eq(resumenesDiariosAgendas.id_registro_agenda, id));
 
   return true;
 }

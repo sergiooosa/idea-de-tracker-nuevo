@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuthAndPermission, enforceCloserFilter } from "@/lib/api-auth";
 import { auth } from "@/lib/auth";
-import { getVideollamadas, updateVideollamada } from "@/lib/queries/videollamadas";
+import { getVideollamadas, updateVideollamada, toggleExcluirVideollamada } from "@/lib/queries/videollamadas";
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
@@ -15,7 +15,8 @@ export async function GET(req: Request) {
     const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
     const requestedEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
     const closerEmails = enforceCloserFilter(requestedEmails, email, session?.user?.permisosArray ?? [], session?.user?.rol ?? "");
-    const data = await getVideollamadas(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined);
+    const includeExcluded = searchParams.get("includeExcluded") === "true";
+    const data = await getVideollamadas(idCuenta, from, to, closerEmails?.length ? closerEmails : undefined, includeExcluded);
     return NextResponse.json(data);
   });
 }
@@ -69,6 +70,22 @@ export async function PUT(req: Request) {
         ...(cash_collected !== undefined && { cash_collected }),
       },
     });
+
+    return NextResponse.json({ ok: true });
+  });
+}
+
+export async function PATCH(req: Request) {
+  return withAuthAndPermission(req, "editar_registros", async (idCuenta, email) => {
+    const body = await req.json();
+    const { id, excluida_dashboard } = body;
+    if (!id || typeof excluida_dashboard !== "boolean") {
+      return NextResponse.json({ error: "id (number) y excluida_dashboard (boolean) requeridos" }, { status: 400 });
+    }
+    const ok = await toggleExcluirVideollamada(id, idCuenta, excluida_dashboard);
+    if (!ok) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+    void logAudit(idCuenta, email, excluida_dashboard ? "EXCLUDE_VIDEOLLAMADA" : "RESTORE_VIDEOLLAMADA", { id });
 
     return NextResponse.json({ ok: true });
   });
