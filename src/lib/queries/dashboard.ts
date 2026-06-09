@@ -202,6 +202,13 @@ export async function getDashboard(
         extras_agg AS (
           SELECT plataforma, jsonb_object_agg(key, avg_val)::text AS campos_extra_json
           FROM extras GROUP BY plataforma
+        ),
+        with_acct_flag AS (
+          SELECT rda.*,
+            BOOL_OR(COALESCE(rda.campana, '') = '') OVER (PARTITION BY rda.plataforma, rda.fecha) AS _has_acct
+          FROM resumenes_diarios_ads rda
+          WHERE rda.id_cuenta = ${idCuenta}
+            AND rda.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
         )
         SELECT
           SUM(rda.gasto_total_ad) AS gasto,
@@ -212,13 +219,12 @@ export async function getDashboard(
           AVG(CASE WHEN rda.gasto_total_ad > 0 THEN rda.cpc END) AS cpc,
           array_agg(DISTINCT rda.plataforma) FILTER (WHERE rda.gasto_total_ad > 0) AS plataformas,
           MAX(ea.campos_extra_json) AS campos_extra_json,
-          -- Vturb metrics: avg across days with activity
           AVG(CASE WHEN rda.play_rate > 0 THEN rda.play_rate END) AS avg_play_rate,
           AVG(CASE WHEN rda.engagement > 0 THEN rda.engagement END) AS avg_engagement
-        FROM resumenes_diarios_ads rda
+        FROM with_acct_flag rda
         LEFT JOIN extras_agg ea ON ea.plataforma = rda.plataforma
-        WHERE rda.id_cuenta = ${idCuenta}
-          AND rda.fecha BETWEEN ${dateFrom}::date AND ${dateTo}::date
+        WHERE (rda._has_acct AND COALESCE(rda.campana, '') = '')
+           OR (NOT rda._has_acct)
       `).then(r => (r.rows[0] ?? {}) as Record<string, unknown>)
     : Promise.resolve({} as Record<string, unknown>);
 
