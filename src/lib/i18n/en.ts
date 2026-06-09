@@ -17,6 +17,10 @@ export const en: Translations = {
     sistema: "System",
     documentacion: "Documentation",
     configuracion: "Configuration",
+    sesiones: "Focus Sessions",
+    "tablero-enfoque": "Operations Board",
+    asignacion: "Lead Assignment",
+    reportes: "Reports",
   },
   dashboard: {
     titulo: "Executive Panel",
