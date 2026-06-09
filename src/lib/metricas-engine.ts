@@ -75,12 +75,13 @@ export const DEFAULT_METRICAS_CONFIG: MetricaConfig[] = [
   { id: "default-agendadas", nombre: "Citas agendadas", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 6, formato: "numero", color: "purple", formula: { tipo: "directo", fuente: "meetingsBooked" } },
   { id: "default-tasa-agendamiento", nombre: "Tasa de agendamiento", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 7, formato: "porcentaje", color: "purple", formula: { tipo: "directo", fuente: "tasaAgendamiento" }, descripcion: "Citas ÷ Leads trabajados" },
   { id: "default-no-shows", nombre: "No shows", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 8, formato: "numero", color: "amber", formula: { tipo: "directo", fuente: "noShows" }, descripcion: "Personas que no se presentaron" },
+  { id: "default-canceladas", nombre: "Canceladas", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 9, formato: "numero", color: "red", formula: { tipo: "directo", fuente: "meetingsCanceled" }, descripcion: "Citas canceladas por el lead" },
   // --- Bloque 4: Cierre ---
-  { id: "default-tasa-cierre", nombre: "Tasa de cierre", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 9, formato: "porcentaje", color: "green", formula: { tipo: "directo", fuente: "tasaCierre" }, descripcion: "Cerradas ÷ Asistidas" },
+  { id: "default-tasa-cierre", nombre: "Tasa de cierre", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 10, formato: "porcentaje", color: "green", formula: { tipo: "directo", fuente: "tasaCierre" }, descripcion: "Cerradas ÷ Asistidas" },
   // --- Bloque 5: Dinero ---
-  { id: "default-revenue", nombre: "Ingresos", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 10, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "revenue" } },
-  { id: "default-cash", nombre: "Efectivo cobrado", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 11, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "cashCollected" } },
-  { id: "default-ticket", nombre: "Ticket promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 12, formato: "moneda", color: "blue", formula: { tipo: "directo", fuente: "avgTicket" }, descripcion: "Ingresos ÷ Citas efectivas" },
+  { id: "default-revenue", nombre: "Ingresos", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 11, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "revenue" } },
+  { id: "default-cash", nombre: "Efectivo cobrado", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 12, formato: "moneda", color: "green", formula: { tipo: "directo", fuente: "cashCollected" } },
+  { id: "default-ticket", nombre: "Ticket promedio", tipo: "automatica", ubicacion: "panel_ejecutivo", orden: 13, formato: "moneda", color: "blue", formula: { tipo: "directo", fuente: "avgTicket" }, descripcion: "Ingresos ÷ Citas efectivas" },
 ];
 
 /**

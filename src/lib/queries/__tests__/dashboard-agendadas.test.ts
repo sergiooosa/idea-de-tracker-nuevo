@@ -136,4 +136,20 @@ describe("dashboard agendadas counting", () => {
       kpis.asistidas + kpis.canceladas + kpis.noShows + kpis.cerradas + kpis.pendientes
     );
   });
+
+  it("PDTE→CANCELADA lead counts once in agendadas and once in canceladas (no double-count)", () => {
+    const agendas: AgendaRecord[] = [
+      { id_registro_agenda: 1, idcliente: "lead-X", categoria: "pdte" },
+      { id_registro_agenda: 2, idcliente: "lead-X", categoria: "cancelada" },
+      { id_registro_agenda: 3, idcliente: "lead-Y", categoria: "calificada" },
+    ];
+
+    const kpis = computeAgendaKpis(agendas);
+
+    expect(kpis.agendadas).toBe(2);
+    expect(kpis.canceladas).toBe(1);
+    expect(kpis.agendadas).toBe(
+      kpis.asistidas + kpis.canceladas + kpis.noShows + kpis.cerradas + kpis.pendientes
+    );
+  });
 });
