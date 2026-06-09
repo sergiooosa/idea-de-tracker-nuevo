@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuthFull } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { registrosDeLlamada } from "@/lib/db/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, ne, inArray } from "drizzle-orm";
 
 interface ReasignarBody {
   ids_registro: number[];
@@ -29,6 +29,14 @@ export async function POST(req: Request) {
       );
     }
 
+    const parsed = ids_registro.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    if (parsed.length === 0) {
+      return NextResponse.json(
+        { error: "ids_registro contiene valores inválidos" },
+        { status: 400 },
+      );
+    }
+
     if (!nuevo_closer_mail || typeof nuevo_closer_mail !== "string") {
       return NextResponse.json(
         { error: "Se requiere nuevo_closer_mail" },
@@ -36,18 +44,21 @@ export async function POST(req: Request) {
       );
     }
 
+    const cleanMail = nuevo_closer_mail.trim();
+    const cleanNombre = (nuevo_nombre_closer ?? "").trim() || null;
     const idCuentaStr = String(idCuenta);
 
     const result = await db
       .update(registrosDeLlamada)
       .set({
-        closer_mail: nuevo_closer_mail.trim(),
-        nombre_closer: (nuevo_nombre_closer ?? "").trim() || null,
+        closer_mail: cleanMail,
+        nombre_closer: cleanNombre,
       })
       .where(
         and(
           eq(registrosDeLlamada.id_cuenta, idCuentaStr),
-          inArray(registrosDeLlamada.id_registro, ids_registro),
+          inArray(registrosDeLlamada.id_registro, parsed),
+          ne(registrosDeLlamada.closer_mail, cleanMail),
         ),
       )
       .returning({ id_registro: registrosDeLlamada.id_registro });
