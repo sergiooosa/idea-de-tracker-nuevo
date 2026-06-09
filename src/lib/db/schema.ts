@@ -356,6 +356,9 @@ export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {
   // AUT-270: re-ingesta Fathom — corrección de categoría
   fathom_reingest_at: timestamp("fathom_reingest_at", { withTimezone: true }),
   categoria_previa: varchar("categoria_previa"),
+  // AUT-632: discriminador videollamada vs llamada telefónica
+  fathom_recording_id: text("fathom_recording_id"),
+  fathom_ingestion_source: text("fathom_ingestion_source"),
 });
 
 /* ------------------------------------------------------------------ */
