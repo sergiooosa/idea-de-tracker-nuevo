@@ -5,6 +5,7 @@ import { cuentas } from "@/lib/db/schema";
 import type { ConfiguracionAds } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { resolveFinancialValues } from "@/lib/queries/resolve-financial";
 
 export async function GET(req: Request) {
   return withAuthAndAnyPermission(req, ["ver_dashboard", "ver_acquisition", "ver_rendimiento"], async (idCuenta) => {
@@ -12,9 +13,14 @@ export async function GET(req: Request) {
     const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
     const to = searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
 
-    // Get ads config
+    // Get ads config + financial config for ROAS resolution
     const [row] = await db
-      .select({ configuracion_ads: cuentas.configuracion_ads })
+      .select({
+        configuracion_ads: cuentas.configuracion_ads,
+        configuracion_ui: cuentas.configuracion_ui,
+        metricas_config: cuentas.metricas_config,
+        metricas_manual_data: cuentas.metricas_manual_data,
+      })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1);
@@ -150,8 +156,21 @@ export async function GET(req: Request) {
     const totalLeads = Number(stats?.total_leads ?? 0);
     const totalAsistidas = Number(stats?.asistidas ?? 0);
     const totalCierres = Number(stats?.cierres ?? 0);
-    const totalRevenue = Number(stats?.revenue ?? 0);
-    const totalCash = Number(stats?.cash_collected ?? 0);
+    const nativeRevenue = Number(stats?.revenue ?? 0);
+    const nativeCash = Number(stats?.cash_collected ?? 0);
+
+    const manualData = (row?.metricas_manual_data && typeof row.metricas_manual_data === "object")
+      ? (row.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
+      : {};
+
+    const { revenue: totalRevenue, cash: totalCash } = await resolveFinancialValues(
+      idCuenta, from, to, nativeRevenue, nativeCash,
+      {
+        fuenteDatosFinancieros: row?.configuracion_ui?.fuente_datos_financieros,
+        metricasConfig: row?.metricas_config,
+        metricasManualData: manualData,
+      },
+    );
 
     // campos_extra_json is computed by the SQL subquery — parse it from each adsRow
     const parseCamposExtra = (raw: unknown): Record<string, number> => {
