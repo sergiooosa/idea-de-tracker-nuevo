@@ -359,6 +359,8 @@ export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {
   // AUT-632: discriminador videollamada vs llamada telefónica
   fathom_recording_id: text("fathom_recording_id"),
   fathom_ingestion_source: text("fathom_ingestion_source"),
+  // AUT-774: exclusión reversible de reuniones del dashboard de Videollamadas
+  excluida_dashboard: boolean("excluida_dashboard").notNull().default(false),
 });
 
 /* ------------------------------------------------------------------ */

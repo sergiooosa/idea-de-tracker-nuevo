@@ -234,6 +234,7 @@ export interface ApiVideollamada {
   fathomReingestAt: string | null;
   /** AUT-270: categoría anterior antes de la corrección de Fathom */
   categoriaPrevia: string | null;
+  excludedFromDashboard: boolean;
 }
 
 export interface VideollamadasAdvisorMetrics {

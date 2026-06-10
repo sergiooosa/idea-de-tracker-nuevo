@@ -40,7 +40,9 @@ export type AuditAccion =
   | "CREATE_API_KEY"
   | "DELETE_API_KEY"
   | "MERGE_ASESORES"
-  | "ANALIZAR_CHATS";
+  | "ANALIZAR_CHATS"
+  | "EXCLUDE_VIDEOLLAMADA"
+  | "RESTORE_VIDEOLLAMADA";
 
 export async function logAudit(
   idCuenta: number,
