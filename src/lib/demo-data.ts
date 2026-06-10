@@ -359,6 +359,7 @@ export function generateVideollamadas(): VideollamadasResponse {
       advisorName: a.name,
       agendadas: mine.length,
       asistencias: myAttended,
+      cerradas: myCierres,
       pctCierre: pct(myCierres, myAttended),
       facturacion: myRev,
       cashCollected: Math.floor(myRev * 0.7),
@@ -367,7 +368,7 @@ export function generateVideollamadas(): VideollamadasResponse {
 
   return {
     registros,
-    agg: { agendadas, asistidas, canceladas, efectivas, noShows: Math.max(0, noShows), revenue, cashCollected, ticket },
+    agg: { agendadas, asistidas, canceladas, efectivas, cerradas: cierres, noShows: Math.max(0, noShows), revenue, cashCollected, ticket },
     advisorMetrics,
     advisors: ASESORES.map((a, i) => ({ id: String(i + 1), name: a.name, email: a.email })),
   };

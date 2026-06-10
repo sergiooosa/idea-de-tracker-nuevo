@@ -279,10 +279,10 @@ export async function getVideollamadas(
     asistidas,
     canceladas,
     efectivas,
+    cerradas: registrosCerrados.length,
     noShows,
     revenue,
     cashCollected: cash,
-    // Denominador = cerradas para ser coherente con revenue (que suma solo facturación de cerradas)
     ticket: registrosCerrados.length > 0 ? Math.round(revenue / registrosCerrados.length) : 0,
   };
 
@@ -349,6 +349,7 @@ export async function getVideollamadas(
       advisorName: emailToNombre[name] ?? name,
       agendadas: uniqueBooked.size,
       asistencias: asist,
+      cerradas: cerr,
       pctCierre: asist > 0 ? (cerr / asist) * 100 : 0,
       facturacion: meetings.filter((m) => m.outcome === "cerrada" || m.outcome === "cerrado").reduce((s, m) => s + m.facturacion, 0) || meetings.reduce((s, m) => s + m.facturacion, 0),
       cashCollected: meetings.reduce((s, m) => s + m.cashCollected, 0),
@@ -360,7 +361,7 @@ export async function getVideollamadas(
   const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
     ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
     : {};
-  const kpiKeysVideollamadas = new Set(["agendadas", "asistidas", "canceladas", "efectivas", "noShows", "revenue", "cashCollected", "ticket"]);
+  const kpiKeysVideollamadas = new Set(["agendadas", "asistidas", "canceladas", "efectivas", "cerradas", "noShows", "revenue", "cashCollected", "ticket"]);
   const metricasValores: Record<string, string | number> = {};
   const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string }[] = [];
 

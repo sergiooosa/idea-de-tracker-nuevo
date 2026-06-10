@@ -27,6 +27,7 @@ const kpiTooltips = {
   asistidas: { significado: 'Reuniones a las que el lead asistió. El dato llega de Fathom.', calculo: 'Videollamadas con attended = true; fuente: Fathom.' },
   canceladas: { significado: 'Reuniones canceladas antes de realizarse. Provienen de las canceladas en GHL.', calculo: 'Videollamadas con canceled = true en GHL.' },
   efectivas: { significado: 'Ventas cerradas. Las que Fathom determina como cerradas.', calculo: 'Videollamadas que Fathom marca como cerradas.' },
+  cerradasVendidas: { significado: 'Reuniones que terminaron en venta (conteo absoluto).', calculo: 'Registros con categoría cerrada/cerrado. Mismo numerador que Tasa de cierre.' },
   noShows: { significado: 'Leads que no se presentaron a la cita agendada.', calculo: 'Registros con categoría no_show en el período seleccionado.' },
   revenue: { significado: 'Lo que se vendió (ingresos por ventas).', calculo: 'Suma del monto vendido en reuniones cerradas.' },
   cashCollected: { significado: 'Lo que se recolectó (efectivo cobrado por cierres).', calculo: 'Suma de cashCollected por reunión.' },
@@ -79,7 +80,7 @@ export default function PerformanceVideollamadasPage() {
     else setModalSelectorMeetings(meetingsOfLead);
   };
 
-  const agg = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
+  const agg = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, cerradas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
 
   const isCerrada = (r: ApiVideollamada) =>
     r.outcome === 'cerrada' || r.outcome === 'cerrado' || r.outcome === 'closed';
@@ -124,14 +125,15 @@ export default function PerformanceVideollamadasPage() {
 
   function metricsFromMeetings(ms: ApiVideollamada[]): VideollamadasAdvisorMetrics {
     const asist = ms.filter((r) => r.attended).length;
-    const efect = ms.filter((r) => r.attended && r.qualified).length;
+    const cerr = ms.filter((r) => r.outcome === 'cerrada' || r.outcome === 'cerrado').length;
     const fact = ms.reduce((s, r) => s + r.facturacion, 0);
     const cash = ms.reduce((s, r) => s + r.cashCollected, 0);
     return {
       advisorName: ms[0]?.closer ?? '',
       agendadas: ms.length,
       asistencias: asist,
-      pctCierre: asist > 0 ? (efect / asist) * 100 : 0,
+      cerradas: cerr,
+      pctCierre: asist > 0 ? (cerr / asist) * 100 : 0,
       facturacion: fact,
       cashCollected: cash,
     };
@@ -243,12 +245,13 @@ export default function PerformanceVideollamadasPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[
           { label: t.performance.videollamadas.kpis.agendadas, value: agg.agendadas, color: 'purple', tip: kpiTooltips.agendadas },
           { label: t.performance.videollamadas.kpis.asistidas, value: agg.asistidas, color: 'cyan', tip: kpiTooltips.asistidas },
           { label: t.performance.videollamadas.kpis.canceladas, value: agg.canceladas, color: 'red', tip: kpiTooltips.canceladas },
           { label: t.performance.videollamadas.kpis.noShows, value: agg.noShows, color: 'amber', tip: kpiTooltips.noShows },
+          { label: t.performance.videollamadas.kpis.cerradasVendidas, value: agg.cerradas, color: 'green', tip: kpiTooltips.cerradasVendidas },
           { label: t.performance.videollamadas.kpis.ingresos, value: fm(agg.revenue), color: 'green', tip: kpiTooltips.revenue },
           { label: t.performance.videollamadas.kpis.efectivoCobrado, value: fm(agg.cashCollected), color: 'green', tip: kpiTooltips.cashCollected },
           { label: t.performance.videollamadas.kpis.ticketPromedio, value: fm(agg.ticket), color: 'blue', tip: kpiTooltips.ticket },
@@ -308,6 +311,7 @@ export default function PerformanceVideollamadasPage() {
                     <th className="px-2 py-2 font-medium">{t.performance.videollamadas.closer}</th>
                     <th className="px-2 py-2 font-medium">{t.performance.videollamadas.reunion}</th>
                     <th className="px-2 py-2 font-medium">{t.dashboard.kpis.asistidas}</th>
+                    <th className="px-2 py-2 font-medium">{t.dashboard.kpis.cerradas}</th>
                     <th className="px-2 py-2 font-medium">{t.dashboard.kpis.tasaCierre}</th>
                     <th className="px-2 py-2 font-medium">{t.dashboard.kpis.ingresos}</th>
                     <th className="px-2 py-2 font-medium">{t.dashboard.kpis.efectivoCobrado}</th>
@@ -338,13 +342,14 @@ export default function PerformanceVideollamadasPage() {
                             </td>
                             <td className="px-2 py-2 text-accent-purple">{metrics?.agendadas ?? 0}</td>
                             <td className="px-2 py-2 text-accent-cyan">{metrics?.asistencias ?? 0}</td>
+                            <td className="px-2 py-2 text-accent-green">{metrics?.cerradas ?? 0}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics != null ? pct(metrics.pctCierre) : '—'}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics ? fm(metrics.facturacion) : '—'}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics ? fm(metrics.cashCollected) : '—'}</td>
                           </tr>
                           {isExpanded && (
                             <tr className="bg-surface-800/90">
-                              <td colSpan={7} className="p-0">
+                              <td colSpan={8} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
                                   <div className="text-[10px] text-gray-400 mb-1.5">Leads de {metrics?.advisorName ?? advisorMeetings[0]?.closer ?? advisorKey} (clic en la fila abre reuniones)</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[400px] overflow-y-auto">

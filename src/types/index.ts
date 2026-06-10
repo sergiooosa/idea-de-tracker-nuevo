@@ -240,6 +240,7 @@ export interface VideollamadasAdvisorMetrics {
   advisorName: string;
   agendadas: number;
   asistencias: number;
+  cerradas: number;
   pctCierre: number;
   facturacion: number;
   cashCollected: number;
@@ -260,6 +261,7 @@ export interface VideollamadasResponse {
     asistidas: number;
     canceladas: number;
     efectivas: number;
+    cerradas: number;
     noShows: number;
     revenue: number;
     cashCollected: number;

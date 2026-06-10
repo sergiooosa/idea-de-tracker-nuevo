@@ -67,6 +67,7 @@ export const en: Translations = {
         asistidas: "Attended",
         canceladas: "Canceled",
         noShows: "No Shows",
+        cerradasVendidas: "Closed / Sold",
         ingresos: "Revenue",
         efectivoCobrado: "Cash collected",
         ticketPromedio: "Average ticket",

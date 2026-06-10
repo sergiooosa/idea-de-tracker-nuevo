@@ -65,6 +65,7 @@ export const es = {
         asistidas: "Asistidas",
         canceladas: "Canceladas",
         noShows: "No Shows",
+        cerradasVendidas: "Cerradas / Vendidas",
         ingresos: "Ingresos",
         efectivoCobrado: "Efectivo cobrado",
         ticketPromedio: "Ticket promedio",
