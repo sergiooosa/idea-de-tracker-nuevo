@@ -29,6 +29,8 @@ export async function resolveFinancialValues(
 ): Promise<{ revenue: number; cash: number }> {
   let revenue = nativeRevenue;
   let cash = nativeCash;
+  let cashSetByManual = false;
+  let revenueSetByManual = false;
 
   const configs = parseMetricasConfig(config.metricasConfig);
   const manualData = config.metricasManualData ?? {};
@@ -47,7 +49,7 @@ export async function resolveFinancialValues(
     if (entries.length > 0) {
       const manualVal = calcMetricaManual(cashMetric, entries, dateFrom, dateTo);
       const num = typeof manualVal === "number" ? manualVal : parseFloat(String(manualVal)) || 0;
-      if (num > 0) cash = num;
+      if (num > 0) { cash = num; cashSetByManual = true; }
     }
   }
 
@@ -56,7 +58,7 @@ export async function resolveFinancialValues(
     if (entries.length > 0) {
       const manualVal = calcMetricaManual(revenueMetric, entries, dateFrom, dateTo);
       const num = typeof manualVal === "number" ? manualVal : parseFloat(String(manualVal)) || 0;
-      if (num > 0) revenue = num;
+      if (num > 0) { revenue = num; revenueSetByManual = true; }
     }
   }
 
@@ -82,8 +84,8 @@ export async function resolveFinancialValues(
         extCash += m.cash_collected ?? 0;
         extIngresos += m.ingresos ?? 0;
       }
-      revenue = extRevenue || extIngresos;
-      cash = extCash;
+      if (!revenueSetByManual) revenue = extRevenue || extIngresos;
+      if (!cashSetByManual) cash = extCash;
     }
   }
 
