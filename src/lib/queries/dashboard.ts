@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, cuentas, kpisExternos, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS } from "@/lib/metricas-engine";
+import { resolveFinancialValues } from "@/lib/queries/resolve-financial";
 import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { agendaDedupKey } from "./agenda-dedup-key";
 import type {
@@ -372,38 +373,18 @@ export async function getDashboard(
   const revenueNativo = revenueClosedSet > 0 ? revenueClosedSet : revenueAnyFact;
   const cashNativo = filteredAgendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
 
-  let revenue = revenueNativo;
-  let cash = cashNativo;
+  const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
+    ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
+    : {};
 
-  if (useExterna) {
-    const kpisExt = await db
-      .select({ metricas: kpisExternos.metricas })
-      .from(kpisExternos)
-      .where(
-        and(
-          eq(kpisExternos.id_cuenta, idCuenta),
-          gte(kpisExternos.fecha, dateFrom),
-          lte(kpisExternos.fecha, dateTo),
-        ),
-      );
-
-    // Solo reemplazar con datos externos si existen registros para el período.
-    // Si kpis_externos está vacío (sin datos externos para este período),
-    // mantenemos los datos nativos de resumenes_diarios_agendas como fallback.
-    if (kpisExt.length > 0) {
-      let extRevenue = 0;
-      let extCash = 0;
-      let extIngresos = 0;
-      for (const row of kpisExt) {
-        const m = row.metricas ?? {};
-        extRevenue += m.facturacion ?? 0;
-        extCash += m.cash_collected ?? 0;
-        extIngresos += m.ingresos ?? 0;
-      }
-      revenue = extRevenue || extIngresos;
-      cash = extCash;
-    }
-  }
+  const { revenue, cash } = await resolveFinancialValues(
+    idCuenta, dateFrom, dateTo, revenueNativo, cashNativo,
+    {
+      fuenteDatosFinancieros: fuenteFinanciera,
+      metricasConfig: cuentaRow?.metricas_config,
+      metricasManualData: manualData,
+    },
+  );
 
   const efectivasCalls = filteredCalls.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
   const contestadas = efectivasCalls;
@@ -781,9 +762,6 @@ export async function getDashboard(
 
   const rawConfigs = parseMetricasConfig(cuentaRow?.metricas_config);
   const configs = rawConfigs.length > 0 ? normalizeMetricasConfig(rawConfigs) : DEFAULT_METRICAS_CONFIG;
-  const manualData = (cuentaRow?.metricas_manual_data && typeof cuentaRow.metricas_manual_data === "object")
-    ? (cuentaRow.metricas_manual_data as Record<string, { [k: string]: string | number | boolean | null }[]>)
-    : {};
 
   // Cargar datos de metricas_webhook para el período (suma por campo)
   const webhookRows = await db
