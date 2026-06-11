@@ -178,7 +178,7 @@ export default function EnfoquePantalla() {
       }
     }, 1000);
 
-    const pollMs = (sesionRef.current?.poll_intervalo_seg ?? 4) * 1000;
+    const pollMs = Math.max(2000, (sesionRef.current?.poll_intervalo_seg ?? 4) * 1000);
 
     pollingRef.current = setInterval(async () => {
       if (!mountedRef.current || procesandoRef.current) return;
@@ -518,6 +518,23 @@ export default function EnfoquePantalla() {
                 </>
               )}
             </button>
+          )}
+
+          {/* No phone — show fallback panel directly so closer is never stuck */}
+          {estadoFlujo === "idle" && lead && !lead.phone && !mostrarFallback && (
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-900/40 border border-amber-800">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-amber-300 font-medium">Sin teléfono registrado</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarFallback(true)}
+                className="w-full flex items-center justify-center gap-3 px-8 py-5 rounded-3xl bg-gray-700 hover:bg-gray-600 active:scale-[0.98] text-white text-xl font-bold transition-all shadow-lg"
+              >
+                Clasificar manual / Saltar
+              </button>
+            </div>
           )}
 
           {/* Marking state — brief transition */}
