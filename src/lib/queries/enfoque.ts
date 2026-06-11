@@ -4,6 +4,7 @@ import {
   sesionesEnfoque,
   enfoqueResultado,
   enfoqueLock,
+  logLlamadas,
 } from "@/lib/db/schema";
 import type { ResultadoCanonicoEnfoque } from "@/lib/db/schema";
 import { eq, and, sql, inArray, notInArray, asc, ne } from "drizzle-orm";
@@ -130,14 +131,36 @@ export async function getSiguienteLead(
     if (lockedLead) return { lead: lockedLead, reconexion: true };
   }
 
-  const registrosYaGestionados = db
-    .select({ id_registro: enfoqueResultado.id_registro })
-    .from(enfoqueResultado)
+  const maxIntentos = sesion.max_intentos ?? 3;
+  const retryIntervaloMin = sesion.retry_intervalo_min ?? 30;
+  const retryEstados = (sesion.retry_estados as string[] | null) ?? ["no_contesto", "buzon"];
+  const accionAgotado = sesion.accion_agotado ?? "seguimiento";
+  const expiryStreakMax = sesion.expiry_streak_max ?? 5;
+
+  const registrosTerminados = db
+    .select({ id_registro: sql<number>`er.id_registro` })
+    .from(sql`enfoque_resultado er`)
     .where(
-      and(
-        eq(enfoqueResultado.id_sesion, idSesion),
-        eq(enfoqueResultado.closer_mail, closerMail),
-      ),
+      sql`er.id_sesion = ${idSesion}
+        AND er.closer_mail = ${closerMail}
+        AND (
+          er.resultado_canonico NOT IN (${sql.join(retryEstados.map(e => sql`${e}`), sql`, `)})
+          OR (
+            SELECT count(*) FROM enfoque_resultado er2
+            WHERE er2.id_sesion = ${idSesion}
+              AND er2.id_registro = er.id_registro
+              AND er2.closer_mail = ${closerMail}
+          ) >= ${maxIntentos}
+        )`,
+    );
+
+  const registrosEnCooldown = db
+    .select({ id_registro: sql<number>`erc.id_registro` })
+    .from(sql`enfoque_resultado erc`)
+    .where(
+      sql`erc.id_sesion = ${idSesion}
+        AND erc.closer_mail = ${closerMail}
+        AND erc.ts > now() - interval '${sql.raw(String(retryIntervaloMin))} minutes'`,
     );
 
   const orderBy =
@@ -148,7 +171,8 @@ export async function getSiguienteLead(
   const conditions = [
     eq(registrosDeLlamada.id_cuenta, idCuentaStr),
     eq(registrosDeLlamada.closer_mail, closerMail),
-    notInArray(registrosDeLlamada.id_registro, registrosYaGestionados),
+    notInArray(registrosDeLlamada.id_registro, registrosTerminados),
+    notInArray(registrosDeLlamada.id_registro, registrosEnCooldown),
     notInArray(registrosDeLlamada.id_registro, lockedByOtherSubquery(idSesion, closerMail, lockMin)),
   ];
 
@@ -250,6 +274,199 @@ export async function liberarLead(
 
   await db.delete(enfoqueLock).where(and(...conditions));
   return { ok: true };
+}
+
+export interface MarcarLeadResult {
+  ok: boolean;
+  lockId: string | null;
+  dial_ts: string | null;
+  snapshot_canonico: string | null;
+  error?: string;
+}
+
+export async function marcarLead(
+  idCuenta: number,
+  closerMail: string,
+  idSesion: string,
+  idRegistro: number,
+  callSid?: string,
+): Promise<MarcarLeadResult> {
+  const [sesion] = await db
+    .select()
+    .from(sesionesEnfoque)
+    .where(
+      and(
+        eq(sesionesEnfoque.id, idSesion),
+        eq(sesionesEnfoque.id_cuenta, idCuenta),
+        eq(sesionesEnfoque.activa, true),
+      ),
+    )
+    .limit(1);
+
+  if (!sesion) {
+    return { ok: false, lockId: null, dial_ts: null, snapshot_canonico: null, error: "sesion_no_encontrada" };
+  }
+
+  const idCuentaStr = String(idCuenta);
+  const [registro] = await db
+    .select({ estado: registrosDeLlamada.estado })
+    .from(registrosDeLlamada)
+    .where(
+      and(
+        eq(registrosDeLlamada.id_registro, idRegistro),
+        eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+      ),
+    )
+    .limit(1);
+
+  if (!registro) {
+    return { ok: false, lockId: null, dial_ts: null, snapshot_canonico: null, error: "registro_no_encontrado" };
+  }
+
+  const snapshotCanonico = estadoToCanonicoEnfoque(registro.estado);
+  const lockMin = sesion.lock_expiracion_min ?? LOCK_EXPIRATION_MINUTES_DEFAULT;
+  const lockId = crypto.randomUUID();
+
+  const result = await db.execute(sql`
+    INSERT INTO enfoque_lock (id, id_sesion, id_cuenta, id_registro, en_progreso_por, lock_ts, dial_ts, call_sid, snapshot_canonico)
+    VALUES (${lockId}, ${idSesion}, ${idCuenta}, ${idRegistro}, ${closerMail}, now(), now(), ${callSid ?? null}, ${snapshotCanonico})
+    ON CONFLICT (id_sesion, id_registro) DO UPDATE
+      SET en_progreso_por = ${closerMail},
+          lock_ts = now(),
+          dial_ts = now(),
+          call_sid = COALESCE(${callSid ?? null}, enfoque_lock.call_sid),
+          snapshot_canonico = ${snapshotCanonico}
+      WHERE enfoque_lock.en_progreso_por = ${closerMail}
+         OR enfoque_lock.lock_ts <= now() - interval '${sql.raw(String(lockMin))} minutes'
+    RETURNING id, dial_ts::text, snapshot_canonico
+  `);
+
+  const rows = result.rows as Array<{ id: string; dial_ts: string; snapshot_canonico: string | null }>;
+  if (!rows.length) {
+    return { ok: false, lockId: null, dial_ts: null, snapshot_canonico: null, error: "lock_race" };
+  }
+
+  return {
+    ok: true,
+    lockId: rows[0].id,
+    dial_ts: rows[0].dial_ts,
+    snapshot_canonico: rows[0].snapshot_canonico,
+  };
+}
+
+export interface ResolverEstadoResult {
+  resuelto: boolean;
+  resultado_canonico: ResultadoCanonicoEnfoque | null;
+  estado_raw: string | null;
+  siguiente_lead: SiguienteLead | null;
+  attempt_no: number | null;
+  estado: "esperando" | "resuelto" | "sin_lock";
+}
+
+export async function resolverEstadoLead(
+  idCuenta: number,
+  closerMail: string,
+  idSesion: string,
+  idRegistro: number,
+): Promise<ResolverEstadoResult> {
+  const [lock] = await db
+    .select({
+      id: enfoqueLock.id,
+      dial_ts: enfoqueLock.dial_ts,
+      call_sid: enfoqueLock.call_sid,
+      snapshot_canonico: enfoqueLock.snapshot_canonico,
+    })
+    .from(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_sesion, idSesion),
+        eq(enfoqueLock.id_registro, idRegistro),
+        eq(enfoqueLock.en_progreso_por, closerMail),
+      ),
+    )
+    .limit(1);
+
+  if (!lock) {
+    return { resuelto: false, resultado_canonico: null, estado_raw: null, siguiente_lead: null, attempt_no: null, estado: "sin_lock" };
+  }
+
+  if (!lock.dial_ts) {
+    return { resuelto: false, resultado_canonico: null, estado_raw: null, siguiente_lead: null, attempt_no: null, estado: "esperando" };
+  }
+
+  const conditions = [
+    eq(logLlamadas.id_registro, idRegistro),
+    eq(logLlamadas.id_cuenta, idCuenta),
+  ];
+
+  if (lock.call_sid) {
+    conditions.push(
+      sql`(${logLlamadas.ts} > ${lock.dial_ts} OR ${logLlamadas.call_sid} = ${lock.call_sid})`,
+    );
+  } else {
+    conditions.push(sql`${logLlamadas.ts} > ${lock.dial_ts}`);
+  }
+
+  const [evento] = await db
+    .select({
+      estado_resultado: logLlamadas.estado_resultado,
+      tipo_evento: logLlamadas.tipo_evento,
+      call_sid: logLlamadas.call_sid,
+      ts: logLlamadas.ts,
+    })
+    .from(logLlamadas)
+    .where(and(...conditions))
+    .orderBy(asc(logLlamadas.ts))
+    .limit(1);
+
+  if (!evento) {
+    return { resuelto: false, resultado_canonico: null, estado_raw: null, siguiente_lead: null, attempt_no: null, estado: "esperando" };
+  }
+
+  const resultadoCanonico = estadoToCanonicoEnfoque(evento.estado_resultado);
+  if (!resultadoCanonico) {
+    return { resuelto: false, resultado_canonico: null, estado_raw: evento.estado_resultado, siguiente_lead: null, attempt_no: null, estado: "esperando" };
+  }
+
+  const [attemptCount] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(enfoqueResultado)
+    .where(
+      and(
+        eq(enfoqueResultado.id_sesion, idSesion),
+        eq(enfoqueResultado.id_registro, idRegistro),
+        eq(enfoqueResultado.closer_mail, closerMail),
+      ),
+    );
+  const attemptNo = (attemptCount?.count ?? 0) + 1;
+
+  await db.execute(sql`
+    INSERT INTO enfoque_resultado (id, id_sesion, id_cuenta, closer_mail, id_registro, resultado_canonico, ts, attempt_no, detectado_por)
+    VALUES (${crypto.randomUUID()}, ${idSesion}, ${idCuenta}, ${closerMail}, ${idRegistro}, ${resultadoCanonico}, now(), ${attemptNo}, 'auto')
+    ON CONFLICT (id_sesion, id_registro, closer_mail, attempt_no) WHERE attempt_no IS NOT NULL
+    DO NOTHING
+  `);
+
+  await db
+    .delete(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_sesion, idSesion),
+        eq(enfoqueLock.id_registro, idRegistro),
+        eq(enfoqueLock.en_progreso_por, closerMail),
+      ),
+    );
+
+  const siguiente = await getSiguienteLead(idCuenta, closerMail, idSesion);
+
+  return {
+    resuelto: true,
+    resultado_canonico: resultadoCanonico,
+    estado_raw: evento.estado_resultado,
+    siguiente_lead: siguiente.lead,
+    attempt_no: attemptNo,
+    estado: "resuelto",
+  };
 }
 
 export interface MetricasEnfoque {
@@ -469,6 +686,24 @@ export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqu
     totalContactados,
     tasaContactoGlobal: totalTrabajadosHoy > 0 ? Math.round((totalContactados / totalTrabajadosHoy) * 100) : 0,
   };
+}
+
+export async function getAttemptCount(
+  idSesion: string,
+  idRegistro: number,
+  closerMail: string,
+): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(enfoqueResultado)
+    .where(
+      and(
+        eq(enfoqueResultado.id_sesion, idSesion),
+        eq(enfoqueResultado.id_registro, idRegistro),
+        eq(enfoqueResultado.closer_mail, closerMail),
+      ),
+    );
+  return row?.count ?? 0;
 }
 
 async function getLeadById(idRegistro: number): Promise<SiguienteLead | null> {

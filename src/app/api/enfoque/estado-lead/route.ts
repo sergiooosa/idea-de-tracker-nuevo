@@ -3,12 +3,13 @@ import { withAuth } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { registrosDeLlamada } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { estadoToCanonicoEnfoque } from "@/lib/queries/enfoque";
+import { estadoToCanonicoEnfoque, resolverEstadoLead } from "@/lib/queries/enfoque";
 
 export async function GET(req: Request) {
-  return withAuth(req, async (idCuenta, _email) => {
+  return withAuth(req, async (idCuenta, email) => {
     const { searchParams } = new URL(req.url);
     const idRegistroStr = searchParams.get("id_registro");
+    const idSesion = searchParams.get("id_sesion");
 
     if (!idRegistroStr) {
       return NextResponse.json({ error: "Falta id_registro" }, { status: 400 });
@@ -17,6 +18,11 @@ export async function GET(req: Request) {
     const idRegistro = Number(idRegistroStr);
     if (Number.isNaN(idRegistro)) {
       return NextResponse.json({ error: "id_registro inválido" }, { status: 400 });
+    }
+
+    if (idSesion) {
+      const result = await resolverEstadoLead(idCuenta, email, idSesion, idRegistro);
+      return NextResponse.json(result);
     }
 
     const idCuentaStr = String(idCuenta);
