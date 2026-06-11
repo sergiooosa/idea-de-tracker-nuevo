@@ -30,7 +30,7 @@ interface MetricasEnfoque {
   duracionPromedio: number;
 }
 
-type EstadoFlujo = "idle" | "marcando" | "llamando" | "fallback";
+type EstadoFlujo = "idle" | "marcando" | "llamando";
 
 const RESULTADOS_FALLBACK = [
   { valor: "contesto", label: "Contestó", color: "bg-green-600 hover:bg-green-500" },
@@ -110,6 +110,7 @@ export default function EnfoquePantalla() {
   const leadRef = useRef<Lead | null>(null);
   const timerSegRef = useRef(0);
   const notaFallbackRef = useRef("");
+  const suppressBeaconRef = useRef(false);
 
   useEffect(() => {
     return () => { mountedRef.current = false; };
@@ -244,6 +245,7 @@ export default function EnfoquePantalla() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
+      if (suppressBeaconRef.current) return;
       const s = sesionRef.current;
       const l = leadRef.current;
       if (!s || !l) return;
@@ -256,6 +258,46 @@ export default function EnfoquePantalla() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
+
+  useEffect(() => {
+    if (!lead || lead.phone || !sesion || estadoFlujo !== "idle") return;
+    if (mostrarFallback || procesandoRef.current) return;
+
+    let cancelled = false;
+    procesandoRef.current = true;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/enfoque/marcar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_sesion: sesion.id,
+            id_registro: lead.id_registro,
+          }),
+        });
+        const data = await res.json();
+
+        if (cancelled || !mountedRef.current) return;
+
+        if (!data.ok && data.error === "lock_race") {
+          procesandoRef.current = false;
+          resetLeadState();
+          await cargarSiguiente(sesion.id);
+          return;
+        }
+      } catch {
+        // lock failed — still show fallback so kiosk is never stuck
+      }
+
+      if (!cancelled && mountedRef.current) {
+        procesandoRef.current = false;
+        setMostrarFallback(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [lead, sesion, estadoFlujo, mostrarFallback, resetLeadState, cargarSiguiente]);
 
   const marcarYLlamar = useCallback(async () => {
     if (!lead || !sesion || procesandoRef.current) return;
@@ -286,7 +328,9 @@ export default function EnfoquePantalla() {
       }
 
       if (lead.phone) {
+        suppressBeaconRef.current = true;
         window.location.href = `tel:${lead.phone}`;
+        setTimeout(() => { suppressBeaconRef.current = false; }, 2000);
       }
 
       procesandoRef.current = false;
@@ -520,20 +564,13 @@ export default function EnfoquePantalla() {
             </button>
           )}
 
-          {/* No phone — show fallback panel directly so closer is never stuck */}
-          {estadoFlujo === "idle" && lead && !lead.phone && !mostrarFallback && (
-            <div className="text-center space-y-4">
+          {/* No phone — badge only; classification panel auto-opens via effect */}
+          {estadoFlujo === "idle" && lead && !lead.phone && (
+            <div className="text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-900/40 border border-amber-800">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
                 <span className="text-sm text-amber-300 font-medium">Sin teléfono registrado</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setMostrarFallback(true)}
-                className="w-full flex items-center justify-center gap-3 px-8 py-5 rounded-3xl bg-gray-700 hover:bg-gray-600 active:scale-[0.98] text-white text-xl font-bold transition-all shadow-lg"
-              >
-                Clasificar manual / Saltar
-              </button>
             </div>
           )}
 
