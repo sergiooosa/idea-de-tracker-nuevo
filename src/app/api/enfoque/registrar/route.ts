@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { enfoqueResultado, registrosDeLlamada, sesionesEnfoque, enfoqueLock } from "@/lib/db/schema";
 import type { ResultadoCanonicoEnfoque } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getSiguienteLead } from "@/lib/queries/enfoque";
+import { getSiguienteLead, getAttemptCount } from "@/lib/queries/enfoque";
 
 const RESULTADOS_VALIDOS: ResultadoCanonicoEnfoque[] = [
   "contesto",
@@ -77,15 +77,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Registro no encontrado" }, { status: 404 });
     }
 
-    await db.insert(enfoqueResultado).values({
-      id_sesion,
-      id_cuenta: idCuenta,
-      closer_mail: email,
-      id_registro,
-      resultado_canonico: resultado as ResultadoCanonicoEnfoque,
-      nota: nota?.trim() || null,
-      duracion_seg: duracion_seg ?? null,
-    });
+    const attemptNo = (await getAttemptCount(id_sesion, id_registro, email)) + 1;
+
+    await db.execute(sql`
+      INSERT INTO enfoque_resultado (id, id_sesion, id_cuenta, closer_mail, id_registro, resultado_canonico, nota, duracion_seg, ts, attempt_no, detectado_por)
+      VALUES (${crypto.randomUUID()}, ${id_sesion}, ${idCuenta}, ${email}, ${id_registro}, ${resultado}, ${nota?.trim() || null}, ${duracion_seg ?? null}, now(), ${attemptNo}, 'manual')
+      ON CONFLICT (id_sesion, id_registro, closer_mail, attempt_no) WHERE attempt_no IS NOT NULL
+      DO NOTHING
+    `);
 
     await db
       .delete(enfoqueLock)
@@ -94,19 +93,6 @@ export async function POST(req: Request) {
           eq(enfoqueLock.id_sesion, id_sesion),
           eq(enfoqueLock.id_registro, id_registro),
           eq(enfoqueLock.en_progreso_por, email),
-        ),
-      );
-
-    await db
-      .update(registrosDeLlamada)
-      .set({
-        estado: resultado,
-        intentos_contacto: sql`COALESCE(${registrosDeLlamada.intentos_contacto}, 0) + 1`,
-      })
-      .where(
-        and(
-          eq(registrosDeLlamada.id_registro, id_registro),
-          eq(registrosDeLlamada.id_cuenta, idCuentaStr),
         ),
       );
 

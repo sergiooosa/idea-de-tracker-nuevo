@@ -1,6 +1,8 @@
 import "next-auth";
 import "next-auth/jwt";
 
+export type TipoUsuario = "analista" | "enfoque";
+
 declare module "next-auth" {
   interface User {
     id_cuenta: number | null;
@@ -9,6 +11,7 @@ declare module "next-auth" {
     permisos: Record<string, boolean> | null;
     permisosArray: string[];
     platformAdmin?: boolean;
+    tipoUsuario: TipoUsuario;
   }
   interface Session {
     user: {
@@ -21,6 +24,7 @@ declare module "next-auth" {
       permisos: Record<string, boolean> | null;
       permisosArray: string[];
       platformAdmin?: boolean;
+      tipoUsuario: TipoUsuario;
     };
   }
 }
@@ -34,5 +38,6 @@ declare module "next-auth/jwt" {
     permisos: Record<string, boolean> | null;
     permisosArray: string[];
     platformAdmin?: boolean;
+    tipoUsuario: TipoUsuario;
   }
 }

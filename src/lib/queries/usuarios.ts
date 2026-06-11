@@ -4,6 +4,8 @@ import { eq, and } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { registrarWebhookFathom } from "@/lib/fathom-webhook";
 
+export type TipoUsuario = "analista" | "enfoque";
+
 export interface UsuarioRow {
   id: number;
   nombre: string | null;
@@ -12,6 +14,7 @@ export interface UsuarioRow {
   permisos: Record<string, boolean> | null;
   fathom: string | null;
   id_webhook_fathom: string | null;
+  tipo_usuario: TipoUsuario;
 }
 
 export async function listUsuarios(idCuenta: number): Promise<UsuarioRow[]> {
@@ -24,11 +27,12 @@ export async function listUsuarios(idCuenta: number): Promise<UsuarioRow[]> {
       permisos: usuariosDashboard.permisos,
       fathom: usuariosDashboard.fathom,
       id_webhook_fathom: usuariosDashboard.id_webhook_fathom,
+      tipo_usuario: usuariosDashboard.tipo_usuario,
     })
     .from(usuariosDashboard)
     .where(eq(usuariosDashboard.id_cuenta, idCuenta));
 
-  return rows;
+  return rows as UsuarioRow[];
 }
 
 export interface CreateUsuarioResult {
@@ -39,9 +43,10 @@ export interface CreateUsuarioResult {
 
 export async function createUsuario(
   idCuenta: number,
-  data: { nombre: string; email: string; password: string; rol: string; permisos?: Record<string, boolean>; fathom?: string },
+  data: { nombre: string; email: string; password: string; rol: string; permisos?: Record<string, boolean>; fathom?: string; tipo_usuario?: TipoUsuario },
 ): Promise<CreateUsuarioResult> {
   const fathomKey = data.fathom?.trim() || null;
+  const tipoUsuario = data.tipo_usuario === "enfoque" ? "enfoque" : "analista";
   const hashed = await hash(data.password, 10);
   const [row] = await db
     .insert(usuariosDashboard)
@@ -54,6 +59,7 @@ export async function createUsuario(
       permisos: data.permisos ?? null,
       fathom: fathomKey,
       id_webhook_fathom: null,
+      tipo_usuario: tipoUsuario,
     })
     .returning({
       id: usuariosDashboard.id_evento,
@@ -63,6 +69,7 @@ export async function createUsuario(
       permisos: usuariosDashboard.permisos,
       fathom: usuariosDashboard.fathom,
       id_webhook_fathom: usuariosDashboard.id_webhook_fathom,
+      tipo_usuario: usuariosDashboard.tipo_usuario,
     });
 
   let fathomWarning: string | null = null;
@@ -76,20 +83,20 @@ export async function createUsuario(
           and(eq(usuariosDashboard.id_evento, row.id), eq(usuariosDashboard.id_cuenta, idCuenta)),
         );
       return {
-        user: { ...row, id_webhook_fathom: reg.webhookId },
+        user: { ...row, id_webhook_fathom: reg.webhookId } as UsuarioRow,
         fathomWarning: null,
       };
     }
     fathomWarning = reg.error;
   }
 
-  return { user: row, fathomWarning };
+  return { user: row as UsuarioRow, fathomWarning };
 }
 
 export async function updateUsuario(
   idCuenta: number,
   idEvento: number,
-  data: { nombre?: string; rol?: string; permisos?: Record<string, boolean>; fathom?: string; password?: string },
+  data: { nombre?: string; rol?: string; permisos?: Record<string, boolean>; fathom?: string; password?: string; tipo_usuario?: TipoUsuario },
 ): Promise<{ fathomWarning: string | null }> {
   let fathomWarning: string | null = null;
 
@@ -109,6 +116,7 @@ export async function updateUsuario(
   if (data.rol !== undefined) set.rol = data.rol;
   if (data.permisos !== undefined) set.permisos = data.permisos;
   if (data.password) set.pass = await hash(data.password, 10);
+  if (data.tipo_usuario !== undefined) set.tipo_usuario = data.tipo_usuario === "enfoque" ? "enfoque" : "analista";
 
   if (data.fathom !== undefined) {
     const newF = data.fathom.trim() || null;

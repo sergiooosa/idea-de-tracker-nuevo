@@ -46,6 +46,7 @@ export async function PUT(req: Request) {
         ...(body.permisos !== undefined && { permisos: body.permisos }),
         ...(body.nombre !== undefined && { nombre: body.nombre }),
         ...(body.email !== undefined && { email_nuevo: body.email }),
+        ...(body.tipo_usuario !== undefined && { tipo_usuario: body.tipo_usuario }),
       },
     });
     return NextResponse.json({ ok: true, fathomWarning });

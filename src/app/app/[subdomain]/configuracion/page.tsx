@@ -14,6 +14,8 @@ interface CriteriosCalificacionData {
   categoriasDisponibles: string[];
 }
 
+type TipoUsuario = "analista" | "enfoque";
+
 interface UserRow {
   id: number;
   nombre: string | null;
@@ -22,6 +24,7 @@ interface UserRow {
   permisos: Record<string, boolean> | null;
   fathom: string | null;
   id_webhook_fathom?: string | null;
+  tipo_usuario: TipoUsuario;
 }
 
 const ROLES_BUILTIN = [
@@ -41,7 +44,7 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false);
   const [modalUser, setModalUser] = useState<"create" | "edit" | null>(null);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
-  const [formUser, setFormUser] = useState({ name: "", email: "", password: "", fathom: "", rol: "usuario" });
+  const [formUser, setFormUser] = useState({ name: "", email: "", password: "", fathom: "", rol: "usuario", tipo_usuario: "analista" as TipoUsuario });
   const [error, setError] = useState("");
 
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -98,14 +101,14 @@ export default function ConfiguracionPage() {
 
   const openCreateUser = () => {
     setEditingUser(null);
-    setFormUser({ name: "", email: "", password: "", fathom: "", rol: "usuario" });
+    setFormUser({ name: "", email: "", password: "", fathom: "", rol: "usuario", tipo_usuario: "analista" });
     setError("");
     setModalUser("create");
   };
 
   const openEditUser = (u: UserRow) => {
     setEditingUser(u);
-    setFormUser({ name: u.nombre ?? "", email: u.email, password: "", fathom: u.fathom ?? "", rol: u.rol });
+    setFormUser({ name: u.nombre ?? "", email: u.email, password: "", fathom: u.fathom ?? "", rol: u.rol, tipo_usuario: u.tipo_usuario ?? "analista" });
     setError("");
     setModalUser("edit");
   };
@@ -116,7 +119,7 @@ export default function ConfiguracionPage() {
     setError("");
     try {
       if (editingUser) {
-        const body: Record<string, unknown> = { id: editingUser.id, nombre: formUser.name, rol: formUser.rol, fathom: formUser.fathom };
+        const body: Record<string, unknown> = { id: editingUser.id, nombre: formUser.name, rol: formUser.rol, fathom: formUser.fathom, tipo_usuario: formUser.tipo_usuario };
         if (formUser.password) body.password = formUser.password;
         const putRes = await fetch("/api/data/usuarios", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         if (!putRes.ok) throw new Error("Error al actualizar");
@@ -141,6 +144,7 @@ export default function ConfiguracionPage() {
             password: formUser.password,
             rol: formUser.rol,
             fathom: formUser.fathom,
+            tipo_usuario: formUser.tipo_usuario,
           }),
         });
         if (!res.ok) {
@@ -411,6 +415,9 @@ export default function ConfiguracionPage() {
                       <div className="flex items-center gap-1.5">
                         <span className="text-white font-medium">{u.nombre ?? u.email}</span>
                         {u.rol === "superadmin" && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                        {u.tipo_usuario === "enfoque" && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-purple/20 text-accent-purple border border-accent-purple/30 font-medium uppercase">Enfoque</span>
+                        )}
                       </div>
                       <span className="text-gray-500 text-xs block">{u.email}</span>
                       {u.fathom?.trim() && (
@@ -611,6 +618,22 @@ export default function ConfiguracionPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Tipo de usuario</label>
+                <select
+                  value={formUser.tipo_usuario}
+                  onChange={(e) => setFormUser((f) => ({ ...f, tipo_usuario: e.target.value as TipoUsuario }))}
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40"
+                >
+                  <option value="analista">Analista (ve todo el dashboard)</option>
+                  <option value="enfoque">Enfoque (kiosko fullscreen, solo órdenes)</option>
+                </select>
+                {formUser.tipo_usuario === "enfoque" && (
+                  <p className="text-[11px] text-accent-purple mt-1">
+                    Este usuario solo verá el modo enfoque en pantalla completa al iniciar sesión.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2 pt-2">
                 <button

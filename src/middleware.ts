@@ -42,6 +42,7 @@ type SessionPayload = {
   rol?: string;
   id_cuenta?: number | null;
   platformAdmin?: boolean;
+  tipoUsuario?: string;
   [key: string]: unknown;
 };
 
@@ -199,6 +200,13 @@ export default async function middleware(req: NextRequest) {
     // Ya estamos en /login del dominio raíz (o acceso directo a subdomain/login)
     // → servir normalmente
     return setCspHeaders(NextResponse.next(), subdomain);
+  }
+
+  // Usuario enfoque: redirigir a /enfoque (kiosko fullscreen)
+  if (session.tipoUsuario === "enfoque" && pathname !== "/enfoque" && !pathname.startsWith("/api")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/enfoque";
+    return NextResponse.redirect(url);
   }
 
   // Raíz del subdominio → /dashboard

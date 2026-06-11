@@ -22,6 +22,7 @@ export const PERMISOS_DISPONIBLES = [
   { id: "ver_comisiones", label: "Ver Comisiones" },
   { id: "ver_ads", label: "Ver Ads & Inversión" },
   { id: "ver_reportes", label: "Ver Reportes" },
+  { id: "ver_enfoque", label: "Ver Modo Enfoque" },
   { id: "controlar_enfoque", label: "Controlar Modo Enfoque (acciones admin en vivo)" },
 ] as const;
 
@@ -40,6 +41,9 @@ export const NAV_PERMISOS: Record<string, PermisoId> = {
   "/comisiones": "ver_comisiones",
   "/reportes": "ver_reportes",
   // "/ads": "ver_ads",  // visible para todos — solo se activa si hay ads configurados
+  "/sesiones": "ver_enfoque",
+  "/tablero-enfoque": "ver_enfoque",
+  "/asignacion": "ver_enfoque",
 };
 
 /** Permisos que dan acceso al toggle "Solo data del asesor" (ver datos de todos) */
