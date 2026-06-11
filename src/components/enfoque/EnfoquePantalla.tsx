@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Phone, ChevronRight, Loader2, PhoneCall, Timer, BarChart3, TrendingUp, Maximize } from "lucide-react";
+import { Phone, Loader2, Timer, BarChart3, TrendingUp, Maximize, AlertTriangle, ChevronDown } from "lucide-react";
 import { useUserFilter } from "@/contexts/UserFilterContext";
 
 interface Lead {
@@ -30,9 +30,9 @@ interface MetricasEnfoque {
   duracionPromedio: number;
 }
 
-type ModoLead = "idle" | "en_llamada";
+type EstadoFlujo = "idle" | "marcando" | "llamando" | "fallback";
 
-const RESULTADOS = [
+const RESULTADOS_FALLBACK = [
   { valor: "contesto", label: "Contestó", color: "bg-green-600 hover:bg-green-500" },
   { valor: "no_contesto", label: "No contestó", color: "bg-red-600 hover:bg-red-500" },
   { valor: "buzon", label: "Buzón", color: "bg-orange-600 hover:bg-orange-500" },
@@ -45,10 +45,8 @@ const RESULTADOS = [
   { valor: "no_interesado", label: "No interesado", color: "bg-gray-600 hover:bg-gray-500" },
 ] as const;
 
-const POLL_INTERVAL_MS_DEFAULT = 4000;
-
 const RESULTADO_LABELS: Record<string, string> = Object.fromEntries(
-  RESULTADOS.map((r) => [r.valor, r.label]),
+  RESULTADOS_FALLBACK.map((r) => [r.valor, r.label]),
 );
 
 function formatTimer(seconds: number): string {
@@ -93,64 +91,47 @@ export default function EnfoquePantalla() {
   const [completados, setCompletados] = useState(0);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [nota, setNota] = useState("");
-  const [resultadoSeleccionado, setResultadoSeleccionado] = useState<string | null>(null);
   const [sinSesion, setSinSesion] = useState(false);
   const [sinLeads, setSinLeads] = useState(false);
 
-  const [modo, setModo] = useState<ModoLead>("idle");
+  const [estadoFlujo, setEstadoFlujo] = useState<EstadoFlujo>("idle");
   const [timerSeg, setTimerSeg] = useState(0);
   const [autoAvanceMsg, setAutoAvanceMsg] = useState<string | null>(null);
   const [metricas, setMetricas] = useState<MetricasEnfoque | null>(null);
+  const [mostrarFallback, setMostrarFallback] = useState(false);
+  const [resultadoFallback, setResultadoFallback] = useState<string | null>(null);
+  const [notaFallback, setNotaFallback] = useState("");
 
-  const estadoSnapshotRef = useRef<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
   const procesandoRef = useRef(false);
-  const notaRef = useRef("");
   const sesionRef = useRef<SesionActiva | null>(null);
   const leadRef = useRef<Lead | null>(null);
-  const avanzarRef = useRef<((resultado: string, esAutoAvance: boolean) => Promise<void>) | null>(null);
   const timerSegRef = useRef(0);
+  const notaFallbackRef = useRef("");
 
   useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
-  useEffect(() => {
-    notaRef.current = nota;
-  }, [nota]);
-
-  useEffect(() => {
-    sesionRef.current = sesion;
-  }, [sesion]);
-
-  useEffect(() => {
-    leadRef.current = lead;
-  }, [lead]);
+  useEffect(() => { sesionRef.current = sesion; }, [sesion]);
+  useEffect(() => { leadRef.current = lead; }, [lead]);
+  useEffect(() => { notaFallbackRef.current = notaFallback; }, [notaFallback]);
 
   const limpiarIntervalos = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
 
   const resetLeadState = useCallback(() => {
-    setModo("idle");
+    setEstadoFlujo("idle");
     setTimerSeg(0);
     timerSegRef.current = 0;
-    setNota("");
-    setResultadoSeleccionado(null);
     setAutoAvanceMsg(null);
-    estadoSnapshotRef.current = null;
+    setMostrarFallback(false);
+    setResultadoFallback(null);
+    setNotaFallback("");
     procesandoRef.current = false;
     limpiarIntervalos();
   }, [limpiarIntervalos]);
@@ -162,9 +143,7 @@ export default function EnfoquePantalla() {
         const data = await res.json();
         if (mountedRef.current) setMetricas(data);
       }
-    } catch {
-      // non-critical
-    }
+    } catch { /* non-critical */ }
   }, []);
 
   const cargarSesion = useCallback(async () => {
@@ -185,9 +164,10 @@ export default function EnfoquePantalla() {
     }
   }, []);
 
-  const iniciarModoLlamada = useCallback((leadActual: Lead) => {
-    setModo("en_llamada");
+  const iniciarPolling = useCallback((leadActual: Lead, idSesion: string) => {
+    setEstadoFlujo("llamando");
     setTimerSeg(0);
+    timerSegRef.current = 0;
 
     timerRef.current = setInterval(() => {
       if (mountedRef.current) {
@@ -198,24 +178,39 @@ export default function EnfoquePantalla() {
       }
     }, 1000);
 
+    const pollMs = Math.max(2000, (sesionRef.current?.poll_intervalo_seg ?? 4) * 1000);
+
     pollingRef.current = setInterval(async () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || procesandoRef.current) return;
       try {
         const pollRes = await fetch(
-          `/api/enfoque/estado-lead?id_registro=${leadActual.id_registro}`,
+          `/api/enfoque/estado-lead?id_registro=${leadActual.id_registro}&id_sesion=${encodeURIComponent(idSesion)}`,
         );
         const pollData = await pollRes.json();
-        const nuevoCanonico: string | null = pollData.estado_canonico ?? null;
-        const snapshotActual = estadoSnapshotRef.current;
 
-        if (nuevoCanonico !== null && nuevoCanonico !== snapshotActual) {
-          avanzarRef.current?.(nuevoCanonico, true);
+        if (pollData.resuelto && pollData.estado === "resuelto") {
+          procesandoRef.current = true;
+          limpiarIntervalos();
+          const label = RESULTADO_LABELS[pollData.resultado_canonico] ?? pollData.resultado_canonico;
+          if (mountedRef.current) {
+            setAutoAvanceMsg(`Auto-detectado: ${label}`);
+            setGuardando(true);
+          }
+          await new Promise((r) => setTimeout(r, 1200));
+          if (!mountedRef.current) return;
+
+          resetLeadState();
+          setLead(pollData.siguiente_lead ?? null);
+          setCompletados((prev) => prev + 1);
+          setGuardando(false);
+          if (!pollData.siguiente_lead) {
+            setSinLeads(true);
+            cargarMetricas(idSesion);
+          }
         }
-      } catch {
-        // poll failed, retry on next tick
-      }
-    }, (sesionRef.current?.poll_intervalo_seg ?? 4) * 1000 || POLL_INTERVAL_MS_DEFAULT);
-  }, []);
+      } catch { /* poll failed, retry */ }
+    }, pollMs);
+  }, [limpiarIntervalos, resetLeadState, cargarMetricas]);
 
   const cargarSiguiente = useCallback(async (idSesion: string) => {
     try {
@@ -227,19 +222,14 @@ export default function EnfoquePantalla() {
         setSinLeads(true);
         cargarMetricas(idSesion);
       } else if (data.reconexion) {
-        const snapshotRes = await fetch(
-          `/api/enfoque/estado-lead?id_registro=${data.lead.id_registro}`,
-        );
-        const snapshotData = await snapshotRes.json();
-        estadoSnapshotRef.current = snapshotData.estado_canonico ?? null;
-        iniciarModoLlamada(data.lead);
+        iniciarPolling(data.lead, idSesion);
       }
     } catch {
       setLead(null);
     } finally {
       setLoading(false);
     }
-  }, [cargarMetricas, iniciarModoLlamada]);
+  }, [cargarMetricas, iniciarPolling]);
 
   useEffect(() => {
     (async () => {
@@ -252,38 +242,72 @@ export default function EnfoquePantalla() {
     return () => limpiarIntervalos();
   }, [limpiarIntervalos]);
 
-  // Abandonment: release lock on tab close/navigate away
   useEffect(() => {
     const handleBeforeUnload = () => {
       const s = sesionRef.current;
       const l = leadRef.current;
       if (!s || !l) return;
-
       const payload = new Blob(
         [JSON.stringify({ id_sesion: s.id, id_registro: l.id_registro })],
         { type: "application/json" },
       );
       navigator.sendBeacon("/api/enfoque/liberar", payload);
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
-  const avanzarConResultado = useCallback(async (resultado: string, esAutoAvance: boolean) => {
+  const marcarYLlamar = useCallback(async () => {
+    if (!lead || !sesion || procesandoRef.current) return;
+    procesandoRef.current = true;
+    setEstadoFlujo("marcando");
+    setGuardando(true);
+
+    try {
+      const res = await fetch("/api/enfoque/marcar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_sesion: sesion.id,
+          id_registro: lead.id_registro,
+        }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        if (data.error === "lock_race") {
+          resetLeadState();
+          await cargarSiguiente(sesion.id);
+        } else {
+          procesandoRef.current = false;
+          setEstadoFlujo("idle");
+        }
+        return;
+      }
+
+      if (lead.phone) {
+        window.location.href = `tel:${lead.phone}`;
+      }
+
+      procesandoRef.current = false;
+      iniciarPolling(lead, sesion.id);
+    } catch {
+      procesandoRef.current = false;
+      setEstadoFlujo("idle");
+    } finally {
+      if (mountedRef.current) setGuardando(false);
+    }
+  }, [lead, sesion, resetLeadState, cargarSiguiente, iniciarPolling]);
+
+  const registrarFallback = useCallback(async () => {
+    if (!resultadoFallback || !leadRef.current || !sesionRef.current) return;
     if (procesandoRef.current) return;
-    if (!leadRef.current || !sesionRef.current) return;
     procesandoRef.current = true;
     setGuardando(true);
-    limpiarIntervalos();
 
     const currentLead = leadRef.current;
     const currentSesion = sesionRef.current;
     const currentTimer = timerSegRef.current;
-
-    if (esAutoAvance) {
-      setAutoAvanceMsg(`Auto-detectado: ${RESULTADOS.find((r) => r.valor === resultado)?.label ?? resultado}`);
-    }
 
     try {
       const res = await fetch("/api/enfoque/registrar", {
@@ -292,16 +316,13 @@ export default function EnfoquePantalla() {
         body: JSON.stringify({
           id_sesion: currentSesion.id,
           id_registro: currentLead.id_registro,
-          resultado,
-          nota: notaRef.current.trim() || undefined,
+          resultado: resultadoFallback,
+          nota: notaFallbackRef.current.trim() || undefined,
           duracion_seg: currentTimer > 0 ? currentTimer : undefined,
         }),
       });
       const data = await res.json();
       if (data.ok) {
-        if (esAutoAvance) {
-          await new Promise((r) => setTimeout(r, 1200));
-        }
         if (!mountedRef.current) return;
         resetLeadState();
         setLead(data.lead ?? null);
@@ -311,57 +332,16 @@ export default function EnfoquePantalla() {
           cargarMetricas(currentSesion.id);
         }
       }
-    } catch {
-      // user can retry
-    } finally {
+    } catch { /* user can retry */ }
+    finally {
       if (mountedRef.current) {
         procesandoRef.current = false;
         setGuardando(false);
       }
     }
-  }, [limpiarIntervalos, resetLeadState, cargarMetricas]);
+  }, [resultadoFallback, resetLeadState, cargarMetricas]);
 
-  avanzarRef.current = avanzarConResultado;
-
-  const iniciarLlamada = useCallback(async () => {
-    if (!lead || !sesion) return;
-
-    setGuardando(true);
-    try {
-      const res = await fetch("/api/enfoque/tomar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_sesion: sesion.id }),
-      });
-      const data = await res.json();
-
-      if (!data.ok) {
-        if (data.error === "lock_race") {
-          await cargarSiguiente(sesion.id);
-        }
-        return;
-      }
-
-      const snapshotRes = await fetch(
-        `/api/enfoque/estado-lead?id_registro=${lead.id_registro}`,
-      );
-      const snapshotData = await snapshotRes.json();
-      estadoSnapshotRef.current = snapshotData.estado_canonico ?? null;
-
-      iniciarModoLlamada(lead);
-    } catch {
-      // network error
-    } finally {
-      if (mountedRef.current) {
-        setGuardando(false);
-      }
-    }
-  }, [lead, sesion, cargarSiguiente, iniciarModoLlamada]);
-
-  const registrarManual = useCallback(async () => {
-    if (!resultadoSeleccionado) return;
-    await avanzarConResultado(resultadoSeleccionado, false);
-  }, [resultadoSeleccionado, avanzarConResultado]);
+  // --- Render ---
 
   if (esKiosko && mostrarPromptFS && !fullscreenActivo) {
     return (
@@ -470,160 +450,209 @@ export default function EnfoquePantalla() {
     );
   }
 
+  const esLlamando = estadoFlujo === "llamando";
+  const esMarcando = estadoFlujo === "marcando";
+
   return (
     <div className="min-h-screen bg-black flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <div
-            className={`w-2 h-2 rounded-full ${
-              modo === "en_llamada" ? "bg-red-500 animate-pulse" : "bg-green-500 animate-pulse"
+            className={`w-2.5 h-2.5 rounded-full ${
+              esLlamando ? "bg-red-500 animate-pulse" : "bg-green-500 animate-pulse"
             }`}
           />
           <span className="text-sm text-gray-400 font-medium">{sesion?.nombre ?? "Enfoque"}</span>
-          {modo === "en_llamada" && (
+          {esLlamando && (
             <span className="flex items-center gap-1 text-sm text-red-400 font-mono ml-2">
               <Timer className="w-3.5 h-3.5" />
               {formatTimer(timerSeg)}
             </span>
           )}
         </div>
-        <div className="text-sm text-gray-500">
-          {completados} completado{completados !== 1 ? "s" : ""}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">
+            <span className="text-white font-bold">{completados}</span> hoy
+          </span>
         </div>
       </header>
 
       {/* Auto-avance notification */}
       {autoAvanceMsg && (
-        <div className="px-4 py-2 bg-emerald-900/50 border-b border-emerald-800 text-center">
+        <div className="px-4 py-3 bg-emerald-900/50 border-b border-emerald-800 text-center">
           <p className="text-sm text-emerald-300 font-medium">{autoAvanceMsg} — avanzando...</p>
         </div>
       )}
 
-      {/* Lead card */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-6">
-        <div className="w-full max-w-lg space-y-6">
-          {/* Nombre */}
-          <div className="text-center">
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">
+      {/* Lead card — single-click area */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        <div className="w-full max-w-lg space-y-8">
+          {/* Order number / lead info */}
+          <div className="text-center space-y-1">
+            <p className="text-xs text-gray-500 uppercase tracking-widest">
+              Intento {(lead?.intentos_contacto ?? 0) + 1}
+            </p>
+            <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight">
               {lead?.nombre_lead ?? "Sin nombre"}
             </h1>
-            <p className="text-gray-500 text-sm">
-              {lead?.creativo_origen ? `Origen: ${lead.creativo_origen}` : ""}
-            </p>
+            {lead?.creativo_origen && (
+              <p className="text-gray-500 text-sm">{lead.creativo_origen}</p>
+            )}
           </div>
 
-          {/* Teléfono grande + botón llamar */}
-          {lead?.phone && (
-            <div className="text-center">
-              <a
-                href={`tel:${lead.phone}`}
-                className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-green-600 hover:bg-green-500 text-white text-2xl font-bold transition-colors"
-              >
-                <Phone className="w-7 h-7" />
-                {lead.phone}
-              </a>
-            </div>
-          )}
-
-          {/* Contexto mínimo */}
-          <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
-            <span>
-              Estado: <span className="text-white font-medium">{lead?.estado ?? "—"}</span>
-            </span>
-            <span>
-              Intentos: <span className="text-white font-medium">{lead?.intentos_contacto ?? 0}</span>
-            </span>
-          </div>
-
-          {/* Botón "Estoy llamando" — visible solo en idle */}
-          {modo === "idle" && (
+          {/* Phone — the main CTA (tap to call + mark) */}
+          {estadoFlujo === "idle" && lead?.phone && (
             <button
               type="button"
-              onClick={iniciarLlamada}
+              onClick={marcarYLlamar}
               disabled={guardando}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white text-lg font-bold transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-4 px-8 py-6 rounded-3xl bg-green-600 hover:bg-green-500 active:scale-[0.98] text-white text-3xl md:text-4xl font-bold transition-all disabled:opacity-50 shadow-lg shadow-green-600/20"
             >
               {guardando ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-8 h-8 animate-spin" />
               ) : (
                 <>
-                  <PhoneCall className="w-6 h-6" />
-                  Estoy llamando
+                  <Phone className="w-8 h-8" />
+                  {lead.phone}
                 </>
               )}
             </button>
           )}
 
-          {/* En llamada: escucha activa indicator */}
-          {modo === "en_llamada" && (
-            <div className="text-center py-2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-900/40 border border-red-800">
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm text-red-300 font-medium">
-                  En llamada — escuchando cambios...
+          {/* No phone — show fallback panel directly so closer is never stuck */}
+          {estadoFlujo === "idle" && lead && !lead.phone && !mostrarFallback && (
+            <div className="text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-900/40 border border-amber-800">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-amber-300 font-medium">Sin teléfono registrado</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarFallback(true)}
+                className="w-full flex items-center justify-center gap-3 px-8 py-5 rounded-3xl bg-gray-700 hover:bg-gray-600 active:scale-[0.98] text-white text-xl font-bold transition-all shadow-lg"
+              >
+                Clasificar manual / Saltar
+              </button>
+            </div>
+          )}
+
+          {/* Marking state — brief transition */}
+          {esMarcando && (
+            <div className="w-full flex items-center justify-center gap-3 px-8 py-6 rounded-3xl bg-gray-800 text-gray-300 text-xl">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              Conectando...
+            </div>
+          )}
+
+          {/* In-call / waiting state */}
+          {esLlamando && (
+            <div className="space-y-6">
+              {/* Phone display (non-interactive while calling) */}
+              <div className="w-full flex items-center justify-center gap-4 px-8 py-6 rounded-3xl bg-gray-900 border-2 border-red-500/30 text-white text-3xl md:text-4xl font-bold">
+                <Phone className="w-8 h-8 text-red-400" />
+                {lead?.phone ?? "—"}
+              </div>
+
+              {/* Calling indicator */}
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-red-900/40 border border-red-800">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm text-red-300 font-medium">
+                    Esperando resultado automático...
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  El sistema detectará el resultado de la llamada
+                </p>
+              </div>
+
+              {/* Estado actual */}
+              <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
+                <span>
+                  Estado: <span className="text-gray-300 font-medium">{lead?.estado ?? "—"}</span>
+                </span>
+                <span>
+                  Timer: <span className="text-red-400 font-mono font-medium">{formatTimer(timerSeg)}</span>
                 </span>
               </div>
             </div>
           )}
 
-          {/* Divider */}
-          <div className="border-t border-gray-800" />
-
-          {/* Botonera de resultados — siempre visible como fallback */}
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-3 text-center">
-              {modo === "en_llamada"
-                ? "Marcar resultado manual (o espera auto-detección)"
-                : "Resultado de la llamada"}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {RESULTADOS.map((r) => (
-                <button
-                  key={r.valor}
-                  type="button"
-                  onClick={() => setResultadoSeleccionado(r.valor)}
-                  disabled={guardando}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    resultadoSeleccionado === r.valor
-                      ? `${r.color} text-white ring-2 ring-white ring-offset-2 ring-offset-black`
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  } disabled:opacity-40`}
-                >
-                  {r.label}
-                </button>
-              ))}
+          {/* Idle state — show context */}
+          {estadoFlujo === "idle" && (
+            <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
+              <span>
+                Estado: <span className="text-gray-300 font-medium">{lead?.estado ?? "—"}</span>
+              </span>
+              <span>
+                Intentos: <span className="text-gray-300 font-medium">{lead?.intentos_contacto ?? 0}</span>
+              </span>
             </div>
-          </div>
+          )}
 
-          {/* Nota opcional */}
-          <div>
-            <textarea
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Nota opcional..."
-              rows={2}
-              disabled={guardando}
-              className="w-full rounded-xl bg-gray-900 border border-gray-700 px-4 py-3 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-gray-500 disabled:opacity-40"
-            />
-          </div>
+          {/* F6 Safety net — discreet, only in "llamando" state */}
+          {esLlamando && !mostrarFallback && (
+            <div className="text-center pt-4">
+              <button
+                type="button"
+                onClick={() => setMostrarFallback(true)}
+                className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+              >
+                <AlertTriangle className="w-3 h-3" />
+                No se detectó — marcar manual
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
-          {/* Botón siguiente — registrar manual */}
-          <button
-            type="button"
-            onClick={registrarManual}
-            disabled={!resultadoSeleccionado || guardando}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-white text-black text-lg font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
-          >
-            {guardando ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                Siguiente
-                <ChevronRight className="w-5 h-5" />
-              </>
-            )}
-          </button>
+          {/* F6 Fallback panel — manual classification */}
+          {mostrarFallback && (
+            <div className="space-y-4 pt-2 border-t border-gray-800/50">
+              <p className="text-xs text-gray-500 uppercase tracking-wider text-center">
+                Clasificación manual
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {RESULTADOS_FALLBACK.map((r) => (
+                  <button
+                    key={r.valor}
+                    type="button"
+                    onClick={() => setResultadoFallback(r.valor)}
+                    disabled={guardando}
+                    className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      resultadoFallback === r.valor
+                        ? `${r.color} text-white ring-2 ring-white ring-offset-2 ring-offset-black`
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    } disabled:opacity-40`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={notaFallback}
+                onChange={(e) => setNotaFallback(e.target.value)}
+                placeholder="Nota opcional..."
+                rows={2}
+                disabled={guardando}
+                className="w-full rounded-xl bg-gray-900 border border-gray-700 px-4 py-3 text-sm text-white placeholder-gray-600 resize-none focus:outline-none focus:border-gray-500 disabled:opacity-40"
+              />
+
+              <button
+                type="button"
+                onClick={registrarFallback}
+                disabled={!resultadoFallback || guardando}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white text-black text-base font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
+              >
+                {guardando ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  "Registrar y siguiente"
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
