@@ -538,6 +538,7 @@ export interface AsesorEnVivo {
   idSesion: string;
   nombreSesion: string;
   leadActual: string | null;
+  idRegistro: number | null;
   lockDesde: string;
 }
 
@@ -551,6 +552,13 @@ export interface MetricasAsesor {
   resumen: Array<{ resultado: string; cantidad: number }>;
 }
 
+export interface UsuarioEnfoque {
+  email: string;
+  nombre: string | null;
+  rol: string;
+  tipoUsuario: string;
+}
+
 export interface TableroEnfoqueData {
   asesoresActivos: AsesorEnVivo[];
   metricasPorAsesor: MetricasAsesor[];
@@ -558,6 +566,7 @@ export interface TableroEnfoqueData {
   totalTrabajadosHoy: number;
   totalContactados: number;
   tasaContactoGlobal: number;
+  usuarios: UsuarioEnfoque[];
 }
 
 export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqueData> {
@@ -575,7 +584,7 @@ export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqu
   let asesoresActivos: AsesorEnVivo[] = [];
   if (sesionesActivasRows.length > 0) {
     const locksVigentes = await db.execute(sql`
-      SELECT l.en_progreso_por, l.id_sesion, l.lock_ts, r.nombre_lead
+      SELECT l.en_progreso_por, l.id_sesion, l.lock_ts, l.id_registro, r.nombre_lead
       FROM enfoque_lock l
       JOIN registros_de_llamada r ON r.id_registro = l.id_registro
       JOIN sesiones_enfoque s ON s.id = l.id_sesion
@@ -587,6 +596,7 @@ export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqu
       en_progreso_por: string;
       id_sesion: string;
       lock_ts: string;
+      id_registro: number | null;
       nombre_lead: string | null;
     }>;
 
@@ -596,6 +606,7 @@ export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqu
       idSesion: r.id_sesion,
       nombreSesion: sesionMap.get(r.id_sesion)?.nombre ?? "",
       leadActual: r.nombre_lead,
+      idRegistro: r.id_registro,
       lockDesde: r.lock_ts,
     }));
   }
@@ -680,6 +691,23 @@ export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqu
   const totalTrabajadosHoy = metricasPorAsesor.reduce((s, m) => s + m.trabajadosHoy, 0);
   const totalContactados = metricasPorAsesor.reduce((s, m) => s + m.contactados, 0);
 
+  const usuariosRows = await db
+    .select({
+      email: usuariosDashboard.email,
+      nombre: usuariosDashboard.nombre,
+      rol: usuariosDashboard.rol,
+      tipo_usuario: usuariosDashboard.tipo_usuario,
+    })
+    .from(usuariosDashboard)
+    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
+
+  const usuarios: UsuarioEnfoque[] = usuariosRows.map((u) => ({
+    email: u.email,
+    nombre: u.nombre,
+    rol: u.rol,
+    tipoUsuario: u.tipo_usuario,
+  }));
+
   return {
     asesoresActivos,
     metricasPorAsesor,
@@ -687,6 +715,7 @@ export async function getTableroEnfoque(idCuenta: number): Promise<TableroEnfoqu
     totalTrabajadosHoy,
     totalContactados,
     tasaContactoGlobal: totalTrabajadosHoy > 0 ? Math.round((totalContactados / totalTrabajadosHoy) * 100) : 0,
+    usuarios,
   };
 }
 
