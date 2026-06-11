@@ -116,7 +116,7 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
 
 type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion";
 
-const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType }[] = [
+const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType; beta?: boolean }[] = [
   { path: "/dashboard", navKey: "dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
   { path: "/performance", navKey: "performance", label: "Rendimiento", icon: BarChart3 },
   { path: "/asesor", navKey: "asesor", label: "Panel asesor", icon: UserCheck },
@@ -125,9 +125,9 @@ const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.Elem
   { path: "/acquisition", navKey: "adquisicion", label: "Resumen adquisición", icon: TrendingUp },
   { path: "/ads", navKey: "ads", label: "Ads & Inversión", icon: BarChart2 },
   { path: "/comparaciones", navKey: "comparaciones", label: "Comparaciones", icon: GitCompareArrows },
-  { path: "/sesiones", navKey: "sesiones", label: "Sesiones de enfoque", icon: Sparkles },
-  { path: "/tablero-enfoque", navKey: "tablero-enfoque", label: "Tablero de operación", icon: Activity },
-  { path: "/asignacion", navKey: "asignacion", label: "Asignación de leads", icon: UserPlus },
+  { path: "/sesiones", navKey: "sesiones", label: "Sesiones de enfoque", icon: Sparkles, beta: true },
+  { path: "/tablero-enfoque", navKey: "tablero-enfoque", label: "Tablero de operación", icon: Activity, beta: true },
+  { path: "/asignacion", navKey: "asignacion", label: "Asignación de leads", icon: UserPlus, beta: true },
   { path: "/reportes", navKey: "reportes", label: "Reportes", icon: TrendingUp },
   { path: "/system", navKey: "sistema", label: "Control del sistema", icon: Target },
   { path: "/documentacion", navKey: "documentacion", label: "Documentación", icon: BookOpen },
@@ -253,7 +253,7 @@ function NavFiltered({
 
   return (
     <>
-      {navFiltered.map(({ path, navKey, label, icon: Icon }) => (
+      {navFiltered.map(({ path, navKey, label, icon: Icon, beta }) => (
         <React.Fragment key={`${path}-${navKey}`}>
           {/* Ads item: grayed out with tooltip when ads not configured */}
           {path === "/ads" && hasAds === false ? (
@@ -279,6 +279,7 @@ function NavFiltered({
           >
             <Icon className="w-5 h-5 shrink-0" />
             {t.nav[navKey] ?? label}
+            {beta && <span className="ml-auto text-[9px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-accent-purple/20 text-accent-purple border border-accent-purple/30">Beta</span>}
           </Link>
           )}
           {path === "/dashboard" && dashboards.length > 0 && (

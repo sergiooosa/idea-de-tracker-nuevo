@@ -208,7 +208,7 @@ export default function AsignacionAsesores() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-white">Asignación de leads</h1>
+          <h1 className="text-xl font-semibold text-white flex items-center gap-2">Asignación de leads <span className="text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-accent-purple/20 text-accent-purple border border-accent-purple/30">Beta</span></h1>
           <p className="text-sm text-gray-400 mt-1">
             {totalGlobal.toLocaleString()} leads totales · {asesores.length} asesores
           </p>
