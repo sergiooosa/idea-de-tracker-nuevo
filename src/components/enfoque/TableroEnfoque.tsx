@@ -172,7 +172,7 @@ export default function TableroEnfoque() {
             <Activity className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Tablero de operación</h1>
+            <h1 className="text-xl font-bold text-white flex items-center gap-2">Tablero de operación <span className="text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-accent-purple/20 text-accent-purple border border-accent-purple/30">Beta</span></h1>
             <p className="text-xs text-gray-400">Actividad en vivo del modo enfoque</p>
           </div>
         </div>
