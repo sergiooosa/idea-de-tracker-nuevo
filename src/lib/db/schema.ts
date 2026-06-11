@@ -321,6 +321,8 @@ export const usuariosDashboard = pgTable("usuarios_dashboard", {
    *  Necesario porque Fathom a veces guarda nombre completo en lugar de email.
    *  Ej: miguel@serenthys.com → nombre_closer = "Miguel Puga" */
   nombre_closer: text("nombre_closer"),
+  // Modo Enfoque v2 (AUT-856): tipo de usuario — "analista" (ve todo) | "enfoque" (kiosko)
+  tipo_usuario: text("tipo_usuario").notNull().default("analista"),
 });
 
 /* ------------------------------------------------------------------ */
@@ -693,6 +695,12 @@ export const sesionesEnfoque = pgTable("sesiones_enfoque", {
   orden: text("orden").$type<OrdenEnfoque>().notNull().default("mas_antiguo"),
   lock_expiracion_min: integer("lock_expiracion_min").notNull().default(15),
   poll_intervalo_seg: integer("poll_intervalo_seg").notNull().default(4),
+  // Modo Enfoque v2 (AUT-856): reintentos / expiración
+  max_intentos: integer("max_intentos").notNull().default(3),
+  retry_intervalo_min: integer("retry_intervalo_min").notNull().default(30),
+  retry_estados: jsonb("retry_estados").$type<string[]>().notNull().default(["no_contesto", "buzon"]),
+  accion_agotado: text("accion_agotado").notNull().default("seguimiento"),
+  expiry_streak_max: integer("expiry_streak_max").notNull().default(5),
   activa: boolean("activa").notNull().default(true),
   created_by: text("created_by").notNull(),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -707,6 +715,10 @@ export const enfoqueLock = pgTable("enfoque_lock", {
   id_registro: integer("id_registro").notNull().references(() => registrosDeLlamada.id_registro),
   en_progreso_por: text("en_progreso_por").notNull(),
   lock_ts: timestamp("lock_ts", { withTimezone: true }).notNull().defaultNow(),
+  // Modo Enfoque v2 (AUT-856): metadatos de marcación / snapshot
+  dial_ts: timestamp("dial_ts", { withTimezone: true }),
+  call_sid: text("call_sid"),
+  snapshot_canonico: text("snapshot_canonico"),
 }, (table) => [
   uniqueIndex("uq_enfoque_lock_sesion_registro").on(table.id_sesion, table.id_registro),
   index("idx_enfoque_lock_sesion_closer").on(table.id_sesion, table.en_progreso_por),
@@ -721,8 +733,27 @@ export const enfoqueResultado = pgTable("enfoque_resultado", {
   resultado_canonico: text("resultado_canonico").$type<ResultadoCanonicoEnfoque>().notNull(),
   nota: text("nota"),
   duracion_seg: integer("duracion_seg"),
+  // Modo Enfoque v2 (AUT-856): numeración de intento + detección
+  attempt_no: integer("attempt_no"),
+  detectado_por: text("detectado_por"),
   ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("idx_enfoque_resultado_sesion").on(table.id_sesion),
   index("idx_enfoque_resultado_cuenta").on(table.id_cuenta),
 ]);
+
+/* ------------------------------------------------------------------ */
+/*  enfoque_admin_audit — auditoría de acciones admin (F4, AUT-860)   */
+/* ------------------------------------------------------------------ */
+
+export const enfoqueAdminAudit = pgTable("enfoque_admin_audit", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id_cuenta: integer("id_cuenta"),
+  id_sesion: text("id_sesion"),
+  actor_email: text("actor_email"),
+  accion: text("accion"),
+  target_email: text("target_email"),
+  id_registro: integer("id_registro"),
+  detalle: jsonb("detalle").$type<Record<string, unknown>>(),
+  ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -22,6 +22,7 @@ export const PERMISOS_DISPONIBLES = [
   { id: "ver_comisiones", label: "Ver Comisiones" },
   { id: "ver_ads", label: "Ver Ads & Inversión" },
   { id: "ver_reportes", label: "Ver Reportes" },
+  { id: "controlar_enfoque", label: "Controlar Modo Enfoque (acciones admin en vivo)" },
 ] as const;
 
 export type PermisoId = (typeof PERMISOS_DISPONIBLES)[number]["id"];
@@ -72,6 +73,16 @@ export function canManageSystem(permisosArray: string[]): boolean {
 
 export function canManageUsers(permisosArray: string[]): boolean {
   return permisosArray.includes("gestionar_usuarios");
+}
+
+/**
+ * Acciones admin del Modo Enfoque (F4): finalizar sesión, reasignar lead,
+ * cambiar tipo de usuario, forzar saltar lead.
+ * Gating EXPLÍCITO — NO usa tienePermiso() porque `ver_todo` no debe otorgar
+ * acciones destructivas. Solo superadmin (rol) o el permiso explícito.
+ */
+export function canControlEnfoque(rol: string, permisosArray: string[]): boolean {
+  return rol === "superadmin" || permisosArray.includes("controlar_enfoque");
 }
 
 export function canManageRoles(permisosArray: string[]): boolean {
