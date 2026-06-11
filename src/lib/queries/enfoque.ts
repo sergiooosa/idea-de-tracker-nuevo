@@ -4,6 +4,8 @@ import {
   sesionesEnfoque,
   enfoqueResultado,
   enfoqueLock,
+  enfoqueAdminAudit,
+  usuariosDashboard,
   logLlamadas,
 } from "@/lib/db/schema";
 import type { ResultadoCanonicoEnfoque } from "@/lib/db/schema";
@@ -725,4 +727,236 @@ async function getLeadById(idRegistro: number): Promise<SiguienteLead | null> {
     .limit(1);
 
   return lead ?? null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  F4 — Control en vivo del admin + auditoría (AUT-860)              */
+/*  Gating en la capa de ruta (canControlEnfoque). Aquí: lógica       */
+/*  tenant-scoped, concurrency-safe (WHERE = last-writer-wins) y      */
+/*  fila de auditoría en enfoque_admin_audit por cada acción.         */
+/* ------------------------------------------------------------------ */
+
+export type AccionAdminEnfoque =
+  | "finalizar_sesion_usuario"
+  | "reasignar_lead"
+  | "cambiar_tipo_usuario"
+  | "forzar_saltar_lead";
+
+export const TIPOS_USUARIO_VALIDOS = ["analista", "enfoque"] as const;
+export type TipoUsuario = (typeof TIPOS_USUARIO_VALIDOS)[number];
+
+/** Inserta una fila de auditoría. Nunca lanza si la auditoría falla por sí sola. */
+async function auditarAccionEnfoque(params: {
+  idCuenta: number;
+  idSesion: string | null;
+  actorEmail: string;
+  accion: AccionAdminEnfoque;
+  targetEmail?: string | null;
+  idRegistro?: number | null;
+  detalle?: Record<string, unknown>;
+}): Promise<void> {
+  await db.insert(enfoqueAdminAudit).values({
+    id_cuenta: params.idCuenta,
+    id_sesion: params.idSesion,
+    actor_email: params.actorEmail,
+    accion: params.accion,
+    target_email: params.targetEmail ?? null,
+    id_registro: params.idRegistro ?? null,
+    detalle: params.detalle ?? null,
+  });
+}
+
+/**
+ * Finaliza la sesión de un usuario: libera TODOS sus locks en esa sesión.
+ * Graceful: los resultados ya escritos en enfoque_resultado se conservan
+ * (solo se borran locks, no resultados). Tenant-scoped por id_cuenta.
+ */
+export async function finalizarSesionUsuario(
+  idCuenta: number,
+  actorEmail: string,
+  idSesion: string,
+  targetEmail: string,
+): Promise<{ ok: boolean; locksLiberados: number }> {
+  const result = await db
+    .delete(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_cuenta, idCuenta),
+        eq(enfoqueLock.id_sesion, idSesion),
+        eq(enfoqueLock.en_progreso_por, targetEmail),
+      ),
+    )
+    .returning({ id: enfoqueLock.id });
+
+  await auditarAccionEnfoque({
+    idCuenta,
+    idSesion,
+    actorEmail,
+    accion: "finalizar_sesion_usuario",
+    targetEmail,
+    detalle: { locks_liberados: result.length },
+  });
+
+  return { ok: true, locksLiberados: result.length };
+}
+
+/**
+ * Reasigna un lead a otro asesor: libera el lock actual (sea de quien sea)
+ * y actualiza closer_mail en registros_de_llamada. El asesor anterior queda
+ * sin lock → su cliente lo trata como PREEMPTED y sirve el siguiente.
+ * Concurrency: last-writer-wins, ambos statements guardados por WHERE.
+ */
+export async function reasignarLead(
+  idCuenta: number,
+  actorEmail: string,
+  idSesion: string,
+  idRegistro: number,
+  nuevoCloserMail: string,
+): Promise<{ ok: boolean; closerAnterior: string | null; lockLiberado: boolean }> {
+  const idCuentaStr = String(idCuenta);
+
+  const liberado = await db
+    .delete(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_cuenta, idCuenta),
+        eq(enfoqueLock.id_sesion, idSesion),
+        eq(enfoqueLock.id_registro, idRegistro),
+      ),
+    )
+    .returning({ closer: enfoqueLock.en_progreso_por });
+
+  const closerAnterior = liberado[0]?.closer ?? null;
+
+  const actualizado = await db
+    .update(registrosDeLlamada)
+    .set({ closer_mail: nuevoCloserMail })
+    .where(
+      and(
+        eq(registrosDeLlamada.id_registro, idRegistro),
+        eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+      ),
+    )
+    .returning({ id: registrosDeLlamada.id_registro });
+
+  await auditarAccionEnfoque({
+    idCuenta,
+    idSesion,
+    actorEmail,
+    accion: "reasignar_lead",
+    targetEmail: nuevoCloserMail,
+    idRegistro,
+    detalle: {
+      closer_anterior: closerAnterior,
+      registro_actualizado: actualizado.length > 0,
+    },
+  });
+
+  if (actualizado.length === 0) {
+    return { ok: false, closerAnterior, lockLiberado: liberado.length > 0 };
+  }
+
+  return { ok: true, closerAnterior, lockLiberado: liberado.length > 0 };
+}
+
+/**
+ * Cambia el tipo de usuario (analista ↔ enfoque) al vuelo. Tenant-scoped.
+ * El refresco del JWT y la redirección de kiosko se manejan en el cliente
+ * (la sesión del target re-lee tipo_usuario en su siguiente request).
+ */
+export async function cambiarTipoUsuario(
+  idCuenta: number,
+  actorEmail: string,
+  targetEmail: string,
+  nuevoTipo: TipoUsuario,
+): Promise<{ ok: boolean }> {
+  const actualizado = await db
+    .update(usuariosDashboard)
+    .set({ tipo_usuario: nuevoTipo })
+    .where(
+      and(
+        eq(usuariosDashboard.id_cuenta, idCuenta),
+        eq(usuariosDashboard.email, targetEmail),
+      ),
+    )
+    .returning({ id: usuariosDashboard.id_evento });
+
+  await auditarAccionEnfoque({
+    idCuenta,
+    idSesion: null,
+    actorEmail,
+    accion: "cambiar_tipo_usuario",
+    targetEmail,
+    detalle: { nuevo_tipo: nuevoTipo, encontrado: actualizado.length > 0 },
+  });
+
+  return { ok: actualizado.length > 0 };
+}
+
+/**
+ * Fuerza saltar un lead atorado: libera el lock y escribe un resultado
+ * marcador "seguimiento" para que getSiguienteLead lo excluya (registro ya
+ * gestionado) y no se re-sirva. NO incrementa intentos_contacto (evita el
+ * doble conteo). Tenant-scoped + auditado.
+ */
+export async function forzarSaltarLead(
+  idCuenta: number,
+  actorEmail: string,
+  idSesion: string,
+  idRegistro: number,
+): Promise<{ ok: boolean; closerAfectado: string | null }> {
+  const liberado = await db
+    .delete(enfoqueLock)
+    .where(
+      and(
+        eq(enfoqueLock.id_cuenta, idCuenta),
+        eq(enfoqueLock.id_sesion, idSesion),
+        eq(enfoqueLock.id_registro, idRegistro),
+      ),
+    )
+    .returning({ closer: enfoqueLock.en_progreso_por });
+
+  const closerAfectado = liberado[0]?.closer ?? null;
+
+  // Marcar como gestionado para el asesor afectado (si lo hay) y, en su
+  // defecto, para el closer actual del registro — así sale de la cola.
+  let closerMarcador: string | null = closerAfectado;
+  if (!closerMarcador) {
+    const idCuentaStr = String(idCuenta);
+    const [reg] = await db
+      .select({ closer_mail: registrosDeLlamada.closer_mail })
+      .from(registrosDeLlamada)
+      .where(
+        and(
+          eq(registrosDeLlamada.id_registro, idRegistro),
+          eq(registrosDeLlamada.id_cuenta, idCuentaStr),
+        ),
+      )
+      .limit(1);
+    closerMarcador = reg?.closer_mail ?? null;
+  }
+
+  if (closerMarcador) {
+    await db.insert(enfoqueResultado).values({
+      id_sesion: idSesion,
+      id_cuenta: idCuenta,
+      closer_mail: closerMarcador,
+      id_registro: idRegistro,
+      resultado_canonico: "seguimiento",
+      nota: "Saltado por admin (F4)",
+      detectado_por: "admin",
+    });
+  }
+
+  await auditarAccionEnfoque({
+    idCuenta,
+    idSesion,
+    actorEmail,
+    accion: "forzar_saltar_lead",
+    targetEmail: closerMarcador,
+    idRegistro,
+    detalle: { lock_liberado: liberado.length > 0, marcado: Boolean(closerMarcador) },
+  });
+
+  return { ok: true, closerAfectado: closerMarcador };
 }
