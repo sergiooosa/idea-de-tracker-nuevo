@@ -22,6 +22,7 @@ const DEMO_SESSION = {
   ],
   id_cuenta: 999,
   platformAdmin: false,
+  tipoUsuario: "analista" as const,
 };
 
 const DEMO_ASESORES: AsesorOption[] = [

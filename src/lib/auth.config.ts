@@ -65,6 +65,7 @@ export const authConfig: NextAuthConfig = {
             permisos: null,
             permisosArray: ALL_PERMISOS,
             platformAdmin: true,
+            tipoUsuario: "analista" as const,
           };
         }
 
@@ -96,6 +97,7 @@ export const authConfig: NextAuthConfig = {
               permisos: usuariosDashboard.permisos,
               subdominio: cuentas.subdominio,
               roles_config: cuentas.roles_config,
+              tipo_usuario: usuariosDashboard.tipo_usuario,
             })
             .from(usuariosDashboard)
             .innerJoin(
@@ -138,6 +140,7 @@ export const authConfig: NextAuthConfig = {
             subdominio: subdominioFinal,
             permisos: user.permisos,
             permisosArray,
+            tipoUsuario: (user.tipo_usuario === "enfoque" ? "enfoque" : "analista") as "analista" | "enfoque",
           };
         } catch (dbErr) {
           console.error("[auth] error de DB en authorize:", dbErr);
@@ -158,6 +161,7 @@ export const authConfig: NextAuthConfig = {
         token.permisos = (user as any).permisos;
         token.permisosArray = (user as any).permisosArray;
         token.platformAdmin = (user as any).platformAdmin ?? false;
+        token.tipoUsuario = (user as any).tipoUsuario ?? "analista";
       }
       return token;
     },
@@ -169,6 +173,7 @@ export const authConfig: NextAuthConfig = {
       session.user.permisos = token.permisos as Record<string, boolean> | null;
       session.user.permisosArray = (token.permisosArray as string[]) ?? [];
       session.user.platformAdmin = token.platformAdmin as boolean | undefined;
+      session.user.tipoUsuario = token.tipoUsuario ?? "analista";
       return session;
     },
   },

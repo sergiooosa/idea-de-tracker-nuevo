@@ -64,6 +64,7 @@ export async function POST(req: Request) {
       rol: usuariosDashboard.rol,
       permisos: usuariosDashboard.permisos,
       roles_config: cuentas.roles_config,
+      tipo_usuario: usuariosDashboard.tipo_usuario,
     })
     .from(usuariosDashboard)
     .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
