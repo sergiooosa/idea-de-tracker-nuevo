@@ -14,5 +14,6 @@ export async function GET() {
     permisosArray: session.user.permisosArray ?? [],
     id_cuenta: session.user.id_cuenta,
     platformAdmin: session.user.platformAdmin ?? false,
+    tipoUsuario: session.user.tipoUsuario ?? "analista",
   });
 }

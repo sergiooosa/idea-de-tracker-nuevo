@@ -91,6 +91,7 @@ export async function GET(req: NextRequest) {
     rol: string;
     permisos: Record<string, boolean> | null;
     roles_config: RolConfig[] | null;
+    tipo_usuario: string;
   } | undefined;
 
   try {
@@ -103,6 +104,7 @@ export async function GET(req: NextRequest) {
         rol: usuariosDashboard.rol,
         permisos: usuariosDashboard.permisos,
         roles_config: cuentas.roles_config,
+        tipo_usuario: usuariosDashboard.tipo_usuario,
       })
       .from(usuariosDashboard)
       .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
@@ -140,6 +142,7 @@ export async function GET(req: NextRequest) {
     permisos: row.permisos,
     permisosArray,
     platformAdmin: false,
+    tipoUsuario: row.tipo_usuario === "enfoque" ? "enfoque" : "analista",
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
   };
@@ -165,7 +168,8 @@ export async function GET(req: NextRequest) {
   const targetHost = isLocalDev
     ? `${subdominioSlug}.localhost${port}`
     : `${subdominioSlug}.${ROOT_DOMAIN}`;
-  const targetUrl = new URL(`${protocol}//${targetHost}/dashboard`);
+  const landingPath = row.tipo_usuario === "enfoque" ? "/enfoque" : "/dashboard";
+  const targetUrl = new URL(`${protocol}//${targetHost}${landingPath}`);
 
   const response = NextResponse.redirect(targetUrl);
 

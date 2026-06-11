@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { canViewAll as canViewAllPerm, canEditRecords } from "@/lib/permisos";
 
+export type TipoUsuario = "analista" | "enfoque";
+
 export interface SessionInfo {
   email: string;
   name: string | null;
@@ -11,6 +13,7 @@ export interface SessionInfo {
   permisosArray: string[];
   id_cuenta: number | null;
   platformAdmin?: boolean;
+  tipoUsuario: TipoUsuario;
 }
 
 export function useSession() {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Phone, ChevronRight, Loader2, PhoneCall, Timer, BarChart3, TrendingUp } from "lucide-react";
+import { Phone, ChevronRight, Loader2, PhoneCall, Timer, BarChart3, TrendingUp, Maximize } from "lucide-react";
+import { useUserFilter } from "@/contexts/UserFilterContext";
 
 interface Lead {
   id_registro: number;
@@ -57,6 +58,36 @@ function formatTimer(seconds: number): string {
 }
 
 export default function EnfoquePantalla() {
+  const { session } = useUserFilter();
+  const esKiosko = session?.tipoUsuario === "enfoque";
+  const [fullscreenActivo, setFullscreenActivo] = useState(false);
+  const [mostrarPromptFS, setMostrarPromptFS] = useState(false);
+
+  useEffect(() => {
+    if (!esKiosko) return;
+    const isFS = !!document.fullscreenElement;
+    setFullscreenActivo(isFS);
+    if (!isFS) setMostrarPromptFS(true);
+
+    const handleChange = () => {
+      const fs = !!document.fullscreenElement;
+      setFullscreenActivo(fs);
+      if (!fs) setMostrarPromptFS(true);
+    };
+    document.addEventListener("fullscreenchange", handleChange);
+    return () => document.removeEventListener("fullscreenchange", handleChange);
+  }, [esKiosko]);
+
+  const entrarFullscreen = useCallback(async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+      setMostrarPromptFS(false);
+      setFullscreenActivo(true);
+    } catch {
+      setMostrarPromptFS(false);
+    }
+  }, []);
+
   const [sesion, setSesion] = useState<SesionActiva | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [completados, setCompletados] = useState(0);
@@ -331,6 +362,28 @@ export default function EnfoquePantalla() {
     if (!resultadoSeleccionado) return;
     await avanzarConResultado(resultadoSeleccionado, false);
   }, [resultadoSeleccionado, avanzarConResultado]);
+
+  if (esKiosko && mostrarPromptFS && !fullscreenActivo) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center px-4">
+        <div className="text-center max-w-md space-y-6">
+          <Maximize className="w-16 h-16 text-accent-purple mx-auto" />
+          <h1 className="text-2xl font-bold text-white">Modo Enfoque</h1>
+          <p className="text-gray-400">
+            Toca para entrar en pantalla completa y comenzar a trabajar.
+          </p>
+          <button
+            type="button"
+            onClick={entrarFullscreen}
+            className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-accent-purple hover:bg-accent-purple/80 text-white text-lg font-bold transition-colors"
+          >
+            <Maximize className="w-6 h-6" />
+            Entrar en modo kiosko
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
