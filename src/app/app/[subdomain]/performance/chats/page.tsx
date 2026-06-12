@@ -467,7 +467,7 @@ export default function PerformanceChatsPage() {
           ⚡ Sin contactar
           {data && (
             <span className={`rounded-full px-1 text-[10px] ${soloSinContactar ? 'bg-accent-amber/30' : 'bg-surface-600'}`}>
-              {data.chats.filter((c) => !c.humanTookOver).length}
+              {data.chats.filter((c) => !c.humanTookOver && !((c.estado ?? '').trim().toLowerCase() === 'perdido' || (c.estado ?? '').trim().toLowerCase() === 'perdida')).length}
             </span>
           )}
         </button>
