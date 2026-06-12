@@ -184,7 +184,7 @@ export async function GET(req: Request): Promise<Response> {
         AND fecha_y_hora_z >= ${from}
         AND fecha_y_hora_z <= ${to}
         AND estado IS NOT NULL
-        AND estado NOT IN ('sin contactar', 'pendiente', 'sin_contactar')
+        AND estado NOT IN ('sin contactar', 'pendiente', 'sin_contactar', 'perdido', 'perdida')
     `);
     const contactadosPorChat = Number(contactadosChatRows.rows[0]?.count ?? 0);
 
