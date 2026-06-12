@@ -702,6 +702,10 @@ export async function getReportFunnel(
   const llamadasContactados = Object.entries(llamadasCategorias)
     .filter(([k]) => estadosContactados.has(k) || k.startsWith("efectiva"))
     .reduce((s, [, n]) => s + n, 0);
+  const estadosTerminalesNoPendientes = new Set(["perdido", "perdida", "no_interesado", "no interesado"]);
+  const llamadasTerminales = Object.entries(llamadasCategorias)
+    .filter(([k]) => estadosTerminalesNoPendientes.has(k))
+    .reduce((s, [, n]) => s + n, 0);
 
   // --- Chats ---
   const chatsCategorias: Record<string, number> = {};
@@ -740,7 +744,7 @@ export async function getReportFunnel(
   return {
     llamadas: {
       contactados: llamadasContactados,
-      sinContacto: llamadasTotal - llamadasContactados,
+      sinContacto: llamadasTotal - llamadasContactados - llamadasTerminales,
       porCategoria: buildNodos(llamadasCategorias, llamadasTotal),
     },
     chats: {
@@ -806,6 +810,7 @@ export async function getReportCrmHealth(
     `),
 
     // Leads sin acción = lead en registros_de_llamada sin ninguna entrada en log_llamadas
+    // Excluir leads con estado terminal (perdido/perdida) — no requieren acción
     db.execute(sql`
       SELECT
         COALESCE(rr.nombre_closer, rr.closer_mail, 'sin asignar') AS asesor,
@@ -813,6 +818,7 @@ export async function getReportCrmHealth(
       FROM registros_de_llamada rr
       WHERE rr.id_cuenta = ${String(idCuenta)}
         AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
+        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('perdido', 'perdida')
         AND NOT EXISTS (
           SELECT 1 FROM log_llamadas ll
           WHERE ll.id_registro = rr.id_registro
@@ -835,7 +841,7 @@ export async function getReportCrmHealth(
       FROM registros_de_llamada rr
       WHERE rr.id_cuenta = ${String(idCuenta)}
         AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
-        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('cerrado', 'vendido', 'ganado', 'done')
+        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('cerrado', 'vendido', 'ganado', 'done', 'perdido', 'perdida')
         AND (
           EXISTS (
             SELECT 1 FROM log_llamadas ll
@@ -865,6 +871,7 @@ export async function getReportCrmHealth(
     `),
 
     // Top 10 leads individuales sin acción (más antiguos primero)
+    // Excluir leads con estado terminal (perdido/perdida)
     db.execute(sql`
       SELECT
         COALESCE(rr.nombre_lead, 'Lead sin nombre') AS nombre,
@@ -873,6 +880,7 @@ export async function getReportCrmHealth(
       FROM registros_de_llamada rr
       WHERE rr.id_cuenta = ${String(idCuenta)}
         AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
+        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('perdido', 'perdida')
         AND NOT EXISTS (
           SELECT 1 FROM log_llamadas ll
           WHERE ll.id_registro = rr.id_registro
@@ -905,7 +913,7 @@ export async function getReportCrmHealth(
       FROM registros_de_llamada rr
       WHERE rr.id_cuenta = ${String(idCuenta)}
         AND rr.fecha_evento BETWEEN ${fromTs} AND ${toTs}
-        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('cerrado', 'vendido', 'ganado', 'done')
+        AND LOWER(TRIM(COALESCE(rr.estado, ''))) NOT IN ('cerrado', 'vendido', 'ganado', 'done', 'perdido', 'perdida')
         AND (
           EXISTS (
             SELECT 1 FROM log_llamadas ll

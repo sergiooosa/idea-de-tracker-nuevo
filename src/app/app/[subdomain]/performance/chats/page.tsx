@@ -145,7 +145,8 @@ export default function PerformanceChatsPage() {
   const extraKpis = useMemo(() => {
     if (!data) return { sinRespuesta: 0, pctSinContactar: 0, calificados: 0 };
     const sinRespuesta = data.chats.filter((c) => c.minutesSinceLastLeadMsg != null).length;
-    const sinContactar = data.chats.filter((c) => !c.humanTookOver).length;
+    const isPerdido = (e: string | null) => { const l = (e ?? '').trim().toLowerCase(); return l === 'perdido' || l === 'perdida'; };
+    const sinContactar = data.chats.filter((c) => !c.humanTookOver && !isPerdido(c.estado)).length;
     const pctSinContactar = data.chats.length > 0 ? Math.round((sinContactar / data.chats.length) * 100) : 0;
     const criterios = criteriosData?.categorias;
     const calificados = data.chats.filter((c) =>
@@ -224,7 +225,7 @@ export default function PerformanceChatsPage() {
   const filteredChats = useMemo(() => {
     if (!data) return [];
     let chats = canalActivo === 'todos' ? data.chats : data.chats.filter((c) => detectCanal(c) === canalActivo);
-    if (soloSinContactar) chats = chats.filter((c) => !c.humanTookOver);
+    if (soloSinContactar) chats = chats.filter((c) => !c.humanTookOver && !((c.estado ?? '').trim().toLowerCase() === 'perdido' || (c.estado ?? '').trim().toLowerCase() === 'perdida'));
     if (soloCalificados && criteriosData?.categorias != null) {
       chats = chats.filter((c) => c.iaCategoria != null && criteriosData.categorias!.includes(c.iaCategoria));
     }

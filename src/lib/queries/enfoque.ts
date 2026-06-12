@@ -178,6 +178,10 @@ export async function getSiguienteLead(
     notInArray(registrosDeLlamada.id_registro, lockedByOtherSubquery(idSesion, closerMail, lockMin)),
   ];
 
+  conditions.push(
+    sql`LOWER(TRIM(COALESCE(${registrosDeLlamada.estado}, ''))) NOT IN ('perdido', 'perdida')`,
+  );
+
   if (filtroEstado.length > 0) {
     conditions.push(inArray(registrosDeLlamada.estado, filtroEstado));
   }
