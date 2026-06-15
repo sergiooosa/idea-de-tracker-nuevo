@@ -136,6 +136,46 @@ export default function PerformanceLlamadasPage() {
     );
   }, [leadsPendientes, leadSearch]);
 
+  const filteredAdvisorMetrics = useMemo(() => {
+    if (resultadoFiltro === 'todos' || !data?.registros) return null;
+    const metrics: Record<string, { advisorName: string; advisorEmail: string; leadsAsignados: number; llamadas: number; contestadas: number; pctContestacion: number; tiempoAlLead: number | null }> = {};
+    for (const [advisorKey, leads] of Object.entries(leadsByAdvisor)) {
+      let totalCalls = 0;
+      let answered = 0;
+      const speedValues: number[] = [];
+      for (const lead of leads) {
+        const leadPhone = phoneDigits(lead.phone);
+        const leadMail = lead.mail_lead?.trim().toLowerCase() ?? '';
+        const leadCloser = lead.closer_mail?.trim().toLowerCase() ?? '';
+        const calls = data.registros.filter((c) => {
+          if (c.tipoEvento === TIPO_PDTE) return false;
+          const rid = c.id_registro;
+          if (rid != null && rid > 0) return rid === lead.id_registro;
+          const cPhone = phoneDigits(c.phone);
+          if (!leadPhone || cPhone !== leadPhone) return false;
+          if (leadMail) return (c.leadEmail?.trim().toLowerCase() ?? '') === leadMail;
+          return leadCloser !== '' && (c.closerMail?.trim().toLowerCase() ?? '') === leadCloser;
+        });
+        totalCalls += calls.length;
+        answered += calls.filter((c) => c.tipoEvento?.startsWith('efectiva_')).length;
+        if (lead.speed_to_lead_min != null && lead.estado?.toUpperCase() !== 'PDTE') {
+          speedValues.push(lead.speed_to_lead_min);
+        }
+      }
+      const serverMetrics = data.advisorMetrics[advisorKey];
+      metrics[advisorKey] = {
+        advisorName: serverMetrics?.advisorName ?? advisorKey,
+        advisorEmail: serverMetrics?.advisorEmail ?? advisorKey,
+        leadsAsignados: leads.length,
+        llamadas: totalCalls,
+        contestadas: answered,
+        pctContestacion: totalCalls > 0 ? (answered / totalCalls) * 100 : 0,
+        tiempoAlLead: speedValues.length > 0 ? speedValues.reduce((a, b) => a + b, 0) / speedValues.length : null,
+      };
+    }
+    return metrics;
+  }, [resultadoFiltro, leadsByAdvisor, data?.registros, data?.advisorMetrics]);
+
   const leadsByAdvisorFiltered = useMemo(() => {
     const q = leadSearch.trim();
     if (!q) return leadsByAdvisor;
@@ -399,12 +439,24 @@ export default function PerformanceLlamadasPage() {
                 <tbody>
                   {(() => {
                     const q = leadSearch.trim();
+                    const isFiltered = resultadoFiltro !== 'todos';
                     const advisorKeys = q
                       ? [...Object.keys(leadsByAdvisorFiltered)].sort((a, b) => a.localeCompare(b))
-                      : [...new Set([...Object.keys(leadsByAdvisor), ...Object.keys(data?.advisorMetrics ?? {})])].sort((a, b) => a.localeCompare(b));
+                      : isFiltered
+                        ? [...Object.keys(leadsByAdvisor)].sort((a, b) => a.localeCompare(b))
+                        : [...new Set([...Object.keys(leadsByAdvisor), ...Object.keys(data?.advisorMetrics ?? {})])].sort((a, b) => a.localeCompare(b));
+                    if (isFiltered && !q && advisorKeys.length === 0) {
+                      return (
+                        <tr key="__empty">
+                          <td colSpan={7} className="px-3 py-4 text-center text-gray-500 text-xs">
+                            0 asesores con leads en esta categoría.
+                          </td>
+                        </tr>
+                      );
+                    }
                     return advisorKeys.map((advisorKey) => {
                       const isExpanded = expandedAdvisorId === advisorKey;
-                      const metrics = data?.advisorMetrics[advisorKey];
+                      const metrics = isFiltered && filteredAdvisorMetrics ? filteredAdvisorMetrics[advisorKey] : data?.advisorMetrics[advisorKey];
                       const advisorLeads = (q ? leadsByAdvisorFiltered[advisorKey] : leadsByAdvisor[advisorKey]) ?? [];
                       return (
                         <Fragment key={advisorKey}>
