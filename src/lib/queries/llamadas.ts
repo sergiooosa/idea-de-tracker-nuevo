@@ -9,10 +9,23 @@ import type {
   LlamadaLead,
 } from "@/types";
 
-function mapTipoEvento(tipo: string): ApiLlamadaLog["outcome"] {
-  if (tipo.startsWith("efectiva_")) return "answered";
+const VOZ_CONTESTADA_ESTADOS = new Set([
+  "interesado",
+  "no_interesado",
+  "reagendado",
+  "no_elegible",
+]);
+
+export function esLlamadaContestada(tipoEvento: string, estadoResultado?: string | null): boolean {
+  if (tipoEvento.startsWith("efectiva_")) return true;
+  if (tipoEvento === "voz_callai" && estadoResultado && VOZ_CONTESTADA_ESTADOS.has(estadoResultado)) return true;
+  return false;
+}
+
+function mapTipoEvento(tipo: string, estadoResultado?: string | null): ApiLlamadaLog["outcome"] {
+  if (esLlamadaContestada(tipo, estadoResultado)) return "answered";
   if (tipo === "no_contesto") return "no_answer";
-  if (tipo === "buzon") return "voicemail";
+  if (tipo === "buzon" || (tipo === "voz_callai" && estadoResultado === "buzon_voz")) return "voicemail";
   if (tipo === "pdte") return "pending";
   return "no_answer";
 }
@@ -111,7 +124,7 @@ export async function getLlamadas(
     closerMail: r.closer_mail,
     closerName: r.nombre_closer,
     tipoEvento: r.tipo_evento,
-    outcome: mapTipoEvento(r.tipo_evento),
+    outcome: mapTipoEvento(r.tipo_evento, r.estado_resultado),
     transcripcion: r.transcripcion,
     iaDescripcion: r.ia_descripcion,
     speedToLeadMinutes: r.speed_to_lead ? parseFloat(r.speed_to_lead) || null : null,
