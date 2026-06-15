@@ -114,7 +114,25 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
   );
 }
 
-type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion";
+export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion";
+
+const NAV_KEY_TO_PATH: Record<NavKey, string> = {
+  dashboard: "/dashboard",
+  performance: "/performance",
+  asesor: "/asesor",
+  comisiones: "/comisiones",
+  bandeja: "/bandeja",
+  adquisicion: "/acquisition",
+  ads: "/ads",
+  comparaciones: "/comparaciones",
+  sistema: "/system",
+  documentacion: "/documentacion",
+  configuracion: "/configuracion",
+  reportes: "/reportes",
+  sesiones: "/sesiones",
+  "tablero-enfoque": "/tablero-enfoque",
+  asignacion: "/asignacion",
+};
 
 const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType; beta?: boolean }[] = [
   { path: "/dashboard", navKey: "dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
@@ -228,10 +246,12 @@ function NavFiltered({
   onLinkClick,
   dashboards = [],
   hasAds = null,
+  seccionesOcultas = [],
 }: {
   onLinkClick?: () => void;
   dashboards?: { id: string; nombre: string; icono?: string }[];
   hasAds?: boolean | null;
+  seccionesOcultas?: string[];
 }) {
   const pathname = usePathname();
   const { session, sessionLoading } = useUserFilter();
@@ -239,8 +259,11 @@ function NavFiltered({
   const permisos = session?.permisosArray ?? [];
   const navFiltered = useMemo(() => {
     if (sessionLoading) return NAV_ITEMS;
-    return NAV_ITEMS.filter((item) => puedeVerRuta(permisos, item.path) || session?.rol === "superadmin");
-  }, [sessionLoading, permisos, session?.rol]);
+    return NAV_ITEMS.filter((item) => {
+      if (seccionesOcultas.includes(item.navKey)) return false;
+      return puedeVerRuta(permisos, item.path) || session?.rol === "superadmin";
+    });
+  }, [sessionLoading, permisos, session?.rol, seccionesOcultas]);
 
   const isActive = (path: string) => {
     if (path === "/dashboard") return pathname.endsWith("/dashboard");
@@ -312,15 +335,17 @@ function NavFilteredMobile({
   onClose,
   dashboards = [],
   hasAds = null,
+  seccionesOcultas = [],
 }: {
   onClose: () => void;
   dashboards?: { id: string; nombre: string; icono?: string }[];
   hasAds?: boolean | null;
+  seccionesOcultas?: string[];
 }) {
-  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} hasAds={hasAds} />;
+  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} hasAds={hasAds} seccionesOcultas={seccionesOcultas} />;
 }
 
-function PermissionGuard({ children }: { children: React.ReactNode }) {
+function PermissionGuard({ children, seccionesOcultas = [] }: { children: React.ReactNode; seccionesOcultas?: string[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, sessionLoading } = useUserFilter();
@@ -328,12 +353,21 @@ function PermissionGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (sessionLoading || !session) return;
     const path = pathname.replace(/^\/app\/[^/]+/, "") || "/dashboard";
+
+    if (seccionesOcultas.length > 0) {
+      const hiddenPaths = seccionesOcultas
+        .map((k) => NAV_KEY_TO_PATH[k as NavKey])
+        .filter(Boolean);
+      const isHidden = hiddenPaths.some((hp) => path === hp || (hp !== "/dashboard" && path.startsWith(hp + "/")));
+      if (isHidden) { router.replace("/dashboard"); return; }
+    }
+
     const basePath = Object.keys(NAV_PERMISOS).find((p) => path === p || (p !== "/dashboard" && path.startsWith(p + "/")));
     const perm = basePath ? NAV_PERMISOS[basePath as keyof typeof NAV_PERMISOS] : null;
     if (!perm) return;
     const puede = session.rol === "superadmin" || puedeVerRuta(session.permisosArray ?? [], basePath!);
     if (!puede) router.replace("/dashboard");
-  }, [pathname, session, sessionLoading, router]);
+  }, [pathname, session, sessionLoading, router, seccionesOcultas]);
 
   return <>{children}</>;
 }
@@ -347,6 +381,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [dashboardsNav, setDashboardsNav] = useState<{ id: string; nombre: string; icono?: string }[]>([]);
   const [hasAds, setHasAds] = useState<boolean | null>(null); // null = loading
+  const [seccionesOcultas, setSeccionesOcultas] = useState<string[]>([]);
   const [ghlTokenStatus, setGhlTokenStatus] = useState<"ok" | "invalid" | "unknown" | null>(null);
   const [ghlPendingCount, setGhlPendingCount] = useState(0);
   const [ghlLocationId, setGhlLocationId] = useState<string | null>(null);
@@ -365,6 +400,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
       .then((d) => {
         if (d?.idioma) setLocale(d.idioma as Locale);
         if (typeof d?.hasAds === "boolean") setHasAds(d.hasAds);
+        if (Array.isArray(d?.seccionesOcultas)) setSeccionesOcultas(d.seccionesOcultas);
       })
       .catch(() => { /* fallback */ });
   }, [isFullscreen]);
@@ -559,7 +595,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
-          <NavFiltered dashboards={dashboardsNav} hasAds={hasAds} />
+          <NavFiltered dashboards={dashboardsNav} hasAds={hasAds} seccionesOcultas={seccionesOcultas} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
@@ -599,7 +635,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex-1 p-2">
-          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} hasAds={hasAds} />
+          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} hasAds={hasAds} seccionesOcultas={seccionesOcultas} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
@@ -620,7 +656,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 flex flex-col min-w-0 max-w-full overflow-x-hidden pb-20 md:pb-24">
         <div className="flex-1 min-w-0 max-w-full">
-          <PermissionGuard>{children}</PermissionGuard>
+          <PermissionGuard seccionesOcultas={seccionesOcultas}>{children}</PermissionGuard>
         </div>
       </main>
 
