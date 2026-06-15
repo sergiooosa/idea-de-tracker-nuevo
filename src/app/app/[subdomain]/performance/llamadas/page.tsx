@@ -6,7 +6,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Pencil, Phone, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import { FileText, Pencil, Phone, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
@@ -38,6 +38,34 @@ function isAnswered(c: ApiLlamadaLog) {
   return c.tipoEvento?.startsWith('efectiva_') ?? false;
 }
 
+type ResultadoFiltro = 'todos' | 'no_contestaron' | 'no_interesadas' | 'interesadas';
+
+const ESTADOS_NO_CONTESTARON = new Set([
+  'no_contestado', 'buzon_voz', 'no_contesto', 'no_contestada',
+]);
+const ESTADOS_NO_INTERESADAS = new Set([
+  'no_interesado', 'no_calificada', 'no_elegible',
+]);
+const ESTADOS_INTERESADAS = new Set([
+  'calificada', 'interesado', 'programado', 'seguimiento', 'reagendado',
+]);
+
+function categoriaResultado(estado: string | null): ResultadoFiltro | null {
+  const s = (estado ?? '').trim().toLowerCase();
+  if (!s || s === 'pdte') return null;
+  if (ESTADOS_NO_CONTESTARON.has(s)) return 'no_contestaron';
+  if (ESTADOS_NO_INTERESADAS.has(s)) return 'no_interesadas';
+  if (ESTADOS_INTERESADAS.has(s)) return 'interesadas';
+  return null;
+}
+
+const RESULTADO_FILTROS: { key: ResultadoFiltro; label: string; icon: typeof Phone; active: string; inactive: string; badge: string }[] = [
+  { key: 'todos', label: 'Todos', icon: Phone, active: 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50', inactive: 'hover:border-accent-cyan/30', badge: 'bg-accent-cyan/30' },
+  { key: 'no_contestaron', label: 'No contestaron', icon: PhoneMissed, active: 'bg-accent-amber/20 text-accent-amber border-accent-amber/50', inactive: 'hover:border-accent-amber/30', badge: 'bg-accent-amber/30' },
+  { key: 'no_interesadas', label: 'No interesadas', icon: PhoneOff, active: 'bg-red-400/20 text-red-400 border-red-400/50', inactive: 'hover:border-red-400/30', badge: 'bg-red-400/30' },
+  { key: 'interesadas', label: 'Interesadas', icon: PhoneForwarded, active: 'bg-emerald-400/20 text-emerald-400 border-emerald-400/50', inactive: 'hover:border-emerald-400/30', badge: 'bg-emerald-400/30' },
+];
+
 export default function PerformanceLlamadasPage() {
   const t = useT();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
@@ -57,16 +85,31 @@ export default function PerformanceLlamadasPage() {
   } | null>(null);
   const [leadSearch, setLeadSearch] = useState('');
   const [showNuevoModal, setShowNuevoModal] = useState(false);
+  const [resultadoFiltro, setResultadoFiltro] = useState<ResultadoFiltro>('todos');
 
   const { data, loading, refetch } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
 
+  const resultadoCounts = useMemo(() => {
+    const counts: Record<ResultadoFiltro, number> = { todos: 0, no_contestaron: 0, no_interesadas: 0, interesadas: 0 };
+    if (!data?.leads) return counts;
+    for (const l of data.leads) {
+      counts.todos++;
+      const cat = categoriaResultado(l.estado);
+      if (cat) counts[cat]++;
+    }
+    return counts;
+  }, [data?.leads]);
+
+  const leadsFiltered = useMemo(() => {
+    if (!data?.leads || resultadoFiltro === 'todos') return data?.leads ?? [];
+    return data.leads.filter((l) => categoriaResultado(l.estado) === resultadoFiltro);
+  }, [data?.leads, resultadoFiltro]);
+
   /** Leads agrupados por asesor (closer_mail); el listado expandido muestra esto */
   const leadsByAdvisor = useMemo(() => {
-    if (!data?.leads) return {} as Record<string, LlamadaLead[]>;
+    if (!leadsFiltered.length) return {} as Record<string, LlamadaLead[]>;
     const map: Record<string, LlamadaLead[]> = {};
-    for (const l of data.leads) {
-      // Normalizar igual que el backend: email lowercase tiene prioridad,
-      // luego nombre lowercase, sino 'sin asignar' (minúsculas para que coincida con advisorMetrics)
+    for (const l of leadsFiltered) {
       const email = l.closer_mail?.trim().toLowerCase();
       const nombre = (l as { nombre_closer?: string | null }).nombre_closer?.trim().toLowerCase();
       const key = email || nombre || 'sin asignar';
@@ -74,7 +117,7 @@ export default function PerformanceLlamadasPage() {
       map[key].push(l);
     }
     return map;
-  }, [data?.leads]);
+  }, [leadsFiltered]);
 
   /** Leads pendientes por llamar — estado PDTE, nunca contactados en el rango de fechas */
   const leadsPendientes = useMemo(() => {
@@ -222,6 +265,40 @@ export default function PerformanceLlamadasPage() {
         <KPICard label={t.performance.llamadas.kpis.intentosProm} value={agg.attemptsAvg.toFixed(1)} color="amber" className={kpiCompact} tooltip={{ significado: 'Intentos promedios por lead.', calculo: 'Total llamadas / leads únicos.' }} />
         <KPICard label={t.performance.llamadas.kpis.intentosPrimerContacto} value={agg.firstContactAttempts.toFixed(1)} color="purple" className={kpiCompact} tooltip={{ significado: 'Llamadas hasta que el lead contesta.', calculo: 'Promedio de intentos por lead.' }} />
         <KPICard label="Tasa de contestación" value={pct(agg.answerRate * 100)} color="green" className={kpiCompact} tooltip={{ significado: '% de llamadas contestadas.', calculo: '(Contestadas / Total) × 100.' }} />
+      </div>
+
+      {/* ── Filtro por resultado ── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs text-gray-400 font-medium">Resultado:</span>
+        {RESULTADO_FILTROS.map(({ key, label, icon: Icon, active, inactive, badge }) => {
+          const count = resultadoCounts[key];
+          const isActive = resultadoFiltro === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setResultadoFiltro(key)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all border ${
+                isActive
+                  ? active
+                  : `bg-surface-700 text-gray-400 border-surface-500 ${inactive} hover:text-gray-300`
+              }`}
+            >
+              <Icon className="w-3 h-3" />
+              {label}
+              {count > 0 && (
+                <span className={`rounded-full px-1 text-[10px] ${isActive ? badge : 'bg-surface-600'}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+        {resultadoFiltro !== 'todos' && (
+          <span className="text-[11px] text-gray-500 ml-1">
+            Mostrando {leadsFiltered.length} de {resultadoCounts.todos} leads
+          </span>
+        )}
       </div>
 
       {/* ── Leads pendientes por llamar ─────────────────────────────────────── */}
