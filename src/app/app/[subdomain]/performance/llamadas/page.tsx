@@ -51,9 +51,13 @@ const ESTADOS_INTERESADAS = new Set([
 ]);
 
 function categoriaResultado(estado: string | null): ResultadoFiltro | null {
-  const s = (estado ?? '').trim().toLowerCase();
+  // Normalizar: trim, lowercase, quitar llaves de valores serializados desde JSONB
+  // (p.ej. "{seguimiento}") y unificar espacios con guion bajo ("no interesado" → "no_interesado").
+  const s = (estado ?? '').trim().toLowerCase().replace(/^\{+|\}+$/g, '').replace(/\s+/g, '_');
   if (!s || s === 'pdte') return null;
-  if (ESTADOS_NO_CONTESTARON.has(s)) return 'no_contestaron';
+  // Variantes de seguimiento por tenant: seguimiento_1, seguimiento_2 … seguimiento_10 = interesadas.
+  if (s.startsWith('seguimiento')) return 'interesadas';
+  if (ESTADOS_NO_CONTESTARON.has(s) || s === 'nocontest') return 'no_contestaron';
   if (ESTADOS_NO_INTERESADAS.has(s)) return 'no_interesadas';
   if (ESTADOS_INTERESADAS.has(s)) return 'interesadas';
   return null;
