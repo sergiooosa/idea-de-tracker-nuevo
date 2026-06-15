@@ -17,13 +17,16 @@ export async function GET(req: Request) {
         .limit(1);
 
       const idioma = row?.configuracion_ui?.idioma ?? "es";
+      const seccionesOcultas: string[] = Array.isArray(row?.configuracion_ui?.secciones_ocultas)
+        ? row.configuracion_ui.secciones_ocultas
+        : [];
       const adsCfg = (row?.configuracion_ads ?? {}) as ConfiguracionAds;
       const hasAds = !!(
         (adsCfg.meta?.activo && adsCfg.meta.ad_account_id) ||
         (adsCfg.google?.activo && adsCfg.google.customer_id) ||
         (adsCfg.tiktok?.activo && adsCfg.tiktok.advertiser_id)
       );
-      return NextResponse.json({ idioma, hasAds });
+      return NextResponse.json({ idioma, hasAds, seccionesOcultas });
     },
   );
 }

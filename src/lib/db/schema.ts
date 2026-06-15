@@ -54,6 +54,7 @@ export interface ConfiguracionUI {
   };
   /** Toggle: si true, las etapas con es_cerrada:true también cuentan como calificadas. Default: true */
   cerradas_cuentan_como_calificadas?: boolean;
+  secciones_ocultas?: string[];
 }
 
 export interface ReglaEtiqueta {
