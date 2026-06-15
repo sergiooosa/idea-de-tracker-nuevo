@@ -3,9 +3,49 @@ import { auth } from "@/lib/auth";
 
 const PAPERCLIP_WEBHOOK_URL = process.env.PAPERCLIP_REPORT_WEBHOOK_URL ?? "";
 const PAPERCLIP_WEBHOOK_SECRET = process.env.PAPERCLIP_REPORT_WEBHOOK_SECRET ?? "";
+const PAPERCLIP_API_BASE = process.env.PAPERCLIP_API_BASE ?? "";
+const PAPERCLIP_API_TOKEN = process.env.PAPERCLIP_API_TOKEN ?? "";
 
 const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB per image
 const MAX_IMAGES = 3;
+const TICKET_LOOKUP_TIMEOUT_MS = 2500;
+
+/**
+ * Resuelve el identificador humano (AUT-NNN) de un issue a partir de su UUID.
+ * Degradación elegante: ante token faltante, error o timeout devuelve null.
+ * NUNCA debe romper el flujo de envío del reporte.
+ */
+async function resolveTicketIdentifier(linkedIssueId: string): Promise<string | null> {
+  if (!PAPERCLIP_API_BASE || !PAPERCLIP_API_TOKEN) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TICKET_LOOKUP_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(
+      `${PAPERCLIP_API_BASE}/api/issues/${encodeURIComponent(linkedIssueId)}`,
+      {
+        headers: { Authorization: `Bearer ${PAPERCLIP_API_TOKEN}` },
+        signal: controller.signal,
+      },
+    );
+
+    if (!res.ok) {
+      console.error(`[report-problem] Ticket lookup failed: ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json() as { identifier?: string };
+    return typeof data.identifier === "string" && data.identifier ? data.identifier : null;
+  } catch (err) {
+    console.error("[report-problem] Ticket lookup error:", err instanceof Error ? err.message : err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -92,5 +132,15 @@ export async function POST(req: Request) {
   }
 
   const result = await webhookRes.json() as { linkedIssueId?: string };
-  return NextResponse.json({ ok: true, issueId: result.linkedIssueId });
+  const linkedIssueId = result.linkedIssueId;
+
+  if (!linkedIssueId) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const ticket = await resolveTicketIdentifier(linkedIssueId);
+
+  return ticket
+    ? NextResponse.json({ ok: true, ticket, issueId: linkedIssueId })
+    : NextResponse.json({ ok: true, issueId: linkedIssueId });
 }

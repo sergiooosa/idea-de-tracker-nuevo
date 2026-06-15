@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { AlertCircle, X, Upload, Loader2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, X, Upload, Loader2, CheckCircle2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +21,20 @@ export default function ReportProblemButton() {
   const [images, setImages] = useState<File[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [ticket, setTicket] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  async function copyTicket() {
+    if (!ticket) return;
+    try {
+      await navigator.clipboard.writeText(ticket);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard no disponible — silencioso, el ticket sigue visible para copiar a mano.
+    }
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []).slice(0, 3);
@@ -58,6 +71,8 @@ export default function ReportProblemButton() {
         throw new Error(data.error ?? "Error desconocido");
       }
 
+      const data = await res.json().catch(() => ({})) as { ticket?: string };
+      setTicket(typeof data.ticket === "string" ? data.ticket : null);
       setStatus("success");
       setTitulo("");
       setDescripcion("");
@@ -92,6 +107,8 @@ export default function ReportProblemButton() {
       setTitulo("");
       setDescripcion("");
       setImages([]);
+      setTicket(null);
+      setCopied(false);
     }, 200);
   }
 
@@ -125,6 +142,37 @@ export default function ReportProblemButton() {
               <p className="text-sm text-gray-400">
                 Nuestro equipo técnico lo revisará pronto.
               </p>
+              {ticket && (
+                <div className="mt-1 w-full rounded-md border border-accent-purple/40 bg-accent-purple/10 px-4 py-3">
+                  <p className="text-xs text-gray-400">Tu número de ticket</p>
+                  <div className="mt-1 flex items-center justify-center gap-2">
+                    <span className="text-lg font-bold tracking-wide text-white">
+                      {ticket}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyTicket}
+                      title="Copiar número de ticket"
+                      className="flex items-center gap-1 rounded-md border border-surface-500 px-2 py-1 text-xs text-gray-300 transition-colors hover:text-white hover:border-accent-purple/60"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-green-400" />
+                          Copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Copiar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    Guárdalo para dar seguimiento con soporte.
+                  </p>
+                </div>
+              )}
               <Button
                 onClick={handleClose}
                 className="mt-2 bg-surface-600 hover:bg-surface-500 text-white"
