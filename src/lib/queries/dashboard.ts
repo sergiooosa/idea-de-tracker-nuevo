@@ -5,6 +5,7 @@ import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFA
 import { resolveFinancialValues } from "@/lib/queries/resolve-financial";
 import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { agendaDedupKey } from "./agenda-dedup-key";
+import { esLlamadaContestada } from "./llamadas";
 import type {
   DashboardKpis,
   DashboardAdvisorRow,
@@ -386,8 +387,7 @@ export async function getDashboard(
     },
   );
 
-  const efectivasCalls = filteredCalls.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
-  const contestadas = efectivasCalls;
+  const contestadas = filteredCalls.filter((c) => esLlamadaContestada(c.tipo_evento ?? "", c.estado_resultado)).length;
 
   // Usar email OR phone OR id para no perder leads sin email (igual que panel asesor)
   const normLeadKey = (mail: string | null | undefined, phone: string | null | undefined, id: string | number) =>
@@ -396,7 +396,7 @@ export async function getDashboard(
   // (numerador correcto para tasa de contestación: leads contactados / leads llegados)
   const leadsContactados = new Set(
     filteredCalls
-      .filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_"))
+      .filter((c) => esLlamadaContestada(c.tipo_evento ?? "", c.estado_resultado))
       .map((c) => normLeadKey(c.mail_lead, c.phone, c.id))
   ).size;
   const leadsFromCalls = new Set(filteredCalls.map((c) => normLeadKey(c.mail_lead, c.phone, c.id)));
@@ -552,11 +552,10 @@ export async function getDashboard(
 
   const advisorRanking: DashboardAdvisorRow[] = Object.entries(advisorMap).map(
     ([key, { calls: ac, agendas: aa }]) => {
-      const aContestadas = ac.filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_")).length;
-      // Leads únicos contactados por este asesor (al menos 1 llamada efectiva)
+      const aContestadas = ac.filter((c) => esLlamadaContestada(c.tipo_evento ?? "", c.estado_resultado)).length;
       const aLeadsContactados = new Set(
         ac
-          .filter((c) => (c.tipo_evento ?? "").startsWith("efectiva_"))
+          .filter((c) => esLlamadaContestada(c.tipo_evento ?? "", c.estado_resultado))
           .map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id))
       ).size;
       // Deduplicar leads usando la misma clave que meetingsBooked (idcliente || ghl_contact_id || email || phone)
