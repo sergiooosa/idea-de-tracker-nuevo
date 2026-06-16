@@ -6,7 +6,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Pencil, Phone, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import { FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
@@ -38,7 +38,7 @@ function isAnswered(c: ApiLlamadaLog) {
   return c.tipoEvento?.startsWith('efectiva_') ?? false;
 }
 
-type ResultadoFiltro = 'todos' | 'no_contestaron' | 'no_interesadas' | 'interesadas';
+type ResultadoFiltro = 'todos' | 'contestadas' | 'no_contestaron' | 'no_interesadas' | 'interesadas';
 
 const ESTADOS_NO_CONTESTARON = new Set([
   'no_contestado', 'buzon_voz', 'no_contesto', 'no_contestada',
@@ -65,6 +65,7 @@ function categoriaResultado(estado: string | null): ResultadoFiltro | null {
 
 const RESULTADO_FILTROS: { key: ResultadoFiltro; label: string; icon: typeof Phone; active: string; inactive: string; badge: string }[] = [
   { key: 'todos', label: 'Todos', icon: Phone, active: 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50', inactive: 'hover:border-accent-cyan/30', badge: 'bg-accent-cyan/30' },
+  { key: 'contestadas', label: 'Contestadas', icon: PhoneCall, active: 'bg-teal-400/20 text-teal-400 border-teal-400/50', inactive: 'hover:border-teal-400/30', badge: 'bg-teal-400/30' },
   { key: 'no_contestaron', label: 'No contestaron', icon: PhoneMissed, active: 'bg-accent-amber/20 text-accent-amber border-accent-amber/50', inactive: 'hover:border-accent-amber/30', badge: 'bg-accent-amber/30' },
   { key: 'no_interesadas', label: 'No interesadas', icon: PhoneOff, active: 'bg-red-400/20 text-red-400 border-red-400/50', inactive: 'hover:border-red-400/30', badge: 'bg-red-400/30' },
   { key: 'interesadas', label: 'Interesadas', icon: PhoneForwarded, active: 'bg-emerald-400/20 text-emerald-400 border-emerald-400/50', inactive: 'hover:border-emerald-400/30', badge: 'bg-emerald-400/30' },
@@ -93,21 +94,44 @@ export default function PerformanceLlamadasPage() {
 
   const { data, loading, refetch } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
 
+  const contestadasLeadIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (!data?.leads || !data?.registros) return ids;
+    for (const lead of data.leads) {
+      const leadPhone = phoneDigits(lead.phone);
+      const leadMail = lead.mail_lead?.trim().toLowerCase() ?? '';
+      const leadCloser = lead.closer_mail?.trim().toLowerCase() ?? '';
+      const hasAnswered = data.registros.some((c) => {
+        if (c.tipoEvento === TIPO_PDTE || c.outcome !== 'answered') return false;
+        const rid = c.id_registro;
+        if (rid != null && rid > 0) return rid === lead.id_registro;
+        const cPhone = phoneDigits(c.phone);
+        if (!leadPhone || cPhone !== leadPhone) return false;
+        if (leadMail) return (c.leadEmail?.trim().toLowerCase() ?? '') === leadMail;
+        return leadCloser !== '' && (c.closerMail?.trim().toLowerCase() ?? '') === leadCloser;
+      });
+      if (hasAnswered) ids.add(lead.id_registro);
+    }
+    return ids;
+  }, [data?.leads, data?.registros]);
+
   const resultadoCounts = useMemo(() => {
-    const counts: Record<ResultadoFiltro, number> = { todos: 0, no_contestaron: 0, no_interesadas: 0, interesadas: 0 };
+    const counts: Record<ResultadoFiltro, number> = { todos: 0, contestadas: 0, no_contestaron: 0, no_interesadas: 0, interesadas: 0 };
     if (!data?.leads) return counts;
     for (const l of data.leads) {
       counts.todos++;
       const cat = categoriaResultado(l.estado);
       if (cat) counts[cat]++;
+      if (contestadasLeadIds.has(l.id_registro)) counts.contestadas++;
     }
     return counts;
-  }, [data?.leads]);
+  }, [data?.leads, contestadasLeadIds]);
 
   const leadsFiltered = useMemo(() => {
     if (!data?.leads || resultadoFiltro === 'todos') return data?.leads ?? [];
+    if (resultadoFiltro === 'contestadas') return data.leads.filter((l) => contestadasLeadIds.has(l.id_registro));
     return data.leads.filter((l) => categoriaResultado(l.estado) === resultadoFiltro);
-  }, [data?.leads, resultadoFiltro]);
+  }, [data?.leads, resultadoFiltro, contestadasLeadIds]);
 
   /** Leads agrupados por asesor (closer_mail); el listado expandido muestra esto */
   const leadsByAdvisor = useMemo(() => {
