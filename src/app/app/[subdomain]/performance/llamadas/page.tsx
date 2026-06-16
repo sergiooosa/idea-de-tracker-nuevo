@@ -181,7 +181,7 @@ export default function PerformanceLlamadasPage() {
           return leadCloser !== '' && (c.closerMail?.trim().toLowerCase() ?? '') === leadCloser;
         });
         totalCalls += calls.length;
-        answered += calls.filter((c) => c.tipoEvento?.startsWith('efectiva_')).length;
+        answered += calls.filter((c) => c.outcome === 'answered').length;
         if (lead.speed_to_lead_min != null && lead.estado?.toUpperCase() !== 'PDTE') {
           speedValues.push(lead.speed_to_lead_min);
         }
