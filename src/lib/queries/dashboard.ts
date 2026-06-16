@@ -35,6 +35,24 @@ function toDateString(value: Date | string | null | undefined): string {
   return String(value).slice(0, 10);
 }
 
+const FIXED_STAGE_GENDER_VARIANTS: Record<string, string[]> = {
+  cerrada: ["cerrado"],
+  cerrado: ["cerrada"],
+};
+
+function expandFixedStageVariants(ids: string[], embudo: EmbudoEtapa[]): string[] {
+  const fixedIds = new Set(
+    embudo.filter((e) => e.es_fija === true).map((e) => e.id.toLowerCase())
+  );
+  const expanded: string[] = [...ids];
+  for (const id of ids) {
+    if (!fixedIds.has(id)) continue;
+    const variants = FIXED_STAGE_GENDER_VARIANTS[id];
+    if (variants) expanded.push(...variants);
+  }
+  return expanded;
+}
+
 export function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
   if (!embudo || embudo.length === 0) {
     return {
@@ -60,14 +78,17 @@ export function buildFunnelSets(embudo: EmbudoEtapa[] | null | undefined) {
 
   // closedSet: etapas cerradas por flag o por texto heurístico
   const closedByFlag = cerradas.length > 0;
+  const cerradasWithVariants = closedByFlag
+    ? expandFixedStageVariants(cerradas, embudo)
+    : cerradas;
   const closedSet = closedByFlag
-    ? new Set(cerradas)
+    ? new Set(cerradasWithVariants)
     : new Set(allKeysLower.filter((k) => k.includes("cerrad") || k.includes("closed")));
 
   // effectiveSet: calificadas + cerradas (las que "asistieron y valió la pena")
   const effectiveByFlag = calificadas.length > 0 || cerradas.length > 0;
   const effectiveSet = effectiveByFlag
-    ? new Set([...calificadas, ...cerradas])
+    ? new Set([...calificadas, ...cerradasWithVariants])
     : new Set([...allKeysLower.filter((k) =>
         k.includes("cerrad") || k.includes("closed") ||
         k.includes("ofertad") || k.includes("offered") ||
