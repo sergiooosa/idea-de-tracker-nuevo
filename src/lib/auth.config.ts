@@ -162,6 +162,36 @@ export const authConfig: NextAuthConfig = {
         token.permisosArray = (user as any).permisosArray;
         token.platformAdmin = (user as any).platformAdmin ?? false;
         token.tipoUsuario = (user as any).tipoUsuario ?? "analista";
+        token.tipoUsuarioCheckedAt = Date.now();
+      } else if (
+        token.id_cuenta != null &&
+        token.email &&
+        !token.platformAdmin
+      ) {
+        const TIPO_USUARIO_TTL_MS = 60_000;
+        const lastChecked = (token.tipoUsuarioCheckedAt as number | undefined) ?? 0;
+        if (Date.now() - lastChecked > TIPO_USUARIO_TTL_MS) {
+          try {
+            const rows = await db
+              .select({ tipo_usuario: usuariosDashboard.tipo_usuario })
+              .from(usuariosDashboard)
+              .where(
+                and(
+                  eq(usuariosDashboard.id_cuenta, token.id_cuenta as number),
+                  eq(usuariosDashboard.email, token.email),
+                ),
+              )
+              .limit(1);
+
+            if (rows.length > 0) {
+              const fresh = rows[0].tipo_usuario === "enfoque" ? "enfoque" : "analista";
+              token.tipoUsuario = fresh as "analista" | "enfoque";
+            }
+            token.tipoUsuarioCheckedAt = Date.now();
+          } catch {
+            // Fail-open: keep current tipoUsuario, retry on next TTL expiry
+          }
+        }
       }
       return token;
     },
