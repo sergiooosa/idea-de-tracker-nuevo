@@ -9,7 +9,9 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Pause, Play, Users, ListFilter, ArrowUpDown, Loader2, Settings2, Clock, Radio } from "lucide-react";
+import { Plus, Pencil, Pause, Play, Users, ListFilter, ArrowUpDown, Loader2, Settings2, Clock, Radio, AlertTriangle, ArrowRightLeft, Monitor } from "lucide-react";
+import { useSession } from "@/hooks/useSession";
+import { canControlEnfoque } from "@/lib/permisos";
 
 interface Sesion {
   id: string;
@@ -53,7 +55,104 @@ function estadoLabel(estado: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function TipoToggleBanner({
+  session,
+  isAdmin,
+  onChanged,
+}: {
+  session: { email: string; tipoUsuario: string };
+  isAdmin: boolean;
+  onChanged: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function handleSwitch() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/enfoque/admin/cambiar-tipo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_email: session.email,
+          nuevo_tipo: "enfoque",
+        }),
+      });
+      if (res.ok) {
+        onChanged();
+      }
+    } finally {
+      setLoading(false);
+      setConfirmOpen(false);
+    }
+  }
+
+  return (
+    <>
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-surface-800 border border-surface-500 p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-3">
+              <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0" />
+              <h3 className="text-lg font-bold text-white">Activar modo enfoque</h3>
+            </div>
+            <p className="text-sm text-gray-300 mb-6">
+              Vas a cambiar tu tipo de usuario a <strong className="text-accent-purple">enfoque</strong>.
+              Esto te permite trabajar leads desde el kiosko. El cambio se aplica en unos segundos sin cerrar sesión.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                disabled={loading}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:bg-surface-700 border border-surface-500 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSwitch()}
+                disabled={loading}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-accent-purple hover:bg-accent-purple/80 transition-colors disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Activar enfoque"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="text-center py-16 bg-surface-800 rounded-xl border border-surface-600">
+        <Monitor className="w-12 h-12 mx-auto mb-4 text-accent-purple opacity-60" />
+        <h2 className="text-base font-semibold text-white mb-2">Modo Enfoque no activo</h2>
+        <p className="text-sm text-gray-400 max-w-md mx-auto mb-1">
+          Para trabajar los leads del kiosko, tu usuario necesita estar en <strong className="text-accent-purple">modo enfoque</strong>.
+        </p>
+        <p className="text-xs text-gray-500 max-w-md mx-auto">
+          Actualmente estás en modo <span className="font-medium text-gray-400">analista</span>.
+          Las sesiones configuradas aquí solo funcionan para usuarios en modo enfoque.
+        </p>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent-purple/20 text-accent-purple text-sm font-medium border border-accent-purple/30 hover:bg-accent-purple/30 transition-colors"
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+            Cambiar a modo enfoque
+          </button>
+        )}
+        {!isAdmin && (
+          <p className="mt-6 text-xs text-gray-500">
+            Contacta a tu administrador para activar el modo enfoque en tu cuenta.
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function SesionesEditor() {
+  const { session, loading: sessionLoading } = useSession();
   const [sesiones, setSesiones] = useState<Sesion[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -217,10 +316,36 @@ export default function SesionesEditor() {
     );
   }
 
-  if (loading) {
+  const isEnfoque = session?.tipoUsuario === "enfoque";
+  const isAdmin = session
+    ? canControlEnfoque(session.rol, session.permisosArray)
+    : false;
+
+  if (loading || sessionLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (session && !isEnfoque) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-white flex items-center gap-2">
+            Sesiones de enfoque
+            <span className="text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-accent-purple/20 text-accent-purple border border-accent-purple/30">Beta</span>
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Configura qué leads entran en cada sesión de trabajo
+          </p>
+        </div>
+        <TipoToggleBanner
+          session={session}
+          isAdmin={isAdmin}
+          onChanged={() => window.location.reload()}
+        />
       </div>
     );
   }
