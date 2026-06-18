@@ -894,8 +894,8 @@ export async function reasignarLead(
 
 /**
  * Cambia el tipo de usuario (analista ↔ enfoque) al vuelo. Tenant-scoped.
- * El refresco del JWT y la redirección de kiosko se manejan en el cliente
- * (la sesión del target re-lee tipo_usuario en su siguiente request).
+ * El JWT del target re-lee tipo_usuario desde BD cada ~60 s (TTL en jwt callback),
+ * sin necesidad de re-login.
  */
 export async function cambiarTipoUsuario(
   idCuenta: number,

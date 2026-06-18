@@ -39,5 +39,6 @@ declare module "next-auth/jwt" {
     permisosArray: string[];
     platformAdmin?: boolean;
     tipoUsuario: TipoUsuario;
+    tipoUsuarioCheckedAt?: number;
   }
 }
