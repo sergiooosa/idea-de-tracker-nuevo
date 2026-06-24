@@ -7,7 +7,7 @@ const cookieDomain = isProduction ? `.${rootDomain}` : undefined;
 
 // SameSite=none + Secure permite que la cookie funcione dentro de iframes
 // (ej. embebido en GHL). En dev no aplicamos none porque requiere HTTPS.
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   ...authConfig,
   cookies: {
     sessionToken: {

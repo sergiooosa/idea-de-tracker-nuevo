@@ -152,7 +152,7 @@ export const authConfig: NextAuthConfig = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id!;
         token.id_cuenta = (user as any).id_cuenta ?? null;
@@ -169,8 +169,9 @@ export const authConfig: NextAuthConfig = {
         !token.platformAdmin
       ) {
         const TIPO_USUARIO_TTL_MS = 60_000;
+        const forceRefresh = trigger === "update";
         const lastChecked = (token.tipoUsuarioCheckedAt as number | undefined) ?? 0;
-        if (Date.now() - lastChecked > TIPO_USUARIO_TTL_MS) {
+        if (forceRefresh || Date.now() - lastChecked > TIPO_USUARIO_TTL_MS) {
           try {
             const rows = await db
               .select({ tipo_usuario: usuariosDashboard.tipo_usuario })

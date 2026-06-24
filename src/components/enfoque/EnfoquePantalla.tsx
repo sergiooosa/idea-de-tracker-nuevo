@@ -387,6 +387,21 @@ export default function EnfoquePantalla() {
     );
   }
 
+  if (sinLeads && completados === 0 && (!metricas || metricas.trabajadosHoy === 0)) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <Phone className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">No tienes leads asignados</h1>
+          <p className="text-gray-400">
+            No hay leads disponibles en esta sesión para tu usuario.
+            Consulta con tu administrador para verificar los filtros de la sesión o la asignación de leads.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (sinLeads) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-4">
