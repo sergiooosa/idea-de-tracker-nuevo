@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Pause, Play, Users, ListFilter, ArrowUpDown, Loader2, Settings2, Clock, Radio, AlertTriangle, ArrowRightLeft, Monitor } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useSession } from "@/hooks/useSession";
 import { canControlEnfoque } from "@/lib/permisos";
 
@@ -62,7 +63,7 @@ function TipoToggleBanner({
 }: {
   session: { email: string; tipoUsuario: string };
   isAdmin: boolean;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }) {
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -79,7 +80,7 @@ function TipoToggleBanner({
         }),
       });
       if (res.ok) {
-        onChanged();
+        await onChanged();
       }
     } finally {
       setLoading(false);
@@ -152,7 +153,8 @@ function TipoToggleBanner({
 }
 
 export default function SesionesEditor() {
-  const { session, loading: sessionLoading } = useSession();
+  const { session, loading: sessionLoading, refresh } = useSession();
+  const router = useRouter();
   const [sesiones, setSesiones] = useState<Sesion[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -344,7 +346,10 @@ export default function SesionesEditor() {
         <TipoToggleBanner
           session={session}
           isAdmin={isAdmin}
-          onChanged={() => window.location.reload()}
+          onChanged={async () => {
+            await refresh();
+            router.replace("/enfoque");
+          }}
         />
       </div>
     );

@@ -45,5 +45,10 @@ export function useSession() {
     ? session.rol === "superadmin" || canEditRecords(session.permisosArray)
     : false;
 
-  return { session, loading, canViewAll, canEdit };
+  const refresh = useCallback(async () => {
+    await fetch("/api/auth/refresh-session", { method: "POST" });
+    await fetchSession();
+  }, [fetchSession]);
+
+  return { session, loading, canViewAll, canEdit, refresh };
 }
