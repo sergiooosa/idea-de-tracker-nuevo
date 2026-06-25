@@ -69,7 +69,9 @@ export default function PerformanceVideollamadasPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [leadSearch, setLeadSearch] = useState('');
   const [showNuevoModal, setShowNuevoModal] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'todas' | 'cerradas' | 'no_cerradas' | 'no_calificadas'>('todas');
+  const [filterAsistio, setFilterAsistio] = useState<'all' | 'si' | 'no'>('all');
+  const [filterCalificada, setFilterCalificada] = useState<'all' | 'si' | 'no'>('all');
+  const [filterCompro, setFilterCompro] = useState<'all' | 'si' | 'no'>('all');
   const [showExcluded, setShowExcluded] = useState(false);
 
   const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined, includeExcluded: showExcluded ? 'true' : undefined });
@@ -116,12 +118,14 @@ export default function PerformanceVideollamadasPage() {
         ]),
       );
     }
-    // Status filter (applies to list view only — KPI totals are server-side and unaffected)
-    if (statusFilter === 'cerradas') records = records.filter(isCerrada);
-    else if (statusFilter === 'no_cerradas') records = records.filter((r) => r.attended && !isCerrada(r));
-    else if (statusFilter === 'no_calificadas') records = records.filter((r) => r.attended && !r.qualified);
+    if (filterAsistio === 'si') records = records.filter((r) => r.attended);
+    else if (filterAsistio === 'no') records = records.filter((r) => !r.attended);
+    if (filterCalificada === 'si') records = records.filter((r) => r.qualified);
+    else if (filterCalificada === 'no') records = records.filter((r) => !r.qualified);
+    if (filterCompro === 'si') records = records.filter(isCerrada);
+    else if (filterCompro === 'no') records = records.filter((r) => !isCerrada(r));
     return records;
-  }, [data?.registros, leadSearch, statusFilter, showExcluded]);
+  }, [data?.registros, leadSearch, filterAsistio, filterCalificada, filterCompro, showExcluded]);
 
   const meetingsByAdvisor = useMemo(() => {
     const map: Record<string, ApiVideollamada[]> = {};
@@ -231,25 +235,30 @@ export default function PerformanceVideollamadasPage() {
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[10px] text-gray-500 uppercase tracking-wider">Filtrar lista:</span>
         {([
-          { id: 'todas', label: 'Todas' },
-          { id: 'cerradas', label: 'Cerradas' },
-          { id: 'no_cerradas', label: 'No cerradas' },
-          { id: 'no_calificadas', label: 'No calificadas' },
-        ] as const).map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => setStatusFilter(opt.id)}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
-              statusFilter === opt.id
-                ? 'bg-accent-purple/20 border-accent-purple/50 text-accent-purple'
-                : 'bg-surface-700 border-surface-500 text-gray-400 hover:border-accent-purple/30 hover:text-gray-300'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {statusFilter !== 'todas' && (
+          { key: 'asistio' as const, label: 'Asistió', value: filterAsistio, setter: setFilterAsistio },
+          { key: 'calificada' as const, label: 'Calificada', value: filterCalificada, setter: setFilterCalificada },
+          { key: 'compro' as const, label: 'Compró', value: filterCompro, setter: setFilterCompro },
+        ]).map(({ key, label, value, setter }) => {
+          const next: Record<string, 'all' | 'si' | 'no'> = { all: 'si', si: 'no', no: 'all' };
+          const display = value === 'all' ? label : value === 'si' ? `${label}: Sí` : `${label}: No`;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setter(next[value])}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                value === 'si'
+                  ? 'bg-accent-green/20 border-accent-green/50 text-accent-green'
+                  : value === 'no'
+                  ? 'bg-red-500/20 border-red-500/50 text-red-400'
+                  : 'bg-surface-700 border-surface-500 text-gray-400 hover:border-accent-purple/30 hover:text-gray-300'
+              }`}
+            >
+              {display}
+            </button>
+          );
+        })}
+        {(filterAsistio !== 'all' || filterCalificada !== 'all' || filterCompro !== 'all') && (
           <span className="text-[10px] text-gray-500">
             — {registrosFiltrados.length} reunión{registrosFiltrados.length !== 1 ? 'es' : ''} · los KPIs de arriba no cambian
           </span>
