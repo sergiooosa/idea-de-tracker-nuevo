@@ -263,6 +263,24 @@ export interface ConfiguracionAds {
   };
 }
 
+// ─── Razones de pérdida ──────────────────────────────────────────────────────
+
+export interface RazonPerdidaOption {
+  id: string;
+  label: string;
+  color?: string;
+  activo: boolean;
+}
+
+export interface RazonPerdidaEntry {
+  razon_id: string;
+  contact_id?: string;
+  contact_name?: string;
+  closer_email?: string;
+  fecha: string;
+  notas?: string;
+}
+
 // ─── Closer merge rules ───────────────────────────────────────────────────────
 
 export interface CloserMergeRule {
@@ -302,6 +320,8 @@ export const cuentas = pgTable("cuentas", {
   ghl_app_uninstalled_at: timestamp("ghl_app_uninstalled_at", { withTimezone: true }),
   // ── V8: reglas de deduplicación inteligente de closers ────────────────────
   closer_merge_rules: jsonb("closer_merge_rules").$type<CloserMergeRule[]>().default([]),
+  razones_perdida_config: jsonb("razones_perdida_config").$type<RazonPerdidaOption[]>(),
+  razones_perdida_data: jsonb("razones_perdida_data").$type<RazonPerdidaEntry[]>(),
 });
 
 /* ------------------------------------------------------------------ */
