@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS } from "@/lib/metricas-engine";
+import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS, type MetricaEngineContext } from "@/lib/metricas-engine";
 import { resolveFinancialValues } from "@/lib/queries/resolve-financial";
 import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { agendaDedupKey } from "./agenda-dedup-key";
@@ -851,6 +851,10 @@ export async function getDashboard(
   ];
 
   const sorted = configsDeduped.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+  const metricaCtx: MetricaEngineContext = {
+    id_cuenta: idCuenta,
+    allConfigIds: new Set(sorted.map((m) => m.id)),
+  };
   const computed = new Set<string>();
   let pass = 0;
   const maxPasses = sorted.length + 1;
@@ -934,7 +938,7 @@ export async function getDashboard(
           valor = agendas.length;
         }
       } else {
-        valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo);
+        valor = calcMetricaAutomatica(m, kpis, metricasValores, dateFrom, dateTo, metricaCtx);
       }
       metricasValores[m.id] = typeof valor === "number" ? valor : parseFloat(String(valor)) || 0;
       // Incluir series de tiempo para métricas webhook con visualización de barra

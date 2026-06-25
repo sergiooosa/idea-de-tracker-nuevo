@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas, usuariosDashboard, logLlamadas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
-import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig } from "@/lib/metricas-engine";
+import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig, type MetricaEngineContext } from "@/lib/metricas-engine";
 import { eq, and, or, gt, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import type {
   ApiVideollamada,
@@ -382,6 +382,10 @@ export async function getVideollamadas(
   const sorted = [...configs]
     .filter((m) => m.ubicacion === "rendimiento" || m.ubicacion === "ambos")
     .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+  const metricaCtx: MetricaEngineContext = {
+    id_cuenta: idCuenta,
+    allConfigIds: new Set(configs.map((m) => m.id)),
+  };
   const computed = new Set<string>();
   let pass = 0;
   const maxPasses = sorted.length + 1;
@@ -399,7 +403,7 @@ export async function getVideollamadas(
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
       } else {
-        valor = calcMetricaAutomatica(m, agg as Record<string, number>, metricasValores, dateFrom, dateTo);
+        valor = calcMetricaAutomatica(m, agg as Record<string, number>, metricasValores, dateFrom, dateTo, metricaCtx);
       }
       metricasValores[m.id] = typeof valor === "number" ? valor : parseFloat(String(valor)) || 0;
       metricasComputadas.push({ id: m.id, nombre: m.nombre, valor, descripcion: m.descripcion, ubicacion: m.ubicacion });
