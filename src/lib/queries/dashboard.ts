@@ -129,8 +129,6 @@ export async function getDashboard(
       dashboards_personalizados: cuentas.dashboards_personalizados,
       fuente_llamadas: cuentas.fuente_llamadas,
       configuracion_ads: cuentas.configuracion_ads,
-      razones_perdida_config: cuentas.razones_perdida_config,
-      razones_perdida_data: cuentas.razones_perdida_data,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
@@ -713,31 +711,6 @@ export async function getDashboard(
       count,
       percent: totalObj > 0 ? Math.round((count / totalObj) * 100) : 0,
       tipos: quotes.size,
-    }))
-    .sort((a, b) => b.count - a.count);
-
-  // Razones de pérdida
-  const rpConfig = Array.isArray(cuentaRow?.razones_perdida_config) ? cuentaRow.razones_perdida_config : [];
-  const rpData = Array.isArray(cuentaRow?.razones_perdida_data) ? cuentaRow.razones_perdida_data : [];
-  const rpConfigMap = new Map(rpConfig.filter(r => r.activo).map(r => [r.id, r]));
-  const rpFiltered = rpData.filter(e => {
-    if (!rpConfigMap.has(e.razon_id)) return false;
-    if (!e.fecha) return false;
-    const d = new Date(e.fecha);
-    return d >= fromDate && d <= toDate;
-  });
-  const rpCountMap: Record<string, number> = {};
-  for (const e of rpFiltered) {
-    rpCountMap[e.razon_id] = (rpCountMap[e.razon_id] ?? 0) + 1;
-  }
-  const totalRp = rpFiltered.length;
-  const razonesPerdida = Object.entries(rpCountMap)
-    .map(([id, count]) => ({
-      id,
-      name: rpConfigMap.get(id)?.label ?? id,
-      count,
-      percent: totalRp > 0 ? Math.round((count / totalRp) * 100) : 0,
-      color: rpConfigMap.get(id)?.color,
     }))
     .sort((a, b) => b.count - a.count);
 
@@ -1361,7 +1334,6 @@ export async function getDashboard(
     advisorRanking,
     volumeByDay,
     objeciones,
-    razonesPerdida: razonesPerdida.length > 0 ? razonesPerdida : undefined,
     advisors,
     fuenteDatosFinancieros: fuenteFinanciera ?? "nativa",
     embudoPersonalizado: etapas?.map((e) => ({
