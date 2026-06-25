@@ -430,7 +430,16 @@ export default function SystemPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Error al guardar');
+      if (!res.ok) {
+        const err = await res.json().catch(() => null) as { refsColgantes?: Array<{ metricaNombre: string; fuenteFaltante: string }> } | null;
+        if (err?.refsColgantes?.length) {
+          const detalles = err.refsColgantes.map((r) => `"${r.metricaNombre}" usa fuente inexistente "${r.fuenteFaltante}"`).join('; ');
+          toast.error(`No se pudo guardar: ${detalles}`);
+          setSaving(false);
+          return false;
+        }
+        throw new Error('Error al guardar');
+      }
       if (openaiKey) {
         setHasOpenaiKey(true);
         setOpenaiKey('');
@@ -951,35 +960,19 @@ export default function SystemPage() {
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                   <div className="absolute inset-0 bg-black/60" onClick={() => setMetricasDeleteConfirm(null)} aria-hidden />
                   <div className="relative rounded-xl bg-surface-800 border border-surface-500 p-4 max-w-md">
-                    <h4 className="font-semibold text-white mb-2">Eliminar métrica</h4>
+                    <h4 className="font-semibold text-white mb-2">No se puede eliminar</h4>
                     <p className="text-sm text-gray-400 mb-3">
-                      Esta métrica alimenta a {metricasDeleteConfirm.dependientes.length} otra(s):{' '}
-                      {metricasDeleteConfirm.dependientes.map((d) => d.nombre).join(', ')}. Si la eliminas, esas fallarán.
+                      Esta métrica es fuente de {metricasDeleteConfirm.dependientes.length} otra(s):{' '}
+                      <span className="text-white font-medium">{metricasDeleteConfirm.dependientes.map((d) => d.nombre).join(', ')}</span>.
+                      Edita o elimina primero las métricas dependientes.
                     </p>
-                    <p className="text-sm text-gray-500 mb-4">¿Continuar?</p>
                     <div className="flex gap-2 justify-end">
                       <button
                         type="button"
                         onClick={() => setMetricasDeleteConfirm(null)}
                         className="px-3 py-1.5 rounded-lg bg-surface-600 text-gray-300"
                       >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const id = metricasDeleteConfirm.id;
-                          setMetricasConfig((prev) => prev.filter((x) => x.id !== id));
-                          setMetricasManualData((prev) => {
-                            const next = { ...prev };
-                            delete next[id];
-                            return next;
-                          });
-                          setMetricasDeleteConfirm(null);
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                      >
-                        Eliminar
+                        Entendido
                       </button>
                     </div>
                   </div>
@@ -997,36 +990,43 @@ export default function SystemPage() {
                     setMetricasSheetOpen(false);
                     setMetricasEditingId(null);
                   }}
-                  onSave={(config, manualData) => {
-                    // Actualizar state local y persistir inmediatamente en BD
-                    setMetricasConfig((prev) => {
-                      const idx = prev.findIndex((x) => x.id === config.id);
-                      const next = [...prev];
-                      if (idx >= 0) {
-                        next[idx] = config;
+                  onSave={async (config, manualData) => {
+                    const prev = metricasConfig;
+                    const idx = prev.findIndex((x) => x.id === config.id);
+                    const next = [...prev];
+                    if (idx >= 0) {
+                      next[idx] = config;
+                    } else {
+                      next.push(config);
+                    }
+                    const sorted = next.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+
+                    const res = await fetch('/api/data/system-config', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ metricas_config: sorted }),
+                    });
+
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => null) as { refsColgantes?: Array<{ metricaNombre: string; fuenteFaltante: string }> } | null;
+                      if (err?.refsColgantes?.length) {
+                        const detalles = err.refsColgantes.map((r) => `"${r.metricaNombre}" usa fuente inexistente "${r.fuenteFaltante}"`).join('; ');
+                        toast.error(`No se pudo guardar: ${detalles}`);
                       } else {
-                        next.push(config);
+                        toast.error('Error al guardar la configuración de métricas');
                       }
-                      const sorted = next.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
-                      // Auto-guardar en BD con la nueva config
+                      return;
+                    }
+
+                    setMetricasConfig(sorted);
+                    if (manualData !== undefined) {
+                      const nextManual = { ...metricasManualData, [config.id]: manualData };
                       void fetch('/api/data/system-config', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ metricas_config: sorted }),
+                        body: JSON.stringify({ metricas_manual_data: nextManual }),
                       });
-                      return sorted;
-                    });
-                    if (manualData !== undefined) {
-                      setMetricasManualData((prev) => {
-                        const next = { ...prev, [config.id]: manualData };
-                        // Auto-guardar datos manuales también
-                        void fetch('/api/data/system-config', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ metricas_manual_data: next }),
-                        });
-                        return next;
-                      });
+                      setMetricasManualData(nextManual);
                     }
                     setMetricasSheetOpen(false);
                     setMetricasEditingId(null);

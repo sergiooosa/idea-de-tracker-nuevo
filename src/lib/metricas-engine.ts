@@ -344,3 +344,43 @@ export function calcMetricaAutomatica(
 
   return 0;
 }
+
+export interface RefColgante {
+  metricaId: string;
+  metricaNombre: string;
+  fuenteFaltante: string;
+}
+
+export function validarRefsMetricasConfig(configs: MetricaConfig[]): RefColgante[] {
+  const allIds = new Set(configs.map((m) => m.id));
+  const validSource = (key: string): boolean =>
+    allIds.has(key) ||
+    KPI_DEFAULT_KEYS.includes(key as KpiDefaultKey) ||
+    !!METRICA_FALLBACK_KPI[key];
+
+  const errors: RefColgante[] = [];
+
+  for (const m of configs) {
+    if (m.tipo !== "automatica" || !m.formula) continue;
+    const f = m.formula;
+
+    const check = (src: string) => {
+      if (!validSource(src)) {
+        errors.push({ metricaId: m.id, metricaNombre: m.nombre, fuenteFaltante: src });
+      }
+    };
+
+    if (f.fuente) check(f.fuente);
+    if (f.fuentes) f.fuentes.forEach(check);
+
+    if (f.tipo === "condicion") {
+      for (const val of [f.valorComparacion, f.valorSiCumple, f.valorSiNo]) {
+        if (typeof val === "string" && val.startsWith("ref:")) {
+          check(val.slice(4));
+        }
+      }
+    }
+  }
+
+  return errors;
+}
