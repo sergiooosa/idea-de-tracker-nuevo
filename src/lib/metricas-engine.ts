@@ -214,6 +214,35 @@ const METRICA_FALLBACK_KPI: Record<string, KpiDefaultKey> = {
   "base-llamadas-pendientes": "pendientesLlamadas",
 };
 
+export interface MetricaEngineContext {
+  id_cuenta?: string | number;
+  allConfigIds?: Set<string>;
+}
+
+function isResolvableSource(
+  key: string,
+  metricasValores: Record<string, string | number>,
+  ctx?: MetricaEngineContext,
+): boolean {
+  if (KPI_DEFAULT_KEYS.includes(key as KpiDefaultKey)) return true;
+  if (key in metricasValores) return true;
+  if (METRICA_FALLBACK_KPI[key]) return true;
+  if (ctx?.allConfigIds?.has(key)) return true;
+  return false;
+}
+
+function warnDanglingSource(
+  metricaId: string,
+  fuenteFaltante: string,
+  ctx?: MetricaEngineContext,
+): void {
+  console.warn("[metricas-engine] fuente inexistente en fórmula", {
+    id_cuenta: ctx?.id_cuenta ?? "unknown",
+    metricaId,
+    fuenteFaltante,
+  });
+}
+
 /** Calcular valor de una métrica automática */
 export function calcMetricaAutomatica(
   config: MetricaConfig,
@@ -221,11 +250,19 @@ export function calcMetricaAutomatica(
   metricasValores: Record<string, string | number>,
   dateFrom: string,
   dateTo: string,
+  ctx?: MetricaEngineContext,
 ): string | number {
   if (config.tipo !== "automatica" || !config.formula) return 0;
 
   const f = config.formula;
+  const warnIfDangling = (key: string): void => {
+    if (!isResolvableSource(key, metricasValores, ctx)) {
+      warnDanglingSource(config.id, key, ctx);
+    }
+  };
+
   const getVal = (key: string): number => {
+    warnIfDangling(key);
     if (KPI_DEFAULT_KEYS.includes(key as KpiDefaultKey)) {
       const v = kpis[key];
       return typeof v === "number" ? v : parseFloat(String(v)) || 0;
@@ -243,6 +280,7 @@ export function calcMetricaAutomatica(
   };
 
   const getValStr = (key: string): string | number => {
+    warnIfDangling(key);
     if (KPI_DEFAULT_KEYS.includes(key as KpiDefaultKey)) {
       const v = kpis[key];
       return (typeof v === "string" || typeof v === "number") ? v : (v != null ? Number(v) : 0);
