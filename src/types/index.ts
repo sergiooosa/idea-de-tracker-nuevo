@@ -479,6 +479,14 @@ export interface DashboardObjecionDetail {
   quote: string;
 }
 
+export interface DashboardRazonPerdida {
+  id: string;
+  name: string;
+  count: number;
+  percent: number;
+  color?: string;
+}
+
 export interface EmbudoEtapaUI {
   id: string;
   nombre: string;
@@ -551,6 +559,7 @@ export interface DashboardResponse {
   advisorRanking: DashboardAdvisorRow[];
   volumeByDay: DashboardVolumeDay[];
   objeciones: DashboardObjecion[];
+  razonesPerdida?: DashboardRazonPerdida[];
   advisors: ApiAdvisor[];
   fuenteDatosFinancieros: "nativa" | "api_externa";
   embudoPersonalizado?: EmbudoEtapaUI[];
