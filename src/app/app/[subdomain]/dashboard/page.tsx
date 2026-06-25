@@ -11,7 +11,8 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse, LeadDetailItem } from '@/types';
 import Link from 'next/link';
-import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap, SlidersHorizontal } from 'lucide-react';
+import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap, SlidersHorizontal, Download } from 'lucide-react';
+import { exportDashboardToExcel } from '@/lib/export-excel';
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -178,6 +179,17 @@ export default function DashboardPage() {
             selected={selectedTags}
             onChange={setSelectedTags}
           />
+          {data && (
+            <button
+              type="button"
+              onClick={() => exportDashboardToExcel(data, dateFrom, dateTo)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/20 text-accent-green border border-accent-green/50 hover:bg-accent-green/30 text-xs font-medium transition-colors ml-auto"
+              title="Exportar KPIs a Excel"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exportar Excel
+            </button>
+          )}
         </section>
 
         <LeadsEnEspera dateFrom={dateFrom} dateTo={dateTo} />
