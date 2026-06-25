@@ -26,6 +26,7 @@ const defaultDateTo = new Date();
 const defaultDateFrom = subDays(defaultDateTo, 7);
 
 const OBJECTION_PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6'];
+const LOSS_REASON_PIE_COLORS = ['#f43f5e', '#fb923c', '#a78bfa', '#38bdf8', '#34d399', '#fbbf24'];
 
 const RANKING_COLS = [
   { key: 'leads', label: 'Leads trabajados' },
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showObjeciones, setShowObjeciones] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showObj') !== 'false' : true);
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
+  const [showRazonesPerdida, setShowRazonesPerdida] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showRP') !== 'false' : true);
   const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
   const [modalLeads, setModalLeads] = useState<{ titulo: string; leads: LeadDetailItem[] } | null>(null);
   const [rankingColsOpen, setRankingColsOpen] = useState(false);
@@ -62,6 +64,7 @@ export default function DashboardPage() {
 
   const toggleObjeciones = () => setShowObjeciones((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showObj', String(next)); return next; });
   const toggleVolumen = () => setShowVolumen((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showVol', String(next)); return next; });
+  const toggleRazonesPerdida = () => setShowRazonesPerdida((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showRP', String(next)); return next; });
 
   const { data, loading, error, refetch } = useApiData<DashboardResponse>('/api/data/dashboard', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined });
 
@@ -73,6 +76,7 @@ export default function DashboardPage() {
     avgAttempts: 0, attemptsToFirstContactAvg: 0, noShows: 0, pendientesAgendas: 0,
   };
   const objeciones = data?.objeciones ?? [];
+  const razonesPerdida = data?.razonesPerdida ?? [];
   const volumeByDay = data?.volumeByDay ?? [];
   const advisorRanking = data?.advisorRanking ?? [];
 
@@ -732,6 +736,55 @@ export default function DashboardPage() {
             )}
           </section>
         </div>
+
+        {razonesPerdida.length > 0 && (
+          <section className="rounded-lg p-3 section-futuristic">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5 text-rose-400" />
+                Razones de pérdida
+              </h2>
+              <button type="button" onClick={toggleRazonesPerdida} className="p-1 rounded hover:bg-surface-600 text-gray-500 hover:text-gray-300 transition-colors" title={showRazonesPerdida ? 'Ocultar' : 'Mostrar'}>
+                {showRazonesPerdida ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {showRazonesPerdida && (
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 items-start">
+                <div className="h-36 sm:h-40 w-full min-h-[140px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
+                      <Pie data={razonesPerdida} dataKey="count" nameKey="name" cx="50%" cy="45%" innerRadius="58%" outerRadius="78%" paddingAngle={2}>
+                        {razonesPerdida.map((r, i) => (
+                          <Cell key={r.id} fill={r.color ?? LOSS_REASON_PIE_COLORS[i % LOSS_REASON_PIE_COLORS.length]} stroke="transparent" />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a' }}
+                        formatter={(_, name, props) => {
+                          const p = props?.payload as { count?: number; percent?: number } | undefined;
+                          return [`${p?.count ?? 0}x (${p?.percent ?? 0}%)`, String(name)];
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="space-y-1">
+                  {razonesPerdida.map((r, i) => (
+                    <li key={r.id}>
+                      <div className="w-full flex items-center justify-between gap-2 rounded-md bg-surface-700 px-2.5 py-1.5">
+                        <span className="flex items-center gap-2 font-medium text-white">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color ?? LOSS_REASON_PIE_COLORS[i % LOSS_REASON_PIE_COLORS.length] }} />
+                          {r.name}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 text-sm font-medium">{r.count}x</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
 
         <section>
           <div className="flex items-center justify-between mb-2">
