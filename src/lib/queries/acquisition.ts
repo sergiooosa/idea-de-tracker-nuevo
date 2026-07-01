@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbudoEtapas } from "@/lib/db/schema";
 import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
 
@@ -56,7 +56,7 @@ export async function getAcquisition(
     .limit(1);
 
   const embudoRaw: EmbudoEtapa[] | null = Array.isArray(cuentaRow?.embudo_personalizado)
-    ? cuentaRow.embudo_personalizado
+    ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado)
     : null;
 
   // Soporta campo "nombre" (estándar), "name" (legacy) y "id"

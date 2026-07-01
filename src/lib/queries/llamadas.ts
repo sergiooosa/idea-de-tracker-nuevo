@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada, cuentas } from "@/lib/db/schema";
+import { logLlamadas, registrosDeLlamada, cuentas, normalizeEmbudoEtapas } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, inArray } from "drizzle-orm";
 import type {
   ApiLlamadaLog,
@@ -78,10 +78,10 @@ export async function getLlamadas(
   const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
 
   // Extraer etapas del embudo para mostrar en el selector del modal de edición
-  const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
+  const embudoRaw = Array.isArray(cuentaRow?.embudo_personalizado) ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado) : [];
   const embudoEtapas = embudoRaw.map((e) => ({
     id: String(e.id ?? ""),
-    nombre: String((e as unknown as { name?: string }).name ?? e.nombre ?? e.id ?? ""),
+    nombre: String(e.nombre ?? e.id ?? ""),
   })).filter((e) => e.id);
 
   const tiposEventosConfig = Array.isArray(cuentaRow?.tipos_eventos_config)

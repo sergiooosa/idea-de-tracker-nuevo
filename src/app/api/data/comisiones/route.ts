@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuthAndPermission, withAuthAndAnyPermission } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, cuentas, usuariosDashboard, TramoEscalada } from "@/lib/db/schema";
+import { comisionesConfig, resumenesDiariosAgendas, metasCuenta, cuentas, usuariosDashboard, TramoEscalada, normalizeEmbudoEtapas } from "@/lib/db/schema";
 import type { SocioSplit } from "@/lib/db/schema";
 import { eq, and, sql, isNotNull } from "drizzle-orm";
 import { buildFunnelSets } from "@/lib/queries/dashboard";
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1);
-    const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
+    const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado) : [];
     const embudoRaw = embudoRawArr.length > 0 ? embudoRawArr : DEFAULT_EMBUDO_CONFIG;
     const { closedSet } = buildFunnelSets(embudoRaw);
 

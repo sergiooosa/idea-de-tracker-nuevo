@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs, cuentas, usuariosDashboard, metricasWebhook } from "@/lib/db/schema";
+import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs, cuentas, usuariosDashboard, metricasWebhook, normalizeEmbudoEtapas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, isNull, isNotNull, inArray } from "drizzle-orm";
 import { agendaDedupKey } from "./agenda-dedup-key";
@@ -93,7 +93,7 @@ export async function getAsesorData(
   const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
   const ghlLocationId = cuentaRow?.ghl_location_id ?? cuentaRow?.locationid ?? null;
   const embudo = Array.isArray(cuentaRow?.embudo_personalizado)
-    ? (cuentaRow.embudo_personalizado as EmbudoEtapa[])
+    ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado)
     : [];
 
   // ── Mapas de nombre ↔ email ─────────────────────────────────────────────────

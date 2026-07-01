@@ -199,17 +199,25 @@ export interface ReglaAutomatica {
 export interface EmbudoEtapa {
   id: string;
   nombre: string;
+  name?: string; // legacy key emitted by some onboarding flows; normalised to `nombre` at read time
   color?: string;
   orden: number;
   condition?: string;
-  fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];  // canales que alimentan esta etapa
-  reglas_automaticas?: ReglaAutomatica[];  // reglas sin IA para mover leads
-  es_fallback?: boolean;  // catch-all para leads sin categoría reconocida
-  es_fija?: boolean;  // no eliminable, id inmutable
-  es_calificada?: boolean;  // cuenta como qualified=true
-  es_cerrada?: boolean;  // cuenta como cerrada (revenue)
-  es_unica?: boolean;  // true=un registro por lead, false=múltiple
-  metrica_id?: string;  // id de métrica auto-creada para etapas custom
+  fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];
+  reglas_automaticas?: ReglaAutomatica[];
+  es_fallback?: boolean;
+  es_fija?: boolean;
+  es_calificada?: boolean;
+  es_cerrada?: boolean;
+  es_unica?: boolean;
+  metrica_id?: string;
+}
+
+export function normalizeEmbudoEtapas(raw: unknown[]): EmbudoEtapa[] {
+  return (raw as (EmbudoEtapa & { name?: string })[]).map((e) => ({
+    ...e,
+    nombre: e.nombre ?? e.name ?? e.id,
+  }));
 }
 
 export interface ChatTrigger {
