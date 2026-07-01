@@ -12,6 +12,7 @@ declare module "next-auth" {
     permisosArray: string[];
     platformAdmin?: boolean;
     tipoUsuario: TipoUsuario;
+    mustChangePassword?: boolean;
   }
   interface Session {
     user: {
@@ -25,6 +26,7 @@ declare module "next-auth" {
       permisosArray: string[];
       platformAdmin?: boolean;
       tipoUsuario: TipoUsuario;
+      mustChangePassword?: boolean;
     };
   }
 }
@@ -40,5 +42,6 @@ declare module "next-auth/jwt" {
     platformAdmin?: boolean;
     tipoUsuario: TipoUsuario;
     tipoUsuarioCheckedAt?: number;
+    mustChangePassword?: boolean;
   }
 }

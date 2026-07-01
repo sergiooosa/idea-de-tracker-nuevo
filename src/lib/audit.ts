@@ -42,7 +42,8 @@ export type AuditAccion =
   | "MERGE_ASESORES"
   | "ANALIZAR_CHATS"
   | "EXCLUDE_VIDEOLLAMADA"
-  | "RESTORE_VIDEOLLAMADA";
+  | "RESTORE_VIDEOLLAMADA"
+  | "CHANGE_PASSWORD";
 
 export async function logAudit(
   idCuenta: number,

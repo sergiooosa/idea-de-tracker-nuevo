@@ -3,6 +3,7 @@ import { usuariosDashboard } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { registrarWebhookFathom } from "@/lib/fathom-webhook";
+import { randomBytes } from "crypto";
 
 export type TipoUsuario = "analista" | "enfoque";
 
@@ -15,6 +16,10 @@ export interface UsuarioRow {
   fathom: string | null;
   id_webhook_fathom: string | null;
   tipo_usuario: TipoUsuario;
+}
+
+function generateProvisionalPassword(): string {
+  return randomBytes(12).toString("base64url");
 }
 
 export async function listUsuarios(idCuenta: number): Promise<UsuarioRow[]> {
@@ -39,15 +44,19 @@ export interface CreateUsuarioResult {
   user: UsuarioRow;
   /** Si hubo API key Fathom pero el registro del webhook falló */
   fathomWarning: string | null;
+  /** Contraseña provisional generada (solo cuando no se envió password). Mostrar una sola vez. */
+  provisionalPassword: string | null;
 }
 
 export async function createUsuario(
   idCuenta: number,
-  data: { nombre: string; email: string; password: string; rol: string; permisos?: Record<string, boolean>; fathom?: string; tipo_usuario?: TipoUsuario },
+  data: { nombre: string; email: string; password?: string; rol: string; permisos?: Record<string, boolean>; fathom?: string; tipo_usuario?: TipoUsuario },
 ): Promise<CreateUsuarioResult> {
   const fathomKey = data.fathom?.trim() || null;
   const tipoUsuario = data.tipo_usuario === "enfoque" ? "enfoque" : "analista";
-  const hashed = await hash(data.password, 10);
+  const isProvisional = !data.password;
+  const plaintext = data.password || generateProvisionalPassword();
+  const hashed = await hash(plaintext, 10);
   const [row] = await db
     .insert(usuariosDashboard)
     .values({
@@ -60,6 +69,7 @@ export async function createUsuario(
       fathom: fathomKey,
       id_webhook_fathom: null,
       tipo_usuario: tipoUsuario,
+      must_change_password: isProvisional,
     })
     .returning({
       id: usuariosDashboard.id_evento,
@@ -71,6 +81,8 @@ export async function createUsuario(
       id_webhook_fathom: usuariosDashboard.id_webhook_fathom,
       tipo_usuario: usuariosDashboard.tipo_usuario,
     });
+
+  const provisionalPassword = isProvisional ? plaintext : null;
 
   let fathomWarning: string | null = null;
   if (fathomKey) {
@@ -85,12 +97,13 @@ export async function createUsuario(
       return {
         user: { ...row, id_webhook_fathom: reg.webhookId } as UsuarioRow,
         fathomWarning: null,
+        provisionalPassword,
       };
     }
     fathomWarning = reg.error;
   }
 
-  return { user: row as UsuarioRow, fathomWarning };
+  return { user: row as UsuarioRow, fathomWarning, provisionalPassword };
 }
 
 export async function updateUsuario(
