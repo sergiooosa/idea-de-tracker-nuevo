@@ -8,6 +8,8 @@ export interface LeadEnEspera {
   closer_mail: string | null;
   creativo_origen: string | null;
   min_sin_llamar: number;
+  phone: string | null;
+  mail_lead: string | null;
 }
 
 export interface CloserConLeadsEnEspera {
@@ -64,6 +66,8 @@ export async function getLeadsEnEspera(
       nombre_closer: registrosDeLlamada.nombre_closer,
       closer_mail: registrosDeLlamada.closer_mail,
       creativo_origen: registrosDeLlamada.creativo_origen,
+      phone: registrosDeLlamada.phone_raw_format,
+      mail_lead: registrosDeLlamada.mail_lead,
       min_sin_llamar: sql<number>`ROUND(EXTRACT(EPOCH FROM (NOW() - ${registrosDeLlamada.fecha_evento}))/60)::int`,
     })
     .from(registrosDeLlamada)
@@ -110,6 +114,8 @@ export async function getLeadsEnEspera(
       closer_mail: row.closer_mail,
       creativo_origen: row.creativo_origen,
       min_sin_llamar: minSinLlamar,
+      phone: row.phone,
+      mail_lead: row.mail_lead,
     });
 
     if (minSinLlamar > grupo.lead_mas_antiguo_min) {

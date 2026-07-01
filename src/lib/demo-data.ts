@@ -393,6 +393,8 @@ export function generateChats(): ChatsResponse {
       id: i + 1,
       leadName: faker.person.fullName(),
       leadId: faker.string.uuid(),
+      leadPhone: Math.random() > 0.3 ? faker.phone.number() : null,
+      leadEmail: Math.random() > 0.5 ? faker.internet.email() : null,
       agentName: asesor.name,
       datetime: faker.date.recent({ days: 30 }).toISOString(),
       totalMessages: msgCount,

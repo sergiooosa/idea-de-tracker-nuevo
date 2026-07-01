@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail } from "lucide-react";
 import { useApiData } from "@/hooks/useApiData";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -10,6 +12,8 @@ export interface LeadEnEspera {
   closer_mail: string | null;
   creativo_origen: string | null;
   min_sin_llamar: number;
+  phone: string | null;
+  mail_lead: string | null;
 }
 
 export interface CloserConLeadsEnEspera {
@@ -56,15 +60,27 @@ const URGENCIA_STYLES: Record<UrgenciaNivel, { badge: string; dot: string }> = {
   },
 };
 
-function LeadRow({ lead }: { lead: LeadEnEspera }) {
+function LeadRow({ lead, asesorBasePath }: { lead: LeadEnEspera; asesorBasePath: string }) {
   const urgencia = getUrgencia(lead.min_sin_llamar);
   const styles = URGENCIA_STYLES[urgencia];
+  const contactInfo = lead.phone ?? lead.mail_lead;
+  const asesorLink = lead.closer_mail
+    ? `${asesorBasePath}?advisor=${encodeURIComponent(lead.closer_mail)}`
+    : null;
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm">
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <span className={`h-2 w-2 shrink-0 rounded-full ${styles.dot}`} />
-        <span className="truncate text-slate-200">{lead.nombre_lead}</span>
+        <div className="min-w-0">
+          <span className="truncate text-slate-200 block">{lead.nombre_lead}</span>
+          {contactInfo && (
+            <span className="flex items-center gap-1 text-[11px] text-slate-400 truncate">
+              {lead.phone ? <Phone className="h-3 w-3 shrink-0" /> : <Mail className="h-3 w-3 shrink-0" />}
+              {contactInfo}
+            </span>
+          )}
+        </div>
         {lead.creativo_origen && (
           <span className="hidden shrink-0 rounded px-1.5 py-0.5 text-xs bg-slate-700 text-slate-400 sm:inline">
             {lead.creativo_origen}
@@ -76,16 +92,28 @@ function LeadRow({ lead }: { lead: LeadEnEspera }) {
           </span>
         )}
       </div>
-      <span
-        className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${styles.badge}`}
-      >
-        {formatTiempoEspera(lead.min_sin_llamar)} sin llamar
-      </span>
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${styles.badge}`}
+        >
+          {formatTiempoEspera(lead.min_sin_llamar)} sin llamar
+        </span>
+        {asesorLink && (
+          <Link
+            href={asesorLink}
+            className="hidden sm:inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors whitespace-nowrap"
+            title={`Ver pipeline de ${lead.nombre_closer ?? lead.closer_mail}`}
+          >
+            <User className="h-3 w-3" />
+            Ver lead
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
 
-function CloserCard({ grupo }: { grupo: CloserConLeadsEnEspera }) {
+function CloserCard({ grupo, asesorBasePath }: { grupo: CloserConLeadsEnEspera; asesorBasePath: string }) {
   const [expandido, setExpandido] = useState(false);
   const urgenciaMayor = getUrgencia(grupo.lead_mas_antiguo_min);
   const styles = URGENCIA_STYLES[urgenciaMayor];
@@ -126,7 +154,7 @@ function CloserCard({ grupo }: { grupo: CloserConLeadsEnEspera }) {
       {expandido && (
         <div className="border-t border-white/10 px-4 py-3 space-y-2">
           {grupo.leads.map((lead, i) => (
-            <LeadRow key={`${lead.nombre_lead}-${i}`} lead={lead} />
+            <LeadRow key={`${lead.nombre_lead}-${i}`} lead={lead} asesorBasePath={asesorBasePath} />
           ))}
         </div>
       )}
@@ -135,6 +163,8 @@ function CloserCard({ grupo }: { grupo: CloserConLeadsEnEspera }) {
 }
 
 export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
+  const pathname = usePathname();
+  const asesorBasePath = pathname.replace(/\/[^/]*$/, "/asesor");
   const { data, loading, error } = useApiData<LeadsEnEsperaResponse>(
     "/api/data/leads-en-espera",
     { from: dateFrom, to: dateTo },
@@ -184,7 +214,7 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
       {/* Grupos por closer */}
       <div className="p-4 space-y-3">
         {data.grupos.map((grupo) => (
-          <CloserCard key={grupo.closer_mail ?? grupo.nombre_closer} grupo={grupo} />
+          <CloserCard key={grupo.closer_mail ?? grupo.nombre_closer} grupo={grupo} asesorBasePath={asesorBasePath} />
         ))}
       </div>
     </section>
