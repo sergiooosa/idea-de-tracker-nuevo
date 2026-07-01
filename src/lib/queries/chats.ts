@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { chatsLogs, cuentas } from "@/lib/db/schema";
+import { chatsLogs, cuentas, registrosDeLlamada } from "@/lib/db/schema";
 import type { ChatMessage, MetricaConfig, ChatMetricaCampo } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, isNull, or, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull, or, desc, getTableColumns } from "drizzle-orm";
 import type {
   ApiChatLead,
   ChatsAdvisorMetrics,
@@ -132,7 +132,23 @@ export async function getChats(
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1),
     db
-      .select()
+      .select({
+        ...getTableColumns(chatsLogs),
+        leadPhone: sql<string | null>`(
+          SELECT ${registrosDeLlamada.phone_raw_format}
+          FROM ${registrosDeLlamada}
+          WHERE ${registrosDeLlamada.ghl_contact_id} = ${chatsLogs.id_lead}
+            AND ${registrosDeLlamada.id_cuenta} = ${chatsLogs.id_cuenta}::text
+          LIMIT 1
+        )`,
+        leadEmail: sql<string | null>`(
+          SELECT ${registrosDeLlamada.mail_lead}
+          FROM ${registrosDeLlamada}
+          WHERE ${registrosDeLlamada.ghl_contact_id} = ${chatsLogs.id_lead}
+            AND ${registrosDeLlamada.id_cuenta} = ${chatsLogs.id_cuenta}::text
+          LIMIT 1
+        )`,
+      })
       .from(chatsLogs)
       .where(
         and(
@@ -171,6 +187,8 @@ export async function getChats(
       id: r.id_evento,
       leadName: r.nombre_lead,
       leadId: r.id_lead,
+      leadPhone: r.leadPhone ?? null,
+      leadEmail: r.leadEmail ?? null,
       agentName,
       // Normalizar asesor: prioridad asesor_asignado → notas_extra → agentName.
       // notas_extra guarda el nombre real cuando closerName resolvió pero asesor_asignado

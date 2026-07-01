@@ -11,7 +11,7 @@ import type { ChatsResponse, ApiChatLead } from '@/types';
 import type { MetricaConfig } from '@/lib/db/schema';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Pencil, User, X, Plus, Sparkles, AlertTriangle, Settings, CheckCircle2 } from 'lucide-react';
+import { Pencil, User, X, Plus, Sparkles, AlertTriangle, Settings, CheckCircle2, Phone, ExternalLink } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import InsightsChat from '@/components/dashboard/InsightsChat';
@@ -602,7 +602,17 @@ export default function PerformanceChatsPage() {
                                               <td className="px-2 py-2 text-center" title={canal}>
                                                 <span className="text-base">{CANAL_EMOJI[canal] ?? '⚙️'}</span>
                                               </td>
-                                              <td className="px-2 py-2 text-white">{chat.leadName ?? '—'}</td>
+                                              <td className="px-2 py-2">
+                                                <div className="text-white">{chat.leadName ?? '—'}</div>
+                                                {chat.leadPhone && (
+                                                  <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
+                                                    <Phone className="h-2.5 w-2.5" />{chat.leadPhone}
+                                                  </span>
+                                                )}
+                                                {!chat.leadPhone && chat.leadEmail && (
+                                                  <span className="text-[10px] text-gray-400 truncate block max-w-[120px]">{chat.leadEmail}</span>
+                                                )}
+                                              </td>
                                               <td className="px-2 py-2">
                                                 {chat.asesorAsignado ? (
                                                   <span className="text-accent-cyan font-medium">{chat.asesorAsignado}</span>
@@ -659,10 +669,26 @@ export default function PerformanceChatsPage() {
                                                 )}
                                               </td>
                                               <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                                                <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.asesorAsignado ?? chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5 mr-2"><Pencil className="w-3 h-3" /> Editar</button>
-                                                <button type="button" onClick={() => setModalConversacion(chat)} className="text-accent-cyan text-[10px] font-medium hover:underline">
-                                                  Ver conversación
-                                                </button>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <button type="button" onClick={() => setEditingRecord({ id: chat.id, nombre_lead: chat.leadName, closer: chat.asesorAsignado ?? chat.agentName, estado: chat.estado })} className="text-accent-amber text-[10px] inline-flex items-center gap-0.5"><Pencil className="w-3 h-3" /> Editar</button>
+                                                  <button type="button" onClick={() => setModalConversacion(chat)} className="text-accent-cyan text-[10px] font-medium hover:underline">
+                                                    Ver conversación
+                                                  </button>
+                                                  {(() => {
+                                                    const chatAdvisorEmail = chat.asesorAsignado
+                                                      ? (nameToEmail[chat.asesorAsignado.toLowerCase()] ?? null)
+                                                      : null;
+                                                    return chatAdvisorEmail ? (
+                                                      <Link
+                                                        href={`${asesorBasePath}?advisor=${encodeURIComponent(chatAdvisorEmail)}`}
+                                                        className="text-emerald-400 text-[10px] inline-flex items-center gap-0.5 hover:underline"
+                                                        title={`Ver pipeline de ${chat.asesorAsignado}`}
+                                                      >
+                                                        <ExternalLink className="w-3 h-3" /> Ver lead
+                                                      </Link>
+                                                    ) : null;
+                                                  })()}
+                                                </div>
                                               </td>
                                             </tr>
                                           );
