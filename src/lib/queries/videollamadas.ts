@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas, usuariosDashboard, logLlamadas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
+import { normalizeEmbudoEtapas } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig, type MetricaEngineContext } from "@/lib/metricas-engine";
 import { eq, and, or, gt, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import type {
@@ -170,7 +171,7 @@ export async function getVideollamadas(
   }
 
   const embudo = Array.isArray(cuentaRow?.embudo_personalizado)
-    ? cuentaRow.embudo_personalizado
+    ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado)
     : null;
 
   // AUT-603: Check if a row has real interaction (Fathom or effective call)

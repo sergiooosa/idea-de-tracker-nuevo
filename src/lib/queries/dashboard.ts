@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, cuentas, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
+import { normalizeEmbudoEtapas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS, type MetricaEngineContext } from "@/lib/metricas-engine";
 import { resolveFinancialValues } from "@/lib/queries/resolve-financial";
@@ -139,7 +140,7 @@ export async function getDashboard(
   const fuenteFinanciera = cuentaRow?.configuracion_ui?.fuente_datos_financieros;
   const useExterna = fuenteFinanciera === "api_externa";
   const cerradasCuentanComoCal = cuentaRow?.configuracion_ui?.cerradas_cuentan_como_calificadas ?? true;
-  const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? cuentaRow.embudo_personalizado : [];
+  const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado) : [];
   const embudoRaw = embudoRawArr.length > 0 ? embudoRawArr : DEFAULT_EMBUDO_CONFIG;
   const { attendedSet, closedSet, effectiveSet, qualifiedSet, etapas } = buildFunnelSets(embudoRaw);
   // closedByFlag: el embudo tiene etapas cerradas explícitamente configuradas (es_cerrada=true o texto heurístico).

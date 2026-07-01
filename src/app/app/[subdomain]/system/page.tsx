@@ -43,17 +43,18 @@ interface ReglaAutomatica {
 interface EmbudoEtapa {
   id: string;
   nombre: string;
+  name?: string;
   color?: string;
   orden: number;
   condition?: string;
   fuentes?: ('llamadas' | 'videollamadas' | 'chats')[];
   reglas_automaticas?: ReglaAutomatica[];
-  es_fallback?: boolean;  // captura leads que no clasifican en ninguna otra etapa
-  es_fija?: boolean;  // no eliminable, id inmutable
-  es_calificada?: boolean;  // cuenta como qualified=true
-  es_cerrada?: boolean;  // cuenta como cerrada (revenue)
-  es_unica?: boolean;  // true=un registro por lead, false=múltiple
-  metrica_id?: string;  // id de métrica auto-creada para etapas custom
+  es_fallback?: boolean;
+  es_fija?: boolean;
+  es_calificada?: boolean;
+  es_cerrada?: boolean;
+  es_unica?: boolean;
+  metrica_id?: string;
 }
 interface ChatConfig {
   tiene_chatbot: boolean;
@@ -308,7 +309,9 @@ export default function SystemPage() {
         setPromptLlamadas(cfg.prompt_llamadas);
         setTagRules(cfg.reglas_etiquetas.length > 0 ? cfg.reglas_etiquetas : []);
         setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
-        const loadedEmbudo = Array.isArray(cfg.embudo_personalizado) ? cfg.embudo_personalizado : [];
+        const loadedEmbudo = Array.isArray(cfg.embudo_personalizado)
+          ? cfg.embudo_personalizado.map((e: EmbudoEtapa) => ({ ...e, nombre: e.nombre ?? e.name ?? e.id }))
+          : [];
         setEmbudoEtapas(loadedEmbudo.length > 0 ? loadedEmbudo : DEFAULT_EMBUDO_CONFIG);
         setHasOpenaiKey(cfg.has_openai_key ?? false);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
