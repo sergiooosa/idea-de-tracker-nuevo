@@ -126,8 +126,8 @@ export default function DashboardNodePage() {
           </div>
         )}
 
-        {!loading && (data?.advisorRanking?.length ?? 0) > 0 && (
-          <AdvisorRankingWidget advisorRanking={data!.advisorRanking} />
+        {!loading && data?.advisorRanking && data.advisorRanking.length > 0 && (
+          <AdvisorRankingWidget advisorRanking={data.advisorRanking} />
         )}
       </div>
     </main>

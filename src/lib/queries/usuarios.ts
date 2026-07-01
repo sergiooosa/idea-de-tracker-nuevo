@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { usuariosDashboard } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hash } from "bcryptjs";
+import { randomBytes } from "crypto";
 import { registrarWebhookFathom } from "@/lib/fathom-webhook";
 
 export type TipoUsuario = "analista" | "enfoque";
@@ -15,6 +16,10 @@ export interface UsuarioRow {
   fathom: string | null;
   id_webhook_fathom: string | null;
   tipo_usuario: TipoUsuario;
+}
+
+function generateProvisionalPassword(): string {
+  return randomBytes(12).toString("base64url").slice(0, 16);
 }
 
 export async function listUsuarios(idCuenta: number): Promise<UsuarioRow[]> {
@@ -37,17 +42,19 @@ export async function listUsuarios(idCuenta: number): Promise<UsuarioRow[]> {
 
 export interface CreateUsuarioResult {
   user: UsuarioRow;
-  /** Si hubo API key Fathom pero el registro del webhook falló */
   fathomWarning: string | null;
+  provisionalPassword: string | null;
 }
 
 export async function createUsuario(
   idCuenta: number,
-  data: { nombre: string; email: string; password: string; rol: string; permisos?: Record<string, boolean>; fathom?: string; tipo_usuario?: TipoUsuario },
+  data: { nombre: string; email: string; password?: string; rol: string; permisos?: Record<string, boolean>; fathom?: string; tipo_usuario?: TipoUsuario },
 ): Promise<CreateUsuarioResult> {
   const fathomKey = data.fathom?.trim() || null;
   const tipoUsuario = data.tipo_usuario === "enfoque" ? "enfoque" : "analista";
-  const hashed = await hash(data.password, 10);
+  const isProvisional = !data.password;
+  const plainPassword = data.password || generateProvisionalPassword();
+  const hashed = await hash(plainPassword, 10);
   const [row] = await db
     .insert(usuariosDashboard)
     .values({
@@ -60,6 +67,7 @@ export async function createUsuario(
       fathom: fathomKey,
       id_webhook_fathom: null,
       tipo_usuario: tipoUsuario,
+      must_change_password: isProvisional,
     })
     .returning({
       id: usuariosDashboard.id_evento,
@@ -71,6 +79,8 @@ export async function createUsuario(
       id_webhook_fathom: usuariosDashboard.id_webhook_fathom,
       tipo_usuario: usuariosDashboard.tipo_usuario,
     });
+
+  const provisionalPassword = isProvisional ? plainPassword : null;
 
   let fathomWarning: string | null = null;
   if (fathomKey) {
@@ -85,12 +95,13 @@ export async function createUsuario(
       return {
         user: { ...row, id_webhook_fathom: reg.webhookId } as UsuarioRow,
         fathomWarning: null,
+        provisionalPassword,
       };
     }
     fathomWarning = reg.error;
   }
 
-  return { user: row as UsuarioRow, fathomWarning };
+  return { user: row as UsuarioRow, fathomWarning, provisionalPassword };
 }
 
 export async function updateUsuario(
@@ -156,4 +167,18 @@ export async function deleteUsuario(idCuenta: number, idEvento: number): Promise
         eq(usuariosDashboard.id_cuenta, idCuenta),
       ),
     );
+}
+
+export async function changePassword(
+  idCuenta: number,
+  email: string,
+  newPassword: string,
+): Promise<boolean> {
+  const hashed = await hash(newPassword, 10);
+  const result = await db
+    .update(usuariosDashboard)
+    .set({ pass: hashed, must_change_password: false })
+    .where(and(eq(usuariosDashboard.email, email), eq(usuariosDashboard.id_cuenta, idCuenta)))
+    .returning({ id: usuariosDashboard.id_evento });
+  return result.length > 0;
 }
