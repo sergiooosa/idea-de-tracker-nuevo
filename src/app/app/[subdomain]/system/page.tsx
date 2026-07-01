@@ -997,7 +997,7 @@ export default function SystemPage() {
                         </select>
                       </div>
                     )}
-                    {(r as unknown as { accion?: string }).accion === 'asignar_etiqueta' && (
+                    {((r as unknown as { accion?: string }).accion ?? 'asignar_etiqueta') === 'asignar_etiqueta' && (
                       <div className="rounded-lg border border-surface-500 bg-surface-800/50 p-3 space-y-2">
                         <div className="flex items-center gap-2">
                           <label className="flex items-center gap-2 cursor-pointer">
