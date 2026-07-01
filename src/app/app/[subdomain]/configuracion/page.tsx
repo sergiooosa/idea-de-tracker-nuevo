@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
-import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download, CheckCircle2, Sparkles } from "lucide-react";
+import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download, CheckCircle2, Sparkles, Copy, FileDown } from "lucide-react";
 import { useUserFilter } from "@/contexts/UserFilterContext";
 import { canManageUsers, canManageRoles } from "@/lib/permisos";
 import { PERMISOS_DISPONIBLES, type PermisoId } from "@/lib/permisos";
@@ -46,6 +46,8 @@ export default function ConfiguracionPage() {
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [formUser, setFormUser] = useState({ name: "", email: "", password: "", fathom: "", rol: "usuario", tipo_usuario: "analista" as TipoUsuario });
   const [error, setError] = useState("");
+
+  const [provisionalPassword, setProvisionalPassword] = useState<{ email: string; password: string } | null>(null);
 
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkFile, setBulkFile] = useState<File | null>(null);
@@ -130,22 +132,23 @@ export default function ConfiguracionPage() {
           toast.success("Usuario actualizado");
         }
       } else {
-        if (!formUser.email || !formUser.password) {
-          setError("Email y contraseña son obligatorios");
+        if (!formUser.email) {
+          setError("Email es obligatorio");
           setSaving(false);
           return;
         }
+        const payload: Record<string, unknown> = {
+          nombre: formUser.name,
+          email: formUser.email,
+          rol: formUser.rol,
+          fathom: formUser.fathom,
+          tipo_usuario: formUser.tipo_usuario,
+        };
+        if (formUser.password) payload.password = formUser.password;
         const res = await fetch("/api/data/usuarios", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre: formUser.name,
-            email: formUser.email,
-            password: formUser.password,
-            rol: formUser.rol,
-            fathom: formUser.fathom,
-            tipo_usuario: formUser.tipo_usuario,
-          }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -154,10 +157,13 @@ export default function ConfiguracionPage() {
           return;
         }
         const created = await res.json().catch(() => ({}));
+        if (created.provisionalPassword) {
+          setProvisionalPassword({ email: created.email, password: created.provisionalPassword });
+        }
         if (created.fathomWarning) {
           toast.warning("Usuario creado, pero Fathom no registró el webhook", { description: created.fathomWarning });
         } else {
-          toast.success("Usuario creado");
+          toast.success(created.provisionalPassword ? "Usuario creado con contraseña provisional" : "Usuario creado");
         }
       }
       setModalUser(null);
@@ -581,7 +587,7 @@ export default function ConfiguracionPage() {
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">
-                  {editingUser ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña"}
+                  {editingUser ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña (dejar vacío para auto-generar)"}
                 </label>
                 <div className="relative">
                   <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -589,11 +595,13 @@ export default function ConfiguracionPage() {
                     type="password"
                     value={formUser.password}
                     onChange={(e) => setFormUser((f) => ({ ...f, password: e.target.value }))}
-                    placeholder="••••••••"
-                    required={!editingUser}
+                    placeholder={editingUser ? "••••••••" : "Dejar vacío para generar provisional"}
                     className="w-full rounded-lg bg-surface-700 border border-surface-500 pl-9 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-cyan/40"
                   />
                 </div>
+                {!editingUser && !formUser.password && (
+                  <p className="text-xs text-gray-500 mt-1">Se generará una contraseña provisional. El usuario deberá cambiarla en su primer login.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1">API de Fathom (opcional)</label>
@@ -804,6 +812,54 @@ export default function ConfiguracionPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {provisionalPassword && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-surface-800 rounded-2xl border border-surface-600 p-6 w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Contraseña provisional generada</h3>
+              <button onClick={() => setProvisionalPassword(null)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 mb-4">
+              Comparte esta contraseña con <strong className="text-white">{provisionalPassword.email}</strong>. Solo se muestra una vez.
+              El usuario deberá cambiarla en su primer login.
+            </p>
+            <div className="bg-surface-700 rounded-lg px-4 py-3 font-mono text-lg text-accent-cyan select-all text-center mb-4 border border-surface-500">
+              {provisionalPassword.password}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(provisionalPassword.password);
+                  toast.success("Contraseña copiada al portapapeles");
+                }}
+                className="flex-1 px-3 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 flex items-center justify-center gap-2"
+              >
+                <Copy className="w-4 h-4" /> Copiar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const content = `Usuario: ${provisionalPassword.email}\nContraseña provisional: ${provisionalPassword.password}\n\nEsta contraseña debe ser cambiada en el primer inicio de sesión.`;
+                  const blob = new Blob([content], { type: "text/plain" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `credenciales-${provisionalPassword.email}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Archivo descargado");
+                }}
+                className="flex-1 px-3 py-2 rounded-lg bg-surface-600 text-gray-300 text-sm font-medium hover:bg-surface-500 flex items-center justify-center gap-2"
+              >
+                <FileDown className="w-4 h-4" /> Descargar
+              </button>
+            </div>
           </div>
         </div>
       )}

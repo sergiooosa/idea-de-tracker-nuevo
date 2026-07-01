@@ -13,16 +13,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   return withAuthAndPermission(req, "gestionar_usuarios", async (idCuenta, email) => {
     const body = await req.json();
-    if (!body.email || !body.password) {
-      return NextResponse.json({ error: "Email y password son obligatorios" }, { status: 400 });
+    if (!body.email) {
+      return NextResponse.json({ error: "Email es obligatorio" }, { status: 400 });
     }
     try {
-      const { user, fathomWarning } = await createUsuario(idCuenta, body);
+      const { user, fathomWarning, provisionalPassword } = await createUsuario(idCuenta, body);
       void logAudit(idCuenta, email, "CREATE_USER", {
         nuevo_usuario: body.email,
         rol: body.rol ?? "usuario",
+        provisional: !body.password,
       });
-      return NextResponse.json({ ...user, fathomWarning }, { status: 201 });
+      return NextResponse.json({ ...user, fathomWarning, provisionalPassword }, { status: 201 });
     } catch (e: unknown) {
       if ((e as { code?: string })?.code === "23505") {
         return NextResponse.json({ error: "El email ya está registrado" }, { status: 409 });

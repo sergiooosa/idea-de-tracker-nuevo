@@ -43,6 +43,7 @@ type SessionPayload = {
   id_cuenta?: number | null;
   platformAdmin?: boolean;
   tipoUsuario?: string;
+  mustChangePassword?: boolean;
   [key: string]: unknown;
 };
 
@@ -200,6 +201,13 @@ export default async function middleware(req: NextRequest) {
     // Ya estamos en /login del dominio raíz (o acceso directo a subdomain/login)
     // → servir normalmente
     return setCspHeaders(NextResponse.next(), subdomain);
+  }
+
+  // Cambio forzado de contraseña: bloquear todo excepto la propia pantalla y la API
+  if (session.mustChangePassword && pathname !== "/cambiar-password" && !pathname.startsWith("/api")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/cambiar-password";
+    return NextResponse.redirect(url);
   }
 
   // Usuario enfoque: redirigir a /enfoque (kiosko fullscreen)

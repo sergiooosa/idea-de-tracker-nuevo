@@ -98,6 +98,7 @@ export const authConfig: NextAuthConfig = {
               subdominio: cuentas.subdominio,
               roles_config: cuentas.roles_config,
               tipo_usuario: usuariosDashboard.tipo_usuario,
+              must_change_password: usuariosDashboard.must_change_password,
             })
             .from(usuariosDashboard)
             .innerJoin(
@@ -141,6 +142,7 @@ export const authConfig: NextAuthConfig = {
             permisos: user.permisos,
             permisosArray,
             tipoUsuario: (user.tipo_usuario === "enfoque" ? "enfoque" : "analista") as "analista" | "enfoque",
+            mustChangePassword: user.must_change_password,
           };
         } catch (dbErr) {
           console.error("[auth] error de DB en authorize:", dbErr);
@@ -163,6 +165,7 @@ export const authConfig: NextAuthConfig = {
         token.platformAdmin = (user as any).platformAdmin ?? false;
         token.tipoUsuario = (user as any).tipoUsuario ?? "analista";
         token.tipoUsuarioCheckedAt = Date.now();
+        token.mustChangePassword = (user as any).mustChangePassword ?? false;
       } else if (
         token.id_cuenta != null &&
         token.email &&
@@ -174,7 +177,7 @@ export const authConfig: NextAuthConfig = {
         if (forceRefresh || Date.now() - lastChecked > TIPO_USUARIO_TTL_MS) {
           try {
             const rows = await db
-              .select({ tipo_usuario: usuariosDashboard.tipo_usuario })
+              .select({ tipo_usuario: usuariosDashboard.tipo_usuario, must_change_password: usuariosDashboard.must_change_password })
               .from(usuariosDashboard)
               .where(
                 and(
@@ -187,6 +190,7 @@ export const authConfig: NextAuthConfig = {
             if (rows.length > 0) {
               const fresh = rows[0].tipo_usuario === "enfoque" ? "enfoque" : "analista";
               token.tipoUsuario = fresh as "analista" | "enfoque";
+              token.mustChangePassword = rows[0].must_change_password;
             }
             token.tipoUsuarioCheckedAt = Date.now();
           } catch {
@@ -205,6 +209,7 @@ export const authConfig: NextAuthConfig = {
       session.user.permisosArray = (token.permisosArray as string[]) ?? [];
       session.user.platformAdmin = token.platformAdmin as boolean | undefined;
       session.user.tipoUsuario = token.tipoUsuario ?? "analista";
+      session.user.mustChangePassword = token.mustChangePassword ?? false;
       return session;
     },
   },
