@@ -70,12 +70,24 @@ export interface DynamicValueConfig {
   mode?: "exacto" | "aproximado";
 }
 
+export interface AccionRegla {
+  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
+  valor?: string;
+  funnelStage?: string;
+  metrica_id?: string;
+  metrica_incremento?: number;
+  categoria_id?: string;
+}
+
 export interface ReglaEtiqueta {
   id: string;
   nombre: string;
   condicion: string;
-  accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
-  valor: string;
+  acciones?: AccionRegla[];
+  fuentes?: string[];
+  // Legacy fields (kept for backward compatibility)
+  accion?: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
+  valor?: string;
   fuente?: "chats" | "videollamadas" | "llamadas" | "todas";
   metrica_id?: string;
   metrica_incremento?: number;
@@ -85,6 +97,27 @@ export interface ReglaEtiqueta {
   tag?: string;
   source?: string;
   funnelStage?: string;
+}
+
+export function normalizeReglaEtiqueta(r: ReglaEtiqueta): Required<Pick<ReglaEtiqueta, 'id' | 'nombre' | 'condicion' | 'acciones' | 'fuentes'>> & ReglaEtiqueta {
+  const acciones: AccionRegla[] = r.acciones && r.acciones.length > 0
+    ? r.acciones
+    : [{
+        tipo: r.accion ?? 'asignar_etiqueta',
+        valor: r.valor ?? r.tag,
+        funnelStage: r.funnelStage,
+        metrica_id: r.metrica_id,
+        metrica_incremento: r.metrica_incremento,
+        categoria_id: r.categoria_id,
+      }];
+  const fuentes: string[] = r.fuentes && r.fuentes.length > 0
+    ? r.fuentes
+    : (r.fuente && r.fuente !== 'todas')
+      ? [r.fuente]
+      : (r.source && r.source !== 'todas' && r.source !== 'call' && r.source !== 'meeting')
+        ? [r.source]
+        : ['llamadas', 'videollamadas', 'chats'];
+  return { ...r, acciones, fuentes, condicion: r.condicion ?? r.condition ?? '', nombre: r.nombre ?? '' };
 }
 
 export interface MetricaPersonalizada {

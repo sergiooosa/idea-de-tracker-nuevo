@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { cuentas, apiKeysCuenta } from "@/lib/db/schema";
+import { cuentas, apiKeysCuenta, normalizeReglaEtiqueta } from "@/lib/db/schema";
+import type { ReglaEtiqueta } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 /**
@@ -83,7 +84,8 @@ export async function GET(
         videollamadas: cuenta.prompt_videollamadas ?? null,
         llamadas: cuenta.prompt_llamadas ?? null,
       },
-      reglas_etiquetas: cuenta.reglas_etiquetas ?? [],
+      // Normalized shape: each rule has acciones[] and fuentes[] for Cerebro consumption
+      reglas_etiquetas: (cuenta.reglas_etiquetas ?? []).map((r: ReglaEtiqueta) => normalizeReglaEtiqueta(r)),
       embudo_personalizado: cuenta.embudo_personalizado ?? [],
       chat_triggers: cuenta.chat_triggers ?? [],
       has_openai_key: !!cuenta.openai_api_key,
