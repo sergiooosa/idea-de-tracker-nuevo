@@ -24,7 +24,7 @@ const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const kpiTooltips = {
   agendadas: { significado: 'Citas o presentaciones programadas. Vienen de los calendarios usados para citas o presentaciones.', calculo: 'Eventos de videollamada de los calendarios de citas/presentaciones en el rango.' },
-  asistidas: { significado: 'Reuniones a las que el lead asistió. El dato llega de Fathom.', calculo: 'Videollamadas con attended = true; fuente: Fathom.' },
+  asistidas: { significado: 'Reuniones a las que el lead asistió (videollamadas y citas GHL).', calculo: 'Citas con attended = true (interacción real verificada).' },
   canceladas: { significado: 'Reuniones canceladas antes de realizarse. Provienen de las canceladas en GHL.', calculo: 'Videollamadas con canceled = true en GHL.' },
   efectivas: { significado: 'Ventas cerradas. Las que Fathom determina como cerradas.', calculo: 'Videollamadas que Fathom marca como cerradas.' },
   cerradasVendidas: { significado: 'Reuniones que terminaron en venta (conteo absoluto).', calculo: 'Registros con categoría cerrada/cerrado. Mismo numerador que Tasa de cierre.' },
