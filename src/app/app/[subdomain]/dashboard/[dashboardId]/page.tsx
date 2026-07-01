@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Pencil, ArrowLeft } from 'lucide-react';
 import type { DashboardResponse } from '@/types';
 import KPICard from '@/components/dashboard/KPICard';
+import AdvisorRankingWidget from '@/components/dashboard/AdvisorRankingWidget';
 import PageHeader from '@/components/dashboard/PageHeader';
 
 const fm = (n: number) =>
@@ -123,6 +124,10 @@ export default function DashboardNodePage() {
               );
             })}
           </div>
+        )}
+
+        {!loading && (data?.advisorRanking?.length ?? 0) > 0 && (
+          <AdvisorRankingWidget advisorRanking={data!.advisorRanking} />
         )}
       </div>
     </main>
