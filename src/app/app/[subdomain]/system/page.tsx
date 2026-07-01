@@ -27,7 +27,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { getMetricasQueDependenDe, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG } from '@/lib/metricas-engine';
 import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import DashboardsManager from '@/components/dashboard/DashboardsManager';
-import type { MetricaConfig, MetricaManualEntry } from '@/lib/db/schema';
+import type { MetricaConfig, MetricaManualEntry, CategoriaLlamada } from '@/lib/db/schema';
 import ChatRecoverySection from '@/features/quick-triggers/chat-recovery/ChatRecoverySection';
 
 interface TagRule { id: string; condition: string; tag: string; source: string; funnelStage?: string }
@@ -125,6 +125,7 @@ interface SystemConfig {
   idioma?: 'es' | 'en';
   configuracion_ads?: ConfiguracionAdsLocal;
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
+  categorias_llamadas?: CategoriaLlamada[];
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -264,6 +265,12 @@ export default function SystemPage() {
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
   const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
   const [metasPorRol, setMetasPorRol] = useState<MetaPorRolLocal[]>([]);
+  const [categoriasLlamadas, setCategoriasLlamadas] = useState<CategoriaLlamada[]>([]);
+  const [catEditId, setCatEditId] = useState<string | null>(null);
+  const [catNombre, setCatNombre] = useState('');
+  const [catTemas, setCatTemas] = useState<string[]>([]);
+  const [catPrompt, setCatPrompt] = useState('');
+  const [catTemaInput, setCatTemaInput] = useState('');
 
   // Ads config state
   const [metaAdsActivo, setMetaAdsActivo] = useState(false);
@@ -318,6 +325,7 @@ export default function SystemPage() {
         setSeccionChatsDashboard(cfg.seccion_chats_dashboard !== false);
         if (cfg.idioma === 'en' || cfg.idioma === 'es') setCurrentIdioma(cfg.idioma);
         setFuenteLlamadas((cfg as unknown as { fuente_llamadas?: string }).fuente_llamadas === 'ghl' ? 'ghl' : 'twilio');
+        setCategoriasLlamadas(Array.isArray(cfg.categorias_llamadas) ? cfg.categorias_llamadas : []);
         setGhlLocationId((cfg as unknown as { ghl_location_id?: string }).ghl_location_id ?? '');
         if (cfg.chat_config) {
           setChatConfig({
@@ -426,6 +434,7 @@ export default function SystemPage() {
         fuente_llamadas: fuenteLlamadas,
         ghl_location_id: ghlLocationId.trim() || null,
         cerradas_cuentan_como_calificadas: cerradasCuentanComoCal,
+        categorias_llamadas: categoriasLlamadas,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
       const res = await fetch('/api/data/system-config', {
@@ -699,6 +708,126 @@ export default function SystemPage() {
                 className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan/50 transition-colors"
                 placeholder="Evalúa la llamada telefónica según..." />
               <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
+
+              {/* ── Categorías de llamada ── */}
+              <div className="mt-6 pt-5 border-t border-surface-500">
+                <div className="flex items-center gap-2 pb-3">
+                  <div className="rounded-lg p-1.5 bg-accent-purple/20 border border-accent-purple/40"><Tag className="w-4 h-4 text-accent-purple" /></div>
+                  <div>
+                    <h4 className="text-base font-semibold text-white">Categorías de llamada</h4>
+                    <p className="text-xs text-gray-400">Crea categorías con un prompt de evaluación propio y temas específicos.</p>
+                  </div>
+                </div>
+
+                {categoriasLlamadas.length > 0 && (
+                  <ul className="space-y-2 mb-3">
+                    {categoriasLlamadas.map((cat) => (
+                      <li key={cat.id} className="rounded-xl p-3 border-l-4 border-accent-purple/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500 flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{cat.nombre}</p>
+                          {cat.temas.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {cat.temas.map((t, i) => (
+                                <span key={i} className="px-1.5 py-0.5 rounded bg-accent-purple/15 text-accent-purple text-[10px] border border-accent-purple/30">{t}</span>
+                              ))}
+                            </div>
+                          )}
+                          {cat.prompt && <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{cat.prompt}</p>}
+                        </div>
+                        <button type="button" onClick={() => {
+                          setCatEditId(cat.id);
+                          setCatNombre(cat.nombre);
+                          setCatTemas([...cat.temas]);
+                          setCatPrompt(cat.prompt);
+                          setCatTemaInput('');
+                        }} className="p-1.5 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-accent-cyan" title="Editar">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setCategoriasLlamadas((prev) => prev.filter((c) => c.id !== cat.id))}
+                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400" title="Eliminar">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {catEditId !== null ? (
+                  <div className="rounded-xl p-4 border border-accent-purple/30 bg-surface-700/50 space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-accent-purple mb-1">Nombre de la categoría</label>
+                      <input type="text" value={catNombre} onChange={(e) => setCatNombre(e.target.value)}
+                        placeholder="Ej: Perfilamiento, Seguimiento, Cierre"
+                        className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-accent-purple mb-1">Temas</label>
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {catTemas.map((t, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-accent-purple/15 text-accent-purple text-xs border border-accent-purple/30">
+                            {t}
+                            <button type="button" onClick={() => setCatTemas((prev) => prev.filter((_, j) => j !== i))} className="hover:text-red-400">×</button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <input type="text" value={catTemaInput} onChange={(e) => setCatTemaInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && catTemaInput.trim()) {
+                              e.preventDefault();
+                              setCatTemas((prev) => [...prev, catTemaInput.trim()]);
+                              setCatTemaInput('');
+                            }
+                          }}
+                          placeholder="Escribe un tema y presiona Enter"
+                          className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                        <button type="button" onClick={() => {
+                          if (catTemaInput.trim()) {
+                            setCatTemas((prev) => [...prev, catTemaInput.trim()]);
+                            setCatTemaInput('');
+                          }
+                        }} className="px-2 py-1 rounded-lg bg-accent-purple/20 text-accent-purple border border-accent-purple/40 text-xs hover:bg-accent-purple/30">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-accent-purple mb-1">Prompt de evaluación</label>
+                      <textarea value={catPrompt} onChange={(e) => setCatPrompt(e.target.value)}
+                        placeholder="Evalúa esta llamada de perfilamiento según..."
+                        className="w-full rounded-lg bg-surface-600 border border-surface-500 p-2 text-sm text-white min-h-[100px] focus:ring-2 focus:ring-accent-purple/40" />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button type="button" onClick={() => { setCatEditId(null); setCatNombre(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput(''); }}
+                        className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white border border-surface-500 hover:border-surface-400">
+                        Cancelar
+                      </button>
+                      <button type="button" onClick={() => {
+                        if (!catNombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+                        const existing = categoriasLlamadas.find((c) => c.id === catEditId);
+                        if (existing) {
+                          setCategoriasLlamadas((prev) => prev.map((c) => c.id === catEditId ? { ...c, nombre: catNombre.trim(), temas: catTemas, prompt: catPrompt.trim() } : c));
+                        } else {
+                          setCategoriasLlamadas((prev) => [...prev, { id: catEditId, nombre: catNombre.trim(), temas: catTemas, prompt: catPrompt.trim() }]);
+                        }
+                        setCatEditId(null); setCatNombre(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput('');
+                      }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30">
+                        {categoriasLlamadas.some((c) => c.id === catEditId) ? 'Actualizar' : 'Agregar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => {
+                    setCatEditId(crypto.randomUUID());
+                    setCatNombre('');
+                    setCatTemas([]);
+                    setCatPrompt('');
+                    setCatTemaInput('');
+                  }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition-all">
+                    <Plus className="w-4 h-4" /> Añadir categoría
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -764,6 +893,7 @@ export default function SystemPage() {
                           <option value="cambiar_estado">Cambiar estado</option>
                           <option value="etapa_cambiada">Etapa cambiada</option>
                           <option value="incrementar_metrica">Incrementar métrica</option>
+                          {categoriasLlamadas.length > 0 && <option value="asignar_categoria">Asignar categoría</option>}
                         </select>
                       </div>
                       <div className="w-32">
@@ -817,7 +947,22 @@ export default function SystemPage() {
                         </div>
                       </div>
                     )}
-                    {embudoEtapas.length > 0 && (r as unknown as { accion?: string }).accion !== 'incrementar_metrica' && (
+                    {(r as unknown as { accion?: string }).accion === 'asignar_categoria' && (
+                      <div>
+                        <label className="block text-[11px] font-medium text-accent-purple mb-1">Categoría de llamada</label>
+                        <select
+                          value={(r as unknown as { categoria_id?: string }).categoria_id ?? ''}
+                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, categoria_id: e.target.value || undefined } : x))}
+                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
+                        >
+                          <option value="">— Seleccionar categoría —</option>
+                          {categoriasLlamadas.map((cat) => (
+                            <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {embudoEtapas.length > 0 && (r as unknown as { accion?: string }).accion !== 'incrementar_metrica' && (r as unknown as { accion?: string }).accion !== 'asignar_categoria' && (
                       <div>
                         <label className="block text-[11px] font-medium text-accent-purple mb-1">
                           {(r as unknown as { accion?: string }).accion === 'etapa_cambiada' ? 'Etapa del embudo' : 'Mover etapa de funnel a (opcional)'}
