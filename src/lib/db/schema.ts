@@ -114,9 +114,13 @@ export function normalizeReglaEtiqueta(r: ReglaEtiqueta): Required<Pick<ReglaEti
     ? r.fuentes
     : (r.fuente && r.fuente !== 'todas')
       ? [r.fuente]
-      : (r.source && r.source !== 'todas' && r.source !== 'call' && r.source !== 'meeting')
-        ? [r.source]
-        : ['llamadas', 'videollamadas', 'chats'];
+      : r.source === 'call'
+        ? ['llamadas']
+        : r.source === 'meeting'
+          ? ['videollamadas']
+          : (r.source && r.source !== 'todas')
+            ? [r.source]
+            : ['llamadas', 'videollamadas', 'chats'];
   return { ...r, acciones, fuentes, condicion: r.condicion ?? r.condition ?? '', nombre: r.nombre ?? '' };
 }
 

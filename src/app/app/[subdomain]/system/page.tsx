@@ -356,9 +356,13 @@ export default function SystemPage() {
             : [{ tipo: (r.accion as AccionReglaLocal['tipo']) ?? 'asignar_etiqueta', valor: (r.valor as string) ?? (r.tag as string), funnelStage: r.funnelStage as string | undefined, metrica_id: r.metrica_id as string | undefined, metrica_incremento: r.metrica_incremento as number | undefined, categoria_id: (r as Record<string, unknown>).categoria_id as string | undefined }];
           const fuentes: string[] = (r.fuentes && (r.fuentes as string[]).length > 0)
             ? r.fuentes as string[]
-            : ((r.fuente ?? r.source) && (r.fuente ?? r.source) !== 'todas' && (r.fuente ?? r.source) !== 'call' && (r.fuente ?? r.source) !== 'meeting')
-              ? [r.fuente ?? r.source] as string[]
-              : ['llamadas', 'videollamadas', 'chats'];
+            : (r.fuente ?? r.source) === 'call'
+              ? ['llamadas']
+              : (r.fuente ?? r.source) === 'meeting'
+                ? ['videollamadas']
+                : ((r.fuente ?? r.source) && (r.fuente ?? r.source) !== 'todas')
+                  ? [r.fuente ?? r.source] as string[]
+                  : ['llamadas', 'videollamadas', 'chats'];
           return { ...r, condicion: (r.condicion ?? r.condition ?? '') as string, acciones, fuentes, nombre: (r.nombre ?? '') as string };
         }) : []);
         setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
@@ -994,7 +998,7 @@ export default function SystemPage() {
                                     placeholder="nuevo_estado" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
                                 </div>
                               )}
-                              {(a.tipo === 'etapa_cambiada' || (a.tipo === 'cambiar_estado' && embudoEtapas.length > 0)) && a.tipo === 'etapa_cambiada' && (
+                              {a.tipo === 'etapa_cambiada' && (
                                 <div className="flex-1 min-w-[140px]">
                                   <label className="block text-[10px] font-medium text-accent-purple mb-0.5">Etapa del embudo</label>
                                   <select value={a.funnelStage ?? ''} onChange={(e) => updateAccion(ai, { funnelStage: e.target.value || undefined, valor: e.target.value || undefined })}
