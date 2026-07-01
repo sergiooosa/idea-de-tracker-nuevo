@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas, metasCuenta, normalizeEmbudoEtapas } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds, DashboardPersonalizado } from "@/lib/db/schema";
+import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds, DashboardPersonalizado, CategoriaLlamada } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseMetricasConfig } from "@/lib/metricas-engine";
 
@@ -39,6 +39,7 @@ export interface SystemConfigData {
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
   /** Toggle: si true, las etapas con es_cerrada:true también cuentan como calificadas */
   cerradas_cuentan_como_calificadas?: boolean;
+  categorias_llamadas: CategoriaLlamada[];
 }
 
 export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
@@ -52,6 +53,7 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
   ranking_columnas?: string[] | null;
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
   cerradas_cuentan_como_calificadas?: boolean;
+  categorias_llamadas?: CategoriaLlamada[];
 }
 
 const DEFAULT_PROMPT_VENTAS =
@@ -81,6 +83,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         fuente_llamadas: cuentas.fuente_llamadas,
         ghl_location_id: cuentas.ghl_location_id,
         configuracion_ads: cuentas.configuracion_ads,
+        categorias_llamadas: cuentas.categorias_llamadas,
       })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
@@ -118,6 +121,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       configuracion_ads: {},
       ranking_columnas: null,
       cerradas_cuentan_como_calificadas: true,
+      categorias_llamadas: [],
     };
   }
 
@@ -149,6 +153,7 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     ranking_columnas: Array.isArray(r.configuracion_ui?.ranking_columnas) ? r.configuracion_ui.ranking_columnas : null,
     ghl_notas: r.configuracion_ui?.ghl_notas ?? { ia: true, transcripcion: false },
     cerradas_cuentan_como_calificadas: r.configuracion_ui?.cerradas_cuentan_como_calificadas ?? true,
+    categorias_llamadas: Array.isArray(r.categorias_llamadas) ? r.categorias_llamadas : [],
   };
 }
 
@@ -196,6 +201,7 @@ export async function updateSystemConfig(
   if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
   if (data.configuracion_ads !== undefined) setClause.configuracion_ads = data.configuracion_ads;
+  if (data.categorias_llamadas !== undefined) setClause.categorias_llamadas = data.categorias_llamadas;
 
   // Handle chat_analisis_hora — update metas_cuenta table
   const dataAnyTop = data as Record<string, unknown>;
