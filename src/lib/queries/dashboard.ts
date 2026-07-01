@@ -994,6 +994,7 @@ export async function getDashboard(
     eq(chatsLogs.id_cuenta, idCuenta),
     gte(sql`COALESCE(${chatsLogs.primer_msg_at}, ${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`, fromDate),
     lte(sql`COALESCE(${chatsLogs.primer_msg_at}, ${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`, toDate),
+    sql`${chatsLogs.excluida_dashboard} IS NOT TRUE`,
   ];
   // Filtro por asesor en chats: usa asesor_asignado (equivalente a closer_mail en llamadas).
   // Sin esto, usuarios sin ver_todo ven los chats de todo el account.

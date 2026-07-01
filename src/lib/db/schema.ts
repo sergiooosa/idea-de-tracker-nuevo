@@ -490,6 +490,7 @@ export const chatsLogs = pgTable("chats_logs", {
   ia_categoria: text("ia_categoria"),
   ia_analizado_at: timestamp("ia_analizado_at", { withTimezone: true }),
   ia_objeciones: jsonb("ia_objeciones").$type<ObjecionIA[]>(),
+  excluida_dashboard: boolean("excluida_dashboard"),
 });
 
 /* ------------------------------------------------------------------ */
