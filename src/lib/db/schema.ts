@@ -61,11 +61,12 @@ export interface ReglaEtiqueta {
   id: string;
   nombre: string;
   condicion: string;
-  accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica";
+  accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
   valor: string;
   fuente?: "chats" | "videollamadas" | "llamadas" | "todas";
   metrica_id?: string; // ID de MetricaConfig cuando accion = "incrementar_metrica"
   metrica_incremento?: number; // Cuánto sumar (default 1)
+  categoria_id?: string; // ID de CategoriaLlamada cuando accion = "asignar_categoria"
   // Legacy fields (kept for backward compatibility)
   condition?: string;
   tag?: string;
@@ -289,6 +290,15 @@ export interface RazonPerdidaEntry {
   notas?: string;
 }
 
+// ─── Categorías de llamada (AUT-1143) ─────────────────────────────────────────
+
+export interface CategoriaLlamada {
+  id: string;
+  nombre: string;
+  temas: string[];
+  prompt: string;
+}
+
 // ─── Closer merge rules ───────────────────────────────────────────────────────
 
 export interface CloserMergeRule {
@@ -330,6 +340,7 @@ export const cuentas = pgTable("cuentas", {
   closer_merge_rules: jsonb("closer_merge_rules").$type<CloserMergeRule[]>().default([]),
   razones_perdida_config: jsonb("razones_perdida_config").$type<RazonPerdidaOption[]>(),
   razones_perdida_data: jsonb("razones_perdida_data").$type<RazonPerdidaEntry[]>(),
+  categorias_llamadas: jsonb("categorias_llamadas").$type<CategoriaLlamada[]>(),
 });
 
 /* ------------------------------------------------------------------ */
