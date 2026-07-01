@@ -26,18 +26,33 @@ export default function SelectorFuenteConBusqueda({
   const [search, setSearch] = useState("");
 
   const options = useMemo(() => {
-    const kpis = KPI_DEFAULT_KEYS.map((key) => ({
-      id: key,
-      nombre: KPI_DEFAULT_LABELS[key] ?? key,
-      tipo: "kpi" as const,
-    }));
-    const metricas = metricasConfig
-      .filter((m) => m.id !== excludeMetricId)
-      .map((m) => ({
-        id: m.id,
-        nombre: m.nombre,
-        tipo: "metrica" as const,
+    const activeMetricas = metricasConfig.filter((m) => m.id !== excludeMetricId);
+
+    const shadowedKpiKeys = new Set<string>();
+    for (const m of activeMetricas) {
+      if (m.formula?.tipo === "directo" && typeof m.formula.fuente === "string") {
+        shadowedKpiKeys.add(m.formula.fuente);
+      }
+      const label = m.nombre.toLowerCase().trim();
+      for (const key of KPI_DEFAULT_KEYS) {
+        if ((KPI_DEFAULT_LABELS[key] ?? key).toLowerCase().trim() === label) {
+          shadowedKpiKeys.add(key);
+        }
+      }
+    }
+
+    const kpis = KPI_DEFAULT_KEYS
+      .filter((key) => !shadowedKpiKeys.has(key))
+      .map((key) => ({
+        id: key,
+        nombre: KPI_DEFAULT_LABELS[key] ?? key,
+        tipo: "kpi" as const,
       }));
+    const metricas = activeMetricas.map((m) => ({
+      id: m.id,
+      nombre: m.nombre,
+      tipo: "metrica" as const,
+    }));
     const all = [...kpis, ...metricas];
     if (!search.trim()) return all;
     const q = search.toLowerCase().trim();
