@@ -30,7 +30,25 @@ import DashboardsManager from '@/components/dashboard/DashboardsManager';
 import type { MetricaConfig, MetricaManualEntry, CategoriaLlamada } from '@/lib/db/schema';
 import ChatRecoverySection from '@/features/quick-triggers/chat-recovery/ChatRecoverySection';
 
-interface TagRule { id: string; condition: string; tag: string; source: string; funnelStage?: string }
+interface DynamicValueRangeLocal {
+  min: number;
+  label: string;
+}
+interface DynamicValueConfigLocal {
+  fuente: "custom_field" | "formula";
+  fieldId?: string;
+  formula?: string;
+  ranges?: DynamicValueRangeLocal[];
+  mode?: "exacto" | "aproximado";
+}
+interface TagRule {
+  id: string;
+  condition: string;
+  tag: string;
+  source: string;
+  funnelStage?: string;
+  dynamicValue?: DynamicValueConfigLocal;
+}
 interface MetricRule {
   id: string; name: string; description: string; condition: string;
   increment: number; whenMeasured: string; isRecurring: 'recurrente' | 'unica';
@@ -977,6 +995,144 @@ export default function SystemPage() {
                             <option key={e.id} value={e.nombre}>{e.nombre}</option>
                           ))}
                         </select>
+                      </div>
+                    )}
+                    {(r as unknown as { accion?: string }).accion === 'asignar_etiqueta' && (
+                      <div className="rounded-lg border border-surface-500 bg-surface-800/50 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!!r.dynamicValue}
+                              onChange={(e) => {
+                                setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                  ...x,
+                                  dynamicValue: e.target.checked ? { fuente: 'custom_field' as const, mode: 'exacto' as const } : undefined,
+                                } : x));
+                              }}
+                              className="rounded border-surface-500 bg-surface-600 text-accent-cyan focus:ring-accent-cyan/40"
+                            />
+                            <span className="text-[11px] font-medium text-accent-cyan">Valor dinámico</span>
+                          </label>
+                          <span className="text-[10px] text-gray-500">Resuelve el valor desde un campo del contacto</span>
+                        </div>
+                        {r.dynamicValue && (
+                          <div className="space-y-2 pl-4 border-l-2 border-accent-cyan/30">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-400 mb-1">Fuente</label>
+                                <select
+                                  value={r.dynamicValue.fuente}
+                                  onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                    ...x, dynamicValue: { ...x.dynamicValue!, fuente: e.target.value as 'custom_field' | 'formula' },
+                                  } : x))}
+                                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
+                                >
+                                  <option value="custom_field">Campo personalizado (GHL)</option>
+                                  <option value="formula">Fórmula</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-400 mb-1">Modo</label>
+                                <select
+                                  value={r.dynamicValue.mode ?? 'exacto'}
+                                  onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                    ...x, dynamicValue: { ...x.dynamicValue!, mode: e.target.value as 'exacto' | 'aproximado' },
+                                  } : x))}
+                                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
+                                >
+                                  <option value="exacto">Exacto</option>
+                                  <option value="aproximado">Aproximado</option>
+                                </select>
+                              </div>
+                            </div>
+                            {r.dynamicValue.fuente === 'custom_field' && (
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-400 mb-1">ID del campo en GHL</label>
+                                <input
+                                  type="text"
+                                  value={r.dynamicValue.fieldId ?? ''}
+                                  onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                    ...x, dynamicValue: { ...x.dynamicValue!, fieldId: e.target.value || undefined },
+                                  } : x))}
+                                  placeholder="ej: presupuesto_mensual"
+                                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-accent-cyan/40"
+                                />
+                              </div>
+                            )}
+                            {r.dynamicValue.fuente === 'formula' && (
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-400 mb-1">Fórmula</label>
+                                <input
+                                  type="text"
+                                  value={r.dynamicValue.formula ?? ''}
+                                  onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                    ...x, dynamicValue: { ...x.dynamicValue!, formula: e.target.value || undefined },
+                                  } : x))}
+                                  placeholder="ej: campo_a / campo_b * 100"
+                                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-accent-cyan/40"
+                                />
+                              </div>
+                            )}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] font-medium text-gray-400">Rangos (opcional)</label>
+                                <button
+                                  type="button"
+                                  onClick={() => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                    ...x, dynamicValue: { ...x.dynamicValue!, ranges: [...(x.dynamicValue?.ranges ?? []), { min: 0, label: '' }] },
+                                  } : x))}
+                                  className="text-[10px] text-accent-cyan hover:text-accent-cyan/80"
+                                >
+                                  + Rango
+                                </button>
+                              </div>
+                              {(r.dynamicValue.ranges ?? []).map((range, ri) => (
+                                <div key={ri} className="flex items-center gap-2 mb-1">
+                                  <input
+                                    type="number"
+                                    value={range.min}
+                                    onChange={(e) => {
+                                      const newRanges = [...(r.dynamicValue?.ranges ?? [])];
+                                      newRanges[ri] = { ...newRanges[ri], min: parseFloat(e.target.value) || 0 };
+                                      setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                        ...x, dynamicValue: { ...x.dynamicValue!, ranges: newRanges },
+                                      } : x));
+                                    }}
+                                    placeholder="≥"
+                                    className="w-20 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
+                                  />
+                                  <span className="text-[10px] text-gray-500">→</span>
+                                  <input
+                                    type="text"
+                                    value={range.label}
+                                    onChange={(e) => {
+                                      const newRanges = [...(r.dynamicValue?.ranges ?? [])];
+                                      newRanges[ri] = { ...newRanges[ri], label: e.target.value };
+                                      setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                        ...x, dynamicValue: { ...x.dynamicValue!, ranges: newRanges },
+                                      } : x));
+                                    }}
+                                    placeholder="Etiqueta del rango"
+                                    className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newRanges = (r.dynamicValue?.ranges ?? []).filter((_, i) => i !== ri);
+                                      setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                        ...x, dynamicValue: { ...x.dynamicValue!, ranges: newRanges.length ? newRanges : undefined },
+                                      } : x));
+                                    }}
+                                    className="text-gray-500 hover:text-red-400"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="flex justify-end">

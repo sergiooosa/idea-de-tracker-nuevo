@@ -57,6 +57,19 @@ export interface ConfiguracionUI {
   secciones_ocultas?: string[];
 }
 
+export interface DynamicValueRange {
+  min: number;
+  label: string;
+}
+
+export interface DynamicValueConfig {
+  fuente: "custom_field" | "formula";
+  fieldId?: string;
+  formula?: string;
+  ranges?: DynamicValueRange[];
+  mode?: "exacto" | "aproximado";
+}
+
 export interface ReglaEtiqueta {
   id: string;
   nombre: string;
@@ -64,10 +77,10 @@ export interface ReglaEtiqueta {
   accion: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
   valor: string;
   fuente?: "chats" | "videollamadas" | "llamadas" | "todas";
-  metrica_id?: string; // ID de MetricaConfig cuando accion = "incrementar_metrica"
-  metrica_incremento?: number; // Cuánto sumar (default 1)
-  categoria_id?: string; // ID de CategoriaLlamada cuando accion = "asignar_categoria"
-  // Legacy fields (kept for backward compatibility)
+  metrica_id?: string;
+  metrica_incremento?: number;
+  categoria_id?: string;
+  dynamicValue?: DynamicValueConfig;
   condition?: string;
   tag?: string;
   source?: string;
