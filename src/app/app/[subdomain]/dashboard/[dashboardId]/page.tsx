@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Pencil, ArrowLeft } from 'lucide-react';
 import type { DashboardResponse } from '@/types';
 import KPICard from '@/components/dashboard/KPICard';
+import AdvisorRankingWidget from '@/components/dashboard/AdvisorRankingWidget';
 import PageHeader from '@/components/dashboard/PageHeader';
 
 const fm = (n: number) =>
@@ -109,8 +110,8 @@ export default function DashboardNodePage() {
         {!loading && metricasDelPanel.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {metricasDelPanel.map((metrica) => {
-              const color = metrica.color === 'cyan' || metrica.color === 'purple' || metrica.color === 'green' || metrica.color === 'amber' || metrica.color === 'red' || metrica.color === 'blue' 
-                ? metrica.color 
+              const color = metrica.color === 'cyan' || metrica.color === 'purple' || metrica.color === 'green' || metrica.color === 'amber' || metrica.color === 'red' || metrica.color === 'blue'
+                ? metrica.color
                 : 'cyan';
               return (
                 <KPICard
@@ -123,6 +124,10 @@ export default function DashboardNodePage() {
               );
             })}
           </div>
+        )}
+
+        {!loading && (data?.advisorRanking?.length ?? 0) > 0 && (
+          <AdvisorRankingWidget advisorRanking={data!.advisorRanking} />
         )}
       </div>
     </main>
