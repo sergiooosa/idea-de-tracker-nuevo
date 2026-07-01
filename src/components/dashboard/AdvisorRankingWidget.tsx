@@ -161,7 +161,9 @@ export default function AdvisorRankingWidget({ advisorRanking }: Props) {
             </thead>
             <tbody>
               {sorted.map((a, i) => {
-                const key = a.advisorEmail ?? a.advisorName;
+                const key = a.advisorEmail
+                  ? `${a.advisorEmail}-${a.advisorName}`
+                  : `idx-${i}-${a.advisorName}`;
                 const isExpanded = expandedAdvisor === key;
                 const colSpan =
                   2 +
