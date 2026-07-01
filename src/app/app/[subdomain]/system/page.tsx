@@ -41,13 +41,31 @@ interface DynamicValueConfigLocal {
   ranges?: DynamicValueRangeLocal[];
   mode?: "exacto" | "aproximado";
 }
+interface AccionReglaLocal {
+  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
+  valor?: string;
+  funnelStage?: string;
+  metrica_id?: string;
+  metrica_incremento?: number;
+  categoria_id?: string;
+}
 interface TagRule {
   id: string;
-  condition: string;
-  tag: string;
-  source: string;
-  funnelStage?: string;
+  condicion: string;
+  acciones: AccionReglaLocal[];
+  fuentes: string[];
   dynamicValue?: DynamicValueConfigLocal;
+  // legacy read-only
+  condition?: string;
+  tag?: string;
+  source?: string;
+  funnelStage?: string;
+  accion?: string;
+  valor?: string;
+  fuente?: string;
+  metrica_id?: string;
+  metrica_incremento?: number;
+  nombre?: string;
 }
 interface MetricRule {
   id: string; name: string; description: string; condition: string;
@@ -131,7 +149,7 @@ interface ConfiguracionAdsLocal {
 }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
-  reglas_etiquetas: TagRule[]; metricas_personalizadas: MetricRule[];
+  reglas_etiquetas: (TagRule & Record<string, unknown>)[]; metricas_personalizadas: MetricRule[];
   metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
   dashboards_personalizados?: import('@/lib/db/schema').DashboardPersonalizado[];
   embudo_personalizado: EmbudoEtapa[];
@@ -332,7 +350,21 @@ export default function SystemPage() {
         setPromptEmpresa(cfg.prompt_ventas);
         setPromptEvaluacion(cfg.prompt_videollamadas);
         setPromptLlamadas(cfg.prompt_llamadas);
-        setTagRules(cfg.reglas_etiquetas.length > 0 ? cfg.reglas_etiquetas : []);
+        setTagRules(cfg.reglas_etiquetas.length > 0 ? cfg.reglas_etiquetas.map((r: TagRule & Record<string, unknown>) => {
+          const acciones: AccionReglaLocal[] = (r.acciones && (r.acciones as AccionReglaLocal[]).length > 0)
+            ? r.acciones as AccionReglaLocal[]
+            : [{ tipo: (r.accion as AccionReglaLocal['tipo']) ?? 'asignar_etiqueta', valor: (r.valor as string) ?? (r.tag as string), funnelStage: r.funnelStage as string | undefined, metrica_id: r.metrica_id as string | undefined, metrica_incremento: r.metrica_incremento as number | undefined, categoria_id: (r as Record<string, unknown>).categoria_id as string | undefined }];
+          const fuentes: string[] = (r.fuentes && (r.fuentes as string[]).length > 0)
+            ? r.fuentes as string[]
+            : (r.fuente ?? r.source) === 'call'
+              ? ['llamadas']
+              : (r.fuente ?? r.source) === 'meeting'
+                ? ['videollamadas']
+                : ((r.fuente ?? r.source) && (r.fuente ?? r.source) !== 'todas')
+                  ? [r.fuente ?? r.source] as string[]
+                  : ['llamadas', 'videollamadas', 'chats'];
+          return { ...r, condicion: (r.condicion ?? r.condition ?? '') as string, acciones, fuentes, nombre: (r.nombre ?? '') as string };
+        }) : []);
         setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
         const loadedEmbudo = Array.isArray(cfg.embudo_personalizado)
           ? cfg.embudo_personalizado.map((e: EmbudoEtapa) => ({ ...e, nombre: e.nombre ?? e.name ?? e.id }))
@@ -439,7 +471,13 @@ export default function SystemPage() {
         prompt_ventas: promptEmpresa,
         prompt_videollamadas: promptEvaluacion,
         prompt_llamadas: promptLlamadas,
-        reglas_etiquetas: tagRules,
+        reglas_etiquetas: tagRules.map((r) => ({
+          id: r.id,
+          nombre: r.nombre ?? '',
+          condicion: r.condicion,
+          acciones: r.acciones,
+          fuentes: r.fuentes,
+        })),
         metricas_personalizadas: metricRules,
         metricas_config: metricasConfig,
         metricas_manual_data: metricasManualData,
@@ -527,7 +565,7 @@ export default function SystemPage() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const addTagRule = () => setTagRules((r) => [...r, { id: Date.now().toString(), condition: '', tag: '', source: 'call' }]);
+  const addTagRule = () => setTagRules((r) => [...r, { id: Date.now().toString(), condicion: '', acciones: [{ tipo: 'asignar_etiqueta', valor: '' }], fuentes: ['llamadas', 'videollamadas', 'chats'] }]);
   const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '', ubicacion: 'ambos' }]);
   const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1, es_unica: true }]);
   const removeEmbudoEtapa = (id: string) => setEmbudoEtapas((e) => e.filter((x) => x.id !== id).map((x, i) => ({ ...x, orden: i + 1 })));
@@ -855,149 +893,172 @@ export default function SystemPage() {
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><Tag className="w-5 h-5 text-accent-amber" /></div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
-                  <p className="text-sm text-gray-400">Define condiciones para asignar etiquetas automáticamente.</p>
+                  <p className="text-sm text-gray-400">Define condiciones para asignar etiquetas, cambiar estado o incrementar métricas automáticamente. Cada regla puede tener múltiples acciones.</p>
                 </div>
               </div>
               <ul className="space-y-3">
-                {tagRules.map((r) => (
-                  <li key={r.id} className="rounded-xl p-4 space-y-3 border-l-4 border-accent-amber/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500">
-                    <div className="flex flex-wrap gap-3">
-                      <div className="flex-1 min-w-[180px]">
-                        <label className="block text-[11px] font-medium text-accent-amber mb-1">Condición</label>
-                        <select
-                          value={['mencion_precio', 'enojo', 'interes_alto', 'solicitud_propuesta', 'objecion_precio', 'objecion_tiempo', 'duracion_mayor', 'intentos_mayor', 'speed_mayor'].includes(r.condition) ? r.condition : '_custom'}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val !== '_custom') setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, condition: val } : x));
-                          }}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                        >
-                          <optgroup label="Condición IA">
-                            <option value="mencion_precio">Mención de precio</option>
-                            <option value="enojo">Enojo del lead</option>
-                            <option value="interes_alto">Interés alto</option>
-                            <option value="solicitud_propuesta">Solicitud de propuesta</option>
-                            <option value="objecion_precio">Objeción por precio</option>
-                            <option value="objecion_tiempo">Objeción por tiempo</option>
-                          </optgroup>
-                          <optgroup label="Condición Fija">
-                            <option value="duracion_mayor">Duración mayor a X min</option>
-                            <option value="intentos_mayor">Intentos mayor a Y</option>
-                            <option value="speed_mayor">Speed to lead mayor a Z min</option>
-                          </optgroup>
-                          <optgroup label="Personalizada">
-                            <option value="_custom">Texto libre...</option>
-                          </optgroup>
-                        </select>
-                        {!['mencion_precio', 'enojo', 'interes_alto', 'solicitud_propuesta', 'objecion_precio', 'objecion_tiempo', 'duracion_mayor', 'intentos_mayor', 'speed_mayor'].includes(r.condition) && (
-                          <input type="text" value={r.condition} onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, condition: e.target.value } : x))}
-                            placeholder="Condición personalizada"
-                            className="w-full mt-1.5 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
-                        )}
-                      </div>
-                      <div className="w-36">
-                        <label className="block text-[11px] font-medium text-accent-cyan mb-1">Etiqueta</label>
-                        <input type="text" value={r.tag} onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, tag: v } : x)); }} placeholder="nombre_etiqueta"
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
-                      </div>
-                      <div className="w-36">
-                        <label className="block text-[11px] font-medium text-gray-400 mb-1">Acción</label>
-                        <select
-                          value={(r as unknown as { accion?: string }).accion ?? 'asignar_etiqueta'}
-                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, accion: e.target.value } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                        >
-                          <option value="asignar_etiqueta">Asignar etiqueta</option>
-                          <option value="cambiar_estado">Cambiar estado</option>
-                          <option value="etapa_cambiada">Etapa cambiada</option>
-                          <option value="incrementar_metrica">Incrementar métrica</option>
-                          {categoriasLlamadas.length > 0 && <option value="asignar_categoria">Asignar categoría</option>}
-                        </select>
-                      </div>
-                      <div className="w-32">
-                        <label className="block text-[11px] font-medium text-gray-400 mb-1">Fuente</label>
-                        <select
-                          value={(r as unknown as { fuente?: string }).fuente ?? r.source ?? 'todas'}
-                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, fuente: e.target.value, source: e.target.value } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                        >
-                          <option value="todas">Todas</option>
-                          <option value="llamadas">Llamadas</option>
-                          <option value="videollamadas">Videollamadas</option>
-                          <option value="chats">Chats</option>
-                        </select>
-                      </div>
-                    </div>
-                    {(r as unknown as { accion?: string }).accion === 'incrementar_metrica' && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] font-medium text-accent-cyan mb-1">Métrica a incrementar</label>
+                {tagRules.map((r) => {
+                  const KNOWN_CONDITIONS = ['mencion_precio', 'enojo', 'interes_alto', 'solicitud_propuesta', 'objecion_precio', 'objecion_tiempo', 'duracion_mayor', 'intentos_mayor', 'speed_mayor'];
+                  const allChannels = ['llamadas', 'videollamadas', 'chats'];
+                  const isAllSources = r.fuentes.length === 3 && allChannels.every((c) => r.fuentes.includes(c));
+                  const updateRule = (patch: Partial<TagRule>) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, ...patch } : x));
+                  const updateAccion = (idx: number, patch: Partial<AccionReglaLocal>) => {
+                    const next = r.acciones.map((a, i) => i === idx ? { ...a, ...patch } : a);
+                    updateRule({ acciones: next });
+                  };
+                  const addAccion = () => updateRule({ acciones: [...r.acciones, { tipo: 'asignar_etiqueta', valor: '' }] });
+                  const removeAccion = (idx: number) => updateRule({ acciones: r.acciones.filter((_, i) => i !== idx) });
+                  const toggleFuente = (canal: string) => {
+                    const has = r.fuentes.includes(canal);
+                    const next = has ? r.fuentes.filter((f) => f !== canal) : [...r.fuentes, canal];
+                    if (next.length === 0) return;
+                    updateRule({ fuentes: next });
+                  };
+                  const toggleTodas = () => {
+                    updateRule({ fuentes: isAllSources ? [] : [...allChannels] });
+                  };
+                  return (
+                    <li key={r.id} className="rounded-xl p-4 space-y-3 border-l-4 border-accent-amber/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500">
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex-1 min-w-[180px]">
+                          <label className="block text-[11px] font-medium text-accent-amber mb-1">Condición</label>
                           <select
-                            value={(r as unknown as { metrica_id?: string }).metrica_id ?? ''}
-                            onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, metrica_id: e.target.value || undefined } : x))}
+                            value={KNOWN_CONDITIONS.includes(r.condicion) ? r.condicion : '_custom'}
+                            onChange={(e) => { const val = e.target.value; if (val !== '_custom') updateRule({ condicion: val }); }}
                             className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
                           >
-                            <option value="">— Seleccionar —</option>
-                            {/* manual/fija: incremento escrito en metricas_manual_data
-                                webhook: incremento escrito en metricas_webhook (compatible con el engine) */}
-                            {metricasConfig
-                              .filter((m) => m.tipo === 'manual' || m.tipo === 'fija' || m.tipo === 'webhook')
-                              .sort((a, b) => {
-                                const order: Record<string, number> = { manual: 0, fija: 1, webhook: 2 };
-                                return (order[a.tipo] ?? 9) - (order[b.tipo] ?? 9);
-                              })
-                              .map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  {m.nombre}{m.tipo === 'webhook' ? ' (webhook)' : ''}
-                                </option>
-                              ))}
+                            <optgroup label="Condición IA">
+                              <option value="mencion_precio">Mención de precio</option>
+                              <option value="enojo">Enojo del lead</option>
+                              <option value="interes_alto">Interés alto</option>
+                              <option value="solicitud_propuesta">Solicitud de propuesta</option>
+                              <option value="objecion_precio">Objeción por precio</option>
+                              <option value="objecion_tiempo">Objeción por tiempo</option>
+                            </optgroup>
+                            <optgroup label="Condición Fija">
+                              <option value="duracion_mayor">Duración mayor a X min</option>
+                              <option value="intentos_mayor">Intentos mayor a Y</option>
+                              <option value="speed_mayor">Speed to lead mayor a Z min</option>
+                            </optgroup>
+                            <optgroup label="Personalizada">
+                              <option value="_custom">Texto libre...</option>
+                            </optgroup>
                           </select>
+                          {!KNOWN_CONDITIONS.includes(r.condicion) && (
+                            <input type="text" value={r.condicion} onChange={(e) => updateRule({ condicion: e.target.value })}
+                              placeholder="Condición personalizada"
+                              className="w-full mt-1.5 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-amber/40" />
+                          )}
                         </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-accent-cyan mb-1">Incremento</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={(r as unknown as { metrica_incremento?: number }).metrica_incremento ?? 1}
-                            onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, metrica_incremento: parseInt(e.target.value) || 1 } : x))}
-                            className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                          />
+                        <div className="w-48">
+                          <label className="block text-[11px] font-medium text-gray-400 mb-1">Fuentes</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            <button type="button" onClick={toggleTodas}
+                              className={`px-2 py-1 rounded text-[11px] font-medium border transition-colors ${isAllSources ? 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/40' : 'bg-surface-600 text-gray-400 border-surface-500 hover:border-gray-400'}`}>
+                              Todas
+                            </button>
+                            {allChannels.map((canal) => (
+                              <button key={canal} type="button" onClick={() => toggleFuente(canal)}
+                                className={`px-2 py-1 rounded text-[11px] font-medium border transition-colors ${r.fuentes.includes(canal) && !isAllSources ? 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/40' : !isAllSources ? 'bg-surface-600 text-gray-400 border-surface-500 hover:border-gray-400' : 'bg-surface-600 text-gray-500 border-surface-500 opacity-50'}`}
+                                disabled={isAllSources}>
+                                {canal === 'llamadas' ? 'Llamadas' : canal === 'videollamadas' ? 'Video' : 'Chats'}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    )}
-                    {(r as unknown as { accion?: string }).accion === 'asignar_categoria' && (
-                      <div>
-                        <label className="block text-[11px] font-medium text-accent-purple mb-1">Categoría de llamada</label>
-                        <select
-                          value={(r as unknown as { categoria_id?: string }).categoria_id ?? ''}
-                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, categoria_id: e.target.value || undefined } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                        >
-                          <option value="">— Seleccionar categoría —</option>
-                          {categoriasLlamadas.map((cat) => (
-                            <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                          ))}
-                        </select>
+
+                      <div className="space-y-2">
+                        <label className="block text-[11px] font-medium text-gray-400">Acciones ({r.acciones.length})</label>
+                        {r.acciones.map((a, ai) => (
+                          <div key={ai} className="rounded-lg p-3 bg-surface-600/50 border border-surface-500 space-y-2">
+                            <div className="flex flex-wrap gap-2 items-end">
+                              <div className="w-44">
+                                <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Tipo</label>
+                                <select value={a.tipo} onChange={(e) => updateAccion(ai, { tipo: e.target.value as AccionReglaLocal['tipo'], valor: '', funnelStage: undefined, metrica_id: undefined, metrica_incremento: undefined, categoria_id: undefined })}
+                                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white">
+                                  <option value="asignar_etiqueta">Asignar etiqueta</option>
+                                  <option value="cambiar_estado">Cambiar estado</option>
+                                  <option value="etapa_cambiada">Etapa cambiada</option>
+                                  <option value="incrementar_metrica">Incrementar métrica</option>
+                                  {categoriasLlamadas.length > 0 && <option value="asignar_categoria">Asignar categoría</option>}
+                                </select>
+                              </div>
+                              {a.tipo === 'asignar_etiqueta' && (
+                                <div className="flex-1 min-w-[120px]">
+                                  <label className="block text-[10px] font-medium text-accent-cyan mb-0.5">Etiqueta</label>
+                                  <input type="text" value={a.valor ?? ''} onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); updateAccion(ai, { valor: v }); }}
+                                    placeholder="nombre_etiqueta" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
+                                </div>
+                              )}
+                              {a.tipo === 'cambiar_estado' && (
+                                <div className="flex-1 min-w-[120px]">
+                                  <label className="block text-[10px] font-medium text-accent-cyan mb-0.5">Estado</label>
+                                  <input type="text" value={a.valor ?? ''} onChange={(e) => updateAccion(ai, { valor: e.target.value })}
+                                    placeholder="nuevo_estado" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
+                                </div>
+                              )}
+                              {a.tipo === 'etapa_cambiada' && (
+                                <div className="flex-1 min-w-[140px]">
+                                  <label className="block text-[10px] font-medium text-accent-purple mb-0.5">Etapa del embudo</label>
+                                  <select value={a.funnelStage ?? ''} onChange={(e) => updateAccion(ai, { funnelStage: e.target.value || undefined, valor: e.target.value || undefined })}
+                                    className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white">
+                                    <option value="">— Seleccionar —</option>
+                                    {embudoEtapas.map((e) => (<option key={e.id} value={e.nombre}>{e.nombre}</option>))}
+                                  </select>
+                                </div>
+                              )}
+                              {a.tipo === 'incrementar_metrica' && (
+                                <>
+                                  <div className="flex-1 min-w-[140px]">
+                                    <label className="block text-[10px] font-medium text-accent-cyan mb-0.5">Métrica</label>
+                                    <select value={a.metrica_id ?? ''} onChange={(e) => updateAccion(ai, { metrica_id: e.target.value || undefined })}
+                                      className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white">
+                                      <option value="">— Seleccionar —</option>
+                                      {metricasConfig
+                                        .filter((m) => m.tipo === 'manual' || m.tipo === 'fija' || m.tipo === 'webhook')
+                                        .sort((a, b) => { const order: Record<string, number> = { manual: 0, fija: 1, webhook: 2 }; return (order[a.tipo] ?? 9) - (order[b.tipo] ?? 9); })
+                                        .map((m) => (<option key={m.id} value={m.id}>{m.nombre}{m.tipo === 'webhook' ? ' (webhook)' : ''}</option>))}
+                                    </select>
+                                  </div>
+                                  <div className="w-20">
+                                    <label className="block text-[10px] font-medium text-accent-cyan mb-0.5">+</label>
+                                    <input type="number" min="1" value={a.metrica_incremento ?? 1} onChange={(e) => updateAccion(ai, { metrica_incremento: parseInt(e.target.value) || 1 })}
+                                      className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white" />
+                                  </div>
+                                </>
+                              )}
+                              {a.tipo === 'asignar_categoria' && categoriasLlamadas.length > 0 && (
+                                <div className="flex-1 min-w-[140px]">
+                                  <label className="block text-[10px] font-medium text-accent-purple mb-0.5">Categoría</label>
+                                  <select value={a.categoria_id ?? ''} onChange={(e) => updateAccion(ai, { categoria_id: e.target.value || undefined })}
+                                    className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white">
+                                    <option value="">— Seleccionar categoría —</option>
+                                    {categoriasLlamadas.map((cat) => (<option key={cat.id} value={cat.id}>{cat.nombre}</option>))}
+                                  </select>
+                                </div>
+                              )}
+                              {r.acciones.length > 1 && (
+                                <button type="button" onClick={() => removeAccion(ai)} className="text-gray-500 hover:text-red-400 transition-colors p-1">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <button type="button" onClick={addAccion}
+                          className="text-[11px] text-accent-amber hover:text-accent-amber/80 transition-colors flex items-center gap-1">
+                          <Plus className="w-3 h-3" /> Agregar acción
+                        </button>
                       </div>
-                    )}
-                    {embudoEtapas.length > 0 && (r as unknown as { accion?: string }).accion !== 'incrementar_metrica' && (r as unknown as { accion?: string }).accion !== 'asignar_categoria' && (
-                      <div>
-                        <label className="block text-[11px] font-medium text-accent-purple mb-1">
-                          {(r as unknown as { accion?: string }).accion === 'etapa_cambiada' ? 'Etapa del embudo' : 'Mover etapa de funnel a (opcional)'}
-                        </label>
-                        <select
-                          value={r.funnelStage ?? ''}
-                          onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? { ...x, funnelStage: e.target.value || undefined, valor: e.target.value || undefined } : x))}
-                          className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white"
-                        >
-                          <option value="">No mover etapa</option>
-                          {embudoEtapas.map((e) => (
-                            <option key={e.id} value={e.nombre}>{e.nombre}</option>
-                          ))}
-                        </select>
+
+                      <div className="flex justify-end">
+                        <button type="button" onClick={() => setTagRules((prev) => prev.filter((x) => x.id !== r.id))}
+                          className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" /> Eliminar regla
+                        </button>
                       </div>
-                    )}
-                    {((r as unknown as { accion?: string }).accion ?? 'asignar_etiqueta') === 'asignar_etiqueta' && (
+                    {r.acciones.some(a => a.tipo === 'asignar_etiqueta') && (
                       <div className="rounded-lg border border-surface-500 bg-surface-800/50 p-3 space-y-2">
                         <div className="flex items-center gap-2">
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -1135,14 +1196,9 @@ export default function SystemPage() {
                         )}
                       </div>
                     )}
-                    <div className="flex justify-end">
-                      <button type="button" onClick={() => setTagRules((prev) => prev.filter((x) => x.id !== r.id))}
-                        className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1">
-                        <Trash2 className="w-3 h-3" /> Eliminar regla
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
               <button type="button" onClick={addTagRule} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-amber/20 text-accent-amber border border-accent-amber/40 hover:bg-accent-amber/30 transition-all">
                 <Tag className="w-4 h-4" /> + Añadir regla

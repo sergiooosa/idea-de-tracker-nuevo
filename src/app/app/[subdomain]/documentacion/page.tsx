@@ -724,9 +724,9 @@ function EtiquetasSection() {
       id_cuenta: 1,
       subdominio: "tu-subdominio",
       reglas_etiquetas: [
-        { id: "r1", source: "call", condition: "interes_alto", tag: "lead_caliente", funnelStage: "Ofertada" },
-        { id: "r2", source: "call", condition: "objecion_precio", tag: "objecion_precio" },
-        { id: "r3", source: "meeting", condition: "mencion_precio", tag: "mencion_precio" },
+        { id: "r1", condicion: "interes_alto", acciones: [{ tipo: "asignar_etiqueta", valor: "lead_caliente" }, { tipo: "etapa_cambiada", funnelStage: "Ofertada" }], fuentes: ["llamadas", "videollamadas", "chats"] },
+        { id: "r2", condicion: "objecion_precio", acciones: [{ tipo: "asignar_etiqueta", valor: "objecion_precio" }], fuentes: ["llamadas"] },
+        { id: "r3", condicion: "mencion_precio", acciones: [{ tipo: "incrementar_metrica", metrica_id: "m1", metrica_incremento: 1 }], fuentes: ["videollamadas"] },
       ],
       embudo_personalizado: [
         { id: "e1", nombre: "Agendada", orden: 1 },
@@ -810,8 +810,8 @@ function EtiquetasSection() {
             { n: 1, text: "Cerebro recibe webhook de llamada o videollamada." },
             { n: 2, text: <>Llama a <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">GET /webhooks/config/:subdominio</code> para obtener las reglas actuales.</> },
             { n: 3, text: "La IA evalúa la transcripción y detecta condiciones (ver tabla abajo)." },
-            { n: 4, text: "Para cada regla cuya condición match, añade el tag de esa regla a tags_internos." },
-            { n: 5, text: "Si la regla tiene funnelStage, mover el lead a esa etapa del pipeline." },
+            { n: 4, text: "Para cada regla cuya condición match, ejecutar TODAS las acciones de esa regla (acciones[]): asignar etiquetas, cambiar etapa, incrementar métricas." },
+            { n: 5, text: "Verificar que el canal del evento está en fuentes[] de la regla (o que fuentes incluye los 3 canales = todas)." },
             { n: 6, text: "Si aplica, llamar al endpoint de GHL para sincronizar las etiquetas en el CRM." },
           ].map(({ n, text }) => (
             <div key={n} className="flex items-start gap-2">
