@@ -155,6 +155,7 @@ export async function getChats(
           eq(chatsLogs.id_cuenta, idCuenta),
           gte(sql`COALESCE(${chatsLogs.primer_msg_at}, ${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`, fromDate),
           lte(sql`COALESCE(${chatsLogs.primer_msg_at}, ${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`, toDate),
+          sql`${chatsLogs.excluida_dashboard} IS NOT TRUE`,
         ),
       )
       .orderBy(desc(sql`COALESCE(${chatsLogs.primer_msg_at}, ${chatsLogs.primer_msg_lead_at}, ${chatsLogs.fecha_y_hora_z})`)),
