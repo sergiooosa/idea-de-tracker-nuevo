@@ -529,6 +529,25 @@ export async function getDashboard(
     }
   }
 
+  // Enriquecer nombreToEmail con pares nombre↔email de llamadas y new-lead events
+  // (usuarios_dashboard.nombre_closer suele estar vacío; log_llamadas siempre trae ambos)
+  for (const c of filteredCalls) {
+    if (c.nombre_closer && c.closer_mail) {
+      const nameKey = c.nombre_closer.trim().toLowerCase();
+      if (!nombreToEmail[nameKey]) {
+        nombreToEmail[nameKey] = c.closer_mail.trim().toLowerCase();
+      }
+    }
+  }
+  for (const c of filteredNewLeadEvents) {
+    if (c.nombre_closer && c.closer_mail) {
+      const nameKey = c.nombre_closer.trim().toLowerCase();
+      if (!nombreToEmail[nameKey]) {
+        nombreToEmail[nameKey] = c.closer_mail.trim().toLowerCase();
+      }
+    }
+  }
+
   // Normalizar key de asesor: email lowercase > nombre→email lookup > nombre lowercase
   const normAdvisorKey = (mail?: string | null, name?: string | null) => {
     const e = mail?.trim().toLowerCase();
