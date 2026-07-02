@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, cuentas, usuariosDashboard, logLlamadas } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, cuentas, usuariosDashboard, logLlamadas, metricasWebhook } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { normalizeEmbudoEtapas } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig, type MetricaEngineContext } from "@/lib/metricas-engine";
@@ -369,8 +369,26 @@ export async function getVideollamadas(
   };
 
   const sorted = [...configs]
-    .filter((m) => m.ubicacion === "rendimiento" || m.ubicacion === "ambos")
+    .filter((m) => m.ubicacion === "rendimiento" || m.ubicacion === "ambos" || m.paneles?.includes("rendimiento"))
     .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+
+  const webhookCampos = sorted.filter((m) => m.tipo === "webhook" && m.webhookCampo).map((m) => m.webhookCampo!);
+  const webhookSumas: Record<string, number> = {};
+  if (webhookCampos.length > 0) {
+    const webhookRows = await db
+      .select({ campo: metricasWebhook.campo, valor: metricasWebhook.valor, ghl_user_id: metricasWebhook.ghl_user_id })
+      .from(metricasWebhook)
+      .where(and(
+        eq(metricasWebhook.id_cuenta, idCuenta),
+        gte(metricasWebhook.fecha, dateFrom),
+        lte(metricasWebhook.fecha, dateTo),
+        isNull(metricasWebhook.ghl_user_id),
+      ));
+    for (const row of webhookRows) {
+      webhookSumas[row.campo] = (webhookSumas[row.campo] ?? 0) + parseFloat(String(row.valor ?? 0));
+    }
+  }
+
   const metricaCtx: MetricaEngineContext = {
     id_cuenta: idCuenta,
     allConfigIds: new Set(configs.map((m) => m.id)),
@@ -391,6 +409,8 @@ export async function getVideollamadas(
       } else if (m.tipo === "manual") {
         const entries = manualData[m.id] ?? [];
         valor = calcMetricaManual(m, entries, dateFrom, dateTo);
+      } else if (m.tipo === "webhook") {
+        valor = m.webhookCampo ? (webhookSumas[m.webhookCampo] ?? 0) : 0;
       } else {
         valor = calcMetricaAutomatica(m, agg as Record<string, number>, metricasValores, dateFrom, dateTo, metricaCtx);
       }
