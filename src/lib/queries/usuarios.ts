@@ -1,9 +1,11 @@
 import { db } from "@/lib/db";
-import { usuariosDashboard } from "@/lib/db/schema";
+import { usuariosDashboard, cuentas } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { registrarWebhookFathom } from "@/lib/fathom-webhook";
 import { randomBytes } from "crypto";
+import { sendProvisionalPasswordEmail } from "@/lib/email";
+import { normalizeSubdominio } from "@/lib/subdomain";
 
 export type TipoUsuario = "analista" | "enfoque";
 
@@ -94,6 +96,9 @@ export async function createUsuario(
         .where(
           and(eq(usuariosDashboard.id_evento, row.id), eq(usuariosDashboard.id_cuenta, idCuenta)),
         );
+      if (provisionalPassword) {
+        void sendProvisionalEmail(idCuenta, data.email, data.nombre, provisionalPassword);
+      }
       return {
         user: { ...row, id_webhook_fathom: reg.webhookId } as UsuarioRow,
         fathomWarning: null,
@@ -101,6 +106,10 @@ export async function createUsuario(
       };
     }
     fathomWarning = reg.error;
+  }
+
+  if (provisionalPassword) {
+    void sendProvisionalEmail(idCuenta, data.email, data.nombre, provisionalPassword);
   }
 
   return { user: row as UsuarioRow, fathomWarning, provisionalPassword };
@@ -158,6 +167,26 @@ export async function updateUsuario(
     .where(and(eq(usuariosDashboard.id_evento, idEvento), eq(usuariosDashboard.id_cuenta, idCuenta)));
 
   return { fathomWarning };
+}
+
+async function sendProvisionalEmail(
+  idCuenta: number,
+  email: string,
+  nombre: string,
+  provisional: string,
+): Promise<void> {
+  try {
+    const [cuenta] = await db
+      .select({ subdominio: cuentas.subdominio })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+    const slug = normalizeSubdominio(cuenta?.subdominio) ?? "app";
+    const loginUrl = `https://${slug}.autokpi.net`;
+    await sendProvisionalPasswordEmail({ to: email, nombre, provisional, loginUrl });
+  } catch (err) {
+    console.error("[usuarios] Error enviando email provisional:", err);
+  }
 }
 
 export async function deleteUsuario(idCuenta: number, idEvento: number): Promise<void> {
