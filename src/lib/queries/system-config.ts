@@ -171,9 +171,8 @@ export async function updateSystemConfig(
   if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
   if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
   if (data.embudo_personalizado !== undefined) {
-    setClause.embudo_personalizado = data.embudo_personalizado;
-    // Auto-crear métricas para etapas custom (no fijas)
     const embudoNuevo = normalizeEmbudoEtapas(data.embudo_personalizado as unknown[]);
+    setClause.embudo_personalizado = embudoNuevo;
     const metricsExisting = (data.metricas_config ?? []) as MetricaConfig[];
     for (const etapa of embudoNuevo) {
       if (etapa.es_fija !== true) {
