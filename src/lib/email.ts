@@ -6,10 +6,6 @@ const resend = process.env.RESEND_API_KEY
 
 const EMAIL_FROM = process.env.EMAIL_FROM ?? "no-reply@autokpi.net";
 
-function isEnabled(): boolean {
-  return process.env.EMAIL_ENABLED === "true" && resend !== null;
-}
-
 interface ProvisionalEmailParams {
   to: string;
   nombre: string;
@@ -23,7 +19,7 @@ export async function sendProvisionalPasswordEmail({
   provisional,
   loginUrl,
 }: ProvisionalEmailParams): Promise<void> {
-  if (!isEnabled()) return;
+  if (process.env.EMAIL_ENABLED !== "true" || !resend) return;
 
   const html = `
 <!DOCTYPE html>
@@ -56,7 +52,7 @@ export async function sendProvisionalPasswordEmail({
 </html>`.trim();
 
   try {
-    await resend!.emails.send({
+    await resend.emails.send({
       from: EMAIL_FROM,
       to,
       subject: "Tu cuenta de AutoKPI — Contraseña provisional",

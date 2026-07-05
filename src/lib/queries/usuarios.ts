@@ -5,6 +5,7 @@ import { hash } from "bcryptjs";
 import { registrarWebhookFathom } from "@/lib/fathom-webhook";
 import { randomBytes } from "crypto";
 import { sendProvisionalPasswordEmail } from "@/lib/email";
+import { normalizeSubdominio } from "@/lib/subdomain";
 
 export type TipoUsuario = "analista" | "enfoque";
 
@@ -180,8 +181,8 @@ async function sendProvisionalEmail(
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1);
-    const sub = cuenta?.subdominio ?? "app";
-    const loginUrl = `https://${sub}.autokpi.net`;
+    const slug = normalizeSubdominio(cuenta?.subdominio) ?? "app";
+    const loginUrl = `https://${slug}.autokpi.net`;
     await sendProvisionalPasswordEmail({ to: email, nombre, provisional, loginUrl });
   } catch (err) {
     console.error("[usuarios] Error enviando email provisional:", err);
