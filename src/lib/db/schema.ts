@@ -265,9 +265,9 @@ export interface EmbudoEtapa {
 }
 
 export function normalizeEmbudoEtapas(raw: unknown[]): EmbudoEtapa[] {
-  return (raw as (EmbudoEtapa & { name?: string })[]).map((e) => ({
-    ...e,
-    nombre: e.nombre ?? e.name ?? e.id,
+  return (raw as (EmbudoEtapa & { name?: string })[]).map(({ name, ...rest }) => ({
+    ...rest,
+    nombre: rest.nombre ?? name ?? rest.id,
   }));
 }
 
