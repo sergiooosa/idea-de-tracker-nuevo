@@ -29,6 +29,7 @@ import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import DashboardsManager from '@/components/dashboard/DashboardsManager';
 import type { MetricaConfig, MetricaManualEntry, CategoriaLlamada } from '@/lib/db/schema';
 import ChatRecoverySection from '@/features/quick-triggers/chat-recovery/ChatRecoverySection';
+import HelpTooltip from '@/components/dashboard/HelpTooltip';
 
 interface DynamicValueRangeLocal {
   min: number;
@@ -891,8 +892,15 @@ export default function SystemPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><Tag className="w-5 h-5 text-accent-amber" /></div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
+                    <HelpTooltip
+                      titulo="¿Qué son las reglas de etiquetas?"
+                      contenido={`Las reglas asignan etiquetas automáticamente a tus leads después de cada interacción (llamada, videollamada o chat).\n\n• Etiqueta fija: tú escribes el texto exacto (ej. "interesado", "objeción_precio"). Siempre aparece igual.\n• Etiqueta dinámica: el valor se extrae de la respuesta del lead (ej. "Presupuesto: 75k"). Actívala con la casilla "Valor dinámico" dentro de la regla.\n\nCada regla tiene una condición (qué detectar en la conversación) y una o más acciones (qué hacer cuando se cumple).`}
+                      comoProbar="Crea una regla con condición 'mencion_precio' → acción 'Asignar etiqueta' → escribe 'precio_mencionado'. Guarda y espera a que entre una llamada o chat donde el lead mencione un precio. La etiqueta aparecerá en el perfil del lead."
+                    />
+                  </div>
                   <p className="text-sm text-gray-400">Define condiciones para asignar etiquetas, cambiar estado o incrementar métricas automáticamente. Cada regla puede tener múltiples acciones.</p>
                 </div>
               </div>
