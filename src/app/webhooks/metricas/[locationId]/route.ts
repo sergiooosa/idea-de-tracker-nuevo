@@ -39,18 +39,17 @@ export async function POST(
       return NextResponse.json({ error: "API Key inválida o inactiva" }, { status: 401 });
     }
 
-    // Validar que el locationId corresponde a la cuenta.
-    // El subdominio en BD puede tener dos formatos:
-    //   "tracker-scalebox"              (sin dominio)
-    //   "tracker-scalebox.autokpi.net"  (con dominio completo)
-    // El locationId que llega del webhook siempre es el prefijo sin dominio.
-    // Buscar por ambos para cubrir todos los casos.
-    const locationIdFull = locationId.includes(".") ? locationId : `${locationId}.autokpi.net`;
+    // Resolver cuenta: primero por locationid (GHL location_id), luego fallback a subdominio.
     const { or } = await import("drizzle-orm");
+
     const [cuentaRow] = await db
       .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
       .from(cuentas)
-      .where(or(eq(cuentas.subdominio, locationId), eq(cuentas.subdominio, locationIdFull))!)
+      .where(or(
+        eq(cuentas.locationid, locationId),
+        eq(cuentas.subdominio, locationId),
+        eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
+      )!)
       .limit(1);
 
     if (!cuentaRow || cuentaRow.id_cuenta !== keyRow.id_cuenta) {
