@@ -1102,7 +1102,13 @@ export default function SystemPage() {
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-[10px] font-medium text-gray-400 mb-1">Modo</label>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <label className="text-[10px] font-medium text-gray-400">Modo</label>
+                                  <HelpTooltip
+                                    titulo="¿Qué hace el Modo?"
+                                    contenido={`El modo solo antepone un prefijo de texto a la etiqueta:\n\n• Exacto → la etiqueta se guarda como "exacto: [valor]"\n• Aproximado → se guarda como "aprox: [valor]"\n\nNo redondea ni modifica el número. Solo agrega el prefijo para que sepas cómo se obtuvo el dato.`}
+                                  />
+                                </div>
                                 <select
                                   value={r.dynamicValue.mode ?? 'exacto'}
                                   onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
@@ -1117,7 +1123,14 @@ export default function SystemPage() {
                             </div>
                             {r.dynamicValue.fuente === 'custom_field' && (
                               <div>
-                                <label className="block text-[10px] font-medium text-gray-400 mb-1">ID del campo en GHL</label>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <label className="text-[10px] font-medium text-gray-400">ID del campo en GHL</label>
+                                  <HelpTooltip
+                                    titulo="¿Qué poner aquí?"
+                                    contenido={`Escribe el ID o key de un campo personalizado (custom field) que ya exista en tu cuenta de GoHighLevel.\n\nEjemplos:\n• presupuesto_mensual\n• numero_empleados\n• ingreso_anual\n\nEl sistema lee el valor de ese campo desde el contacto. Si el campo no existe o está vacío, simplemente no se asigna la etiqueta (no causa error).`}
+                                    comoProbar="Ve a GHL → Contactos → Custom Fields. Copia el ID del campo que quieras usar y pégalo aquí."
+                                  />
+                                </div>
                                 <input
                                   type="text"
                                   value={r.dynamicValue.fieldId ?? ''}
@@ -1145,7 +1158,13 @@ export default function SystemPage() {
                             )}
                             <div>
                               <div className="flex items-center justify-between mb-1">
-                                <label className="text-[10px] font-medium text-gray-400">Rangos (opcional)</label>
+                                <div className="flex items-center gap-1">
+                                  <label className="text-[10px] font-medium text-gray-400">Rangos (opcional)</label>
+                                  <HelpTooltip
+                                    titulo="¿Cómo funcionan los rangos?"
+                                    contenido={`Los rangos convierten un número en una etiqueta de texto por tramos.\n\nEjemplo con 3 rangos:\n• ≥ 0 → "Bajo"\n• ≥ 50000 → "Medio"\n• ≥ 100000 → "Alto"\n\nSi el valor del campo es 75000 → la etiqueta será "Medio" (el rango más alto cuyo mínimo no supera 75000).\n\nSin rangos, el valor numérico se usa tal cual como etiqueta.`}
+                                  />
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
