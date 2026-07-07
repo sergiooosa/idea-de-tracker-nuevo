@@ -50,13 +50,14 @@ interface DynamicValueConfigLocal {
 const MOSTRAR_VALOR_DINAMICO = false;
 
 interface AccionReglaLocal {
-  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria" | "escribir_campo_ghl";
+  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria" | "escribir_campo_ghl" | "escribir_campo_ghl_ia";
   valor?: string;
   funnelStage?: string;
   metrica_id?: string;
   metrica_incremento?: number;
   categoria_id?: string;
   fieldId?: string;
+  prompt?: string;
 }
 interface TagRule {
   id: string;
@@ -905,7 +906,7 @@ export default function SystemPage() {
                     <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
                     <HelpTooltip
                       titulo="¿Qué son las reglas de etiquetas?"
-                      contenido={`Cada regla es una condición escrita en tus palabras. Después de cada llamada, videollamada o chat, el sistema revisa si esa condición se cumple:\n\n• Si se cumple → ejecuta la acción (pone la etiqueta o escribe en un campo de GHL).\n• Si no se cumple → no hace nada.\n\nEjemplo: condición "el lead menciona un presupuesto mayor a 5000" → acción "Poner etiqueta" → Presupuesto_mayor_5000.`}
+                      contenido={`Cada regla es una condición escrita en tus palabras. Después de cada llamada, videollamada o chat, el sistema revisa si esa condición se cumple:\n\n• Si se cumple → ejecuta la acción (pone la etiqueta, escribe en un campo de GHL, o la IA genera texto y lo guarda en un campo).\n• Si no se cumple → no hace nada.\n\nEjemplo: condición "el lead menciona un presupuesto mayor a 5000" → acción "Poner etiqueta" → Presupuesto_mayor_5000.`}
                       comoProbar="Crea una regla con la condición en tus palabras (ej. 'menciona presupuesto mayor a 5000'), elige la acción y guarda. Espera a que entre una llamada o chat que cumpla la condición: la etiqueta (o el valor del campo) aparecerá en el perfil del lead."
                     />
                   </div>
@@ -991,10 +992,11 @@ export default function SystemPage() {
                             <div className="flex flex-wrap gap-2 items-end">
                               <div className="w-44">
                                 <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Tipo</label>
-                                <select value={a.tipo} onChange={(e) => updateAccion(ai, { tipo: e.target.value as AccionReglaLocal['tipo'], valor: '', funnelStage: undefined, metrica_id: undefined, metrica_incremento: undefined, categoria_id: undefined, fieldId: undefined })}
+                                <select value={a.tipo} onChange={(e) => updateAccion(ai, { tipo: e.target.value as AccionReglaLocal['tipo'], valor: '', funnelStage: undefined, metrica_id: undefined, metrica_incremento: undefined, categoria_id: undefined, fieldId: undefined, prompt: undefined })}
                                   className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white">
                                   <option value="asignar_etiqueta">Poner etiqueta</option>
                                   <option value="escribir_campo_ghl">Escribir en un campo de GHL</option>
+                                  <option value="escribir_campo_ghl_ia">Llenar campo de GHL con IA</option>
                                   <option value="cambiar_estado">Cambiar estado</option>
                                   <option value="etapa_cambiada">Etapa cambiada</option>
                                   <option value="incrementar_metrica">Incrementar métrica</option>
@@ -1033,6 +1035,35 @@ export default function SystemPage() {
                                     </label>
                                     <input type="text" value={a.valor ?? ''} onChange={(e) => updateAccion(ai, { valor: e.target.value })}
                                       placeholder="ej: Presupuesto_mayor_5000" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
+                                  </div>
+                                </>
+                              )}
+                              {a.tipo === 'escribir_campo_ghl_ia' && (
+                                <>
+                                  <div className="flex-1 min-w-[140px]">
+                                    <label className="flex items-center gap-1 text-[10px] font-medium text-accent-purple mb-0.5">
+                                      ID del campo de GHL
+                                      <HelpTooltip
+                                        titulo="Campo de GHL (IA)"
+                                        contenido={'El id o key de un custom field que YA existe en tu GHL. La IA escribirá ahí lo que le pidas en el mini-prompt. Si el campo no existe, no hace nada (no rompe).'}
+                                        comoProbar={'En GHL: Settings → Custom Fields. Copia el "Field Key" (ej. resumen_interes) o su id.'}
+                                      />
+                                    </label>
+                                    <input type="text" value={a.fieldId ?? ''} onChange={(e) => updateAccion(ai, { fieldId: e.target.value || undefined })}
+                                      placeholder="ej: resumen_interes" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
+                                  </div>
+                                  <div className="w-full">
+                                    <label className="flex items-center gap-1 text-[10px] font-medium text-accent-purple mb-0.5">
+                                      Mini-prompt
+                                      <HelpTooltip
+                                        titulo="Llenar campo de GHL con IA"
+                                        contenido={'Si se cumple la condición en la llamada/videollamada, la IA escribe en ese campo de GHL lo que le pidas en el mini-prompt. Ej: condición "el lead menciona un inmueble" → campo "inmueble_interes" → prompt "escribe el inmueble que mencionó".'}
+                                        comoProbar={'Crea la regla, espera una llamada/videollamada que cumpla la condición, y revisa el campo del contacto en GHL — verás el texto generado por la IA.'}
+                                      />
+                                    </label>
+                                    <textarea value={a.prompt ?? ''} onChange={(e) => updateAccion(ai, { prompt: e.target.value })}
+                                      placeholder="ej: Resume en 1 frase por qué el lead está interesado"
+                                      className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white min-h-[60px] focus:ring-2 focus:ring-accent-purple/40" />
                                   </div>
                                 </>
                               )}
