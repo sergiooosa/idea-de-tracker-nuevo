@@ -31,8 +31,7 @@ export function exportDashboardToExcel(
   ];
 
   const metricasDelPanel = (data.metricasComputadas ?? []).filter((m) => {
-    const paneles: string[] = m.paneles ?? [];
-    if (paneles.length > 0) return paneles.includes('panel_ejecutivo');
+    if (Array.isArray(m.paneles)) return m.paneles.includes('panel_ejecutivo');
     return m.ubicacion === 'panel_ejecutivo' || m.ubicacion === 'ambos' || !m.ubicacion;
   });
   for (const m of metricasDelPanel) {
