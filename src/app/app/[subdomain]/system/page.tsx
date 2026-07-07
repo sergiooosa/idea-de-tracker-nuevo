@@ -1207,7 +1207,7 @@ export default function SystemPage() {
                                 </div>
                               </div>
                             )}
-                            {(r.dynamicValue.tipo === 'numero' || (!r.dynamicValue.tipo && r.dynamicValue.ranges?.length)) && (
+                            {(r.dynamicValue.tipo === 'numero' || (!r.dynamicValue.tipo && (r.dynamicValue.ranges?.length ?? 0) > 0)) && (
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-1">
