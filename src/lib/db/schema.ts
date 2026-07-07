@@ -74,12 +74,14 @@ export interface DynamicValueConfig {
 }
 
 export interface AccionRegla {
-  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
+  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria" | "escribir_campo_ghl";
   valor?: string;
   funnelStage?: string;
   metrica_id?: string;
   metrica_incremento?: number;
   categoria_id?: string;
+  // Para tipo "escribir_campo_ghl": id o key del custom field de GHL donde se escribe `valor`.
+  fieldId?: string;
 }
 
 export interface ReglaEtiqueta {

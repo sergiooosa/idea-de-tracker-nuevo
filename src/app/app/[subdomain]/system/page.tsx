@@ -45,13 +45,18 @@ interface DynamicValueConfigLocal {
   labelNo?: string;
   mode?: "exacto" | "aproximado";
 }
+// Oculta el bloque "Valor dinámico / rangos" de la UI (pivote AUT-1241, modelo simple).
+// El schema `dynamicValue` se conserva; poner en true si se decide reactivar la función.
+const MOSTRAR_VALOR_DINAMICO = false;
+
 interface AccionReglaLocal {
-  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria";
+  tipo: "cambiar_estado" | "asignar_etiqueta" | "etapa_cambiada" | "incrementar_metrica" | "asignar_categoria" | "escribir_campo_ghl";
   valor?: string;
   funnelStage?: string;
   metrica_id?: string;
   metrica_incremento?: number;
   categoria_id?: string;
+  fieldId?: string;
 }
 interface TagRule {
   id: string;
@@ -900,8 +905,8 @@ export default function SystemPage() {
                     <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
                     <HelpTooltip
                       titulo="¿Qué son las reglas de etiquetas?"
-                      contenido={`Las reglas asignan etiquetas automáticamente a tus leads después de cada interacción (llamada, videollamada o chat).\n\n• Etiqueta fija: tú escribes el texto exacto (ej. "interesado", "objeción_precio"). Siempre aparece igual.\n• Etiqueta dinámica: el valor se extrae de la respuesta del lead (ej. "Presupuesto: 75k"). Actívala con la casilla "Valor dinámico" dentro de la regla.\n\nCada regla tiene una condición (qué detectar en la conversación) y una o más acciones (qué hacer cuando se cumple).`}
-                      comoProbar="Crea una regla con condición 'mencion_precio' → acción 'Asignar etiqueta' → escribe 'precio_mencionado'. Guarda y espera a que entre una llamada o chat donde el lead mencione un precio. La etiqueta aparecerá en el perfil del lead."
+                      contenido={`Cada regla es una condición escrita en tus palabras. Después de cada llamada, videollamada o chat, el sistema revisa si esa condición se cumple:\n\n• Si se cumple → ejecuta la acción (pone la etiqueta o escribe en un campo de GHL).\n• Si no se cumple → no hace nada.\n\nEjemplo: condición "el lead menciona un presupuesto mayor a 5000" → acción "Poner etiqueta" → Presupuesto_mayor_5000.`}
+                      comoProbar="Crea una regla con la condición en tus palabras (ej. 'menciona presupuesto mayor a 5000'), elige la acción y guarda. Espera a que entre una llamada o chat que cumpla la condición: la etiqueta (o el valor del campo) aparecerá en el perfil del lead."
                     />
                   </div>
                   <p className="text-sm text-gray-400">Define condiciones para asignar etiquetas, cambiar estado o incrementar métricas automáticamente. Cada regla puede tener múltiples acciones.</p>
@@ -986,9 +991,10 @@ export default function SystemPage() {
                             <div className="flex flex-wrap gap-2 items-end">
                               <div className="w-44">
                                 <label className="block text-[10px] font-medium text-gray-500 mb-0.5">Tipo</label>
-                                <select value={a.tipo} onChange={(e) => updateAccion(ai, { tipo: e.target.value as AccionReglaLocal['tipo'], valor: '', funnelStage: undefined, metrica_id: undefined, metrica_incremento: undefined, categoria_id: undefined })}
+                                <select value={a.tipo} onChange={(e) => updateAccion(ai, { tipo: e.target.value as AccionReglaLocal['tipo'], valor: '', funnelStage: undefined, metrica_id: undefined, metrica_incremento: undefined, categoria_id: undefined, fieldId: undefined })}
                                   className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white">
-                                  <option value="asignar_etiqueta">Asignar etiqueta</option>
+                                  <option value="asignar_etiqueta">Poner etiqueta</option>
+                                  <option value="escribir_campo_ghl">Escribir en un campo de GHL</option>
                                   <option value="cambiar_estado">Cambiar estado</option>
                                   <option value="etapa_cambiada">Etapa cambiada</option>
                                   <option value="incrementar_metrica">Incrementar métrica</option>
@@ -1001,6 +1007,34 @@ export default function SystemPage() {
                                   <input type="text" value={a.valor ?? ''} onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''); updateAccion(ai, { valor: v }); }}
                                     placeholder="nombre_etiqueta" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40" />
                                 </div>
+                              )}
+                              {a.tipo === 'escribir_campo_ghl' && (
+                                <>
+                                  <div className="flex-1 min-w-[140px]">
+                                    <label className="flex items-center gap-1 text-[10px] font-medium text-accent-green mb-0.5">
+                                      Campo de GHL
+                                      <HelpTooltip
+                                        titulo="Campo de GHL"
+                                        contenido={'El id o key de un custom field que YA existe en tu GHL. Cuando la condición se cumple, el sistema escribe ahí el texto que pongas al lado. Si el campo no existe, no hace nada (no rompe).'}
+                                        comoProbar={'En GHL: Settings → Custom Fields. Copia el "Field Key" (ej. presupuesto_estado) o su id.'}
+                                      />
+                                    </label>
+                                    <input type="text" value={a.fieldId ?? ''} onChange={(e) => updateAccion(ai, { fieldId: e.target.value || undefined })}
+                                      placeholder="ej: presupuesto_estado" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
+                                  </div>
+                                  <div className="flex-1 min-w-[140px]">
+                                    <label className="flex items-center gap-1 text-[10px] font-medium text-accent-green mb-0.5">
+                                      Texto a escribir
+                                      <HelpTooltip
+                                        titulo="Texto a escribir"
+                                        contenido={'El texto exacto que se guardará en ese campo del contacto cuando la condición se cumpla.'}
+                                        comoProbar={'Ej: Presupuesto_mayor_5000. Después de una llamada que cumpla la condición, revisa el contacto en GHL y verás ese texto en el campo.'}
+                                      />
+                                    </label>
+                                    <input type="text" value={a.valor ?? ''} onChange={(e) => updateAccion(ai, { valor: e.target.value })}
+                                      placeholder="ej: Presupuesto_mayor_5000" className="w-full rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40" />
+                                  </div>
+                                </>
                               )}
                               {a.tipo === 'cambiar_estado' && (
                                 <div className="flex-1 min-w-[120px]">
@@ -1069,7 +1103,9 @@ export default function SystemPage() {
                           <Trash2 className="w-3 h-3" /> Eliminar regla
                         </button>
                       </div>
-                    {r.acciones.some(a => a.tipo === 'asignar_etiqueta') && (
+                    {/* Bloque "Valor dinámico" oculto de la UI tras el pivote de AUT-1241 (modelo simple condición→acción).
+                        Se conserva el código y el schema `dynamicValue` para retro-compatibilidad con reglas existentes. */}
+                    {MOSTRAR_VALOR_DINAMICO && r.acciones.some(a => a.tipo === 'asignar_etiqueta') && (
                       <div className="rounded-lg border border-surface-500 bg-surface-800/50 p-3 space-y-2">
                         <div className="flex items-center gap-2">
                           <label className="flex items-center gap-2 cursor-pointer">
