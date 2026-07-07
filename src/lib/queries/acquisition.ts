@@ -416,7 +416,9 @@ export async function getAcquisition(
     }
     const agg = campoAgg.get(row.campo)!;
     if (row.ghl_user_id === null) {
-      agg.total = val;
+      // Filas account-global (sin asesor): hay una por día. Acumular todo el
+      // rango de fechas — con `=` solo sobrevivía el último día (undercount).
+      agg.total += val;
     } else {
       agg.byUser.set(row.ghl_user_id, (agg.byUser.get(row.ghl_user_id) ?? 0) + val);
     }
