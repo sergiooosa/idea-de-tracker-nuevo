@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbudoEtapas } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbudoEtapas, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
 import type { EmbudoEtapa } from "@/lib/db/schema";
-import { eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, or, gte, lte, isNull, isNotNull, sql } from "drizzle-orm";
 
 export interface AcquisitionLeadDetail {
   key: string;
@@ -35,10 +35,17 @@ export interface ByChannelStats {
   chats: { leads: number; conRespuesta: number; tasaRespuesta: number; topOrigen: string | null };
 }
 
+export interface WebhookMetricRow {
+  campo: string;
+  total: number;
+  porAsesor: { userId: string; nombre: string | null; valor: number }[];
+}
+
 export interface AcquisitionResponse {
   rows: AcquisitionRow[];
   sources: string[];
   byChannel: ByChannelStats;
+  webhookMetrics: WebhookMetricRow[];
 }
 
 export async function getAcquisition(
@@ -359,6 +366,74 @@ export async function getAcquisition(
     topOrigen,
   };
 
+  // ----------------------------------------------------------------
+  // WEBHOOK METRICS — métricas personalizadas atribuidas por asesor
+  // ----------------------------------------------------------------
+  const webhookRows = await db
+    .select({
+      campo: metricasWebhook.campo,
+      valor: metricasWebhook.valor,
+      ghl_user_id: metricasWebhook.ghl_user_id,
+      ghl_customer_id: metricasWebhook.ghl_customer_id,
+    })
+    .from(metricasWebhook)
+    .where(
+      and(
+        eq(metricasWebhook.id_cuenta, idCuenta),
+        gte(metricasWebhook.fecha, dateFrom),
+        lte(metricasWebhook.fecha, dateTo),
+      ),
+    );
+
+  const advisorEmails = new Set(
+    webhookRows
+      .map((r) => r.ghl_user_id)
+      .filter((id): id is string => id !== null),
+  );
+
+  const advisorMap = new Map<string, string | null>();
+  if (advisorEmails.size > 0) {
+    const emailList = [...advisorEmails];
+    const advisors = await db
+      .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+      .from(usuariosDashboard)
+      .where(
+        and(
+          eq(usuariosDashboard.id_cuenta, idCuenta),
+          sql`${usuariosDashboard.email} IN (${sql.join(emailList.map((e) => sql`${e}`), sql`, `)})`,
+        ),
+      );
+    for (const a of advisors) {
+      if (a.email) advisorMap.set(a.email, a.nombre_closer ?? a.email);
+    }
+  }
+
+  const campoAgg = new Map<string, { total: number; byUser: Map<string, number> }>();
+  for (const row of webhookRows) {
+    const val = parseFloat(String(row.valor)) || 0;
+    if (!campoAgg.has(row.campo)) {
+      campoAgg.set(row.campo, { total: 0, byUser: new Map() });
+    }
+    const agg = campoAgg.get(row.campo)!;
+    if (row.ghl_user_id === null) {
+      // Filas account-global (sin asesor): hay una por día. Acumular todo el
+      // rango de fechas — con `=` solo sobrevivía el último día (undercount).
+      agg.total += val;
+    } else {
+      agg.byUser.set(row.ghl_user_id, (agg.byUser.get(row.ghl_user_id) ?? 0) + val);
+    }
+  }
+
+  const webhookMetrics: WebhookMetricRow[] = [...campoAgg.entries()].map(([campo, agg]) => ({
+    campo,
+    total: agg.total || [...agg.byUser.values()].reduce((s, v) => s + v, 0),
+    porAsesor: [...agg.byUser.entries()].map(([userId, valor]) => ({
+      userId,
+      nombre: advisorMap.get(userId) ?? null,
+      valor,
+    })),
+  }));
+
   return {
     rows,
     sources,
@@ -367,5 +442,6 @@ export async function getAcquisition(
       videollamadas: videollamadasChannel,
       chats: chatsChannel,
     },
+    webhookMetrics,
   };
 }

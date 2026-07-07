@@ -40,10 +40,17 @@ interface ByChannelStats {
   chats: { leads: number; conRespuesta: number; tasaRespuesta: number; topOrigen: string | null };
 }
 
+interface WebhookMetricRow {
+  campo: string;
+  total: number;
+  porAsesor: { userId: string; nombre: string | null; valor: number }[];
+}
+
 interface AcqResponse {
   rows: AcqRow[];
   sources: string[];
   byChannel: ByChannelStats;
+  webhookMetrics?: WebhookMetricRow[];
 }
 
 interface AdsRow {
@@ -199,6 +206,33 @@ export default function AcquisitionPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Métricas Webhook por asesor ── */}
+        {!loading && data?.webhookMetrics && data.webhookMetrics.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Métricas Personalizadas</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {data.webhookMetrics.map((m) => (
+                <div key={m.campo} className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-300 capitalize">{m.campo.replace(/_/g, ' ')}</span>
+                    <span className="text-lg font-bold text-accent-cyan">{m.total % 1 === 0 ? m.total : m.total.toFixed(2)}</span>
+                  </div>
+                  {m.porAsesor.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-surface-600">
+                      {m.porAsesor.map((a) => (
+                        <div key={a.userId} className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-400 truncate max-w-[60%]">{a.nombre ?? a.userId}</span>
+                          <span className="text-white font-medium">{a.valor % 1 === 0 ? a.valor : a.valor.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
