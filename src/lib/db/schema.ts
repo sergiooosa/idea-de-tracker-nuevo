@@ -66,7 +66,10 @@ export interface DynamicValueConfig {
   fuente: "custom_field" | "formula";
   fieldId?: string;
   formula?: string;
+  tipo?: "numero" | "si_no" | "texto" | "fecha";
   ranges?: DynamicValueRange[];
+  labelSi?: string;
+  labelNo?: string;
   mode?: "exacto" | "aproximado";
 }
 

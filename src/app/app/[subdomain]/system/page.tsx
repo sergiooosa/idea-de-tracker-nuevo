@@ -39,7 +39,10 @@ interface DynamicValueConfigLocal {
   fuente: "custom_field" | "formula";
   fieldId?: string;
   formula?: string;
+  tipo?: "numero" | "si_no" | "texto" | "fecha";
   ranges?: DynamicValueRangeLocal[];
+  labelSi?: string;
+  labelNo?: string;
   mode?: "exacto" | "aproximado";
 }
 interface AccionReglaLocal {
@@ -1076,7 +1079,7 @@ export default function SystemPage() {
                               onChange={(e) => {
                                 setTagRules((prev) => prev.map((x) => x.id === r.id ? {
                                   ...x,
-                                  dynamicValue: e.target.checked ? { fuente: 'custom_field' as const, mode: 'exacto' as const } : undefined,
+                                  dynamicValue: e.target.checked ? { fuente: 'custom_field' as const, tipo: 'texto' as const } : undefined,
                                 } : x));
                               }}
                               className="rounded border-surface-500 bg-surface-600 text-accent-cyan focus:ring-accent-cyan/40"
@@ -1089,7 +1092,13 @@ export default function SystemPage() {
                           <div className="space-y-2 pl-4 border-l-2 border-accent-cyan/30">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <label className="block text-[10px] font-medium text-gray-400 mb-1">Fuente</label>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <label className="text-[10px] font-medium text-gray-400">Fuente</label>
+                                  <HelpTooltip
+                                    titulo="¿De dónde sale el valor?"
+                                    contenido={`Elige de dónde se lee el valor dinámico:\n\n• Campo personalizado (GHL) → lee un custom field del contacto en GoHighLevel.\n• Fórmula → calcula un valor a partir de otros campos (avanzado).`}
+                                  />
+                                </div>
                                 <select
                                   value={r.dynamicValue.fuente}
                                   onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
@@ -1103,21 +1112,23 @@ export default function SystemPage() {
                               </div>
                               <div>
                                 <div className="flex items-center gap-1 mb-1">
-                                  <label className="text-[10px] font-medium text-gray-400">Modo</label>
+                                  <label className="text-[10px] font-medium text-gray-400">Tipo de dato</label>
                                   <HelpTooltip
-                                    titulo="¿Qué hace el Modo?"
-                                    contenido={`El modo solo antepone un prefijo de texto a la etiqueta:\n\n• Exacto → la etiqueta se guarda como "exacto: [valor]"\n• Aproximado → se guarda como "aprox: [valor]"\n\nNo redondea ni modifica el número. Solo agrega el prefijo para que sepas cómo se obtuvo el dato.`}
+                                    titulo="¿Qué es el tipo de dato?"
+                                    contenido={`Indica qué tipo de valor tiene el campo del contacto:\n\n• Texto → se usa tal cual como etiqueta (ej. "Premium")\n• Número → puedes definir rangos para convertirlo en etiqueta (ej. 75000 → "Medio")\n• Sí / No → asigna una etiqueta distinta según si el valor es verdadero o falso\n• Fecha → se usa la fecha tal cual`}
                                   />
                                 </div>
                                 <select
-                                  value={r.dynamicValue.mode ?? 'exacto'}
+                                  value={r.dynamicValue.tipo ?? 'texto'}
                                   onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
-                                    ...x, dynamicValue: { ...x.dynamicValue!, mode: e.target.value as 'exacto' | 'aproximado' },
+                                    ...x, dynamicValue: { ...x.dynamicValue!, tipo: e.target.value as 'numero' | 'si_no' | 'texto' | 'fecha' },
                                   } : x))}
                                   className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white"
                                 >
-                                  <option value="exacto">Exacto</option>
-                                  <option value="aproximado">Aproximado</option>
+                                  <option value="texto">Texto (valor tal cual)</option>
+                                  <option value="numero">Número (con rangos opcionales)</option>
+                                  <option value="si_no">Sí / No</option>
+                                  <option value="fecha">Fecha</option>
                                 </select>
                               </div>
                             </div>
@@ -1156,6 +1167,47 @@ export default function SystemPage() {
                                 />
                               </div>
                             )}
+                            {(r.dynamicValue.tipo ?? 'texto') === 'si_no' && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <label className="text-[10px] font-medium text-gray-400">Etiqueta si es Sí</label>
+                                    <HelpTooltip
+                                      titulo="Etiqueta para Sí"
+                                      contenido={`Texto que se asigna como etiqueta cuando el valor del campo es verdadero (true, "yes", "sí", 1).\n\nEjemplo: si el campo es "tiene_presupuesto" y el valor es Sí → se asigna esta etiqueta.`}
+                                    />
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={r.dynamicValue.labelSi ?? ''}
+                                    onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                      ...x, dynamicValue: { ...x.dynamicValue!, labelSi: e.target.value || undefined },
+                                    } : x))}
+                                    placeholder="ej: Con presupuesto"
+                                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-accent-cyan/40"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <label className="text-[10px] font-medium text-gray-400">Etiqueta si es No</label>
+                                    <HelpTooltip
+                                      titulo="Etiqueta para No"
+                                      contenido={`Texto que se asigna como etiqueta cuando el valor del campo es falso (false, "no", 0, vacío).\n\nEjemplo: si el campo es "tiene_presupuesto" y el valor es No → se asigna esta etiqueta.`}
+                                    />
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={r.dynamicValue.labelNo ?? ''}
+                                    onChange={(e) => setTagRules((prev) => prev.map((x) => x.id === r.id ? {
+                                      ...x, dynamicValue: { ...x.dynamicValue!, labelNo: e.target.value || undefined },
+                                    } : x))}
+                                    placeholder="ej: Sin presupuesto"
+                                    className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-accent-cyan/40"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {(r.dynamicValue.tipo === 'numero' || (!r.dynamicValue.tipo && r.dynamicValue.ranges?.length)) && (
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <div className="flex items-center gap-1">
@@ -1219,6 +1271,7 @@ export default function SystemPage() {
                                 </div>
                               ))}
                             </div>
+                            )}
                           </div>
                         )}
                       </div>
