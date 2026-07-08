@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cuentas, apiKeysCuenta, metricasWebhook } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, or, sql } from "drizzle-orm";
 
 export async function POST(
   req: Request,
@@ -28,32 +28,52 @@ export async function POST(
       return NextResponse.json({ error: "Header x-api-key requerido" }, { status: 401 });
     }
 
-    // Validar API key
-    const [keyRow] = await db
-      .select({ id_cuenta: apiKeysCuenta.id_cuenta })
-      .from(apiKeysCuenta)
-      .where(and(eq(apiKeysCuenta.token, apiKey.trim()), eq(apiKeysCuenta.activa, true)))
-      .limit(1);
+    const trimmedKey = apiKey.trim();
+    const globalKey = process.env.METRICAS_GLOBAL_API_KEY;
+    const isGlobalAuth = globalKey && trimmedKey === globalKey;
 
-    if (!keyRow) {
-      return NextResponse.json({ error: "API Key inválida o inactiva" }, { status: 401 });
-    }
+    let cuentaRow: { id_cuenta: number; zona_horaria_iana: string | null } | undefined;
 
-    // Resolver cuenta: primero por locationid (GHL location_id), luego fallback a subdominio.
-    const { or } = await import("drizzle-orm");
+    if (isGlobalAuth) {
+      // Auth global: key interna válida para cualquier location_id (write-only a métricas)
+      [cuentaRow] = await db
+        .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
+        .from(cuentas)
+        .where(or(
+          eq(cuentas.locationid, locationId),
+          eq(cuentas.subdominio, locationId),
+          eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
+        )!)
+        .limit(1);
 
-    const [cuentaRow] = await db
-      .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
-      .from(cuentas)
-      .where(or(
-        eq(cuentas.locationid, locationId),
-        eq(cuentas.subdominio, locationId),
-        eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
-      )!)
-      .limit(1);
+      if (!cuentaRow) {
+        return NextResponse.json({ error: "location_id no corresponde a ninguna cuenta" }, { status: 404 });
+      }
+    } else {
+      // Auth per-cuenta: validar key contra api_keys_cuenta
+      const [keyRow] = await db
+        .select({ id_cuenta: apiKeysCuenta.id_cuenta })
+        .from(apiKeysCuenta)
+        .where(and(eq(apiKeysCuenta.token, trimmedKey), eq(apiKeysCuenta.activa, true)))
+        .limit(1);
 
-    if (!cuentaRow || cuentaRow.id_cuenta !== keyRow.id_cuenta) {
-      return NextResponse.json({ error: "Cuenta no encontrada o API Key no corresponde" }, { status: 404 });
+      if (!keyRow) {
+        return NextResponse.json({ error: "API Key inválida o inactiva" }, { status: 401 });
+      }
+
+      [cuentaRow] = await db
+        .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
+        .from(cuentas)
+        .where(or(
+          eq(cuentas.locationid, locationId),
+          eq(cuentas.subdominio, locationId),
+          eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
+        )!)
+        .limit(1);
+
+      if (!cuentaRow || cuentaRow.id_cuenta !== keyRow.id_cuenta) {
+        return NextResponse.json({ error: "Cuenta no encontrada o API Key no corresponde" }, { status: 404 });
+      }
     }
 
     const body = await req.json() as Record<string, unknown>;
