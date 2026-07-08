@@ -195,12 +195,12 @@ export async function GET(req: Request): Promise<Response> {
         COALESCE(o->>'categoria', 'general') AS categoria,
         COUNT(*)::int AS count
       FROM chats_logs,
-           jsonb_array_elements(ia_objeciones) AS o
+           jsonb_array_elements(CASE WHEN jsonb_typeof(ia_objeciones) = 'array' THEN ia_objeciones ELSE '[]'::jsonb END) AS o
       WHERE id_cuenta = ${idCuenta}
         AND fecha_y_hora_z >= ${from}
         AND fecha_y_hora_z <= ${to}
-        AND ia_objeciones IS NOT NULL
-        AND jsonb_array_length(ia_objeciones) > 0
+        AND jsonb_typeof(ia_objeciones) = 'array'
+        AND ia_objeciones <> '[]'::jsonb
       GROUP BY o->>'objecion', o->>'categoria'
       ORDER BY count DESC
       LIMIT 10
