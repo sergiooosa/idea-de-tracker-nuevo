@@ -66,6 +66,8 @@ export interface ReportV2CanalLlamadas {
   realizadas: number;
   leadsLlamados: number;
   contestaronPorLead: number;
+  calificados: number;
+  noCalificados: number;
   intentosProm: number;
   speedToLeadProm: number | null;
   duracionPromContestadas: number | null;
@@ -89,6 +91,8 @@ export interface ReportV2CanalVideo {
   agendadas: number;
   realizadas: number;
   showRate: number; // 0-1
+  calificados: number;
+  noCalificados: number;
   reagendadas: number;
   noShow: number;
   duracionProm: number | null;
