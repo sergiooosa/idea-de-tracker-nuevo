@@ -34,7 +34,8 @@ import {
   SectionConclusiones,
 } from '@/components/report-v2';
 import type { ReportV2Data } from '@/types/report-v2';
-import { getMockReportV2 } from '@/components/report-v2/mockReportV2';
+import type { ReportV2 } from '@/types/reportV2';
+import { adaptReportV2 } from '@/lib/adapters/reportV2Adapter';
 
 // ─── Period helpers ──────────────────────────────────────────────────────────
 
@@ -196,6 +197,8 @@ export default function ReportesPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportV2Data | null>(null);
+  const [enriquecimientoParcial, setEnriquecimientoParcial] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -215,28 +218,47 @@ export default function ReportesPage() {
       .catch(() => {});
   }, [subdomain]);
 
-  // Fetch report data — currently uses mock, will switch to real API when WS2 lands
   useEffect(() => {
     setLoading(true);
     setReportData(null);
+    setFetchError(null);
+    setEnriquecimientoParcial(false);
 
-    // TODO(AUT-1303): Replace with real API call when WS2 backend aggregation lands
-    // const qs = new URLSearchParams({ from, to, period_type: period });
-    // fetch(`/api/data/report-v2?${qs.toString()}`)
-    //   .then(r => r.ok ? r.json() : null)
-    //   .then(data => setReportData(data))
+    const periodTypeMap: Record<PeriodType, string> = {
+      hoy: 'daily',
+      semana: 'weekly',
+      mes: 'monthly',
+      personalizado: 'custom',
+    };
 
-    // Mock: simulate API delay and return mock data
-    const timer = setTimeout(() => {
-      const mock = getMockReportV2(['llamadas', 'chats', 'video']);
-      mock.cuenta.nombre = companyName ?? subdomain;
-      mock.cuenta.subdominio = subdomain;
-      mock.periodo = { from, to, dias: 30 };
-      setReportData(mock);
-      setLoading(false);
-    }, 600);
+    const qs = new URLSearchParams({
+      from,
+      to,
+      period_type: periodTypeMap[period],
+    });
 
-    return () => clearTimeout(timer);
+    const controller = new AbortController();
+
+    fetch(`/api/data/report-v2?${qs.toString()}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Error ${r.status}`);
+        return r.json() as Promise<ReportV2>;
+      })
+      .then((apiData) => {
+        setEnriquecimientoParcial(apiData.meta.enriquecimientoParcial);
+        setReportData(adaptReportV2(apiData));
+        if (!companyName && apiData.meta.nombre) {
+          setCompanyName(apiData.meta.nombre);
+        }
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        console.error('Error al cargar reporte v2:', err);
+        setFetchError('No se pudo cargar el reporte. Intenta de nuevo.');
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
   }, [from, to, period, subdomain, companyName]);
 
   const downloadPdf = useCallback(async () => {
@@ -328,6 +350,10 @@ export default function ReportesPage() {
 
       {loading ? (
         <LoadingSkeleton />
+      ) : fetchError ? (
+        <div className="flex items-center justify-center min-h-[300px] text-accent-red text-sm">
+          {fetchError}
+        </div>
       ) : !reportData ? (
         <div className="flex items-center justify-center min-h-[300px] text-[#5F7288] text-sm">
           No hay datos para el periodo seleccionado.
@@ -338,6 +364,16 @@ export default function ReportesPage() {
           className="p-3 md:p-5 space-y-4 max-w-6xl mx-auto min-w-0 overflow-x-hidden"
           style={{ backgroundColor: '#0A101B' }}
         >
+          {enriquecimientoParcial && (
+            <div className="rounded-lg bg-accent-amber/10 border border-accent-amber/20 px-4 py-3 text-xs text-accent-amber flex items-center gap-2">
+              <span className="font-semibold">Análisis IA parcial:</span>
+              <span className="text-[#8DA2B8]">
+                Algunos bloques cualitativos (conversaciones, demografía IA, narrativas) pueden estar incompletos
+                porque el análisis IA aún no cubre todo el periodo.
+              </span>
+            </div>
+          )}
+
           {/* Portada + KPIs */}
           <SectionPortadaKPIs
             data={reportData.kpis}
