@@ -1,0 +1,15 @@
+export { default as SectionPortadaKPIs } from './SectionPortadaKPIs';
+export { default as SectionNarrativa } from './SectionNarrativa';
+export { default as SectionFunnel } from './SectionFunnel';
+export { default as SectionEstadoFinal } from './SectionEstadoFinal';
+export { default as SectionOrigen } from './SectionOrigen';
+export { default as SectionHigieneCRM } from './SectionHigieneCRM';
+export { default as SectionPorCanal } from './SectionPorCanal';
+export { default as SectionDemografia } from './SectionDemografia';
+export { default as SectionComparativo } from './SectionComparativo';
+export { default as SectionCobertura } from './SectionCobertura';
+export { default as SectionConversaciones } from './SectionConversaciones';
+export { default as SectionRankingAsesores } from './SectionRankingAsesores';
+export { default as SectionObjeciones } from './SectionObjeciones';
+export { default as SectionFrasesRepetitivas } from './SectionFrasesRepetitivas';
+export { default as SectionConclusiones } from './SectionConclusiones';
