@@ -72,8 +72,9 @@ export async function GET(req: Request) {
  */
 export async function PATCH(req: Request) {
   return withAuthFull(req, async (ctx) => {
-    if (ctx.rol !== "superadmin") {
-      return NextResponse.json({ error: "Solo administradores pueden modificar criterios" }, { status: 403 });
+    const puedeEditar = ctx.rol === "superadmin" || ctx.permisosArray.includes("configurar_sistema");
+    if (!puedeEditar) {
+      return NextResponse.json({ error: "Se requiere permiso de configuración del sistema" }, { status: 403 });
     }
     const idCuenta = ctx.idCuenta;
     const body = await req.json().catch(() => null);
