@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, useEffect, useCallback, Fragment } from 'react';
 import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -9,15 +9,17 @@ import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripci
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays, formatDistanceToNow, isAfter, subDays as subDaysDate } from 'date-fns';
 import { es } from 'date-fns/locale';
-import Link from 'next/link';
 import { Pencil, Search, User, X, Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
+import MetricaEditSheet from '@/components/dashboard/MetricaEditSheet';
 import type { VideollamadasResponse, ApiVideollamada, VideoMeeting, VideollamadasAdvisorMetrics } from '@/types';
+import type { MetricaConfig, MetricaManualEntry, DashboardPersonalizado, UbicacionPanel } from '@/lib/db/schema';
 import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
 import { formatCurrency } from '@/lib/format';
+import { useSession } from '@/hooks/useSession';
 
 const fm = formatCurrency;
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -73,6 +75,36 @@ export default function PerformanceVideollamadasPage() {
   const [filterCalificada, setFilterCalificada] = useState<'all' | 'si' | 'no'>('all');
   const [filterCompro, setFilterCompro] = useState<'all' | 'si' | 'no'>('all');
   const [showExcluded, setShowExcluded] = useState(false);
+
+  const [metricaSheetOpen, setMetricaSheetOpen] = useState(false);
+  const [metricaEditingId, setMetricaEditingId] = useState<string | null>(null);
+  const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
+  const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
+  const [dashboardsPersonalizados, setDashboardsPersonalizados] = useState<DashboardPersonalizado[]>([]);
+  const [systemConfigLoaded, setSystemConfigLoaded] = useState(false);
+
+  const { session } = useSession();
+  const canConfigureSystem = session?.rol === 'superadmin' || session?.permisosArray?.includes('configurar_sistema');
+
+  const loadSystemConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/data/system-config');
+      if (res.ok) {
+        const cfg = await res.json();
+        const loadedConfig = Array.isArray(cfg.metricas_config) ? cfg.metricas_config as MetricaConfig[] : [];
+        setMetricasConfig(loadedConfig);
+        setMetricasManualData(
+          cfg.metricas_manual_data && typeof cfg.metricas_manual_data === 'object'
+            ? cfg.metricas_manual_data as Record<string, MetricaManualEntry[]>
+            : {},
+        );
+        setDashboardsPersonalizados(Array.isArray(cfg.dashboards_personalizados) ? cfg.dashboards_personalizados as DashboardPersonalizado[] : []);
+      }
+    } catch { /* silently fail */ }
+    setSystemConfigLoaded(true);
+  }, []);
+
+  useEffect(() => { loadSystemConfig(); }, [loadSystemConfig]);
 
   const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined, includeExcluded: showExcluded ? 'true' : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
@@ -300,12 +332,22 @@ export default function PerformanceVideollamadasPage() {
         ))}
       </div>
 
-      {rendimientoMetrics.length > 0 && (
-        <section>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <BarChart3 className="w-3.5 h-3.5 text-accent-green" />
-            Métricas personalizadas
-          </h3>
+      <section>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <BarChart3 className="w-3.5 h-3.5 text-accent-green" />
+          Métricas personalizadas
+          {canConfigureSystem && (
+            <button
+              type="button"
+              onClick={() => { setMetricaEditingId(null); setMetricaSheetOpen(true); }}
+              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent-green/10 border border-accent-green/30 text-accent-green text-[10px] font-medium hover:bg-accent-green/20 transition-colors"
+              title="Agregar métrica personalizada"
+            >
+              <Plus className="w-3 h-3" /> Agregar métrica
+            </button>
+          )}
+        </h3>
+        {rendimientoMetrics.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
             {rendimientoMetrics.map((m) => (
               <div key={m.id} className="rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-green kpi-card-fixed relative group">
@@ -313,18 +355,34 @@ export default function PerformanceVideollamadasPage() {
                 <p className="text-base font-bold mt-0.5 text-accent-green">{m.valor}</p>
                 {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
                 <div className="kpi-card-spacer" />
-                <Link
-                  href={`/system?step=5&edit=${m.id}`}
-                  className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
-                  title="Editar métrica"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </Link>
+                {canConfigureSystem && (
+                  <button
+                    type="button"
+                    onClick={() => { setMetricaEditingId(m.id); setMetricaSheetOpen(true); }}
+                    className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-surface-600/80 text-gray-400 hover:text-accent-cyan transition-all"
+                    title="Editar métrica"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="rounded-lg border border-dashed border-surface-500 px-4 py-6 text-center">
+            <p className="text-xs text-gray-500">No hay métricas personalizadas en Rendimiento.</p>
+            {canConfigureSystem && (
+              <button
+                type="button"
+                onClick={() => { setMetricaEditingId(null); setMetricaSheetOpen(true); }}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-accent-green hover:underline"
+              >
+                <Plus className="w-3.5 h-3.5" /> Crear tu primera métrica
+              </button>
+            )}
+          </div>
+        )}
+      </section>
 
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
@@ -542,6 +600,55 @@ export default function PerformanceVideollamadasPage() {
         onSuccess={() => refetch()}
         tipo="videollamada"
       />
+      {metricaSheetOpen && systemConfigLoaded && (
+        <MetricaEditSheet
+          metricasConfig={metricasConfig}
+          metricasManualData={metricasManualData}
+          editingMetric={metricaEditingId ? metricasConfig.find((x) => x.id === metricaEditingId) ?? null : null}
+          tipoInicial="manual"
+          dashboardsPersonalizados={dashboardsPersonalizados}
+          subdominio={typeof window !== "undefined" ? window.location.hostname.replace(`.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "autokpi.net"}`, "").replace(".localhost", "") : undefined}
+          onClose={() => { setMetricaSheetOpen(false); setMetricaEditingId(null); }}
+          onSave={async (config, manualData) => {
+            const prev = metricasConfig;
+            const idx = prev.findIndex((x) => x.id === config.id);
+            const next = [...prev];
+            if (idx >= 0) {
+              next[idx] = config;
+            } else {
+              const withRendimiento = {
+                ...config,
+                ubicacion: config.ubicacion === 'panel_ejecutivo' ? 'rendimiento' as const : config.ubicacion,
+                paneles: config.paneles?.includes('rendimiento') ? config.paneles : [...(config.paneles ?? []), 'rendimiento' as UbicacionPanel],
+              };
+              next.push(withRendimiento);
+            }
+            const sorted = next.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+
+            const res = await fetch('/api/data/system-config', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ metricas_config: sorted }),
+            });
+
+            if (!res.ok) return;
+
+            setMetricasConfig(sorted);
+            if (manualData !== undefined) {
+              const nextManual = { ...metricasManualData, [config.id]: manualData };
+              void fetch('/api/data/system-config', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ metricas_manual_data: nextManual }),
+              });
+              setMetricasManualData(nextManual);
+            }
+            setMetricaSheetOpen(false);
+            setMetricaEditingId(null);
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 }
