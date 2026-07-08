@@ -780,7 +780,14 @@ export default function SystemPage() {
                 <div className="flex items-center gap-2 pb-3">
                   <div className="rounded-lg p-1.5 bg-accent-purple/20 border border-accent-purple/40"><Tag className="w-4 h-4 text-accent-purple" /></div>
                   <div>
-                    <h4 className="text-base font-semibold text-white">Categorías de llamada</h4>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-base font-semibold text-white">Categorías de llamada</h4>
+                      <HelpTooltip
+                        titulo="¿Qué son las categorías de llamada?"
+                        contenido={`No todas las llamadas se evalúan igual: una llamada de descubrimiento no es lo mismo que una de perfilamiento, seguimiento o cierre.\n\nAquí creas cada categoría con su PROPIO prompt de evaluación y sus temas. Luego, en el Paso 4 (Reglas de etiquetas), usas la acción "Asignar categoría" para que cada llamada se enrute a la categoría correcta y se analice con el prompt adecuado.`}
+                        comoProbar="Crea una categoría (ej. 'Perfilamiento'), escribe su prompt y sus temas, y guarda. Ve al Paso 4, crea una regla con la condición que identifique ese tipo de llamada y elige la acción 'Asignar categoría'. Cuando entre una llamada que cumpla la condición, se evaluará con el prompt de esa categoría."
+                      />
+                    </div>
                     <p className="text-xs text-gray-400">Crea categorías con un prompt de evaluación propio y temas específicos.</p>
                   </div>
                 </div>
