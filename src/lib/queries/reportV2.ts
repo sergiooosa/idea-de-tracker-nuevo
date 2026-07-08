@@ -23,6 +23,7 @@ import {
   type ReportV2Enrichment,
 } from "./reportV2Enrichment";
 import { generateNarrativa } from "./reportV2Narrative";
+import { phoneToZona } from "./ladaMap";
 import type {
   ReportV2,
   ReportV2Canal,
@@ -73,16 +74,20 @@ function computeScore(
   return Math.round(score * 100);
 }
 
-// ── Derivar zona desde número E.164 ─────────────────────────────────────────
+// ── Derivar zona desde número E.164 (mapeo real de ladas en ./ladaMap) ──────
 
 function ladaToZona(phone: string | null): { zona: string; canal: ReportV2Canal } | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  // México +52 → zona "México"
-  if (digits.startsWith("52") && digits.length >= 12) return { zona: "México", canal: "llamadas" };
-  // USA/Canadá +1 → zona por área code 3 dígitos después del 1
-  if (digits.startsWith("1") && digits.length === 11) return { zona: "EE.UU./Canadá", canal: "llamadas" };
-  return null;
+  const zona = phoneToZona(phone);
+  if (!zona) return null;
+  return { zona, canal: "llamadas" };
+}
+
+/** Zona horaria IANA del tenant (fallback CDMX si no está configurada). */
+async function getTenantTz(idCuenta: number): Promise<string> {
+  const res = await db.execute<{ zona_horaria_iana: string | null }>(sql`
+    SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta} LIMIT 1
+  `);
+  return res.rows[0]?.zona_horaria_iana ?? "America/Mexico_City";
 }
 
 // ── Queries nuevas (base data, sin WS1) ─────────────────────────────────────
@@ -101,6 +106,7 @@ async function getLlamadasCobertura(
   idCuenta: number,
   from: string,
   to: string,
+  tz: string,
 ): Promise<LlamadasCoberturaResult> {
   const fromTs = new Date(`${from}T00:00:00Z`);
   const toTs = new Date(`${to}T23:59:59.999Z`);
@@ -134,18 +140,18 @@ async function getLlamadasCobertura(
       GROUP BY COALESCE(contact_id_ghl, mail_lead, phone)
     `),
 
-    // Franjas horarias: count + contestaron por hora UTC
+    // Franjas horarias: count + contestaron por hora LOCAL del tenant
     db.execute<{ hora: string; total: string; contestaron: string }>(sql`
       SELECT
-        EXTRACT(HOUR FROM ts)::int::text AS hora,
+        EXTRACT(HOUR FROM ts AT TIME ZONE ${tz})::int::text AS hora,
         COUNT(*)::text AS total,
         SUM(CASE WHEN tipo_evento LIKE 'efectiva_%' THEN 1 ELSE 0 END)::text AS contestaron
       FROM log_llamadas
       WHERE id_cuenta = ${idCuenta}
         AND ts BETWEEN ${fromTs} AND ${toTs}
         AND tipo_evento NOT IN ('pdte', 'contacto_creado')
-      GROUP BY EXTRACT(HOUR FROM ts)
-      ORDER BY EXTRACT(HOUR FROM ts)
+      GROUP BY EXTRACT(HOUR FROM ts AT TIME ZONE ${tz})
+      ORDER BY EXTRACT(HOUR FROM ts AT TIME ZONE ${tz})
     `),
   ]);
 
@@ -299,22 +305,32 @@ async function getNuevosReactivados(
   from: string,
   to: string,
 ): Promise<{ nuevos: number; reactivados: number }> {
-  // registros_de_llamada: un registro por lead con estado actual.
-  // Consideramos "nuevo" = fecha_primera_llamada dentro del periodo.
-  // "reactivado" = fecha_primera_llamada antes del periodo pero tiene actividad en él.
+  // Split de los leads con ACTIVIDAD REAL en el periodo (log_llamadas) según la
+  // fecha de su primera llamada en registros_de_llamada:
+  //   - nuevo      = primera llamada dentro del periodo (o sin registro previo).
+  //   - reactivado = primera llamada ANTES del periodo, re-contactado ahora.
+  // NB: no se usa registros_de_llamada.fecha_evento porque no se actualiza en el
+  // re-contacto (produce reactivados=0). Verificado contra BD readonly 2026-07-08.
   const fromTs = new Date(`${from}T00:00:00Z`);
   const toTs = new Date(`${to}T23:59:59.999Z`);
   const rows = await db.execute<{ nuevos: string; reactivados: string }>(sql`
+    WITH activos AS (
+      SELECT DISTINCT id_registro
+      FROM log_llamadas
+      WHERE id_cuenta = ${idCuenta}
+        AND ts BETWEEN ${fromTs} AND ${toTs}
+        AND tipo_evento NOT IN ('pdte', 'contacto_creado')
+        AND id_registro IS NOT NULL
+    )
     SELECT
       SUM(CASE
-        WHEN fecha_primera_llamada BETWEEN ${fromTs} AND ${toTs} THEN 1 ELSE 0
+        WHEN r.fecha_primera_llamada IS NULL OR r.fecha_primera_llamada >= ${fromTs} THEN 1 ELSE 0
       END)::text AS nuevos,
       SUM(CASE
-        WHEN fecha_primera_llamada < ${fromTs} THEN 1 ELSE 0
+        WHEN r.fecha_primera_llamada < ${fromTs} THEN 1 ELSE 0
       END)::text AS reactivados
-    FROM registros_de_llamada
-    WHERE id_cuenta::text = ${String(idCuenta)}
-      AND fecha_evento BETWEEN ${fromTs} AND ${toTs}
+    FROM activos a
+    LEFT JOIN registros_de_llamada r ON r.id_registro = a.id_registro
   `);
   const r = rows.rows[0];
   return { nuevos: Number(r?.nuevos ?? 0), reactivados: Number(r?.reactivados ?? 0) };
@@ -341,7 +357,11 @@ async function getCitasPorAsesor(
       ) THEN 1 ELSE 0 END)::text AS asistieron
     FROM resumenes_diarios_agendas
     WHERE id_cuenta = ${idCuenta}
-      AND fecha_evento BETWEEN ${fromTs} AND ${toTs}
+      AND excluida_dashboard = false
+      AND (
+        (fecha_reunion IS NOT NULL AND fecha_reunion BETWEEN ${fromTs} AND ${toTs})
+        OR (fecha_reunion IS NULL AND fecha BETWEEN ${from} AND ${to})
+      )
     GROUP BY closer
   `);
   const map: Record<string, { citas: number; asistieron: number }> = {};
@@ -350,6 +370,62 @@ async function getCitasPorAsesor(
     map[key] = { citas: Number(r.citas), asistieron: Number(r.asistieron) };
   }
   return map;
+}
+
+async function getChatExtras(
+  idCuenta: number,
+  from: string,
+  to: string,
+): Promise<{ mensajes: number; conBot: number; escaladas: number }> {
+  // mensajes = SUM del largo del array JSONB `chat`.
+  // escalada = chat con `asesor_asignado` a un humano; con-bot = resto (sin asignar).
+  const fromTs = new Date(`${from}T00:00:00Z`);
+  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const rows = await db.execute<{
+    mensajes: string;
+    escaladas: string;
+    con_bot: string;
+  }>(sql`
+    SELECT
+      COALESCE(SUM(jsonb_array_length(chat)), 0)::text AS mensajes,
+      COUNT(*) FILTER (WHERE COALESCE(TRIM(asesor_asignado), '') <> '')::text AS escaladas,
+      COUNT(*) FILTER (WHERE COALESCE(TRIM(asesor_asignado), '') = '')::text AS con_bot
+    FROM chats_logs
+    WHERE id_cuenta = ${idCuenta}
+      AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
+      AND chat IS NOT NULL
+  `);
+  const r = rows.rows[0];
+  return {
+    mensajes: Number(r?.mensajes ?? 0),
+    conBot: Number(r?.con_bot ?? 0),
+    escaladas: Number(r?.escaladas ?? 0),
+  };
+}
+
+async function getReagendadas(
+  idCuenta: number,
+  from: string,
+  to: string,
+): Promise<number> {
+  // No existe categoría "reagendada" en resumenes_diarios_agendas (verificado BD).
+  // Aproximación: leads con >1 registro de agenda en el periodo → cada extra = un
+  // reagendado. Etiquetar como aproximado en UI.
+  const rows = await db.execute<{ reagendadas: string }>(sql`
+    WITH per AS (
+      SELECT COALESCE(ghl_contact_id, email_lead, nombre_de_lead) AS k, COUNT(*)::int AS c
+      FROM resumenes_diarios_agendas
+      WHERE id_cuenta = ${idCuenta}
+        AND excluida_dashboard = false
+        AND (
+          (fecha_reunion IS NOT NULL AND fecha_reunion::date BETWEEN ${from} AND ${to})
+          OR (fecha_reunion IS NULL AND fecha BETWEEN ${from} AND ${to})
+        )
+      GROUP BY 1
+    )
+    SELECT COALESCE(SUM(c - 1), 0)::text AS reagendadas FROM per WHERE c > 1
+  `);
+  return Number(rows.rows[0]?.reagendadas ?? 0);
 }
 
 // ── Comparativo ──────────────────────────────────────────────────────────────
@@ -392,9 +468,11 @@ export async function buildReportV2(
   const enrichment = opts.enrichment ?? getEnrichmentMock();
 
   // ── Queries paralelas ─────────────────────────────────────────────────────
+  const tz = await getTenantTz(idCuenta);
   const [
     calls, chats, video, funnel, crm, conv, contact,
     coberturaLL, canalesPorLead, ubicacion, nrSplit, citasXAsesor,
+    chatExtras, reagendadas,
   ] = await Promise.all([
     getReportCalls(idCuenta, from, to),
     getReportChats(idCuenta, from, to),
@@ -403,11 +481,13 @@ export async function buildReportV2(
     getReportCrmHealth(idCuenta, from, to),
     getReportConversationAnalysis(idCuenta, from, to),
     getReportContactabilidadCanal(idCuenta, from, to),
-    getLlamadasCobertura(idCuenta, from, to),
+    getLlamadasCobertura(idCuenta, from, to, tz),
     getCanalesPorLead(idCuenta, from, to),
     getUbicacionLada(idCuenta, from, to),
     getNuevosReactivados(idCuenta, from, to),
     getCitasPorAsesor(idCuenta, from, to),
+    getChatExtras(idCuenta, from, to),
+    getReagendadas(idCuenta, from, to),
   ]);
 
   // ── canales activos ───────────────────────────────────────────────────────
@@ -517,11 +597,11 @@ export async function buildReportV2(
     chats: canalesActivos.chats
       ? {
           conversaciones: chats.totalChats,
-          mensajes: 0, // JSON JSONB count omitido (campo no prioritario en este sprint)
+          mensajes: chatExtras.mensajes,
           respondieron: contact.canales.find((c) => c.canal === "chats")?.contesto ?? 0,
           tPrimeraRespuesta: chats.speedToLeadAvgMin,
-          conBot: 0, // No hay señal de bot en chats_logs actualmente
-          escaladas: 0, // No hay señal de escalada en chats_logs actualmente
+          conBot: chatExtras.conBot,
+          escaladas: chatExtras.escaladas,
         }
       : null,
     video: canalesActivos.video
@@ -529,7 +609,7 @@ export async function buildReportV2(
           agendadas: video.total,
           realizadas: video.total - video.noShows,
           showRate: video.total > 0 ? (video.total - video.noShows) / video.total : 0,
-          reagendadas: 0, // No hay distinción reagendada vs nueva en resumenes_diarios_agendas
+          reagendadas,
           noShow: video.noShows,
           duracionProm: null, // [WS1 / AUT-1301] columna pendiente
           avanzaron: video.cerradas,
