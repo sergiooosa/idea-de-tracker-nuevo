@@ -9,7 +9,6 @@ import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripci
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays, formatDistanceToNow, isAfter, subDays as subDaysDate } from 'date-fns';
 import { es } from 'date-fns/locale';
-import Link from 'next/link';
 import { Pencil, Search, User, X, Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
