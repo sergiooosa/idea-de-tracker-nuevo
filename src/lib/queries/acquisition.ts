@@ -3,6 +3,11 @@ import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbu
 import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, or, gte, lte, isNull, isNotNull, sql } from "drizzle-orm";
 
+export interface ReMetricaLead {
+  campo: string;
+  valor: number;
+}
+
 export interface AcquisitionLeadDetail {
   key: string;
   nombre: string | null;
@@ -11,6 +16,7 @@ export interface AcquisitionLeadDetail {
   ghlContactId: string | null;
   closer: string | null;
   estado: string | null;
+  reMetricas?: ReMetricaLead[];
 }
 
 export interface AcquisitionRow {
@@ -41,11 +47,20 @@ export interface WebhookMetricRow {
   porAsesor: { userId: string; nombre: string | null; valor: number }[];
 }
 
+export interface ReMetricaSummary {
+  campo: string;
+  label: string;
+  total: number;
+  formato: "numero" | "moneda";
+  porAsesor: { userId: string; nombre: string | null; valor: number }[];
+}
+
 export interface AcquisitionResponse {
   rows: AcquisitionRow[];
   sources: string[];
   byChannel: ByChannelStats;
   webhookMetrics: WebhookMetricRow[];
+  reMetrics?: ReMetricaSummary[];
 }
 
 export async function getAcquisition(
@@ -424,15 +439,98 @@ export async function getAcquisition(
     }
   }
 
-  const webhookMetrics: WebhookMetricRow[] = [...campoAgg.entries()].map(([campo, agg]) => ({
-    campo,
-    total: agg.total || [...agg.byUser.values()].reduce((s, v) => s + v, 0),
-    porAsesor: [...agg.byUser.entries()].map(([userId, valor]) => ({
-      userId,
-      nombre: advisorMap.get(userId) ?? null,
-      valor,
-    })),
-  }));
+  const RE_CAMPOS = new Set([
+    "re_recorridos_agendados",
+    "re_recorridos_realizados",
+    "re_recorridos_cancelados",
+    "re_apartados",
+    "re_monto_apartados",
+  ]);
+
+  const RE_LABELS: Record<string, string> = {
+    re_recorridos_agendados: "Recorridos agendados",
+    re_recorridos_realizados: "Recorridos realizados",
+    re_recorridos_cancelados: "Recorridos cancelados",
+    re_apartados: "Apartados",
+    re_monto_apartados: "Monto apartados",
+  };
+
+  const RE_FORMATO: Record<string, "numero" | "moneda"> = {
+    re_monto_apartados: "moneda",
+  };
+
+  const webhookMetrics: WebhookMetricRow[] = [...campoAgg.entries()]
+    .filter(([campo]) => !RE_CAMPOS.has(campo))
+    .map(([campo, agg]) => ({
+      campo,
+      total: agg.total || [...agg.byUser.values()].reduce((s, v) => s + v, 0),
+      porAsesor: [...agg.byUser.entries()].map(([userId, valor]) => ({
+        userId,
+        nombre: advisorMap.get(userId) ?? null,
+        valor,
+      })),
+    }));
+
+  // ----------------------------------------------------------------
+  // RE METRICS — métricas Real Estate separadas, con detalle por contacto
+  // ----------------------------------------------------------------
+  const reAgg = new Map<string, { total: number; byUser: Map<string, number> }>();
+  const reByCustomer = new Map<string, Map<string, number>>();
+
+  for (const row of webhookRows) {
+    if (!RE_CAMPOS.has(row.campo)) continue;
+    const val = parseFloat(String(row.valor)) || 0;
+
+    if (!reAgg.has(row.campo)) {
+      reAgg.set(row.campo, { total: 0, byUser: new Map() });
+    }
+    const agg = reAgg.get(row.campo)!;
+    if (row.ghl_user_id === null) {
+      agg.total += val;
+    } else {
+      agg.byUser.set(row.ghl_user_id, (agg.byUser.get(row.ghl_user_id) ?? 0) + val);
+    }
+
+    if (row.ghl_customer_id) {
+      if (!reByCustomer.has(row.ghl_customer_id)) {
+        reByCustomer.set(row.ghl_customer_id, new Map());
+      }
+      const cm = reByCustomer.get(row.ghl_customer_id)!;
+      cm.set(row.campo, (cm.get(row.campo) ?? 0) + val);
+    }
+  }
+
+  const hasReData = reAgg.size > 0;
+
+  const reMetrics: ReMetricaSummary[] = hasReData
+    ? [...reAgg.entries()].map(([campo, agg]) => ({
+        campo,
+        label: RE_LABELS[campo] ?? campo.replace(/_/g, " "),
+        total: agg.total || [...agg.byUser.values()].reduce((s, v) => s + v, 0),
+        formato: RE_FORMATO[campo] ?? "numero",
+        porAsesor: [...agg.byUser.entries()].map(([userId, valor]) => ({
+          userId,
+          nombre: advisorMap.get(userId) ?? null,
+          valor,
+        })),
+      }))
+    : [];
+
+  // Attach RE metrics to lead details by ghlContactId
+  if (reByCustomer.size > 0) {
+    for (const row of rows) {
+      for (const lead of row.leadsList) {
+        if (!lead.ghlContactId) continue;
+        const cm = reByCustomer.get(lead.ghlContactId);
+        if (cm) {
+          lead.reMetricas = [...cm.entries()].map(([campo, valor]) => ({
+            campo,
+            valor,
+          }));
+        }
+      }
+    }
+  }
 
   return {
     rows,
@@ -443,5 +541,6 @@ export async function getAcquisition(
       chats: chatsChannel,
     },
     webhookMetrics,
+    ...(hasReData ? { reMetrics } : {}),
   };
 }

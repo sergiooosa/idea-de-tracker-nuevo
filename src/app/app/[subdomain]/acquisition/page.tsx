@@ -17,6 +17,11 @@ const fm = formatCurrency;
 const defaultTo = new Date();
 const defaultFrom = subDays(defaultTo, 7);
 
+interface ReMetricaLead {
+  campo: string;
+  valor: number;
+}
+
 interface AcqLeadDetail {
   key: string;
   nombre: string | null;
@@ -25,6 +30,7 @@ interface AcqLeadDetail {
   ghlContactId: string | null;
   closer: string | null;
   estado: string | null;
+  reMetricas?: ReMetricaLead[];
 }
 
 interface AcqRow {
@@ -46,11 +52,20 @@ interface WebhookMetricRow {
   porAsesor: { userId: string; nombre: string | null; valor: number }[];
 }
 
+interface ReMetricaSummary {
+  campo: string;
+  label: string;
+  total: number;
+  formato: "numero" | "moneda";
+  porAsesor: { userId: string; nombre: string | null; valor: number }[];
+}
+
 interface AcqResponse {
   rows: AcqRow[];
   sources: string[];
   byChannel: ByChannelStats;
   webhookMetrics?: WebhookMetricRow[];
+  reMetrics?: ReMetricaSummary[];
 }
 
 interface AdsRow {
@@ -210,6 +225,35 @@ export default function AcquisitionPage() {
           </div>
         )}
 
+        {/* ── Métricas Real Estate ── */}
+        {!loading && data?.reMetrics && data.reMetrics.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Métricas Inmobiliarias</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {data.reMetrics.map((m) => (
+                <div key={m.campo} className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
+                  <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide">{m.label}</div>
+                  <div className="text-xl font-bold text-accent-cyan">
+                    {m.formato === "moneda" ? fm(m.total) : m.total % 1 === 0 ? m.total : m.total.toFixed(2)}
+                  </div>
+                  {m.porAsesor.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-surface-600">
+                      {m.porAsesor.map((a) => (
+                        <div key={a.userId} className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-400 truncate max-w-[60%]">{a.nombre ?? a.userId}</span>
+                          <span className="text-white font-medium">
+                            {m.formato === "moneda" ? fm(a.valor) : a.valor % 1 === 0 ? a.valor : a.valor.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Métricas Webhook por asesor ── */}
         {!loading && data?.webhookMetrics && data.webhookMetrics.length > 0 && (
           <div className="space-y-2">
@@ -303,6 +347,25 @@ export default function AcquisitionPage() {
                                   <span className="inline-block px-1.5 py-0.5 rounded text-[9px] bg-surface-600 text-gray-300">
                                     {lead.estado.replace('efectiva_', '').replace(/_/g, ' ')}
                                   </span>
+                                )}
+                                {lead.reMetricas && lead.reMetricas.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 pt-0.5">
+                                    {lead.reMetricas.map((rm) => {
+                                      const RE_SHORT: Record<string, string> = {
+                                        re_recorridos_agendados: "Agend.",
+                                        re_recorridos_realizados: "Realiz.",
+                                        re_recorridos_cancelados: "Cancel.",
+                                        re_apartados: "Apart.",
+                                        re_monto_apartados: "Monto",
+                                      };
+                                      const isMoney = rm.campo === "re_monto_apartados";
+                                      return (
+                                        <span key={rm.campo} className="inline-block px-1.5 py-0.5 rounded text-[9px] bg-accent-purple/20 text-accent-purple border border-accent-purple/30">
+                                          {RE_SHORT[rm.campo] ?? rm.campo.replace(/re_/g, "").replace(/_/g, " ")}: {isMoney ? fm(rm.valor) : rm.valor}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
                                 )}
                               </div>
                             ))}
