@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
-import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download, CheckCircle2, Sparkles, Copy, FileDown } from "lucide-react";
+import HelpTooltip from "@/components/dashboard/HelpTooltip";
+import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download, CheckCircle2, Sparkles, Copy, FileDown, MessageSquare, Phone, Video } from "lucide-react";
 import { useUserFilter } from "@/contexts/UserFilterContext";
-import { canManageUsers, canManageRoles } from "@/lib/permisos";
+import { canManageUsers, canManageRoles, canManageSystem } from "@/lib/permisos";
 import { PERMISOS_DISPONIBLES, type PermisoId } from "@/lib/permisos";
 import type { RolConfig } from "@/lib/db/schema";
 import { toast } from "sonner";
@@ -12,6 +13,12 @@ import { toast } from "sonner";
 interface CriteriosCalificacionData {
   categorias: string[] | null;
   categoriasDisponibles: string[];
+}
+
+interface CanalesActivosData {
+  chats: boolean;
+  llamadas: boolean;
+  videollamadas: boolean;
 }
 
 type TipoUsuario = "analista" | "enfoque";
@@ -37,6 +44,7 @@ export default function ConfiguracionPage() {
   const permisos = session?.permisosArray ?? [];
   const puedeUsuarios = canManageUsers(permisos) || session?.rol === "superadmin";
   const puedeRoles = canManageRoles(permisos) || session?.rol === "superadmin";
+  const puedeCriterios = canManageSystem(permisos) || session?.rol === "superadmin";
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<RolConfig[]>([]);
@@ -65,8 +73,13 @@ export default function ConfiguracionPage() {
   const [criteriosSaving, setCriteriosSaving] = useState(false);
   const [criteriosLoaded, setCriteriosLoaded] = useState(false);
 
+  // Canales activos
+  const [canales, setCanales] = useState<CanalesActivosData>({ chats: false, llamadas: false, videollamadas: false });
+  const [canalesSaving, setCanalesSaving] = useState(false);
+  const [canalesLoaded, setCanalesLoaded] = useState(false);
+
   const loadCriterios = useCallback(async () => {
-    if (session?.rol !== "superadmin") return;
+    if (!puedeCriterios) return;
     try {
       const res = await fetch("/api/data/criterios-calificacion");
       if (res.ok) {
@@ -76,7 +89,19 @@ export default function ConfiguracionPage() {
         setCriteriosLoaded(true);
       }
     } catch { /* ignore */ }
-  }, [session?.rol]);
+  }, [puedeCriterios]);
+
+  const loadCanales = useCallback(async () => {
+    if (!puedeCriterios) return;
+    try {
+      const res = await fetch("/api/data/canales-activos");
+      if (res.ok) {
+        const data = (await res.json()) as CanalesActivosData;
+        setCanales(data);
+        setCanalesLoaded(true);
+      }
+    } catch { /* ignore */ }
+  }, [puedeCriterios]);
 
   const loadUsers = useCallback(async () => {
     if (!puedeUsuarios) return;
@@ -96,8 +121,8 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadUsers(), loadRoles(), loadCriterios()]).finally(() => setLoading(false));
-  }, [loadUsers, loadRoles, loadCriterios]);
+    Promise.all([loadUsers(), loadRoles(), loadCriterios(), loadCanales()]).finally(() => setLoading(false));
+  }, [loadUsers, loadRoles, loadCriterios, loadCanales]);
 
   const rolesParaSelect = [...ROLES_BUILTIN, ...roles.filter((r) => !["superadmin", "usuario"].includes(r.id))];
 
@@ -302,13 +327,34 @@ export default function ConfiguracionPage() {
     setCriteriosSaving(false);
   };
 
+  const handleSaveCanales = async () => {
+    setCanalesSaving(true);
+    try {
+      const res = await fetch("/api/data/canales-activos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(canales),
+      });
+      if (!res.ok) throw new Error("Error al guardar");
+      toast.success("Canales activos guardados");
+      await loadCanales();
+    } catch {
+      toast.error("Error al guardar los canales");
+    }
+    setCanalesSaving(false);
+  };
+
+  const toggleCanal = (canal: keyof CanalesActivosData) => {
+    setCanales((prev) => ({ ...prev, [canal]: !prev[canal] }));
+  };
+
   const toggleCriterio = (cat: string) => {
     setCriteriosSeleccionados((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
     );
   };
 
-  if (!puedeUsuarios && !puedeRoles) {
+  if (!puedeUsuarios && !puedeRoles && !puedeCriterios) {
     return (
       <>
         <PageHeader title="Configuración" subtitle="Sin permisos" action={<span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">Beta</span>} />
@@ -467,12 +513,17 @@ export default function ConfiguracionPage() {
         )}
 
         {/* ── Criterios de Calificación ── */}
-        {criteriosLoaded && session?.rol === "superadmin" && (
+        {criteriosLoaded && puedeCriterios && (
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-accent-purple" />
                 <h2 className="text-sm font-semibold text-white">Criterios de Calificación</h2>
+                <HelpTooltip
+                  titulo="¿Qué son los Criterios de Calificación?"
+                  contenido={`Aquí eliges qué categorías de interés (detectadas automáticamente por la IA al analizar tus conversaciones) cuentan como un lead calificado para tu negocio.\n\nLos chats o llamadas que caigan en una de las categorías seleccionadas se marcarán como "Calificado" en Performance. Si no seleccionas ninguna, no se aplica filtro y todo se considera calificado.`}
+                  comoProbar="Selecciona una o más categorías y pulsa 'Guardar criterios'. Ve a Performance y confirma que las conversaciones con esas categorías aparecen marcadas como Calificado."
+                />
               </div>
             </div>
 
@@ -532,6 +583,64 @@ export default function ConfiguracionPage() {
                 </div>
               </>
             )}
+          </section>
+        )}
+
+        {/* ── Canales Activos ── */}
+        {canalesLoaded && puedeCriterios && (
+          <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Phone className="w-5 h-5 text-accent-cyan" />
+                <h2 className="text-sm font-semibold text-white">Canales del Embudo IA</h2>
+                <HelpTooltip
+                  titulo="¿Qué son los Canales del Embudo IA?"
+                  contenido={`Indica qué canales de comunicación usa tu equipo de ventas: Chats (WhatsApp), Llamadas (Twilio) y/o Videollamadas (Fathom).\n\nLa IA del embudo solo analizará y calculará métricas de los canales que marques como activos. Desactivar un canal que no usas evita ruido y métricas vacías en tus reportes.`}
+                  comoProbar="Activa solo los canales que tu equipo realmente usa y pulsa 'Guardar canales'. Revisa el embudo/Performance y confirma que solo aparecen métricas de los canales activos."
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+              Indica qué canales de comunicación usa tu equipo de ventas. La IA del embudo solo analizará los canales activos.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              {([
+                { key: "chats" as const, label: "Chats (WhatsApp)", icon: MessageSquare, desc: "Conversaciones de WhatsApp y chat" },
+                { key: "llamadas" as const, label: "Llamadas (Twilio)", icon: Phone, desc: "Llamadas telefónicas grabadas" },
+                { key: "videollamadas" as const, label: "Videollamadas (Fathom)", icon: Video, desc: "Reuniones con transcripción" },
+              ]).map(({ key, label, icon: Icon, desc }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleCanal(key)}
+                  className={`flex flex-col items-start gap-2 p-3 rounded-lg border text-left transition-all ${
+                    canales[key]
+                      ? "bg-accent-cyan/10 border-accent-cyan/50 text-white"
+                      : "bg-surface-700 border-surface-500 text-gray-400 hover:border-accent-cyan/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-4 h-4 ${canales[key] ? "text-accent-cyan" : "text-gray-500"}`} />
+                    <span className="text-sm font-medium">{label}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">{desc}</span>
+                  {canales[key] && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-accent-cyan">
+                      <CheckCircle2 className="w-3 h-3" /> Activo
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveCanales}
+              disabled={canalesSaving}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 transition-colors"
+            >
+              {canalesSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Guardar canales
+            </button>
           </section>
         )}
       </div>
