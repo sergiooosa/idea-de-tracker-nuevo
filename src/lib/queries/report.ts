@@ -1024,11 +1024,11 @@ export async function getReportConversationAnalysis(
       obj->>'categoria' AS categoria,
       COUNT(*)::int     AS cnt
     FROM chats_logs,
-         jsonb_array_elements(ia_objeciones) AS obj
+         jsonb_array_elements(CASE WHEN jsonb_typeof(ia_objeciones) = 'array' THEN ia_objeciones ELSE '[]'::jsonb END) AS obj
     WHERE id_cuenta = ${idCuenta}
       AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
-      AND ia_objeciones IS NOT NULL
-      AND jsonb_array_length(ia_objeciones) > 0
+      AND jsonb_typeof(ia_objeciones) = 'array'
+      AND ia_objeciones <> '[]'::jsonb
     GROUP BY obj->>'objecion', obj->>'categoria'
     ORDER BY cnt DESC
   `);
@@ -1040,11 +1040,11 @@ export async function getReportConversationAnalysis(
       obj->>'categoria' AS categoria,
       COUNT(*)::int     AS cnt
     FROM resumenes_diarios_agendas,
-         jsonb_array_elements(objeciones_ia) AS obj
+         jsonb_array_elements(CASE WHEN jsonb_typeof(objeciones_ia) = 'array' THEN objeciones_ia ELSE '[]'::jsonb END) AS obj
     WHERE id_cuenta = ${idCuenta}
       AND fecha BETWEEN ${from}::date AND ${to}::date
-      AND objeciones_ia IS NOT NULL
-      AND jsonb_array_length(objeciones_ia) > 0
+      AND jsonb_typeof(objeciones_ia) = 'array'
+      AND objeciones_ia <> '[]'::jsonb
     GROUP BY obj->>'objecion', obj->>'categoria'
     ORDER BY cnt DESC
   `);
@@ -1087,16 +1087,16 @@ export async function getReportConversationAnalysis(
       FROM chats_logs
       WHERE id_cuenta = ${idCuenta}
         AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
-        AND ia_objeciones IS NOT NULL
-        AND jsonb_array_length(ia_objeciones) > 0
+        AND jsonb_typeof(ia_objeciones) = 'array'
+        AND ia_objeciones <> '[]'::jsonb
     `),
     db.execute(sql`
       SELECT COUNT(*)::int AS total
       FROM resumenes_diarios_agendas
       WHERE id_cuenta = ${idCuenta}
         AND fecha BETWEEN ${from}::date AND ${to}::date
-        AND objeciones_ia IS NOT NULL
-        AND jsonb_array_length(objeciones_ia) > 0
+        AND jsonb_typeof(objeciones_ia) = 'array'
+        AND objeciones_ia <> '[]'::jsonb
     `),
   ]);
 
