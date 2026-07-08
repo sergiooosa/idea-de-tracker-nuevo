@@ -6,7 +6,8 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import { CheckCircle2, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
@@ -49,6 +50,13 @@ const ESTADOS_NO_INTERESADAS = new Set([
 const ESTADOS_INTERESADAS = new Set([
   'calificada', 'interesado', 'programado', 'seguimiento', 'reagendado',
 ]);
+
+const ESTADOS_CALIFICADOS = new Set(['calificada', 'calificado']);
+
+function esLeadCalificado(estado: string | null): boolean {
+  const s = (estado ?? '').trim().toLowerCase().replace(/^\{+|\}+$/g, '').replace(/\s+/g, '_');
+  return ESTADOS_CALIFICADOS.has(s);
+}
 
 function categoriaResultado(estado: string | null): ResultadoFiltro | null {
   // Normalizar: trim, lowercase, quitar llaves de valores serializados desde JSONB
@@ -126,6 +134,11 @@ export default function PerformanceLlamadasPage() {
     }
     return counts;
   }, [data?.leads, contestadasLeadIds]);
+
+  const leadsCalificados = useMemo(() => {
+    if (!data?.leads) return 0;
+    return data.leads.filter((l) => esLeadCalificado(l.estado)).length;
+  }, [data?.leads]);
 
   const leadsFiltered = useMemo(() => {
     if (!data?.leads || resultadoFiltro === 'todos') return data?.leads ?? [];
@@ -335,6 +348,22 @@ export default function PerformanceLlamadasPage() {
         <KPICard label="Tasa de contestación" value={pct(agg.answerRate * 100)} color="green" className={kpiCompact} tooltip={{ significado: '% de llamadas contestadas.', calculo: '(Contestadas / Total) × 100.' }} />
       </div>
 
+      {/* ── KPI Calificados ── */}
+      {leadsCalificados > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs font-medium text-gray-300">Leads calificados:</span>
+            <span className="text-base font-bold text-emerald-400">{leadsCalificados}</span>
+            <span className="text-[10px] text-gray-500">de {agg.totalLeads}</span>
+            <KpiTooltip
+              significado="Leads cuyo estado es 'calificada' — el asesor determinó que cumplen criterios de calificación."
+              calculo="Conteo de leads con estado = calificada en el rango."
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Filtro por resultado ── */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="text-xs text-gray-400 font-medium">Resultado:</span>
@@ -511,6 +540,7 @@ export default function PerformanceLlamadasPage() {
                                         <tr className="text-left text-gray-400">
                                           <th className="px-2 py-2 font-medium">Nombre</th>
                                           <th className="px-2 py-2 font-medium">Estado</th>
+                                          <th className="px-2 py-2 font-medium" title="¿Lead calificado por el asesor?">Calificado</th>
                                           <th className="px-2 py-2 font-medium">Llamadas realizadas</th>
                                           <th className="px-2 py-2 font-medium">Llamadas (tipo)</th>
                                           <th className="px-2 py-2 font-medium">Speed to lead</th>
@@ -520,7 +550,7 @@ export default function PerformanceLlamadasPage() {
                                       <tbody>
                                         {advisorLeads.length === 0 ? (
                                           <tr>
-                                            <td colSpan={7} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
+                                            <td colSpan={8} className="px-2 py-4 text-center text-gray-500 text-xs">No hay registros de leads en este rango para este asesor.</td>
                                           </tr>
                                         ) : advisorLeads.map((lead) => (
                                           <tr
@@ -536,6 +566,15 @@ export default function PerformanceLlamadasPage() {
                                               </div>
                                             </td>
                                             <td className="px-2 py-2 text-gray-300">{lead.estado ?? '—'}</td>
+                                            <td className="px-2 py-2">
+                                              {esLeadCalificado(lead.estado) ? (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                                                  <CheckCircle2 className="w-3 h-3" /> Sí
+                                                </span>
+                                              ) : (
+                                                <span className="text-gray-600 text-[10px]">—</span>
+                                              )}
+                                            </td>
                                             <td className="px-2 py-2 text-accent-cyan font-medium">{getCallsForLead(lead).length}</td>
                                             <td className="px-2 py-2 text-gray-400" title={getResumenLlamadas(lead)}>{getResumenLlamadas(lead)}</td>
                                             <td className="px-2 py-2 text-gray-400">{speedDisplay(lead)}</td>
