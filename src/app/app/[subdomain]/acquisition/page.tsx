@@ -228,11 +228,20 @@ export default function AcquisitionPage() {
         {/* ── Métricas Real Estate ── */}
         {!loading && data?.reMetrics && data.reMetrics.length > 0 && (
           <div className="space-y-2">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Métricas Inmobiliarias</h2>
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider inline-flex items-center">Métricas Inmobiliarias <KpiTooltip significado="Métricas de recorridos y apartados reportadas por el CRM inmobiliario." calculo="Suma de eventos recibidos por webhook, atribuidos al asesor que registró cada evento." /></h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {data.reMetrics.map((m) => (
+              {data.reMetrics.map((m) => {
+                const reTooltips: Record<string, { significado: string; calculo: string }> = {
+                  re_recorridos_agendados: { significado: "Recorridos de propiedad agendados con prospectos.", calculo: "Conteo de eventos 're_recorridos_agendados' recibidos por webhook." },
+                  re_recorridos_realizados: { significado: "Recorridos de propiedad efectivamente realizados.", calculo: "Conteo de eventos 're_recorridos_realizados' recibidos por webhook." },
+                  re_recorridos_cancelados: { significado: "Recorridos de propiedad que fueron cancelados.", calculo: "Conteo de eventos 're_recorridos_cancelados' recibidos por webhook." },
+                  re_apartados: { significado: "Unidades apartadas por prospectos.", calculo: "Conteo de eventos 're_apartados' recibidos por webhook." },
+                  re_monto_apartados: { significado: "Valor monetario total de las unidades apartadas.", calculo: "Suma del campo valor de eventos 're_monto_apartados' por webhook." },
+                };
+                const tip = reTooltips[m.campo];
+                return (
                 <div key={m.campo} className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
-                  <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide">{m.label}</div>
+                  <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide inline-flex items-center">{m.label}{tip && <KpiTooltip significado={tip.significado} calculo={tip.calculo} />}</div>
                   <div className="text-xl font-bold text-accent-cyan">
                     {m.formato === "moneda" ? fm(m.total) : m.total % 1 === 0 ? m.total : m.total.toFixed(2)}
                   </div>
@@ -249,7 +258,8 @@ export default function AcquisitionPage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
