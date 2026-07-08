@@ -506,6 +506,8 @@ export async function buildReportV2(
           realizadas: calls.totalLlamadas,
           leadsLlamados: coberturaLL.leadsLlamados,
           contestaronPorLead: coberturaLL.contestaronPorLead,
+          calificados: contact.canales.find((c) => c.canal === "llamadas")?.califico ?? 0,
+          noCalificados: contact.canales.find((c) => c.canal === "llamadas")?.noCalifco ?? 0,
           intentosProm: calls.intentosPromGlobal,
           speedToLeadProm: calls.speedToLeadAvgMin,
           duracionPromContestadas: null, // [WS1 / AUT-1301] columna pendiente
@@ -527,6 +529,8 @@ export async function buildReportV2(
           agendadas: video.total,
           realizadas: video.total - video.noShows,
           showRate: video.total > 0 ? (video.total - video.noShows) / video.total : 0,
+          calificados: video.calificadosReales,
+          noCalificados: video.noCalificadosReales,
           reagendadas: 0, // No hay distinción reagendada vs nueva en resumenes_diarios_agendas
           noShow: video.noShows,
           duracionProm: null, // [WS1 / AUT-1301] columna pendiente

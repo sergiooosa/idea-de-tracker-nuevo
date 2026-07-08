@@ -452,6 +452,8 @@ export interface ReportVideocallsCloser {
 export interface ReportVideocalls {
   total: number;
   calificadas: number;
+  calificadosReales: number;
+  noCalificadosReales: number;
   noShows: number;
   cerradas: number;
   canceladas: number;
@@ -464,15 +466,15 @@ function clasificarCategoria(cat: string | null): {
   noShow: boolean;
   cerrada: boolean;
   cancelada: boolean;
+  esCalificadoReal: boolean;
+  esNoCalificadoReal: boolean;
 } {
-  if (!cat) return { calificada: false, noShow: false, cerrada: false, cancelada: false };
+  if (!cat) return { calificada: false, noShow: false, cerrada: false, cancelada: false, esCalificadoReal: false, esNoCalificadoReal: false };
   const cl = cat.trim().toLowerCase();
   const cancelada = cl.includes("cancel");
   const noShow = cl === "no_show" || cl === "noshow" || cl === "no show";
   const cerrada = cl === "cerrada" || cl === "closed";
-  // "calificada" en este contexto significa "la videollamada ocurrió y fue evaluada" —
-  // incluye tanto calificadas como no_calificadas porque ambas representan una cita que SÍ se realizó.
-  // no_show y cancelada son las únicas que NO ocurrieron.
+  // "calificada" = la videollamada ocurrió y fue evaluada (tanto calificadas como no_calificadas)
   const calificada =
     !cancelada &&
     !noShow &&
@@ -483,7 +485,9 @@ function clasificarCategoria(cat: string | null): {
       cl === "no_calificada" ||
       cl === "no_ofertada" ||
       cl === "no ofertada");
-  return { calificada, noShow, cerrada, cancelada };
+  const esCalificadoReal = cerrada || cl === "calificada" || cl === "ofertada" || cl === "offered";
+  const esNoCalificadoReal = cl === "no_calificada" || cl === "no_ofertada" || cl === "no ofertada";
+  return { calificada, noShow, cerrada, cancelada, esCalificadoReal, esNoCalificadoReal };
 }
 
 export async function getReportVideocalls(
@@ -563,6 +567,8 @@ export async function getReportVideocalls(
   > = {};
 
   let totalCalificadas = 0;
+  let totalCalificadosReales = 0;
+  let totalNoCalificadosReales = 0;
   let totalCerradas = 0;
   let totalCanceladas = 0;
 
@@ -589,6 +595,8 @@ export async function getReportVideocalls(
 
     const cl = clasificarCategoria(r.categoria);
     if (cl.calificada) { entry.calificadas++; totalCalificadas++; }
+    if (cl.esCalificadoReal) { totalCalificadosReales++; }
+    if (cl.esNoCalificadoReal) { totalNoCalificadosReales++; }
     if (cl.noShow)     { entry.noShows++; }
     if (cl.cerrada)    { entry.cerradas++; totalCerradas++; }
     if (cl.cancelada)  { entry.canceladas++; totalCanceladas++; }
@@ -610,6 +618,8 @@ export async function getReportVideocalls(
   return {
     total: totalDeduped,
     calificadas: totalCalificadas,
+    calificadosReales: totalCalificadosReales,
+    noCalificadosReales: totalNoCalificadosReales,
     noShows: totalNoShows,
     cerradas: totalCerradas,
     canceladas: totalCanceladas,

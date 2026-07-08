@@ -46,6 +46,12 @@ function LlamadasBlock({ data }: { data: ReportV2CanalLlamadas }) {
           <Stat label="Contestaron" value={data.contestaronPorLead} color="text-accent-green" />
         </div>
         <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
+          <Stat label="Calificados" value={data.calificados} color="text-accent-green" />
+        </div>
+        <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
+          <Stat label="No calificados" value={data.noCalificados} color="text-accent-amber" />
+        </div>
+        <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
           <Stat label="Intentos prom." value={data.intentosProm.toFixed(1)} />
         </div>
         {data.speedToLeadProm !== null && (
@@ -128,6 +134,12 @@ function VideoBlock({ data }: { data: ReportV2CanalVideo }) {
             value={`${Math.round(data.showRate * 100)}%`}
             color={data.showRate >= 0.7 ? 'text-accent-green' : 'text-accent-amber'}
           />
+        </div>
+        <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
+          <Stat label="Calificados" value={data.calificados} color="text-accent-green" />
+        </div>
+        <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
+          <Stat label="No calificados" value={data.noCalificados} color="text-accent-amber" />
         </div>
         <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
           <Stat label="No-show" value={data.noShow} color="text-accent-red" />
