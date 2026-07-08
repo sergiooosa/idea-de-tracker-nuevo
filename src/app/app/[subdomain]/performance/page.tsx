@@ -9,7 +9,7 @@ import ModalTranscripcionIA from '@/components/dashboard/modals/ModalTranscripci
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays, formatDistanceToNow, isAfter, subDays as subDaysDate } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Pencil, Search, User, X, Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, Pencil, Search, User, X, Plus, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
@@ -116,6 +116,11 @@ export default function PerformanceVideollamadasPage() {
   };
 
   const agg = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, cerradas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
+
+  const leadsCalificados = useMemo(() => {
+    if (!data?.registros) return 0;
+    return data.registros.filter((r) => r.qualified && !r.excludedFromDashboard).length;
+  }, [data?.registros]);
 
   const isCerrada = (r: ApiVideollamada) =>
     r.outcome === 'cerrada' || r.outcome === 'cerrado' || r.outcome === 'closed';
@@ -332,6 +337,22 @@ export default function PerformanceVideollamadasPage() {
         ))}
       </div>
 
+      {/* ── KPI Calificados ── */}
+      {leadsCalificados > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs font-medium text-gray-300">Leads calificados:</span>
+            <span className="text-base font-bold text-emerald-400">{leadsCalificados}</span>
+            <span className="text-[10px] text-gray-500">de {agg.asistidas} asistidas</span>
+            <KpiTooltip
+              significado="Reuniones donde el lead fue calificado — cumple criterios para avanzar en el proceso de venta."
+              calculo="Conteo de videollamadas con categoría calificada o cerrada en el período."
+            />
+          </div>
+        </div>
+      )}
+
       <section>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <BarChart3 className="w-3.5 h-3.5 text-accent-green" />
@@ -449,6 +470,7 @@ export default function PerformanceVideollamadasPage() {
                                         <tr className="text-left text-gray-400">
                                           <th className="px-2 py-2 font-medium">Nombre</th>
                                           <th className="px-2 py-2 font-medium">Correo</th>
+                                          <th className="px-2 py-2 font-medium" title="¿Lead calificado?">Calificado</th>
                                           <th className="px-2 py-2 font-medium">Reuniones realizadas</th>
                                           <th className="px-2 py-2 font-medium">Resultado</th>
                                           <th className="px-2 py-2 font-medium w-8" />
@@ -480,6 +502,15 @@ export default function PerformanceVideollamadasPage() {
                                                 </div>
                                               </td>
                                               <td className="px-2 py-2 text-gray-400">{lead.email ?? '—'}</td>
+                                              <td className="px-2 py-2">
+                                                {lead.meetings.some((m) => m.qualified) ? (
+                                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                                                    <CheckCircle2 className="w-3 h-3" /> Sí
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-600 text-[10px]">No</span>
+                                                )}
+                                              </td>
                                               <td className="px-2 py-2 text-accent-cyan">{lead.meetings.length}</td>
                                               <td className="px-2 py-2 text-gray-300">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
