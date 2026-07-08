@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
+import HelpTooltip from "@/components/dashboard/HelpTooltip";
 import { UserPlus, Shield, Crown, Users, X, Key, Mail, Pencil, Loader2, Plus, Trash2, Upload, Download, CheckCircle2, Sparkles, Copy, FileDown, MessageSquare, Phone, Video } from "lucide-react";
 import { useUserFilter } from "@/contexts/UserFilterContext";
 import { canManageUsers, canManageRoles, canManageSystem } from "@/lib/permisos";
@@ -518,6 +519,11 @@ export default function ConfiguracionPage() {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-accent-purple" />
                 <h2 className="text-sm font-semibold text-white">Criterios de Calificación</h2>
+                <HelpTooltip
+                  titulo="¿Qué son los Criterios de Calificación?"
+                  contenido={`Aquí eliges qué categorías de interés (detectadas automáticamente por la IA al analizar tus conversaciones) cuentan como un lead calificado para tu negocio.\n\nLos chats o llamadas que caigan en una de las categorías seleccionadas se marcarán como "Calificado" en Performance. Si no seleccionas ninguna, no se aplica filtro y todo se considera calificado.`}
+                  comoProbar="Selecciona una o más categorías y pulsa 'Guardar criterios'. Ve a Performance y confirma que las conversaciones con esas categorías aparecen marcadas como Calificado."
+                />
               </div>
             </div>
 
@@ -587,6 +593,11 @@ export default function ConfiguracionPage() {
               <div className="flex items-center gap-2">
                 <Phone className="w-5 h-5 text-accent-cyan" />
                 <h2 className="text-sm font-semibold text-white">Canales del Embudo IA</h2>
+                <HelpTooltip
+                  titulo="¿Qué son los Canales del Embudo IA?"
+                  contenido={`Indica qué canales de comunicación usa tu equipo de ventas: Chats (WhatsApp), Llamadas (Twilio) y/o Videollamadas (Fathom).\n\nLa IA del embudo solo analizará y calculará métricas de los canales que marques como activos. Desactivar un canal que no usas evita ruido y métricas vacías en tus reportes.`}
+                  comoProbar="Activa solo los canales que tu equipo realmente usa y pulsa 'Guardar canales'. Revisa el embudo/Performance y confirma que solo aparecen métricas de los canales activos."
+                />
               </div>
             </div>
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">
