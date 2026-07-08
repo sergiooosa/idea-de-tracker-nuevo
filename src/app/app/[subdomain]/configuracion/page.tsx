@@ -10,10 +10,55 @@ import { PERMISOS_DISPONIBLES, type PermisoId } from "@/lib/permisos";
 import type { RolConfig } from "@/lib/db/schema";
 import { toast } from "sonner";
 
+type Canal = "chats" | "llamadas" | "videollamadas";
+type CriteriosTab = "global" | Canal;
+
+interface CanalesState {
+  chats: string[] | null;
+  llamadas: string[] | null;
+  videollamadas: string[] | null;
+}
+
 interface CriteriosCalificacionData {
   categorias: string[] | null;
+  canales: CanalesState;
   categoriasDisponibles: string[];
 }
+
+const TABS_CONFIG: { id: CriteriosTab; label: string; icon: typeof Sparkles; helpTitulo: string; helpContenido: string; helpProbar: string }[] = [
+  {
+    id: "global",
+    label: "Global",
+    icon: Sparkles,
+    helpTitulo: "Criterios Globales",
+    helpContenido: "Las categorías seleccionadas aquí aplican a todos los canales que no tengan un criterio específico. Si un canal tiene criterios propios, se usarán esos en lugar de los globales.",
+    helpProbar: "Selecciona categorías globales, guarda, y verifica en Performance que se aplican a los canales sin criterios propios.",
+  },
+  {
+    id: "chats",
+    label: "Chats",
+    icon: MessageSquare,
+    helpTitulo: "Criterios de Chats (WhatsApp)",
+    helpContenido: "Las categorías seleccionadas aquí aplican solo a las conversaciones de WhatsApp/chat. Si dejas vacío, se usarán los criterios globales para este canal.",
+    helpProbar: "Selecciona categorías específicas para chats, guarda, y verifica que solo se aplican a los chats en Performance.",
+  },
+  {
+    id: "llamadas",
+    label: "Llamadas",
+    icon: Phone,
+    helpTitulo: "Criterios de Llamadas (Twilio)",
+    helpContenido: "Las categorías seleccionadas aquí aplican solo a las llamadas telefónicas. Si dejas vacío, se usarán los criterios globales para este canal.",
+    helpProbar: "Selecciona categorías específicas para llamadas, guarda, y verifica que solo se aplican a las llamadas en Performance.",
+  },
+  {
+    id: "videollamadas",
+    label: "Videollamadas",
+    icon: Video,
+    helpTitulo: "Criterios de Videollamadas (Fathom)",
+    helpContenido: "Las categorías seleccionadas aquí aplican solo a las videollamadas/reuniones. Si dejas vacío, se usarán los criterios globales para este canal.",
+    helpProbar: "Selecciona categorías específicas para videollamadas, guarda, y verifica que solo se aplican a las videollamadas en Performance.",
+  },
+];
 
 interface CanalesActivosData {
   chats: boolean;
@@ -70,8 +115,10 @@ export default function ConfiguracionPage() {
   // Criterios de calificación
   const [criteriosData, setCriteriosData] = useState<CriteriosCalificacionData | null>(null);
   const [criteriosSeleccionados, setCriteriosSeleccionados] = useState<string[]>([]);
+  const [criteriosCanales, setCriteriosCanales] = useState<CanalesState>({ chats: null, llamadas: null, videollamadas: null });
   const [criteriosSaving, setCriteriosSaving] = useState(false);
   const [criteriosLoaded, setCriteriosLoaded] = useState(false);
+  const [criteriosTab, setCriteriosTab] = useState<CriteriosTab>("global");
 
   // Canales activos
   const [canales, setCanales] = useState<CanalesActivosData>({ chats: false, llamadas: false, videollamadas: false });
@@ -86,6 +133,7 @@ export default function ConfiguracionPage() {
         const data = (await res.json()) as CriteriosCalificacionData;
         setCriteriosData(data);
         setCriteriosSeleccionados(data.categorias ?? []);
+        setCriteriosCanales(data.canales ?? { chats: null, llamadas: null, videollamadas: null });
         setCriteriosLoaded(true);
       }
     } catch { /* ignore */ }
@@ -316,7 +364,10 @@ export default function ConfiguracionPage() {
       const res = await fetch("/api/data/criterios-calificacion", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categorias: criteriosSeleccionados.length > 0 ? criteriosSeleccionados : null }),
+        body: JSON.stringify({
+          categorias: criteriosSeleccionados.length > 0 ? criteriosSeleccionados : null,
+          canales: criteriosCanales,
+        }),
       });
       if (!res.ok) throw new Error("Error al guardar");
       toast.success("Criterios de calificación guardados");
@@ -349,9 +400,23 @@ export default function ConfiguracionPage() {
   };
 
   const toggleCriterio = (cat: string) => {
-    setCriteriosSeleccionados((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    );
+    if (criteriosTab === "global") {
+      setCriteriosSeleccionados((prev) =>
+        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+      );
+    } else {
+      setCriteriosCanales((prev) => {
+        const canal = criteriosTab as Canal;
+        const current = prev[canal] ?? [];
+        const next = current.includes(cat) ? current.filter((c) => c !== cat) : [...current, cat];
+        return { ...prev, [canal]: next.length > 0 ? next : null };
+      });
+    }
+  };
+
+  const getSeleccionados = (): string[] => {
+    if (criteriosTab === "global") return criteriosSeleccionados;
+    return criteriosCanales[criteriosTab as Canal] ?? [];
   };
 
   if (!puedeUsuarios && !puedeRoles && !puedeCriterios) {
@@ -512,7 +577,7 @@ export default function ConfiguracionPage() {
           </section>
         )}
 
-        {/* ── Criterios de Calificación ── */}
+        {/* ── Criterios de Calificación (por canal) ── */}
         {criteriosLoaded && puedeCriterios && (
           <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -521,14 +586,13 @@ export default function ConfiguracionPage() {
                 <h2 className="text-sm font-semibold text-white">Criterios de Calificación</h2>
                 <HelpTooltip
                   titulo="¿Qué son los Criterios de Calificación?"
-                  contenido={`Aquí eliges qué categorías de interés (detectadas automáticamente por la IA al analizar tus conversaciones) cuentan como un lead calificado para tu negocio.\n\nLos chats o llamadas que caigan en una de las categorías seleccionadas se marcarán como "Calificado" en Performance. Si no seleccionas ninguna, no se aplica filtro y todo se considera calificado.`}
-                  comoProbar="Selecciona una o más categorías y pulsa 'Guardar criterios'. Ve a Performance y confirma que las conversaciones con esas categorías aparecen marcadas como Calificado."
+                  contenido={`Aquí eliges qué categorías de interés (detectadas automáticamente por la IA al analizar tus conversaciones) cuentan como un lead calificado para tu negocio.\n\nPuedes definir criterios globales que aplican a todos los canales, o criterios específicos por canal (Chats, Llamadas, Videollamadas). Si un canal tiene criterios propios, se usarán esos en lugar de los globales.`}
+                  comoProbar="Selecciona categorías en la pestaña Global o en un canal específico, guarda, y verifica en Performance que las conversaciones se marcan correctamente como Calificado."
                 />
               </div>
             </div>
 
             {criteriosData?.categoriasDisponibles.length === 0 ? (
-              /* Estado vacío: onboarding — aún no hay categorías IA en la cuenta */
               <div className="rounded-xl border border-accent-purple/20 bg-accent-purple/5 p-4 space-y-2">
                 <p className="text-sm font-medium text-accent-purple">
                   Define qué intereses detectados por IA califican como leads para tu negocio
@@ -540,47 +604,109 @@ export default function ConfiguracionPage() {
               </div>
             ) : (
               <>
-                <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-                  Selecciona las categorías de interés detectadas por la IA que consideras un lead calificado para tu negocio.
-                  Los chats con estas categorías se marcarán como <span className="text-emerald-400 font-medium">Calificado</span> en Performance.
-                  Dejar todo vacío = sin filtro (todos los chats calificados).
-                </p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {criteriosData?.categoriasDisponibles.map((cat) => {
-                    const selected = criteriosSeleccionados.includes(cat);
+                {/* Tabs */}
+                <div className="flex gap-1 mb-4 overflow-x-auto border-b border-surface-600 pb-px">
+                  {TABS_CONFIG.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = criteriosTab === tab.id;
+                    const selCount = tab.id === "global"
+                      ? criteriosSeleccionados.length
+                      : (criteriosCanales[tab.id as Canal] ?? []).length;
                     return (
                       <button
-                        key={cat}
+                        key={tab.id}
                         type="button"
-                        onClick={() => toggleCriterio(cat)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                          selected
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50'
-                            : 'bg-surface-700 text-gray-400 border-surface-500 hover:border-emerald-500/30 hover:text-gray-300'
+                        onClick={() => setCriteriosTab(tab.id)}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                          isActive
+                            ? "bg-surface-700 text-white border-b-2 border-accent-purple"
+                            : "text-gray-400 hover:text-gray-300 hover:bg-surface-700/50"
                         }`}
                       >
-                        {selected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        {cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()}
+                        <Icon className="w-3.5 h-3.5" />
+                        {tab.label}
+                        {selCount > 0 && (
+                          <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                            isActive ? "bg-accent-purple/20 text-accent-purple" : "bg-surface-600 text-gray-500"
+                          }`}>
+                            {selCount}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSaveCriterios}
-                    disabled={criteriosSaving}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 transition-colors"
-                  >
-                    {criteriosSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    Guardar criterios
-                  </button>
-                  {criteriosSeleccionados.length > 0 && (
-                    <span className="text-xs text-gray-400">
-                      {criteriosSeleccionados.length} categoría{criteriosSeleccionados.length !== 1 ? 's' : ''} seleccionada{criteriosSeleccionados.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
+
+                {/* Tab content */}
+                {(() => {
+                  const activeTab = TABS_CONFIG.find((t) => t.id === criteriosTab);
+                  const selected = getSeleccionados();
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-xs text-gray-400 leading-relaxed flex-1">
+                          {criteriosTab === "global" ? (
+                            <>
+                              Selecciona las categorías que consideras un lead calificado.
+                              Aplican a todos los canales sin criterios propios.
+                              Dejar vacío = sin filtro (todos calificados).
+                            </>
+                          ) : (
+                            <>
+                              Criterios específicos para <span className="text-white font-medium">{activeTab?.label}</span>.
+                              Dejar vacío = se usarán los criterios globales para este canal.
+                            </>
+                          )}
+                        </p>
+                        {activeTab && (
+                          <HelpTooltip
+                            titulo={activeTab.helpTitulo}
+                            contenido={activeTab.helpContenido}
+                            comoProbar={activeTab.helpProbar}
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {criteriosData?.categoriasDisponibles.map((cat) => {
+                          const isSelected = selected.includes(cat);
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => toggleCriterio(cat)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                                isSelected
+                                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
+                                  : "bg-surface-700 text-gray-400 border-surface-500 hover:border-emerald-500/30 hover:text-gray-300"
+                              }`}
+                            >
+                              {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                              {cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSaveCriterios}
+                          disabled={criteriosSaving}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 transition-colors"
+                        >
+                          {criteriosSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                          Guardar criterios
+                        </button>
+                        {selected.length > 0 && (
+                          <span className="text-xs text-gray-400">
+                            {selected.length} categoría{selected.length !== 1 ? "s" : ""} seleccionada{selected.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             )}
           </section>
