@@ -325,8 +325,6 @@ async function getCitasPorAsesor(
   from: string,
   to: string,
 ): Promise<Record<string, { citas: number; asistieron: number }>> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
   const rows = await db.execute<{
     closer: string | null;
     citas: string;
@@ -341,7 +339,7 @@ async function getCitasPorAsesor(
       ) THEN 1 ELSE 0 END)::text AS asistieron
     FROM resumenes_diarios_agendas
     WHERE id_cuenta = ${idCuenta}
-      AND fecha_evento BETWEEN ${fromTs} AND ${toTs}
+      AND fecha BETWEEN ${from}::date AND ${to}::date
     GROUP BY closer
   `);
   const map: Record<string, { citas: number; asistieron: number }> = {};
