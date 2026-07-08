@@ -32,6 +32,8 @@ export async function POST(
     const globalKey = process.env.METRICAS_GLOBAL_API_KEY;
     const isGlobalAuth = globalKey && trimmedKey === globalKey;
 
+    const idCuentaNum = /^\d+$/.test(locationId) ? Number(locationId) : null;
+
     let cuentaRow: { id_cuenta: number; zona_horaria_iana: string | null } | undefined;
 
     if (isGlobalAuth) {
@@ -40,6 +42,7 @@ export async function POST(
         .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
         .from(cuentas)
         .where(or(
+          ...(idCuentaNum !== null ? [eq(cuentas.id_cuenta, idCuentaNum)] : []),
           eq(cuentas.locationid, locationId),
           eq(cuentas.subdominio, locationId),
           eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
@@ -65,6 +68,7 @@ export async function POST(
         .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
         .from(cuentas)
         .where(or(
+          ...(idCuentaNum !== null ? [eq(cuentas.id_cuenta, idCuentaNum)] : []),
           eq(cuentas.locationid, locationId),
           eq(cuentas.subdominio, locationId),
           eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
