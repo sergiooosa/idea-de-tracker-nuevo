@@ -233,7 +233,7 @@ async function getCanalesPorLead(
           AND ts BETWEEN ${fromTs} AND ${toTs}
           AND tipo_evento NOT IN ('pdte', 'contacto_creado')
         UNION ALL
-        SELECT COALESCE(id_lead::text, mail_lead) AS lead_id, 'ch' AS fuente
+        SELECT COALESCE(id_lead::text, nombre_lead) AS lead_id, 'ch' AS fuente
         FROM chats_logs
         WHERE id_cuenta = ${idCuenta}
           AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
