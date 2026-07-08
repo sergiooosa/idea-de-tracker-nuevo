@@ -72,17 +72,25 @@ export async function GET(req: Request): Promise<Response> {
       return NextResponse.json({ error: "Cuenta no encontrada" }, { status: 404 });
     }
 
-    const report = await buildReportV2(from, to, {
-      account: {
-        cuentaId: idCuenta,
-        nombre: cuentaRow.nombre_cuenta ?? null,
-        subdominio: cuentaRow.subdominio,
-      },
-      periodType,
-      periodoPrevio: calcPrevPeriod(from, to, periodType),
-      geminiApiKey: null, // usa GEMINI_API_KEY del entorno; fallback determinista.
-    });
+    try {
+      const report = await buildReportV2(from, to, {
+        account: {
+          cuentaId: idCuenta,
+          nombre: cuentaRow.nombre_cuenta ?? null,
+          subdominio: cuentaRow.subdominio,
+        },
+        periodType,
+        periodoPrevio: calcPrevPeriod(from, to, periodType),
+        geminiApiKey: null,
+      });
 
-    return NextResponse.json(report);
+      return NextResponse.json(report);
+    } catch (err) {
+      console.error("[report-v2] buildReportV2 failed", { idCuenta, from, to, err });
+      return NextResponse.json(
+        { error: "Error interno generando reporte v2" },
+        { status: 500 },
+      );
+    }
   });
 }
