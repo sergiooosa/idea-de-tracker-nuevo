@@ -29,9 +29,14 @@ export async function loginAction(formData: {
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      console.error("[login] AuthError type:", error.type);
+      console.error("[login] AuthError type:", error.type, "cause:", (error.cause as { err?: { message?: string } })?.err?.message ?? "none");
+      if (error.type === "CredentialsSignin") {
+        return {
+          error: "Credenciales incorrectas. Verifica tu email y contraseña.",
+        };
+      }
       return {
-        error: "Credenciales incorrectas. Verifica tu email y contraseña.",
+        error: "Error de autenticación. Intenta de nuevo.",
       };
     }
     throw error;
