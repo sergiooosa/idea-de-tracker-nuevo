@@ -17,6 +17,8 @@ import type {
   ApiAdvisor,
   ChatKpis,
   AlertaMeta,
+  SegmentoCalificadoCanal,
+  SegmentoCanal,
 } from "@/types";
 
 // Nuevas etapas fijas del sistema + legacy backward compat
@@ -1377,6 +1379,60 @@ export async function getDashboard(
     };
   }
 
+  // ----------------------------------------------------------------
+  // Segmentación calificado × canal + agendó / no agendó
+  // Canal se infiere: videollamada (fathom_recording_id), llamada (logLlamadas efectiva), chat (chatsLogs)
+  // ----------------------------------------------------------------
+  const segmentacionCalificadoCanal: SegmentoCalificadoCanal[] = (() => {
+    const counters: Record<SegmentoCanal, { cal: number; noCal: number; calAg: number; calNoAg: number; noCalAg: number; noCalNoAg: number }> = {
+      llamada: { cal: 0, noCal: 0, calAg: 0, calNoAg: 0, noCalAg: 0, noCalNoAg: 0 },
+      chat: { cal: 0, noCal: 0, calAg: 0, calNoAg: 0, noCalAg: 0, noCalNoAg: 0 },
+      videollamada: { cal: 0, noCal: 0, calAg: 0, calNoAg: 0, noCalAg: 0, noCalNoAg: 0 },
+    };
+
+    for (const a of filteredAgendas) {
+      const cat = (a.categoria ?? "").toLowerCase().trim();
+      if (!cat || cat === "pdte" || cat === "pendiente") continue;
+      const isQualified = effectiveQualifiedSet.has(cat);
+      const hasAgenda = a.fecha_reunion != null;
+      const canal: SegmentoCanal = a.fathom_recording_id ? "videollamada" : "llamada";
+      const c = counters[canal];
+      if (isQualified) {
+        c.cal++;
+        if (hasAgenda) c.calAg++; else c.calNoAg++;
+      } else {
+        c.noCal++;
+        if (hasAgenda) c.noCalAg++; else c.noCalNoAg++;
+      }
+    }
+
+    for (const chatRow of chatRows) {
+      const estado = (chatRow.estado ?? "").toLowerCase().trim();
+      if (!estado) continue;
+      const isQualified = effectiveQualifiedSet.has(estado);
+      const c = counters.chat;
+      if (isQualified) {
+        c.cal++;
+        c.calNoAg++;
+      } else {
+        c.noCal++;
+        c.noCalNoAg++;
+      }
+    }
+
+    return (Object.entries(counters) as [SegmentoCanal, typeof counters.llamada][])
+      .filter(([, v]) => v.cal + v.noCal > 0)
+      .map(([canal, v]) => ({
+        canal,
+        calificado: v.cal,
+        noCalificado: v.noCal,
+        calificadoAgendo: v.calAg,
+        calificadoNoAgendo: v.calNoAg,
+        noCalificadoAgendo: v.noCalAg,
+        noCalificadoNoAgendo: v.noCalNoAg,
+      }));
+  })();
+
   return {
     kpis,
     advisorRanking,
@@ -1401,6 +1457,7 @@ export async function getDashboard(
     chatKpis: chatKpis.total > 0 ? chatKpis : undefined,
     alertasMetas: alertasMetas.length > 0 ? alertasMetas : undefined,
     adsSummary,
+    segmentacionCalificadoCanal: segmentacionCalificadoCanal.length > 0 ? segmentacionCalificadoCanal : undefined,
     configuracion_ui: cuentaRow?.configuracion_ui as DashboardResponse["configuracion_ui"] ?? undefined,
     fuente_llamadas: (cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio") as "twilio" | "ghl",
   };

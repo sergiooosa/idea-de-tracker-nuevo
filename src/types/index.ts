@@ -542,6 +542,27 @@ export interface AlertaMeta {
   historialDiario?: MetaDiariaHistorial[]; // días del rango con cumplimiento
 }
 
+export type SegmentoCanal = "llamada" | "chat" | "videollamada";
+
+export interface SegmentoCalificadoCanal {
+  canal: SegmentoCanal;
+  calificado: number;
+  noCalificado: number;
+  calificadoAgendo: number;
+  calificadoNoAgendo: number;
+  noCalificadoAgendo: number;
+  noCalificadoNoAgendo: number;
+}
+
+export interface LeadSegmentoItem {
+  nombre: string | null;
+  telefono: string | null;
+  ghl_contact_id: string | null;
+  canal: SegmentoCanal;
+  calificado: boolean;
+  agendo: boolean;
+}
+
 export interface DashboardAdsSummary {
   hasAds: boolean;
   gastoTotal: number;
@@ -574,6 +595,7 @@ export interface DashboardResponse {
   chatKpis?: ChatKpis;
   alertasMetas?: AlertaMeta[];
   adsSummary?: DashboardAdsSummary;
+  segmentacionCalificadoCanal?: SegmentoCalificadoCanal[];
   configuracion_ui?: {
     modulos_activos?: {
       seccion_chats_dashboard?: boolean;
