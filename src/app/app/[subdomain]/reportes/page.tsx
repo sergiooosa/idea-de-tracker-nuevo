@@ -398,7 +398,7 @@ export default function ReportesPage() {
           <SectionOrigen data={reportData.origen} />
 
           {/* Higiene CRM */}
-          <SectionHigieneCRM data={reportData.higieneCRM} />
+          <SectionHigieneCRM data={reportData.higieneCRM} from={from} to={to} />
 
           {/* Desglose por canal */}
           <SectionPorCanal
