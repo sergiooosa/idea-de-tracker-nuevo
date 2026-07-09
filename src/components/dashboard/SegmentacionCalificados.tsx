@@ -52,6 +52,30 @@ const CANAL_LABELS: Record<SegmentoCanal, string> = {
   videollamada: "Videollamadas",
 };
 
+type CounterColor = "accent-green" | "accent-red" | "accent-purple" | "accent-amber";
+
+const COLOR_CLASSES: Record<
+  CounterColor,
+  { active: string; text: string }
+> = {
+  "accent-green": {
+    active: "border-accent-green/50 bg-accent-green/10 ring-1 ring-accent-green/30",
+    text: "text-accent-green",
+  },
+  "accent-red": {
+    active: "border-accent-red/50 bg-accent-red/10 ring-1 ring-accent-red/30",
+    text: "text-accent-red",
+  },
+  "accent-purple": {
+    active: "border-accent-purple/50 bg-accent-purple/10 ring-1 ring-accent-purple/30",
+    text: "text-accent-purple",
+  },
+  "accent-amber": {
+    active: "border-accent-amber/50 bg-accent-amber/10 ring-1 ring-accent-amber/30",
+    text: "text-accent-amber",
+  },
+};
+
 function CounterCard({
   label,
   count,
@@ -63,22 +87,23 @@ function CounterCard({
   count: number;
   active: boolean;
   onClick: () => void;
-  color: string;
+  color: CounterColor;
 }) {
+  const styles = COLOR_CLASSES[color];
   return (
     <button
       type="button"
       onClick={onClick}
       className={`rounded-lg border p-3 text-left transition-all ${
         active
-          ? `border-${color}/50 bg-${color}/10 ring-1 ring-${color}/30`
+          ? styles.active
           : "border-surface-500 bg-surface-800/60 hover:border-surface-400"
       }`}
     >
       <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tight">
         {label}
       </p>
-      <p className={`text-lg font-bold mt-0.5 ${active ? `text-${color}` : "text-white"}`}>
+      <p className={`text-lg font-bold mt-0.5 ${active ? styles.text : "text-white"}`}>
         {count}
       </p>
     </button>
@@ -161,7 +186,7 @@ export default function SegmentacionCalificados({
   const drilldownEnabled = canal != null && segmento != null;
 
   const {
-    data: leads,
+    data: drilldownLeads,
     loading: leadsLoading,
     error: leadsError,
   } = useApiData<LeadSegmentoItem[]>(
@@ -173,9 +198,8 @@ export default function SegmentacionCalificados({
       canal: canal ?? undefined,
       agendo,
     },
+    { enabled: drilldownEnabled },
   );
-
-  const drilldownLeads = drilldownEnabled ? leads : null;
 
   const handleExpand = () => {
     if (!drilldownEnabled) return;

@@ -8,7 +8,9 @@ import { useUserFilter } from "@/contexts/UserFilterContext";
 export function useApiData<T>(
   url: string,
   params?: Record<string, string | undefined>,
+  options?: { enabled?: boolean },
 ) {
+  const enabled = options?.enabled ?? true;
   const pathname = usePathname();
   const isDemo = pathname?.startsWith("/demo") ?? false;
 
@@ -86,10 +88,10 @@ export function useApiData<T>(
   }, [url, serialized, effectiveCloserEmails]);
 
   useEffect(() => {
-    if (isDemo) return; // datos ya generados en useState init
+    if (isDemo || !enabled) return;
     fetchData();
     return () => abortRef.current?.abort();
-  }, [fetchData, isDemo]);
+  }, [fetchData, isDemo, enabled]);
 
   return { data, loading, error, refetch: fetchData };
 }
