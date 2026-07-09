@@ -81,7 +81,7 @@ export default function SectionCobertura({ data }: Props) {
                   <span className="text-[#8DA2B8]">{f.franja}</span>
                   <span className="text-[#E7EFF8] font-semibold">
                     {pct}%
-                    <span className="text-[#5F7288] font-normal ml-1.5">n={f.total}</span>
+                    <span className="text-[#5F7288] font-normal ml-1.5">de {f.total} llamadas</span>
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-[#152238] overflow-hidden">
