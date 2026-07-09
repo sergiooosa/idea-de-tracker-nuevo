@@ -5,6 +5,7 @@ import { useT } from '@/contexts/LocaleContext';
 import PageHeader from '@/components/dashboard/PageHeader';
 import KPICard from '@/components/dashboard/KPICard';
 import LeadsEnEspera from '@/components/dashboard/LeadsEnEspera';
+import SegmentacionCalificados from '@/components/dashboard/SegmentacionCalificados';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
@@ -400,6 +401,14 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
+
+        {(data?.segmentacionCalificadoCanal?.length ?? 0) > 0 && (
+          <SegmentacionCalificados
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            segmentacion={data?.segmentacionCalificadoCanal}
+          />
+        )}
 
         {/* 🎯 Progreso de Metas por Canal */}
         {(data?.alertasMetas?.length ?? 0) > 0 && (() => {
