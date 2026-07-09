@@ -318,6 +318,8 @@ export default function ReportesPage() {
                   value={customFrom}
                   max={customTo}
                   onChange={(e) => setCustomFrom(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                  onFocus={(e) => e.currentTarget.showPicker?.()}
                   className="bg-transparent text-sm text-white border-none focus:ring-0 cursor-pointer w-32"
                 />
                 <ChevronRight className="w-3.5 h-3.5 text-[#5F7288] shrink-0" />
@@ -326,6 +328,8 @@ export default function ReportesPage() {
                   value={customTo}
                   min={customFrom}
                   onChange={(e) => setCustomTo(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                  onFocus={(e) => e.currentTarget.showPicker?.()}
                   className="bg-transparent text-sm text-white border-none focus:ring-0 cursor-pointer w-32"
                 />
               </div>
