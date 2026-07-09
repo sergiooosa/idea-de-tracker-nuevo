@@ -134,18 +134,18 @@ async function getLlamadasCobertura(
       GROUP BY COALESCE(contact_id_ghl, mail_lead, phone)
     `),
 
-    // Franjas horarias: count + contestaron por hora UTC
+    // Franjas horarias: count + contestaron por hora local de la cuenta
     db.execute<{ hora: string; total: string; contestaron: string }>(sql`
       SELECT
-        EXTRACT(HOUR FROM ts)::int::text AS hora,
+        EXTRACT(HOUR FROM ts AT TIME ZONE COALESCE((SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta}), 'America/Mexico_City'))::int::text AS hora,
         COUNT(*)::text AS total,
         SUM(CASE WHEN tipo_evento LIKE 'efectiva_%' THEN 1 ELSE 0 END)::text AS contestaron
       FROM log_llamadas
       WHERE id_cuenta = ${idCuenta}
         AND ts BETWEEN ${fromTs} AND ${toTs}
         AND tipo_evento NOT IN ('pdte', 'contacto_creado')
-      GROUP BY EXTRACT(HOUR FROM ts)
-      ORDER BY EXTRACT(HOUR FROM ts)
+      GROUP BY EXTRACT(HOUR FROM ts AT TIME ZONE COALESCE((SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta}), 'America/Mexico_City'))
+      ORDER BY EXTRACT(HOUR FROM ts AT TIME ZONE COALESCE((SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta}), 'America/Mexico_City'))
     `),
   ]);
 
