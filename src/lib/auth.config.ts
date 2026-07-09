@@ -44,7 +44,7 @@ export const authConfig: NextAuthConfig = {
         if (!credentials?.email || !credentials?.password) return null;
 
         const email = (credentials.email as string).trim().toLowerCase();
-        const password = credentials.password as string;
+        const password = (credentials.password as string).trim();
         const rawOverride = (credentials.subdominio_override as string | undefined)?.trim() || null;
         // Normalizar: aceptar slug o dominio completo (ej. "tracker-credivit" o "tracker-credivit.autokpi.net")
         const subdominioOverride = rawOverride ? (normalizeSubdominio(rawOverride) ?? rawOverride) : null;
