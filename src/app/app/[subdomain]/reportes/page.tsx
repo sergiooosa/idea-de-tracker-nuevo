@@ -1009,7 +1009,7 @@ export default function ReportesPage() {
           <ReportLeadFunnel data={funnelData} />
 
           {/* Bloque 6 — Higiene CRM */}
-          <ReportCrmHealth data={crmHealthData} />
+          <ReportCrmHealth data={crmHealthData} from={from} to={to} />
 
           {/* Bloque 7 — Contactabilidad por Canal (AUT-493) */}
           <ReportContactabilidadCanal data={contactabilidadData} />

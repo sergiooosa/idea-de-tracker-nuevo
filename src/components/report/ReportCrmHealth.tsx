@@ -1,14 +1,18 @@
 // AUT-387 — Bloque 6: Higiene CRM
 // Porcentaje de higiene, leads en limbo, leads sin estado
+// AUT-1395 — Añade panel de contacto (teléfono/correo) al hacer clic en métricas de reactivación
 
 'use client';
 
 import { useState } from 'react';
 import { Shield, AlertTriangle, User, Clock, HelpCircle } from 'lucide-react';
 import type { ReportCrmHealthData, ReportCrmHealthLeadDetalle } from '@/types/report';
+import LeadsContactoPanel from './LeadsContactoPanel';
 
 interface Props {
   data: ReportCrmHealthData | null;
+  from?: string;
+  to?: string;
 }
 
 // Semáforo higiene: verde >= 80, amarillo >= 60, rojo < 60
@@ -101,6 +105,7 @@ function IssueRow({
   suffix,
   severity,
   leads,
+  onVerContactos,
 }: {
   icon: React.ElementType;
   label: string;
@@ -108,6 +113,7 @@ function IssueRow({
   suffix?: string;
   severity: 'ok' | 'warning' | 'critical';
   leads?: ReportCrmHealthLeadDetalle[];
+  onVerContactos?: () => void;
 }) {
   const color =
     severity === 'ok'
@@ -127,7 +133,18 @@ function IssueRow({
       <Icon className={`w-4 h-4 ${color} shrink-0`} />
       <span className="text-xs text-gray-300 flex-1">{label}</span>
       <div className="flex items-baseline gap-1">
-        <span className={`text-base font-bold ${color}`}>{count.toLocaleString('es')}</span>
+        {onVerContactos && count > 0 ? (
+          <button
+            type="button"
+            onClick={onVerContactos}
+            className={`text-base font-bold ${color} hover:underline cursor-pointer`}
+            title="Ver leads con datos de contacto"
+          >
+            {count.toLocaleString('es')}
+          </button>
+        ) : (
+          <span className={`text-base font-bold ${color}`}>{count.toLocaleString('es')}</span>
+        )}
         {suffix && <span className="text-[10px] text-gray-500">{suffix}</span>}
       </div>
       {leads && leads.length > 0 && <LeadsTooltip leads={leads} title={label} />}
@@ -135,17 +152,19 @@ function IssueRow({
   );
 }
 
-export default function ReportCrmHealth({ data }: Props) {
+export default function ReportCrmHealth({ data, from, to }: Props) {
   if (data === null) return null;
+
+  const [panelSegmento, setPanelSegmento] = useState<'enLimbo' | 'sinAccion' | null>(null);
 
   const { label } = higieneColor(data.puntajeHigiene);
 
-  // Determine severity for each issue
   const limboSeverity = data.leadsEnLimbo === 0 ? 'ok' : data.leadsEnLimbo <= 10 ? 'warning' : 'critical';
   const sinEstadoSeverity = data.leadsSinEstado === 0 ? 'ok' : data.leadsSinEstado <= 5 ? 'warning' : 'critical';
   const sinAccionSeverity = data.asignadosSinAccion === 0 ? 'ok' : data.asignadosSinAccion <= 5 ? 'warning' : 'critical';
 
   return (
+    <>
     <section className="rounded-xl p-4 section-futuristic border border-surface-500/60 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2">
@@ -168,6 +187,7 @@ export default function ReportCrmHealth({ data }: Props) {
             suffix="leads"
             severity={limboSeverity}
             leads={data.leadsEnLimboDetalle}
+            onVerContactos={from && to ? () => setPanelSegmento('enLimbo') : undefined}
           />
           <IssueRow
             icon={AlertTriangle}
@@ -183,6 +203,7 @@ export default function ReportCrmHealth({ data }: Props) {
             suffix="leads"
             severity={sinAccionSeverity}
             leads={data.leadsSinAccionDetalle}
+            onVerContactos={from && to ? () => setPanelSegmento('sinAccion') : undefined}
           />
         </div>
       </div>
@@ -207,5 +228,20 @@ export default function ReportCrmHealth({ data }: Props) {
         </div>
       )}
     </section>
+
+    {panelSegmento && from && to && (
+      <LeadsContactoPanel
+        open={!!panelSegmento}
+        onClose={() => setPanelSegmento(null)}
+        segmento={panelSegmento}
+        titulo={panelSegmento === 'enLimbo'
+          ? `Leads en limbo (> ${data.diasLimboUmbral} días)`
+          : 'Asignados sin acción'
+        }
+        from={from}
+        to={to}
+      />
+    )}
+    </>
   );
 }
