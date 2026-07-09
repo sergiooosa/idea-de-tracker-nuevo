@@ -4,31 +4,54 @@ import { ShieldAlert, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { ReportV2HigieneCRM } from '@/types/report-v2';
 import ReportSection from './ReportSection';
+import LeadsContactoPanel from './LeadsContactoPanel';
 
 interface Props {
   data: ReportV2HigieneCRM | null;
+  from?: string;
+  to?: string;
 }
 
-export default function SectionHigieneCRM({ data }: Props) {
+export default function SectionHigieneCRM({ data, from, to }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [panelSegmento, setPanelSegmento] = useState<'enLimbo' | 'sinAccion' | null>(null);
 
   if (!data) return null;
 
+  const canOpenPanel = !!(from && to && data.leadsSinActividad > 0);
+
   return (
+    <>
     <ReportSection
       icon={ShieldAlert}
       title="Higiene CRM"
       helpTitulo="Higiene CRM"
-      helpContenido="Leads sin actividad en los últimos 5+ días. Muestra qué asesores tienen más leads abandonados y el detalle de cada lead afectado."
+      helpContenido="Leads sin actividad en los últimos 5+ días. Muestra qué asesores tienen más leads abandonados y el detalle de cada lead afectado. Haz clic en el número para ver teléfonos y correos."
     >
-      <div className="rounded-lg bg-accent-red/10 border border-accent-red/20 p-4 text-center">
-        <p className="text-[10px] uppercase tracking-wider text-[#5F7288] mb-1">
-          Leads sin actividad
-        </p>
-        <p className="text-3xl font-bold text-accent-red">
-          {data.leadsSinActividad}
-        </p>
-      </div>
+      {canOpenPanel ? (
+        <button
+          type="button"
+          onClick={() => setPanelSegmento('enLimbo')}
+          className="w-full rounded-lg bg-accent-red/10 border border-accent-red/20 p-4 text-center hover:bg-accent-red/20 transition-colors cursor-pointer"
+        >
+          <p className="text-[10px] uppercase tracking-wider text-[#5F7288] mb-1">
+            Leads sin actividad
+          </p>
+          <p className="text-3xl font-bold text-accent-red">
+            {data.leadsSinActividad}
+          </p>
+          <p className="text-[10px] text-[#5F7288] mt-1">Clic para ver contactos</p>
+        </button>
+      ) : (
+        <div className="rounded-lg bg-accent-red/10 border border-accent-red/20 p-4 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-[#5F7288] mb-1">
+            Leads sin actividad
+          </p>
+          <p className="text-3xl font-bold text-accent-red">
+            {data.leadsSinActividad}
+          </p>
+        </div>
+      )}
 
       {data.porAsesor.length > 0 && (
         <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40]/60 p-4">
@@ -98,5 +121,20 @@ export default function SectionHigieneCRM({ data }: Props) {
         </div>
       )}
     </ReportSection>
+
+    {panelSegmento && from && to && (
+      <LeadsContactoPanel
+        open
+        onClose={() => setPanelSegmento(null)}
+        segmento={panelSegmento}
+        titulo={panelSegmento === 'enLimbo'
+          ? 'Leads sin actividad (> 5 días)'
+          : 'Asignados sin ninguna acción'
+        }
+        from={from}
+        to={to}
+      />
+    )}
+    </>
   );
 }
