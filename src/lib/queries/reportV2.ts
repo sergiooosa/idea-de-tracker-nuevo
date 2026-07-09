@@ -145,8 +145,8 @@ async function getLlamadasCobertura(
       WHERE id_cuenta = ${idCuenta}
         AND ts BETWEEN ${fromTs} AND ${toTs}
         AND tipo_evento NOT IN ('pdte', 'contacto_creado')
-      GROUP BY EXTRACT(HOUR FROM ts AT TIME ZONE COALESCE((SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta}), 'America/Mexico_City'))
-      ORDER BY EXTRACT(HOUR FROM ts AT TIME ZONE COALESCE((SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta}), 'America/Mexico_City'))
+      GROUP BY 1
+      ORDER BY 1
     `),
   ]);
 
