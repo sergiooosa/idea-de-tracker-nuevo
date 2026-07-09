@@ -19,6 +19,7 @@ import {
   getReportContactabilidadCanal,
 } from "./report";
 import {
+  getEnrichmentFromDb,
   getEnrichmentMock,
   type ReportV2Enrichment,
 } from "./reportV2Enrichment";
@@ -387,7 +388,7 @@ export async function buildReportV2(
 ): Promise<ReportV2> {
   const { account } = opts;
   const idCuenta = account.cuentaId;
-  const enrichment = opts.enrichment ?? getEnrichmentMock();
+  const enrichment = opts.enrichment ?? await getEnrichmentFromDb(idCuenta, from, to);
 
   // ── Queries paralelas ─────────────────────────────────────────────────────
   const [
