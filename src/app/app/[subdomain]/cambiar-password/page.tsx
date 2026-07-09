@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import { Lock, Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react";
 
 export default function CambiarPasswordPage() {
-  const { update } = useSession();
+  const { refresh } = useSession();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,7 +36,7 @@ export default function CambiarPasswordPage() {
       }
 
       setSuccess(true);
-      await update();
+      await refresh();
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1500);

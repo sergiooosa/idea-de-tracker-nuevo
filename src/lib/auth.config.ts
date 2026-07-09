@@ -70,61 +70,91 @@ export const authConfig: NextAuthConfig = {
         }
 
         try {
-          // Cuando viene subdominio_override (selección de cuenta en login multi-tenant),
-          // filtrar también por subdominio para obtener el registro correcto del usuario
-          // (id_cuenta y pass) para esa cuenta específica. Sin este filtro, .limit(1)
-          // puede devolver la cuenta equivocada, haciendo fallar la verificación de password
-          // o almacenando un id_cuenta incorrecto en el JWT.
-          // La condición OR cubre cuentas que almacenan el dominio completo en lugar del slug (ej. credivit id=25)
-          const whereClause = subdominioOverride
-            ? and(
-                eq(usuariosDashboard.email, email),
-                or(
-                  eq(cuentas.subdominio, subdominioOverride),
-                  ...(subdominioOverrideFull ? [eq(cuentas.subdominio, subdominioOverrideFull)] : []),
+          const selectFields = {
+            id_evento: usuariosDashboard.id_evento,
+            id_cuenta: usuariosDashboard.id_cuenta,
+            nombre: usuariosDashboard.nombre,
+            email: usuariosDashboard.email,
+            pass: usuariosDashboard.pass,
+            rol: usuariosDashboard.rol,
+            permisos: usuariosDashboard.permisos,
+            subdominio: cuentas.subdominio,
+            roles_config: cuentas.roles_config,
+            tipo_usuario: usuariosDashboard.tipo_usuario,
+            must_change_password: usuariosDashboard.must_change_password,
+          };
+
+          let user: {
+            id_evento: number;
+            id_cuenta: number | null;
+            nombre: string | null;
+            email: string;
+            pass: string;
+            rol: string;
+            permisos: Record<string, boolean> | null;
+            subdominio: string;
+            roles_config: RolConfig[] | null;
+            tipo_usuario: string;
+            must_change_password: boolean;
+          } | undefined;
+
+          if (subdominioOverride) {
+            const result = await db
+              .select(selectFields)
+              .from(usuariosDashboard)
+              .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
+              .where(
+                and(
+                  eq(usuariosDashboard.email, email),
+                  or(
+                    eq(cuentas.subdominio, subdominioOverride),
+                    ...(subdominioOverrideFull ? [eq(cuentas.subdominio, subdominioOverrideFull)] : []),
+                  ),
                 ),
               )
-            : eq(usuariosDashboard.email, email);
+              .limit(1);
 
-          const result = await db
-            .select({
-              id_evento: usuariosDashboard.id_evento,
-              id_cuenta: usuariosDashboard.id_cuenta,
-              nombre: usuariosDashboard.nombre,
-              email: usuariosDashboard.email,
-              pass: usuariosDashboard.pass,
-              rol: usuariosDashboard.rol,
-              permisos: usuariosDashboard.permisos,
-              subdominio: cuentas.subdominio,
-              roles_config: cuentas.roles_config,
-              tipo_usuario: usuariosDashboard.tipo_usuario,
-              must_change_password: usuariosDashboard.must_change_password,
-            })
-            .from(usuariosDashboard)
-            .innerJoin(
-              cuentas,
-              eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta),
-            )
-            .where(whereClause)
-            .limit(1);
+            if (result.length === 0) {
+              console.error("[auth] usuario no encontrado:", email, `(subdominio: ${subdominioOverride})`);
+              return null;
+            }
 
-          if (result.length === 0) {
-            console.error("[auth] usuario no encontrado:", email, subdominioOverride ? `(subdominio: ${subdominioOverride})` : "");
-            return null;
+            const matched = await compare(password.trim(), result[0].pass).catch(() => false);
+            if (!matched) {
+              console.error("[auth] password incorrecta para:", email, `(subdominio: ${subdominioOverride})`);
+              return null;
+            }
+            user = result[0];
+          } else {
+            // Sin subdominio: el email puede existir en múltiples tenants.
+            // Probar compare() contra cada fila para encontrar la correcta.
+            const rows = await db
+              .select(selectFields)
+              .from(usuariosDashboard)
+              .innerJoin(cuentas, eq(usuariosDashboard.id_cuenta, cuentas.id_cuenta))
+              .where(eq(usuariosDashboard.email, email));
+
+            if (rows.length === 0) {
+              console.error("[auth] usuario no encontrado:", email);
+              return null;
+            }
+
+            const trimmedPassword = password.trim();
+            for (const row of rows) {
+              const matched = await compare(trimmedPassword, row.pass).catch(() => false);
+              if (matched) {
+                user = row;
+                break;
+              }
+            }
+
+            if (!user) {
+              console.error("[auth] password incorrecta para:", email, `(${rows.length} filas probadas)`);
+              return null;
+            }
           }
 
-          const user = result[0];
-
-          let passwordMatch = false;
-          try {
-            passwordMatch = await compare(password, user.pass);
-          } catch (bcryptErr) {
-            console.error("[auth] bcrypt compare falló:", bcryptErr);
-            return null;
-          }
-
-          if (!passwordMatch) {
-            console.error("[auth] password incorrecta para:", email);
+          if (!user) {
             return null;
           }
 
