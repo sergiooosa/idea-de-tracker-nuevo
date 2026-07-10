@@ -64,36 +64,75 @@ function fallbackResumen(report: ReportV2): string {
 }
 
 function buildPrompt(report: ReportV2): string {
-  // Se pasa el agregado completo (no transcripts crudos) → máxima cobertura,
-  // costo acotado. Gemini resume; no debe inventar cifras fuera del JSON.
+  const { meta, kpis, funnel, estadoFinal, origen, higieneCRM, porCanal, cobertura, comparativo, rankingAsesores, objeciones, demografia } = report;
+
+  const agregados = {
+    meta,
+    kpis,
+    funnel: funnel.stages,
+    estadoFinal,
+    origen: { nuevos: origen.nuevos, reactivados: origen.reactivados },
+    higieneCRM: {
+      leadsSinActividadTotal: higieneCRM.leadsSinActividadTotal,
+      porAsesor: higieneCRM.porAsesor,
+      diasUmbral: higieneCRM.diasUmbral,
+    },
+    porCanal,
+    cobertura,
+    comparativo: comparativo?.filas ?? null,
+    rankingAsesores: {
+      destacados: rankingAsesores.destacados,
+      tabla: rankingAsesores.tabla.slice(0, 8),
+    },
+    objeciones: objeciones.slice(0, 8),
+    demografia: {
+      motivo: demografia.motivo.slice(0, 5),
+      perfil: demografia.perfil.slice(0, 5),
+      iaDenominador: demografia.iaDenominador,
+    },
+  };
+
   return [
-    "Eres un analista comercial senior. Escribe un resumen ejecutivo (máx 180 palabras,",
-    "español neutro, tono directo) del desempeño de ventas del periodo, basándote",
-    "EXCLUSIVAMENTE en los datos agregados de este JSON. No inventes cifras ni",
-    "menciones canales sin datos. Destaca funnel, contactabilidad, citas/show rate,",
-    "higiene CRM y 2-3 acciones recomendadas.",
+    "Eres un analista comercial senior. Redacta un RESUMEN EJECUTIVO profesional",
+    "(400–500 palabras, español neutro, tono directo y accionable) del desempeño",
+    "de ventas del periodo, basándote EXCLUSIVAMENTE en los datos del JSON adjunto.",
+    "",
+    "REGLAS ESTRICTAS:",
+    "- NO inventes cifras ni porcentajes que no estén en el JSON.",
+    "- Si un campo es null o no existe, NO lo menciones.",
+    "- NO menciones DND (no aplica en este reporte).",
+    "- Usa cifras exactas del JSON, no redondees arbitrariamente.",
+    "",
+    "ESTRUCTURA OBLIGATORIA (usa estos encabezados con ##):",
+    "",
+    "## Volumen y origen",
+    "Leads totales, nuevos vs reactivados, tendencia vs periodo anterior si hay comparativo.",
+    "",
+    "## Contactabilidad por canal",
+    "Para cada canal activo: tasa de contacto, intentos promedio, speed-to-lead (llamadas),",
+    "tiempo de primera respuesta (chats), show rate (video). Omitir canales con null.",
+    "",
+    "## Cobertura de canales",
+    "Leads contactados por múltiples canales vs uno solo. A qué intento contestan.",
+    "Mejores franjas horarias si hay datos.",
+    "",
+    "## Calificación y objeciones",
+    "Tasa de calificación (calificados / analizados del funnel). Top objeciones con %.",
+    "Si hay motivos de no-calificación en el funnel, mencionarlos.",
+    "",
+    "## Embudo: calificación → cita → show",
+    "Recorrer las etapas del funnel con tasas de conversión entre cada paso.",
+    "Show rate y causas de no-show si son evidentes.",
+    "",
+    "## Higiene CRM / fuga de leads",
+    "Leads sin actividad (total y por asesor). Porcentaje sobre el total.",
+    "Leads con un solo intento de contacto.",
+    "",
+    "## Acciones recomendadas",
+    "3-5 recomendaciones concretas y priorizadas, derivadas de los datos.",
     "",
     "DATOS_AGREGADOS_JSON:",
-    JSON.stringify(
-      {
-        meta: report.meta,
-        kpis: report.kpis,
-        funnel: report.funnel,
-        estadoFinal: report.estadoFinal,
-        origen: report.origen,
-        higieneCRM: {
-          leadsSinActividadTotal: report.higieneCRM.leadsSinActividadTotal,
-          diasUmbral: report.higieneCRM.diasUmbral,
-        },
-        porCanal: report.porCanal,
-        cobertura: report.cobertura,
-        comparativo: report.comparativo,
-        rankingAsesores: report.rankingAsesores.tabla.slice(0, 5),
-        objeciones: report.objeciones.slice(0, 5),
-      },
-      null,
-      0,
-    ),
+    JSON.stringify(agregados, null, 0),
   ].join("\n");
 }
 
@@ -108,6 +147,9 @@ export async function generateNarrativa(
   const alertasCriticas = deriveAlertas(report);
   const key = apiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || null;
   if (!key) {
+    console.error("[report-v2 narrativa] Gemini fallback", {
+      motivo: "no API key configured (param + env)",
+    });
     return { resumenEjecutivo: fallbackResumen(report), alertasCriticas };
   }
 
@@ -117,19 +159,34 @@ export async function generateNarrativa(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: buildPrompt(report) }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 1536 },
       }),
     });
     if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error("[report-v2 narrativa] Gemini fallback", {
+        motivo: `HTTP ${res.status}`,
+        body: body.slice(0, 300),
+      });
       return { resumenEjecutivo: fallbackResumen(report), alertasCriticas };
     }
     const data = (await res.json()) as GeminiResponse;
     const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!texto) {
+      console.error("[report-v2 narrativa] Gemini fallback", {
+        motivo: "empty response from Gemini",
+        candidates: data.candidates?.length ?? 0,
+      });
+    }
     return {
       resumenEjecutivo: texto || fallbackResumen(report),
       alertasCriticas,
     };
-  } catch {
+  } catch (err) {
+    console.error("[report-v2 narrativa] Gemini fallback", {
+      motivo: "fetch exception",
+      error: err instanceof Error ? err.message : String(err),
+    });
     return { resumenEjecutivo: fallbackResumen(report), alertasCriticas };
   }
 }
