@@ -187,19 +187,19 @@ export async function getEnrichmentFromDb(
     `),
     db.execute<CountRow>(sql`
       SELECT 'llamadas' AS canal,
-        COUNT(*)::text AS total,
+        COUNT(*) FILTER (WHERE transcripcion IS NOT NULL AND LENGTH(transcripcion) >= 50)::text AS total,
         COUNT(gemini_enriquecimiento)::text AS enriched
       FROM log_llamadas
       WHERE id_cuenta = ${idCuenta} AND ts BETWEEN ${fromTs} AND ${toTs}
       UNION ALL
       SELECT 'chats',
-        COUNT(*)::text,
+        COUNT(*) FILTER (WHERE chat IS NOT NULL AND jsonb_array_length(chat) > 0)::text,
         COUNT(gemini_enriquecimiento)::text
       FROM chats_logs
       WHERE id_cuenta = ${idCuenta} AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
       UNION ALL
       SELECT 'video',
-        COUNT(*)::text,
+        COUNT(*) FILTER (WHERE (transcripcion_fathom IS NOT NULL OR resumen_ia IS NOT NULL) AND LENGTH(COALESCE(transcripcion_fathom, resumen_ia, '')) >= 50)::text,
         COUNT(gemini_enriquecimiento)::text
       FROM resumenes_diarios_agendas
       WHERE id_cuenta = ${idCuenta} AND fecha BETWEEN ${from}::date AND ${to}::date
