@@ -29,7 +29,7 @@ export function isPhoneCallRow(row: {
   );
 }
 
-function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
+export function mapCategoria(cat: string | null, embudo: EmbudoEtapa[] | null) {
   if (!cat) return { attended: false, qualified: false, canceled: false, outcome: "pendiente" };
   const c = cat.trim();
   const cl = c.toLowerCase();
