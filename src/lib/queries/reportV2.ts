@@ -8,7 +8,9 @@
 // -----------------------------------------------------------------------------
 
 import { db } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { cuentas } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import {
   getReportCalls,
   getReportChats,
@@ -102,9 +104,9 @@ async function getLlamadasCobertura(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<LlamadasCoberturaResult> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   const [intentoRows, franjaRows] = await Promise.all([
     // Intentos por lead: count total + primer intento efectivo
@@ -211,9 +213,9 @@ async function getCanalesPorLead(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<{ llamadaYChat: number; soloLlamada: number; soloChat: number }> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
   const rows = await db.execute<{
     llamada_y_chat: string;
     solo_llamada: string;
@@ -255,9 +257,9 @@ async function getUbicacionLada(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<{ items: ReportV2UbicacionItem[]; denominador: number }> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
   const rows = await db.execute<{ phone: string; lead_id: string }>(sql`
     SELECT DISTINCT
       COALESCE(contact_id_ghl, mail_lead, phone) AS lead_id,
@@ -299,12 +301,12 @@ async function getNuevosReactivados(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<{ nuevos: number; reactivados: number }> {
   // registros_de_llamada: un registro por lead con estado actual.
   // Consideramos "nuevo" = fecha_primera_llamada dentro del periodo.
   // "reactivado" = fecha_primera_llamada antes del periodo pero tiene actividad en él.
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
   const rows = await db.execute<{ nuevos: string; reactivados: string }>(sql`
     SELECT
       SUM(CASE
@@ -388,24 +390,33 @@ export async function buildReportV2(
 ): Promise<ReportV2> {
   const { account } = opts;
   const idCuenta = account.cuentaId;
-  const enrichment = opts.enrichment ?? await getEnrichmentFromDb(idCuenta, from, to);
+
+  // ── Zona horaria del tenant (AUT-1446) ────────────────────────────────────
+  const [tzRow] = await db
+    .select({ zona_horaria_iana: cuentas.zona_horaria_iana })
+    .from(cuentas)
+    .where(eq(cuentas.id_cuenta, idCuenta))
+    .limit(1);
+  const tz = tzRow?.zona_horaria_iana ?? null;
+
+  const enrichment = opts.enrichment ?? await getEnrichmentFromDb(idCuenta, from, to, tz);
 
   // ── Queries paralelas ─────────────────────────────────────────────────────
   const [
     calls, chats, video, funnel, crm, conv, contact,
     coberturaLL, canalesPorLead, ubicacion, nrSplit, citasXAsesor,
   ] = await Promise.all([
-    getReportCalls(idCuenta, from, to),
-    getReportChats(idCuenta, from, to),
-    getReportVideocalls(idCuenta, from, to),
-    getReportFunnel(idCuenta, from, to),
-    getReportCrmHealth(idCuenta, from, to),
-    getReportConversationAnalysis(idCuenta, from, to),
-    getReportContactabilidadCanal(idCuenta, from, to),
-    getLlamadasCobertura(idCuenta, from, to),
-    getCanalesPorLead(idCuenta, from, to),
-    getUbicacionLada(idCuenta, from, to),
-    getNuevosReactivados(idCuenta, from, to),
+    getReportCalls(idCuenta, from, to, tz),
+    getReportChats(idCuenta, from, to, tz),
+    getReportVideocalls(idCuenta, from, to, tz),
+    getReportFunnel(idCuenta, from, to, tz),
+    getReportCrmHealth(idCuenta, from, to, tz),
+    getReportConversationAnalysis(idCuenta, from, to, tz),
+    getReportContactabilidadCanal(idCuenta, from, to, tz),
+    getLlamadasCobertura(idCuenta, from, to, tz),
+    getCanalesPorLead(idCuenta, from, to, tz),
+    getUbicacionLada(idCuenta, from, to, tz),
+    getNuevosReactivados(idCuenta, from, to, tz),
     getCitasPorAsesor(idCuenta, from, to),
   ]);
 
@@ -571,10 +582,10 @@ export async function buildReportV2(
   let comparativo: ReportV2["comparativo"] = null;
   if (opts.periodoPrevio) {
     const [callsPrev, chatsPrev, videoPrev, contactPrev] = await Promise.all([
-      getReportCalls(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to),
-      getReportChats(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to),
-      getReportVideocalls(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to),
-      getReportContactabilidadCanal(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to),
+      getReportCalls(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
+      getReportChats(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
+      getReportVideocalls(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
+      getReportContactabilidadCanal(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
     ]);
     const prevCitas = videoPrev.total;
     const prevCitasReal = videoPrev.total - videoPrev.noShows;

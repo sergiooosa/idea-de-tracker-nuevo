@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
-import { registrosDeLlamada, logLlamadas } from "@/lib/db/schema";
+import { registrosDeLlamada, logLlamadas, cuentas } from "@/lib/db/schema";
 import { eq, and, isNull, lt, gt, gte, lte, sql, inArray } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -36,8 +37,17 @@ export async function getLeadsEnEspera(
 ): Promise<LeadsEnEsperaResponse> {
   const umbralTs = new Date(Date.now() - UMBRAL_MINUTOS * 60 * 1000);
   const idCuentaStr = String(idCuenta);
-  const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00Z`) : undefined;
-  const toDate = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : undefined;
+  let fromDate: Date | undefined;
+  let toDate: Date | undefined;
+  if (dateFrom && dateTo) {
+    const [tzRow] = await db.select({ zona_horaria_iana: cuentas.zona_horaria_iana }).from(cuentas).where(eq(cuentas.id_cuenta, idCuenta)).limit(1);
+    const range = zonedDayRange(dateFrom, dateTo, tzRow?.zona_horaria_iana);
+    fromDate = range.fromDate;
+    toDate = range.toDate;
+  } else if (dateFrom) {
+    const [tzRow] = await db.select({ zona_horaria_iana: cuentas.zona_horaria_iana }).from(cuentas).where(eq(cuentas.id_cuenta, idCuenta)).limit(1);
+    fromDate = zonedDayRange(dateFrom, dateFrom, tzRow?.zona_horaria_iana).fromDate;
+  }
 
   // Si la cuenta no tiene llamadas en los últimos 90 días, es un cliente de canal
   // Chats/WhatsApp. La métrica "sin contacto inicial" usa fecha_primera_llamada

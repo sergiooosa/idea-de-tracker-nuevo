@@ -5,6 +5,7 @@ import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS, type MetricaEngineContext } from "@/lib/metricas-engine";
 import { resolveFinancialValues } from "@/lib/queries/resolve-financial";
 import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import { agendaDedupKey } from "./agenda-dedup-key";
 import { esLlamadaContestada } from "./llamadas";
 import type {
@@ -119,8 +120,6 @@ export async function getDashboard(
   filterTags?: string[],
 ): Promise<DashboardResponse> {
   const emails = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
-  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
 
   const [cuentaRow] = await db
     .select({
@@ -134,10 +133,13 @@ export async function getDashboard(
       configuracion_ads: cuentas.configuracion_ads,
       razones_perdida_config: cuentas.razones_perdida_config,
       razones_perdida_data: cuentas.razones_perdida_data,
+      zona_horaria_iana: cuentas.zona_horaria_iana,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
     .limit(1);
+
+  const { fromDate, toDate } = zonedDayRange(dateFrom, dateTo, cuentaRow?.zona_horaria_iana);
 
   const fuenteFinanciera = cuentaRow?.configuracion_ui?.fuente_datos_financieros;
   const useExterna = fuenteFinanciera === "api_externa";
@@ -935,8 +937,8 @@ export async function getDashboard(
         // que se almacenan en metricas_manual_data con estructura {date, valor}
         const manualEntries = (manualData[m.id] ?? []) as Array<{date?: string; valor?: number}>;
         if (manualEntries.length > 0) {
-          const fromTs = new Date(`${dateFrom}T00:00:00Z`).getTime();
-          const toTs = new Date(`${dateTo}T23:59:59.999Z`).getTime();
+          const fromTs = fromDate.getTime();
+          const toTs = toDate.getTime();
           const manualSum = manualEntries
             .filter(e => { const d = e.date ? new Date(e.date).getTime() : 0; return d >= fromTs && d <= toTs; })
             .reduce((s, e) => s + (e.valor ?? 0), 0);

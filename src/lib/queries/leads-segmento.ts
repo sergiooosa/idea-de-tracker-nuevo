@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, cuentas, chatsLogs } from "@/lib/db/schema";
 import { normalizeEmbudoEtapas } from "@/lib/db/schema";
+import { zonedDayRange } from "@/lib/date-range";
 import { eq, and, or, gt, gte, lte, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { buildFunnelSets } from "./dashboard";
 import { DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
@@ -16,17 +17,17 @@ export async function getLeadsSegmento(
   closerEmails?: string[],
 ): Promise<LeadSegmentoItem[]> {
   const emails = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
-  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
-
   const [cuentaRow] = await db
     .select({
       embudo_personalizado: cuentas.embudo_personalizado,
       configuracion_ui: cuentas.configuracion_ui,
+      zona_horaria_iana: cuentas.zona_horaria_iana,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
     .limit(1);
+
+  const { fromDate, toDate } = zonedDayRange(dateFrom, dateTo, cuentaRow?.zona_horaria_iana);
 
   const cerradasCuentanComoCal = cuentaRow?.configuracion_ui?.cerradas_cuentan_como_calificadas ?? true;
   const embudoRawArr = Array.isArray(cuentaRow?.embudo_personalizado) ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado) : [];

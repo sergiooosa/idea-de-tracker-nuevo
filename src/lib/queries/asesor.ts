@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { logLlamadas, registrosDeLlamada, resumenesDiariosAgendas, chatsLogs, cuentas, usuariosDashboard, metricasWebhook, normalizeEmbudoEtapas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, isNull, isNotNull, inArray } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import { agendaDedupKey } from "./agenda-dedup-key";
 import type {
   AsesorKpis,
@@ -72,8 +73,6 @@ export async function getAsesorData(
   dateTo: string,
   advisorEmails?: string[],
 ): Promise<AsesorResponse> {
-  const fromTs = new Date(`${dateFrom}T00:00:00Z`);
-  const toTs = new Date(`${dateTo}T23:59:59.999Z`);
   const emails = (advisorEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
 
   // ── Cargar cuenta + embudo + métricas config ────────────────────────────────
@@ -85,10 +84,13 @@ export async function getAsesorData(
       embudo_personalizado: cuentas.embudo_personalizado,
       metricas_config: cuentas.metricas_config,
       configuracion_ui: cuentas.configuracion_ui,
+      zona_horaria_iana: cuentas.zona_horaria_iana,
     })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
     .limit(1);
+
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(dateFrom, dateTo, cuentaRow?.zona_horaria_iana);
 
   const fuenteLlamadas: "twilio" | "ghl" = cuentaRow?.fuente_llamadas === "ghl" ? "ghl" : "twilio";
   const ghlLocationId = cuentaRow?.ghl_location_id ?? cuentaRow?.locationid ?? null;

@@ -231,6 +231,7 @@ export async function GET(req: Request): Promise<Response> {
         subdominio: cuentas.subdominio,
         configuracion_ads: cuentas.configuracion_ads,
         fuente_llamadas: cuentas.fuente_llamadas,
+        zona_horaria_iana: cuentas.zona_horaria_iana,
       })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
@@ -239,6 +240,8 @@ export async function GET(req: Request): Promise<Response> {
     if (!cuentaRow) {
       return NextResponse.json({ error: "Cuenta no encontrada" }, { status: 404 });
     }
+
+    const tz = cuentaRow.zona_horaria_iana ?? null;
 
     // Ejecutar todos los bloques en paralelo (periodo actual + previo)
     const [
@@ -255,18 +258,18 @@ export async function GET(req: Request): Promise<Response> {
       chatsPrevResult,
       videocallsPrevResult,
     ] = await Promise.allSettled([
-      getReportAds(idCuenta, from, to),
-      getReportCalls(idCuenta, from, to),
-      getReportChats(idCuenta, from, to),
-      getReportVideocalls(idCuenta, from, to),
-      getReportFunnel(idCuenta, from, to),
-      getReportCrmHealth(idCuenta, from, to),
-      getReportConversationAnalysis(idCuenta, from, to),
-      getReportContactabilidadCanal(idCuenta, from, to),
-      getReportAds(idCuenta, prevPeriod.from, prevPeriod.to),
-      getReportCalls(idCuenta, prevPeriod.from, prevPeriod.to),
-      getReportChats(idCuenta, prevPeriod.from, prevPeriod.to),
-      getReportVideocalls(idCuenta, prevPeriod.from, prevPeriod.to),
+      getReportAds(idCuenta, from, to, tz),
+      getReportCalls(idCuenta, from, to, tz),
+      getReportChats(idCuenta, from, to, tz),
+      getReportVideocalls(idCuenta, from, to, tz),
+      getReportFunnel(idCuenta, from, to, tz),
+      getReportCrmHealth(idCuenta, from, to, tz),
+      getReportConversationAnalysis(idCuenta, from, to, tz),
+      getReportContactabilidadCanal(idCuenta, from, to, tz),
+      getReportAds(idCuenta, prevPeriod.from, prevPeriod.to, tz),
+      getReportCalls(idCuenta, prevPeriod.from, prevPeriod.to, tz),
+      getReportChats(idCuenta, prevPeriod.from, prevPeriod.to, tz),
+      getReportVideocalls(idCuenta, prevPeriod.from, prevPeriod.to, tz),
     ]);
 
     // Extraer valores — bloques sin datos = null

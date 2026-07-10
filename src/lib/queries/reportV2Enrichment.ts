@@ -7,7 +7,9 @@
 // -----------------------------------------------------------------------------
 
 import { db } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { cuentas } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import type {
   ReportV2ConversacionCanal,
   ReportV2Conversaciones,
@@ -137,9 +139,9 @@ export async function getEnrichmentFromDb(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportV2Enrichment> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   const [enrichedResult, countResult] = await Promise.all([
     db.execute<EnrichmentRow>(sql`

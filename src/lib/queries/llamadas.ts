@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { logLlamadas, registrosDeLlamada, cuentas, normalizeEmbudoEtapas } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, inArray } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import type {
   ApiLlamadaLog,
   LlamadasAdvisorMetrics,
@@ -37,8 +38,8 @@ export async function getLlamadas(
   closerEmails?: string[],
   tipoEvento?: string[],
 ): Promise<LlamadasResponse> {
-  const fromTs = new Date(`${dateFrom}T00:00:00Z`);
-  const toTs = new Date(`${dateTo}T23:59:59.999Z`);
+  const [tzRow] = await db.select({ zona_horaria_iana: cuentas.zona_horaria_iana }).from(cuentas).where(eq(cuentas.id_cuenta, idCuenta)).limit(1);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(dateFrom, dateTo, tzRow?.zona_horaria_iana);
   const emails = (closerEmails ?? []).map((e) => e.trim()).filter(Boolean);
   const tipoEventos = (tipoEvento ?? []).map((t) => t.trim()).filter(Boolean);
 

@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, isNull, isNotNull, or, gt } from "drizzle-orm";
 import { agendaDedupKey } from "./agenda-dedup-key";
+import { zonedDayRange } from "@/lib/date-range";
 
 /* ------------------------------------------------------------------ */
 /*  1. getReportAds                                                    */
@@ -52,7 +53,9 @@ export async function getReportAds(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportAds> {
+  const { fromDate, toDate } = zonedDayRange(from, to, tz);
   const [campanaRows, creativoRows, leadsPorCreativo] = await Promise.all([
     // Agregado por campaña desde resumenes_diarios_ads (no está en schema Drizzle → raw SQL)
     db.execute(sql`
@@ -91,7 +94,7 @@ export async function getReportAds(
         COUNT(DISTINCT COALESCE(contact_id_ghl, mail_lead, phone))::int AS leads_count
       FROM log_llamadas
       WHERE id_cuenta = ${idCuenta}
-        AND ts BETWEEN ${new Date(`${from}T00:00:00Z`)} AND ${new Date(`${to}T23:59:59.999Z`)}
+        AND ts BETWEEN ${fromDate} AND ${toDate}
         AND creativo_origen IS NOT NULL
         AND creativo_origen <> ''
         AND tipo_evento NOT IN ('pdte', 'contacto_creado')
@@ -186,9 +189,9 @@ export async function getReportCalls(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportCalls> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   // Llamadas realizadas en el rango (excluir pdte y contacto_creado que son solo creación de lead)
   // Proyección explícita para no cargar transcripcion (texto completo, caro en memoria con volumen alto)
@@ -366,9 +369,9 @@ export async function getReportChats(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportChats> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   const rows = await db
     .select({
@@ -494,14 +497,14 @@ export async function getReportVideocalls(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportVideocalls> {
   // Use the same 3-condition date filter as getDashboard so both screens show
   // consistent numbers. Dashboard filters by fecha_reunion (actual meeting date)
   // with fallback to fecha (insertion date); filtering only by fecha caused a
   // systematic 2-meeting discrepancy for records inserted outside the period but
   // with a meeting date inside it (or vice-versa).
-  const fromDate = new Date(`${from}T00:00:00Z`);
-  const toDate = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate, toDate } = zonedDayRange(from, to, tz);
   const fechaFilter = or(
     // Caso 1: fecha_reunion conocida y dentro del rango
     and(
@@ -654,9 +657,9 @@ export async function getReportFunnel(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportFunnel> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   const [llamadasResult, chatsResult, videoResult] = await Promise.all([
     // Distribución por estado en registros_de_llamada creados en el rango
@@ -800,9 +803,9 @@ export async function getReportCrmHealth(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportCrmHealth> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
   const limboThreshold = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // hace 5 días
 
   const [sinEstadoResult, sinAccionResult, enLimboResult, leadsDetalleResult, leadsEnLimboDetalleResult] = await Promise.all([
@@ -1023,9 +1026,9 @@ export async function getReportConversationAnalysis(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportConversationAnalysis> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   // Objeciones de chats (ia_objeciones JSONB en chats_logs)
   const chatsObjecionesResult = await db.execute(sql`
@@ -1172,9 +1175,9 @@ export async function getReportContactabilidadCanal(
   idCuenta: number,
   from: string,
   to: string,
+  tz?: string | null,
 ): Promise<ReportContactabilidadCanales> {
-  const fromTs = new Date(`${from}T00:00:00Z`);
-  const toTs = new Date(`${to}T23:59:59.999Z`);
+  const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
   const [llamadasResult, chatsResult] = await Promise.all([
     // Llamadas: contar por tipo_evento (excluir pdte y contacto_creado que no son intentos reales)
