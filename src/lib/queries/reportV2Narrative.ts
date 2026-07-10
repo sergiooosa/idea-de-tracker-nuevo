@@ -13,6 +13,7 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 
 interface GeminiCandidate {
   content?: { parts?: Array<{ text?: string }> };
+  finishReason?: string;
 }
 interface GeminiResponse {
   candidates?: GeminiCandidate[];
@@ -159,7 +160,11 @@ export async function generateNarrativa(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: buildPrompt(report) }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1536 },
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
     if (!res.ok) {
@@ -171,11 +176,22 @@ export async function generateNarrativa(
       return { resumenEjecutivo: fallbackResumen(report), alertasCriticas };
     }
     const data = (await res.json()) as GeminiResponse;
-    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const candidate = data.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const texto = candidate?.content?.parts?.[0]?.text?.trim();
+
+    if (finishReason === "MAX_TOKENS") {
+      console.error("[report-v2 narrativa] respuesta truncada", {
+        finishReason,
+        textoLength: texto?.length ?? 0,
+      });
+    }
+
     if (!texto) {
       console.error("[report-v2 narrativa] Gemini fallback", {
         motivo: "empty response from Gemini",
         candidates: data.candidates?.length ?? 0,
+        finishReason,
       });
     }
     return {

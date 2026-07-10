@@ -11,7 +11,7 @@ export const es = {
     ads: "Ads & Inversión",
     comparaciones: "Comparaciones",
     comisiones: "Comisiones",
-    reporte: "Reporte semanal",
+    reporte: "Reporte mensual",
     sistema: "Control del sistema",
     documentacion: "Documentación",
     configuracion: "Configuración",
