@@ -6,7 +6,8 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { CheckCircle2, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus } from 'lucide-react';
+import { BarChart3, CheckCircle2, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus, CalendarCheck } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import { matchesLeadSearch } from '@/lib/performance-search';
@@ -175,7 +176,7 @@ export default function PerformanceLlamadasPage() {
 
   const filteredAdvisorMetrics = useMemo(() => {
     if (resultadoFiltro === 'todos' || !data?.registros) return null;
-    const metrics: Record<string, { advisorName: string; advisorEmail: string; leadsAsignados: number; llamadas: number; contestadas: number; pctContestacion: number; tiempoAlLead: number | null }> = {};
+    const metrics: Record<string, { advisorName: string; advisorEmail: string; leadsAsignados: number; llamadas: number; contestadas: number; pctContestacion: number; tiempoAlLead: number | null; agendas: number; asistencia: number }> = {};
     for (const [advisorKey, leads] of Object.entries(leadsByAdvisor)) {
       let totalCalls = 0;
       let answered = 0;
@@ -208,10 +209,26 @@ export default function PerformanceLlamadasPage() {
         contestadas: answered,
         pctContestacion: totalCalls > 0 ? (answered / totalCalls) * 100 : 0,
         tiempoAlLead: speedValues.length > 0 ? speedValues.reduce((a, b) => a + b, 0) / speedValues.length : null,
+        agendas: serverMetrics?.agendas ?? 0,
+        asistencia: serverMetrics?.asistencia ?? 0,
       };
     }
     return metrics;
   }, [resultadoFiltro, leadsByAdvisor, data?.registros, data?.advisorMetrics]);
+
+  const chartData = useMemo(() => {
+    const metricsSource = data?.advisorMetrics ?? {};
+    return Object.entries(metricsSource)
+      .map(([key, m]) => ({
+        name: m.advisorName?.length > 15 ? m.advisorName.slice(0, 14) + '…' : m.advisorName ?? key,
+        llamadas: m.llamadas,
+        contestadas: m.contestadas,
+        agendas: m.agendas ?? 0,
+        asistencia: m.asistencia ?? 0,
+      }))
+      .filter((d) => d.llamadas > 0 || d.agendas > 0)
+      .sort((a, b) => (b.llamadas + b.agendas) - (a.llamadas + a.agendas));
+  }, [data?.advisorMetrics]);
 
   const leadsByAdvisorFiltered = useMemo(() => {
     const q = leadSearch.trim();
@@ -486,6 +503,8 @@ export default function PerformanceLlamadasPage() {
                     <th className="px-2 py-2 font-medium">{t.performance.llamadas.titulo}</th>
                     <th className="px-2 py-2 font-medium">{t.dashboard.kpis.contestadas}</th>
                     <th className="px-2 py-2 font-medium">{t.dashboard.kpis.tasaContacto}</th>
+                    <th className="px-2 py-2 font-medium">Agendas</th>
+                    <th className="px-2 py-2 font-medium">Asistencia</th>
                     <th className="px-2 py-2 font-medium">{t.performance.llamadas.speedToLead}</th>
                   </tr>
                 </thead>
@@ -501,7 +520,7 @@ export default function PerformanceLlamadasPage() {
                     if (isFiltered && !q && advisorKeys.length === 0) {
                       return (
                         <tr key="__empty">
-                          <td colSpan={7} className="px-3 py-4 text-center text-gray-500 text-xs">
+                          <td colSpan={9} className="px-3 py-4 text-center text-gray-500 text-xs">
                             0 asesores con leads en esta categoría.
                           </td>
                         </tr>
@@ -527,11 +546,13 @@ export default function PerformanceLlamadasPage() {
                             <td className="px-2 py-2 text-accent-cyan">{metrics?.llamadas ?? 0}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics?.contestadas ?? 0}</td>
                             <td className="px-2 py-2 text-accent-green">{metrics != null ? pct(metrics.pctContestacion) : '—'}</td>
+                            <td className="px-2 py-2 text-accent-purple">{metrics?.agendas ?? 0}</td>
+                            <td className="px-2 py-2 text-teal-400">{metrics?.asistencia ?? 0}</td>
                             <td className="px-2 py-2 text-gray-300">{minFmt(metrics?.tiempoAlLead ?? null)}</td>
                           </tr>
                           {isExpanded && (
                             <tr className="bg-surface-800/90">
-                              <td colSpan={7} className="p-0">
+                              <td colSpan={9} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
                                   <div className="text-[10px] text-gray-400 mb-1.5">Leads (registros) de {metrics?.advisorName ?? advisorKey} — clic en la fila abre las llamadas</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -615,6 +636,54 @@ export default function PerformanceLlamadasPage() {
           )}
         </div>
       </section>
+
+      {/* ── Charts ── */}
+      {chartData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Chart 1: Llamadas por vendedor */}
+          <section className="rounded-lg border border-surface-500 p-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <BarChart3 className="w-3.5 h-3.5 text-accent-cyan" />
+              Llamadas por vendedor
+            </h3>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="llamadas" name="Llamadas" fill="#22d3ee" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="contestadas" name="Contestadas" fill="#2dd4bf" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          {/* Chart 2: Llamadas vs Agendas por vendedor */}
+          <section className="rounded-lg border border-surface-500 p-4">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <CalendarCheck className="w-3.5 h-3.5 text-accent-purple" />
+              Llamadas vs Agendas por vendedor
+            </h3>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="llamadas" name="Llamadas" fill="#22d3ee" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="agendas" name="Agendas" fill="#a78bfa" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="asistencia" name="Asistencia" fill="#2dd4bf" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+        </div>
+      )}
 
       {modalSelectorCalls && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
