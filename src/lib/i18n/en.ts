@@ -13,7 +13,7 @@ export const en: Translations = {
     ads: "Ads & Investment",
     comparaciones: "Comparisons",
     comisiones: "Commissions",
-    reporte: "Weekly Report",
+    reporte: "Monthly Report",
     sistema: "System",
     documentacion: "Documentation",
     configuracion: "Configuration",
