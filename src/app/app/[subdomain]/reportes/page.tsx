@@ -4,13 +4,14 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import {
   format,
-  startOfDay,
-  startOfWeek,
   startOfMonth,
-  endOfDay,
+  endOfMonth,
+  subMonths,
 } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
   Calendar,
+  ChevronDown,
   ChevronRight,
   Download,
   Loader2,
@@ -37,40 +38,33 @@ import type { ReportV2Data } from '@/types/report-v2';
 import type { ReportV2 } from '@/types/reportV2';
 import { adaptReportV2 } from '@/lib/adapters/reportV2Adapter';
 
-// ─── Period helpers ──────────────────────────────────────────────────────────
+// ─── Month helpers ───────────────────────────────────────────────────────────
 
-type PeriodType = 'hoy' | 'semana' | 'mes' | 'personalizado';
+const MONTHS_TO_SHOW = 12;
 
-function getPeriodDates(period: PeriodType, customFrom: string, customTo: string) {
+function buildMonthOptions(): { value: string; label: string; from: string; to: string }[] {
   const today = new Date();
-  switch (period) {
-    case 'hoy':
-      return {
-        from: format(startOfDay(today), 'yyyy-MM-dd'),
-        to: format(endOfDay(today), 'yyyy-MM-dd'),
-      };
-    case 'semana':
-      return {
-        from: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-        to: format(today, 'yyyy-MM-dd'),
-      };
-    case 'mes':
-      return {
-        from: format(startOfMonth(today), 'yyyy-MM-dd'),
-        to: format(today, 'yyyy-MM-dd'),
-      };
-    case 'personalizado':
-      return { from: customFrom, to: customTo };
+  const options: { value: string; label: string; from: string; to: string }[] = [];
+  for (let i = 1; i <= MONTHS_TO_SHOW; i++) {
+    const d = subMonths(today, i);
+    const monthStart = startOfMonth(d);
+    const monthEnd = endOfMonth(d);
+    const label = format(d, 'MMMM yyyy', { locale: es });
+    options.push({
+      value: format(d, 'yyyy-MM'),
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+      from: format(monthStart, 'yyyy-MM-dd'),
+      to: format(monthEnd, 'yyyy-MM-dd'),
+    });
   }
+  return options;
 }
 
-function periodLabel(period: PeriodType, from: string, to: string) {
-  switch (period) {
-    case 'hoy': return 'Hoy';
-    case 'semana': return 'Esta semana';
-    case 'mes': return 'Este mes';
-    case 'personalizado': return `${from} → ${to}`;
-  }
+type PeriodMode = 'month' | 'personalizado';
+
+function periodLabel(mode: PeriodMode, monthLabel: string, from: string, to: string) {
+  if (mode === 'personalizado') return `${from} → ${to}`;
+  return monthLabel;
 }
 
 // ─── Loading skeleton ────────────────────────────────────────────────────────
@@ -186,13 +180,15 @@ async function exportPdf(
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function ReportesPage() {
-  const today = new Date();
   const params = useParams();
   const subdomain = typeof params?.subdomain === 'string' ? params.subdomain : '';
 
-  const [period, setPeriod] = useState<PeriodType>('mes');
-  const [customFrom, setCustomFrom] = useState(format(startOfMonth(today), 'yyyy-MM-dd'));
-  const [customTo, setCustomTo] = useState(format(today, 'yyyy-MM-dd'));
+  const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0].value);
+  const [mode, setMode] = useState<PeriodMode>('month');
+  const [customFrom, setCustomFrom] = useState(monthOptions[0].from);
+  const [customTo, setCustomTo] = useState(monthOptions[0].to);
+  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
@@ -201,11 +197,27 @@ export default function ReportesPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const reportRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { from, to } = useMemo(
-    () => getPeriodDates(period, customFrom, customTo),
-    [period, customFrom, customTo],
+  const currentMonthOption = useMemo(
+    () => monthOptions.find((m) => m.value === selectedMonth) ?? monthOptions[0],
+    [monthOptions, selectedMonth],
   );
+
+  const { from, to } = useMemo(() => {
+    if (mode === 'personalizado') return { from: customFrom, to: customTo };
+    return { from: currentMonthOption.from, to: currentMonthOption.to };
+  }, [mode, customFrom, customTo, currentMonthOption]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setMonthDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch company name
   useEffect(() => {
@@ -224,17 +236,10 @@ export default function ReportesPage() {
     setFetchError(null);
     setEnriquecimientoParcial(false);
 
-    const periodTypeMap: Record<PeriodType, string> = {
-      hoy: 'daily',
-      semana: 'weekly',
-      mes: 'monthly',
-      personalizado: 'custom',
-    };
-
     const qs = new URLSearchParams({
       from,
       to,
-      period_type: periodTypeMap[period],
+      period_type: mode === 'personalizado' ? 'custom' : 'monthly',
     });
 
     const controller = new AbortController();
@@ -259,7 +264,7 @@ export default function ReportesPage() {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [from, to, period, subdomain, companyName]);
+  }, [from, to, mode, subdomain, companyName]);
 
   const downloadPdf = useCallback(async () => {
     if (!reportRef.current || !reportData) return;
@@ -269,7 +274,7 @@ export default function ReportesPage() {
         reportRef.current,
         reportData.cuenta.nombre,
         subdomain,
-        periodLabel(period, from, to),
+        periodLabel(mode, currentMonthOption.label, from, to),
       );
     } catch (err) {
       console.error('Error al exportar PDF:', err);
@@ -277,40 +282,79 @@ export default function ReportesPage() {
     } finally {
       setGeneratingPdf(false);
     }
-  }, [reportData, subdomain, period, from, to]);
-
-  const PERIODS: { id: PeriodType; label: string }[] = [
-    { id: 'hoy', label: 'Hoy' },
-    { id: 'semana', label: 'Esta semana' },
-    { id: 'mes', label: 'Este mes' },
-    { id: 'personalizado', label: 'Personalizado' },
-  ];
+  }, [reportData, subdomain, mode, currentMonthOption.label, from, to]);
 
   return (
     <>
       <PageHeader
-        title="Reporte Ejecutivo"
-        subtitle={`Periodo: ${periodLabel(period, from, to)}`}
+        title="Reporte Mensual"
+        subtitle={`Periodo: ${periodLabel(mode, currentMonthOption.label, from, to)}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
+            {/* Mode toggle: Mensual vs Personalizado */}
             <div className="flex rounded-lg bg-[#111A2A] p-0.5 border border-[#1E2B40]">
-              {PERIODS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setPeriod(p.id)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    period === p.id
-                      ? 'bg-accent-cyan text-black'
-                      : 'text-[#8DA2B8] hover:text-white hover:bg-[#152238]'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => setMode('month')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  mode === 'month'
+                    ? 'bg-accent-cyan text-black'
+                    : 'text-[#8DA2B8] hover:text-white hover:bg-[#152238]'
+                }`}
+              >
+                Mensual
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('personalizado')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  mode === 'personalizado'
+                    ? 'bg-accent-cyan text-black'
+                    : 'text-[#8DA2B8] hover:text-white hover:bg-[#152238]'
+                }`}
+              >
+                Personalizado
+              </button>
             </div>
 
-            {period === 'personalizado' && (
+            {/* Month dropdown */}
+            {mode === 'month' && (
+              <div ref={dropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMonthDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-2 rounded-lg bg-[#111A2A] border border-[#1E2B40] px-3 py-1.5 text-sm text-white hover:border-accent-cyan/50 transition-colors"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-accent-cyan shrink-0" />
+                  {currentMonthOption.label}
+                  <ChevronDown className="w-3.5 h-3.5 text-[#5F7288] shrink-0" />
+                </button>
+                {monthDropdownOpen && (
+                  <div className="absolute top-full mt-1 left-0 z-50 w-56 max-h-64 overflow-y-auto rounded-lg bg-[#111A2A] border border-[#1E2B40] shadow-xl">
+                    {monthOptions.map((m) => (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMonth(m.value);
+                          setMonthDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                          m.value === selectedMonth
+                            ? 'bg-accent-cyan/10 text-accent-cyan font-medium'
+                            : 'text-[#8DA2B8] hover:bg-[#152238] hover:text-white'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Custom date range */}
+            {mode === 'personalizado' && (
               <div className="flex items-center gap-1 rounded-lg bg-[#111A2A] border border-[#1E2B40] px-2 py-1 text-sm text-[#8DA2B8]">
                 <Calendar className="w-3.5 h-3.5 text-accent-cyan shrink-0" />
                 <input
