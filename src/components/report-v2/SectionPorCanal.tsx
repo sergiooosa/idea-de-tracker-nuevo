@@ -58,7 +58,7 @@ function LlamadasBlock({ data }: { data: ReportV2CanalLlamadas }) {
           <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
             <Stat
               label="Speed-to-lead"
-              value={`${data.speedToLeadProm}`}
+              value={data.speedToLeadProm.toFixed(1)}
               suffix="min"
               color={data.speedToLeadProm <= 15 ? 'text-accent-green' : 'text-accent-amber'}
             />
@@ -99,7 +99,7 @@ function ChatsBlock({ data }: { data: ReportV2CanalChats }) {
         </div>
         {data.tPrimeraRespuesta !== null && (
           <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">
-            <Stat label="1ra respuesta" value={`${data.tPrimeraRespuesta}`} suffix="min" />
+            <Stat label="1ra respuesta" value={data.tPrimeraRespuesta.toFixed(1)} suffix="min" />
           </div>
         )}
         <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40] p-3">

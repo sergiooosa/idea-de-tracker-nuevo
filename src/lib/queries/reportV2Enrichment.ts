@@ -100,6 +100,32 @@ function toDistribution(counts: Map<string, number>, denominador: number): Repor
     }));
 }
 
+const MAX_PRESUPUESTO = 100_000_000;
+
+function parseFirstNumber(text: string): number | null {
+  const millonMatch = text.match(/([\d,.]+)\s*millon/i);
+  if (millonMatch) {
+    const base = parseFloat(millonMatch[1].replace(/,/g, ""));
+    if (!isNaN(base) && base > 0) {
+      const val = base * 1_000_000;
+      return val <= MAX_PRESUPUESTO ? val : null;
+    }
+  }
+  const milMatch = text.match(/([\d,.]+)\s*mil\b/i);
+  if (milMatch) {
+    const base = parseFloat(milMatch[1].replace(/,/g, ""));
+    if (!isNaN(base) && base > 0) {
+      const val = base * 1_000;
+      return val <= MAX_PRESUPUESTO ? val : null;
+    }
+  }
+  const match = text.match(/[\d][\d,]*(?:\.\d+)?/);
+  if (!match) return null;
+  const num = parseFloat(match[0].replace(/,/g, ""));
+  if (isNaN(num) || num <= 0 || num > MAX_PRESUPUESTO) return null;
+  return num;
+}
+
 function incrementMap(map: Map<string, number>, key: string | null | undefined): void {
   if (!key) return;
   const normalized = key.trim();
@@ -235,8 +261,8 @@ export async function getEnrichmentFromDb(
     incrementMap(perfilCounts, r.perfil_compra);
     if (r.edad_estimada) edades.push(r.edad_estimada.trim());
     if (r.presupuesto_detectado) {
-      const num = parseFloat(r.presupuesto_detectado.replace(/[^0-9.]/g, ""));
-      if (!isNaN(num) && num > 0) presupuestos.push(num);
+      const num = parseFirstNumber(r.presupuesto_detectado);
+      if (num !== null) presupuestos.push(num);
     }
   }
 
