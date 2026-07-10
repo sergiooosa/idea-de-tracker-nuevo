@@ -12,7 +12,9 @@
 import { NextResponse } from "next/server";
 import { withAuthAndPermission } from "@/lib/api-auth";
 import { db } from "@/lib/db";
-import { sql } from "drizzle-orm";
+import { cuentas } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 
 export interface LeadContacto {
   nombre: string;
@@ -50,8 +52,12 @@ export async function GET(req: Request) {
         { status: 400 },
       );
     }
-    const fromTs = new Date(`${from}T00:00:00Z`);
-    const toTs = new Date(`${to}T23:59:59.999Z`);
+    const [cuentaRow] = await db
+      .select({ zona_horaria_iana: cuentas.zona_horaria_iana })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+    const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, cuentaRow?.zona_horaria_iana);
     const limboThreshold = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
 
     try {
