@@ -6,6 +6,7 @@ import type { SocioSplit } from "@/lib/db/schema";
 import { eq, and, sql, isNotNull } from "drizzle-orm";
 import { buildFunnelSets } from "@/lib/queries/dashboard";
 import { DEFAULT_EMBUDO_CONFIG } from "@/lib/metricas-engine";
+import { zonedDayRange } from "@/lib/date-range";
 
 // ── Tipos del response ─────────────────────────────────────────────────────────
 interface SocioSplitCalculado extends SocioSplit {
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
 
     // Cargar embudo de la cuenta para determinar etapas cerradas correctamente
     const [cuentaRow] = await db
-      .select({ embudo_personalizado: cuentas.embudo_personalizado })
+      .select({ embudo_personalizado: cuentas.embudo_personalizado, zona_horaria_iana: cuentas.zona_horaria_iana })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .limit(1);
@@ -91,8 +92,7 @@ export async function GET(req: Request) {
     let resultados: ComisionResultado[] = [];
 
     if (from && to) {
-      const fromDate = new Date(`${from}T00:00:00Z`);
-      const toDate = new Date(`${to}T23:59:59.999Z`);
+      const { fromDate, toDate } = zonedDayRange(from, to, cuentaRow?.zona_horaria_iana);
 
       const agendaRows = await db
         .select({
