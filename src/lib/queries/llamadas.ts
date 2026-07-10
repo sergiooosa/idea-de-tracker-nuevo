@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
-import { logLlamadas, registrosDeLlamada, cuentas, normalizeEmbudoEtapas } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, or, inArray } from "drizzle-orm";
+import { logLlamadas, registrosDeLlamada, cuentas, normalizeEmbudoEtapas, resumenesDiariosAgendas, usuariosDashboard } from "@/lib/db/schema";
+import { eq, and, gte, lte, sql, or, inArray, isNull, isNotNull, gt } from "drizzle-orm";
 import { zonedDayRange } from "@/lib/date-range";
+import { isPhoneCallRow } from "@/lib/queries/videollamadas";
 import type {
   ApiLlamadaLog,
   LlamadasAdvisorMetrics,
@@ -244,6 +245,8 @@ export async function getLlamadas(
       pctContestacion: calls.length > 0 ? (contest / calls.length) * 100 : 0,
       tiempoAlLead: speeds.length > 0 ? speeds.reduce((s, v) => s + v, 0) / speeds.length : null,
       leadsAsignados,
+      agendas: 0,
+      asistencia: 0,
     };
     advisors.push({ id: key, name, email });
   }
@@ -263,12 +266,160 @@ export async function getLlamadas(
       pctContestacion: 0,
       tiempoAlLead: null,
       leadsAsignados: leadsCountByAdvisorKey[keyNorm] ?? 0,
+      agendas: 0,
+      asistencia: 0,
     };
     advisors.push({
       id: keyNorm,
       name: displayName,
       email: displayEmail,
     });
+  }
+
+  // ── Agenda/asistencia per advisor (reuse videollamadas aggregation pattern) ──
+  const PHONE_CALL_IA_PREFIX = "# Análisis de la Llamada Telefónica";
+  const excludePhoneCalls = sql`NOT (${resumenesDiariosAgendas.fathom_recording_id} IS NULL AND ${resumenesDiariosAgendas.fathom_ingestion_source} IS NULL AND ${resumenesDiariosAgendas.resumen_ia} IS NOT NULL AND ${resumenesDiariosAgendas.resumen_ia} LIKE ${PHONE_CALL_IA_PREFIX + "%"})`;
+  const fechaFilter = or(
+    and(
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha_reunion, fromTs),
+      lte(resumenesDiariosAgendas.fecha_reunion, toTs),
+    ),
+    and(
+      eq(resumenesDiariosAgendas.categoria, 'PDTE'),
+      isNotNull(resumenesDiariosAgendas.fecha_reunion),
+      gt(resumenesDiariosAgendas.fecha_reunion, sql`NOW()`),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+    and(
+      isNull(resumenesDiariosAgendas.fecha_reunion),
+      gte(resumenesDiariosAgendas.fecha, dateFrom),
+      lte(resumenesDiariosAgendas.fecha, dateTo),
+    ),
+  ) ?? sql`TRUE`;
+
+  const agendaConditions = [
+    eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
+    fechaFilter,
+    excludePhoneCalls,
+    eq(resumenesDiariosAgendas.excluida_dashboard, false),
+  ];
+  if (emails.length > 0) {
+    const usuariosNorm = await db
+      .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+      .from(usuariosDashboard)
+      .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), inArray(usuariosDashboard.email, emails)));
+    const closerValues = [...emails];
+    for (const u of usuariosNorm) {
+      if (u.nombre_closer) closerValues.push(u.nombre_closer);
+    }
+    agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
+  }
+
+  const agendaRows = await db
+    .select({
+      closer: resumenesDiariosAgendas.closer,
+      categoria: resumenesDiariosAgendas.categoria,
+      idcliente: resumenesDiariosAgendas.idcliente,
+      ghl_contact_id: resumenesDiariosAgendas.ghl_contact_id,
+      email_lead: resumenesDiariosAgendas.email_lead,
+      id_registro_agenda: resumenesDiariosAgendas.id_registro_agenda,
+      fathom_recording_id: resumenesDiariosAgendas.fathom_recording_id,
+      fathom_ingestion_source: resumenesDiariosAgendas.fathom_ingestion_source,
+      resumen_ia: resumenesDiariosAgendas.resumen_ia,
+      transcripcion_fathom: resumenesDiariosAgendas.transcripcion_fathom,
+      link_llamada: resumenesDiariosAgendas.link_llamada,
+    })
+    .from(resumenesDiariosAgendas)
+    .where(and(...agendaConditions));
+
+  // Build nombre→email map for canonical key resolution (same as videollamadas.ts)
+  const allUsuarios = await db
+    .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer, nombre: usuariosDashboard.nombre })
+    .from(usuariosDashboard)
+    .where(eq(usuariosDashboard.id_cuenta, idCuenta));
+  const nombreToEmailMap: Record<string, string> = {};
+  for (const u of allUsuarios) {
+    if (!u.email) continue;
+    const emailKey = u.email.trim().toLowerCase();
+    const displayName = u.nombre_closer?.trim() ?? u.nombre?.trim();
+    if (displayName) nombreToEmailMap[displayName.toLowerCase()] = emailKey;
+  }
+  function agendaCanonicalKey(rawCloser: string): string {
+    const lc = rawCloser.toLowerCase().trim();
+    if (lc.includes("@")) return lc;
+    return nombreToEmailMap[lc] ?? lc;
+  }
+
+  // Build effective-call set for real-interaction check (same as videollamadas.ts)
+  const effectiveCallLeadKeys = new Set<string>();
+  for (const r of rows) {
+    if (r.tipo_evento.startsWith("efectiva_")) {
+      if (r.mail_lead?.trim()) effectiveCallLeadKeys.add(r.mail_lead.trim().toLowerCase());
+      if (r.phone?.trim()) effectiveCallLeadKeys.add(r.phone.trim());
+      if (r.contact_id_ghl?.trim()) effectiveCallLeadKeys.add(r.contact_id_ghl.trim());
+    }
+  }
+
+  const [cuentaEmbudo] = await db
+    .select({ embudo_personalizado: cuentas.embudo_personalizado })
+    .from(cuentas)
+    .where(eq(cuentas.id_cuenta, idCuenta))
+    .limit(1);
+  const embudoNorm = Array.isArray(cuentaEmbudo?.embudo_personalizado)
+    ? normalizeEmbudoEtapas(cuentaEmbudo.embudo_personalizado)
+    : [];
+
+  function isAttended(cat: string | null, row: typeof agendaRows[0]): boolean {
+    if (!cat) return false;
+    const cl = cat.trim().toLowerCase();
+    if (cl === "cancelada" || cl.includes("cancel") || cl === "pdte" || cl === "pendiente" || cl === "no_show" || cl === "noshow") return false;
+    // Check real interaction (Fathom transcript or effective call)
+    const hasTranscript = (row.transcripcion_fathom && row.transcripcion_fathom.trim() !== "") || (row.link_llamada && row.link_llamada.trim() !== "");
+    const hasEffectiveCall = (row.email_lead?.trim() && effectiveCallLeadKeys.has(row.email_lead.trim().toLowerCase())) ||
+      (row.idcliente?.trim() && effectiveCallLeadKeys.has(row.idcliente.trim())) ||
+      (row.ghl_contact_id?.trim() && effectiveCallLeadKeys.has(row.ghl_contact_id.trim()));
+    return !!(hasTranscript || hasEffectiveCall);
+  }
+
+  // Group agenda rows by advisor and compute agendas/asistencia
+  const agendaByAdvisor: Record<string, { booked: Set<string>; attended: number }> = {};
+  for (const r of agendaRows) {
+    const rawCloser = r.closer?.trim();
+    const key = rawCloser ? agendaCanonicalKey(rawCloser) : "sin asignar";
+    if (!agendaByAdvisor[key]) agendaByAdvisor[key] = { booked: new Set(), attended: 0 };
+    const cl = r.categoria?.trim().toLowerCase() ?? "";
+    const isCanceled = cl === "cancelada" || cl.includes("cancel");
+    if (!isCanceled) {
+      const leadKey = r.idcliente?.trim() || r.ghl_contact_id?.trim() || r.email_lead?.trim().toLowerCase() || `nokey_${r.id_registro_agenda}`;
+      agendaByAdvisor[key].booked.add(leadKey);
+    }
+    if (isAttended(r.categoria, r)) {
+      agendaByAdvisor[key].attended++;
+    }
+  }
+
+  // Merge agenda data into advisorMetrics
+  for (const [advKey, agData] of Object.entries(agendaByAdvisor)) {
+    if (advisorMetrics[advKey]) {
+      advisorMetrics[advKey].agendas = agData.booked.size;
+      advisorMetrics[advKey].asistencia = agData.attended;
+    } else {
+      // Advisor only has agendas, no calls — still show them
+      advisorMetrics[advKey] = {
+        advisorName: advKey,
+        advisorEmail: advKey,
+        llamadas: 0,
+        contestadas: 0,
+        pctContestacion: 0,
+        tiempoAlLead: null,
+        leadsAsignados: 0,
+        agendas: agData.booked.size,
+        asistencia: agData.attended,
+      };
+      advisors.push({ id: advKey, name: advKey, email: advKey });
+    }
   }
 
   const leads: LlamadaLead[] = regRowsResolved.map((r) => ({

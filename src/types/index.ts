@@ -300,6 +300,8 @@ export interface LlamadasAdvisorMetrics {
   tiempoAlLead: number | null;
   /** Número de leads (registros_de_llamada) asignados a este closer en el rango */
   leadsAsignados: number;
+  agendas: number;
+  asistencia: number;
 }
 
 /** Lead desde registros_de_llamada (una fila por persona en Performance > Llamadas) */

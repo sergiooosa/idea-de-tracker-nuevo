@@ -273,6 +273,8 @@ export function generateLlamadas(): LlamadasResponse {
       pctContestacion: pct(myAnswered, mine.length),
       tiempoAlLead: rnd(5, 80) + Math.random(),
       leadsAsignados: Math.floor(mine.length / 2),
+      agendas: rnd(2, 10),
+      asistencia: rnd(1, 8),
     };
   });
 
