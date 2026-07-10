@@ -522,7 +522,7 @@ export async function buildReportV2(
           noCalificados: contact.canales.find((c) => c.canal === "llamadas")?.noCalifco ?? 0,
           intentosProm: calls.intentosPromGlobal,
           speedToLeadProm: calls.speedToLeadAvgMin != null
-            ? Math.round((calls.speedToLeadAvgMin / 60) * 10) / 10
+            ? Math.round(calls.speedToLeadAvgMin * 10) / 10
             : null,
           duracionPromContestadas: null, // [WS1 / AUT-1301] columna pendiente
           mejorFranja: coberturaLL.mejorFranja,
@@ -648,7 +648,7 @@ export async function buildReportV2(
       llamadas: c.totalLlamadas,
       contactoPct,
       spdLead: c.speedToLeadAvgMin != null
-        ? Math.round((c.speedToLeadAvgMin / 60) * 10) / 10
+        ? Math.round(c.speedToLeadAvgMin * 10) / 10
         : null,
       intProm: c.intentosProm,
       dosMasIntPct: leadsPorCloser > 0 ? dosMas / leadsPorCloser : 0,
