@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { logLlamadas, registrosDeLlamada, cuentas, normalizeEmbudoEtapas, resumenesDiariosAgendas, usuariosDashboard } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, or, inArray, isNull, isNotNull, gt } from "drizzle-orm";
 import { zonedDayRange } from "@/lib/date-range";
-import { isPhoneCallRow } from "@/lib/queries/videollamadas";
+import { mapCategoria } from "@/lib/queries/videollamadas";
 import type {
   ApiLlamadaLog,
   LlamadasAdvisorMetrics,
@@ -372,10 +372,8 @@ export async function getLlamadas(
     : [];
 
   function isAttended(cat: string | null, row: typeof agendaRows[0]): boolean {
-    if (!cat) return false;
-    const cl = cat.trim().toLowerCase();
-    if (cl === "cancelada" || cl.includes("cancel") || cl === "pdte" || cl === "pendiente" || cl === "no_show" || cl === "noshow") return false;
-    // Check real interaction (Fathom transcript or effective call)
+    const m = mapCategoria(cat, embudoNorm.length > 0 ? embudoNorm : null);
+    if (!m.attended) return false;
     const hasTranscript = (row.transcripcion_fathom && row.transcripcion_fathom.trim() !== "") || (row.link_llamada && row.link_llamada.trim() !== "");
     const hasEffectiveCall = (row.email_lead?.trim() && effectiveCallLeadKeys.has(row.email_lead.trim().toLowerCase())) ||
       (row.idcliente?.trim() && effectiveCallLeadKeys.has(row.idcliente.trim())) ||
