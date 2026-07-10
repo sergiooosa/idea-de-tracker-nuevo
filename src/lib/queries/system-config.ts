@@ -173,7 +173,7 @@ export async function updateSystemConfig(
   if (data.embudo_personalizado !== undefined) {
     const embudoNuevo = normalizeEmbudoEtapas(data.embudo_personalizado as unknown[]);
     setClause.embudo_personalizado = embudoNuevo;
-    const metricsExisting = (data.metricas_config ?? []) as MetricaConfig[];
+    const metricsExisting = [...(data.metricas_config ?? [])] as MetricaConfig[];
     for (const etapa of embudoNuevo) {
       if (etapa.es_fija !== true) {
         const metricId = `embudo-${etapa.id}`;
@@ -192,12 +192,15 @@ export async function updateSystemConfig(
         }
       }
     }
-    setClause.metricas_config = metricsExisting;
+    const idsEtapasVigentes = new Set(embudoNuevo.map((e) => `embudo-${e.id}`));
+    setClause.metricas_config = metricsExisting.filter(
+      (m) => m.tipo !== "embudo_etapa" || idsEtapasVigentes.has(m.id),
+    );
   }
   if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
   if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
   if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
-  if (data.metricas_config !== undefined) setClause.metricas_config = data.metricas_config;
+  if (data.metricas_config !== undefined && data.embudo_personalizado === undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;
   if (data.configuracion_ads !== undefined) setClause.configuracion_ads = data.configuracion_ads;
   if (data.categorias_llamadas !== undefined) setClause.categorias_llamadas = data.categorias_llamadas;
