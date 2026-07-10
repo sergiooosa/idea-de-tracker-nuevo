@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { chatsLogs, cuentas, registrosDeLlamada } from "@/lib/db/schema";
 import type { ChatMessage, MetricaConfig, ChatMetricaCampo } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, isNull, or, desc, getTableColumns } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import type {
   ApiChatLead,
   ChatsAdvisorMetrics,
@@ -122,8 +123,8 @@ export async function getChats(
   closerEmails?: string[],
 ): Promise<ChatsResponse> {
   const emailsLower = (closerEmails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
-  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+  const [tzRow] = await db.select({ zona_horaria_iana: cuentas.zona_horaria_iana }).from(cuentas).where(eq(cuentas.id_cuenta, idCuenta)).limit(1);
+  const { fromDate, toDate } = zonedDayRange(dateFrom, dateTo, tzRow?.zona_horaria_iana);
 
   const [[cuentaRow], rows] = await Promise.all([
     db

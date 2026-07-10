@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbudoEtapas, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
+import { zonedDayRange } from "@/lib/date-range";
 import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, or, gte, lte, isNull, isNotNull, sql } from "drizzle-orm";
 
@@ -68,14 +69,13 @@ export async function getAcquisition(
   dateFrom: string,
   dateTo: string,
 ): Promise<AcquisitionResponse> {
-  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
-  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
-
   const [cuentaRow] = await db
-    .select({ embudo_personalizado: cuentas.embudo_personalizado })
+    .select({ embudo_personalizado: cuentas.embudo_personalizado, zona_horaria_iana: cuentas.zona_horaria_iana })
     .from(cuentas)
     .where(eq(cuentas.id_cuenta, idCuenta))
     .limit(1);
+
+  const { fromDate, toDate } = zonedDayRange(dateFrom, dateTo, cuentaRow?.zona_horaria_iana);
 
   const embudoRaw: EmbudoEtapa[] | null = Array.isArray(cuentaRow?.embudo_personalizado)
     ? normalizeEmbudoEtapas(cuentaRow.embudo_personalizado)
