@@ -4,6 +4,7 @@ import type { EmbudoEtapa, MetricaConfig } from "@/lib/db/schema";
 import { normalizeEmbudoEtapas } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, parseMetricasConfig, type MetricaEngineContext } from "@/lib/metricas-engine";
 import { eq, and, or, gt, gte, lte, sql, inArray, isNull, isNotNull } from "drizzle-orm";
+import { zonedDayRange } from "@/lib/date-range";
 import type {
   ApiVideollamada,
   VideollamadasAdvisorMetrics,
@@ -102,8 +103,21 @@ export async function getVideollamadas(
   //   Una cita pendiente es prospectiva; excluirla por ser futura hace que no aparezca
   //   en el período en que se agendó. Mismo criterio que /dashboard (AUT-374).
   // Caso 3: sin fecha_reunion → usa fecha de inserción
-  const fromDate = new Date(`${dateFrom}T00:00:00Z`);
-  const toDate = new Date(`${dateTo}T23:59:59.999Z`);
+  // AUT-1446: los límites del día se interpretan en la zona horaria del tenant
+  // (no en UTC). Necesitamos la zona antes de construir el rango, por eso la
+  // fila de `cuentas` se obtiene aquí en lugar de dentro del Promise.all de abajo.
+  const [cuentaRow] = await db
+    .select({
+      embudo_personalizado: cuentas.embudo_personalizado,
+      metricas_config: cuentas.metricas_config,
+      metricas_manual_data: cuentas.metricas_manual_data,
+      zona_horaria_iana: cuentas.zona_horaria_iana,
+    })
+    .from(cuentas)
+    .where(eq(cuentas.id_cuenta, idCuenta))
+    .limit(1);
+
+  const { fromDate, toDate } = zonedDayRange(dateFrom, dateTo, cuentaRow?.zona_horaria_iana);
   const fechaFilter = or(
     and(
       isNotNull(resumenesDiariosAgendas.fecha_reunion),
@@ -136,16 +150,7 @@ export async function getVideollamadas(
   }
   if (closerValues.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, closerValues));
 
-  const [[cuentaRow], rows, effectiveCalls] = await Promise.all([
-    db
-      .select({
-        embudo_personalizado: cuentas.embudo_personalizado,
-        metricas_config: cuentas.metricas_config,
-        metricas_manual_data: cuentas.metricas_manual_data,
-      })
-      .from(cuentas)
-      .where(eq(cuentas.id_cuenta, idCuenta))
-      .limit(1),
+  const [rows, effectiveCalls] = await Promise.all([
     db
       .select()
       .from(resumenesDiariosAgendas)
