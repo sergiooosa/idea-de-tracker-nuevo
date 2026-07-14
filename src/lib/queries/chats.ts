@@ -377,7 +377,11 @@ export function computeKeywordMetricaValue(
   chats: ApiChatLead[],
   config: MetricaConfig,
 ): number {
-  const keywords = config.keywords ?? [];
+  // Sanitizar: descartar keywords vacías o solo-espacios. Una cadena vacía
+  // produce el patrón \b\b (match de ancho cero) que en countMode="ocurrencias"
+  // deja regex.lastIndex sin avanzar → loop infinito síncrono que congela el
+  // render. Filtrar aquí protege el path de config persistida (la UI ya valida).
+  const keywords = (config.keywords ?? []).map((k) => k.trim()).filter((k) => k.length > 0);
   const matchScope: KeywordMatchScope = config.matchScope ?? "mensajes_lead";
   const countMode: KeywordCountMode = config.countMode ?? "chats";
   const normalizeAccents = config.normalizeAccents !== false;
