@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail, MessageSquare, PhoneCall } from "lucide-react";
 import { useApiData } from "@/hooks/useApiData";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import type { CanalLeadsEnEspera } from "@/lib/queries/leads-en-espera";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -14,6 +15,7 @@ export interface LeadEnEspera {
   min_sin_llamar: number;
   phone: string | null;
   mail_lead: string | null;
+  canal_origen?: "llamada" | "chat";
 }
 
 export interface CloserConLeadsEnEspera {
@@ -27,6 +29,7 @@ export interface LeadsEnEsperaResponse {
   grupos: CloserConLeadsEnEspera[];
   total: number;
   umbral_min: number;
+  canal: CanalLeadsEnEspera;
 }
 
 function formatTiempoEspera(minutos: number): string {
@@ -60,13 +63,56 @@ const URGENCIA_STYLES: Record<UrgenciaNivel, { badge: string; dot: string }> = {
   },
 };
 
-function LeadRow({ lead, asesorBasePath }: { lead: LeadEnEspera; asesorBasePath: string }) {
+const CANAL_OPTIONS: { value: CanalLeadsEnEspera; label: string; icon: typeof Phone }[] = [
+  { value: "llamada", label: "Llamada", icon: PhoneCall },
+  { value: "chat", label: "Chat", icon: MessageSquare },
+  { value: "general", label: "Todo", icon: AlertCircle },
+];
+
+const CANAL_SUBTITULO: Record<CanalLeadsEnEspera, string> = {
+  llamada: "primera llamada",
+  chat: "primera respuesta en chat",
+  general: "primer contacto",
+};
+
+function CanalSelector({ canal, onChange }: { canal: CanalLeadsEnEspera; onChange: (c: CanalLeadsEnEspera) => void }) {
+  return (
+    <div className="flex rounded-lg border border-white/10 bg-slate-800/80 p-0.5">
+      {CANAL_OPTIONS.map((opt) => {
+        const Icon = opt.icon;
+        const active = canal === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              active
+                ? "bg-slate-600 text-slate-100 shadow-sm"
+                : "text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LeadRow({ lead, asesorBasePath, canal }: { lead: LeadEnEspera; asesorBasePath: string; canal: CanalLeadsEnEspera }) {
   const urgencia = getUrgencia(lead.min_sin_llamar);
   const styles = URGENCIA_STYLES[urgencia];
   const contactInfo = lead.phone ?? lead.mail_lead;
   const asesorLink = lead.closer_mail
     ? `${asesorBasePath}?advisor=${encodeURIComponent(lead.closer_mail)}`
     : null;
+
+  const badgeLabel = canal === "chat"
+    ? "sin responder"
+    : canal === "general" && lead.canal_origen === "chat"
+      ? "sin responder"
+      : "sin llamar";
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm">
@@ -81,6 +127,15 @@ function LeadRow({ lead, asesorBasePath }: { lead: LeadEnEspera; asesorBasePath:
             </span>
           )}
         </div>
+        {canal === "general" && lead.canal_origen && (
+          <span className={`hidden shrink-0 rounded px-1.5 py-0.5 text-xs sm:inline ${
+            lead.canal_origen === "chat"
+              ? "bg-blue-500/15 text-blue-400"
+              : "bg-green-500/15 text-green-400"
+          }`}>
+            {lead.canal_origen === "chat" ? "Chat" : "Llamada"}
+          </span>
+        )}
         {lead.creativo_origen && (
           <span className="hidden shrink-0 rounded px-1.5 py-0.5 text-xs bg-slate-700 text-slate-400 sm:inline">
             {lead.creativo_origen}
@@ -96,7 +151,7 @@ function LeadRow({ lead, asesorBasePath }: { lead: LeadEnEspera; asesorBasePath:
         <span
           className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${styles.badge}`}
         >
-          {formatTiempoEspera(lead.min_sin_llamar)} sin llamar
+          {formatTiempoEspera(lead.min_sin_llamar)} {badgeLabel}
         </span>
         {asesorLink && (
           <Link
@@ -113,7 +168,7 @@ function LeadRow({ lead, asesorBasePath }: { lead: LeadEnEspera; asesorBasePath:
   );
 }
 
-function CloserCard({ grupo, asesorBasePath }: { grupo: CloserConLeadsEnEspera; asesorBasePath: string }) {
+function CloserCard({ grupo, asesorBasePath, canal }: { grupo: CloserConLeadsEnEspera; asesorBasePath: string; canal: CanalLeadsEnEspera }) {
   const [expandido, setExpandido] = useState(false);
   const urgenciaMayor = getUrgencia(grupo.lead_mas_antiguo_min);
   const styles = URGENCIA_STYLES[urgenciaMayor];
@@ -154,7 +209,7 @@ function CloserCard({ grupo, asesorBasePath }: { grupo: CloserConLeadsEnEspera; 
       {expandido && (
         <div className="border-t border-white/10 px-4 py-3 space-y-2">
           {grupo.leads.map((lead, i) => (
-            <LeadRow key={`${lead.nombre_lead}-${i}`} lead={lead} asesorBasePath={asesorBasePath} />
+            <LeadRow key={`${lead.nombre_lead}-${i}`} lead={lead} asesorBasePath={asesorBasePath} canal={canal} />
           ))}
         </div>
       )}
@@ -163,11 +218,12 @@ function CloserCard({ grupo, asesorBasePath }: { grupo: CloserConLeadsEnEspera; 
 }
 
 export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
+  const [canal, setCanal] = useState<CanalLeadsEnEspera>("llamada");
   const pathname = usePathname();
   const asesorBasePath = pathname.replace(/\/[^/]*$/, "/asesor");
   const { data, loading, error } = useApiData<LeadsEnEsperaResponse>(
     "/api/data/leads-en-espera",
-    { from: dateFrom, to: dateTo },
+    { from: dateFrom, to: dateTo, canal },
   );
 
   if (loading) {
@@ -184,11 +240,19 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
   if (error) return null;
   if (!data || data.total === 0) {
     return (
-      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-4 flex items-center gap-3">
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-        <span className="text-sm text-emerald-300">
-          Todo al día — ningún lead lleva más de {data?.umbral_min ?? 60} min sin contacto inicial.
-        </span>
+      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+            <h2 className="text-base font-semibold text-slate-100">Leads sin contacto inicial</h2>
+          </div>
+          <CanalSelector canal={canal} onChange={setCanal} />
+        </div>
+        <div className="px-5 py-4">
+          <span className="text-sm text-emerald-300">
+            Todo al día — ningún lead lleva más de {data?.umbral_min ?? 60} min sin {CANAL_SUBTITULO[canal]}.
+          </span>
+        </div>
       </div>
     );
   }
@@ -206,15 +270,18 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
             {data.total}
           </span>
         </div>
-        <p className="hidden text-xs text-slate-500 sm:block">
-          Llevan más de {data.umbral_min} min esperando primera llamada
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="hidden text-xs text-slate-500 sm:block">
+            Llevan más de {data.umbral_min} min esperando {CANAL_SUBTITULO[canal]}
+          </p>
+          <CanalSelector canal={canal} onChange={setCanal} />
+        </div>
       </div>
 
       {/* Grupos por closer */}
       <div className="p-4 space-y-3">
         {data.grupos.map((grupo) => (
-          <CloserCard key={grupo.closer_mail ?? grupo.nombre_closer} grupo={grupo} asesorBasePath={asesorBasePath} />
+          <CloserCard key={grupo.closer_mail ?? grupo.nombre_closer} grupo={grupo} asesorBasePath={asesorBasePath} canal={canal} />
         ))}
       </div>
     </section>
