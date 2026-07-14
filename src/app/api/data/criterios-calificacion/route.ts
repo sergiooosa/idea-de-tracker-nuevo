@@ -19,6 +19,12 @@ async function getCuentaApiKey(idCuenta: number): Promise<string | null> {
 type Canal = "chats" | "llamadas" | "videollamadas";
 const CANALES: Canal[] = ["chats", "llamadas", "videollamadas"];
 
+interface CategoriaCustom {
+  slug: string;
+  label: string;
+  descripcion: string;
+}
+
 interface CerebroCriterios {
   categorias_calificadas: string[];
   umbral_minimo: number;
@@ -27,6 +33,7 @@ interface CerebroCriterios {
     llamadas?: { categorias_calificadas: string[]; umbral_minimo: number };
     videollamadas?: { categorias_calificadas: string[]; umbral_minimo: number };
   };
+  categorias_custom?: CategoriaCustom[];
 }
 
 interface DashboardCanales {
@@ -38,9 +45,10 @@ interface DashboardCanales {
 function cerebroToDashboard(c: CerebroCriterios | null): {
   categorias: string[] | null;
   canales: DashboardCanales;
+  categoriasCustom: CategoriaCustom[];
 } {
   if (!c) {
-    return { categorias: null, canales: { chats: null, llamadas: null, videollamadas: null } };
+    return { categorias: null, canales: { chats: null, llamadas: null, videollamadas: null }, categoriasCustom: [] };
   }
   const canales: DashboardCanales = { chats: null, llamadas: null, videollamadas: null };
   for (const canal of CANALES) {
@@ -52,17 +60,20 @@ function cerebroToDashboard(c: CerebroCriterios | null): {
   return {
     categorias: c.categorias_calificadas.length > 0 ? c.categorias_calificadas : null,
     canales,
+    categoriasCustom: c.categorias_custom ?? [],
   };
 }
 
 function dashboardToCerebro(
   categorias: string[] | null,
   canales: DashboardCanales | undefined,
+  categoriasCustom?: CategoriaCustom[],
 ): CerebroCriterios | null {
   const hasGlobal = categorias && categorias.length > 0;
   const hasCanales = canales && CANALES.some((c) => canales[c] && canales[c]!.length > 0);
+  const hasCustom = categoriasCustom && categoriasCustom.length > 0;
 
-  if (!hasGlobal && !hasCanales) return null;
+  if (!hasGlobal && !hasCanales && !hasCustom) return null;
 
   const result: CerebroCriterios = {
     categorias_calificadas: categorias ?? [],
@@ -77,6 +88,10 @@ function dashboardToCerebro(
         result.canales[canal] = { categorias_calificadas: cats, umbral_minimo: 1 };
       }
     }
+  }
+
+  if (hasCustom) {
+    result.categorias_custom = categoriasCustom;
   }
 
   return result;
@@ -112,7 +127,7 @@ export async function GET(req: Request) {
       console.warn("[criterios-calificacion] No se pudo consultar Cerebro:", err);
     }
 
-    const { categorias, canales } = cerebroToDashboard(criteriosRaw);
+    const { categorias, canales, categoriasCustom } = cerebroToDashboard(criteriosRaw);
 
     const categoriasRows = await db
       .selectDistinct({ cat: chatsLogs.ia_categoria })
@@ -125,7 +140,7 @@ export async function GET(req: Request) {
       .map((r) => r.cat)
       .filter((c): c is string => c != null && c.trim().length > 0);
 
-    return NextResponse.json({ categorias, canales, categoriasDisponibles });
+    return NextResponse.json({ categorias, canales, categoriasDisponibles, categoriasCustom });
   });
 }
 
@@ -145,9 +160,10 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "categorias requerido" }, { status: 400 });
     }
 
-    const { categorias, canales } = body as {
+    const { categorias, canales, categoriasCustom } = body as {
       categorias: string[] | null;
       canales?: DashboardCanales;
+      categoriasCustom?: CategoriaCustom[];
     };
     if (categorias !== null && !Array.isArray(categorias)) {
       return NextResponse.json({ error: "categorias debe ser un array o null" }, { status: 400 });
@@ -161,7 +177,7 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const cerebroPayload = dashboardToCerebro(categorias, canales);
+    const cerebroPayload = dashboardToCerebro(categorias, canales, categoriasCustom);
 
     const cerebroRes = await fetch(
       `${API_BASE_URL}/api/cuentas/${idCuenta}/criterios-calificacion`,
