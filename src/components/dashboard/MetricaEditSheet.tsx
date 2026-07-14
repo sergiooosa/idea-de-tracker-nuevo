@@ -8,6 +8,8 @@ import type {
   MetricaFormulaConfig,
   MetricaManualEntry,
   ChatMetricaCampo,
+  KeywordMatchScope,
+  KeywordCountMode,
 } from "@/lib/db/schema";
 import SelectorFuenteConBusqueda from "./SelectorFuenteConBusqueda";
 
@@ -128,6 +130,11 @@ export default function MetricaEditSheet({
   const [webhookCamposDisponibles, setWebhookCamposDisponibles] = useState<string[]>([]);
   const [chatCampo, setChatCampo] = useState<ChatMetricaCampo>("total_mensajes");
   const [chatAgregacion, setChatAgregacion] = useState<NonNullable<MetricaConfig["chatAgregacion"]>>("suma");
+  const [chatSubtipo, setChatSubtipo] = useState<"standard" | "conteo_keyword">("standard");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [matchScope, setMatchScope] = useState<KeywordMatchScope>("mensajes_lead");
+  const [countMode, setCountMode] = useState<KeywordCountMode>("chats");
   const [formato, setFormato] = useState<MetricaConfig["formato"]>("numero");
   const [color, setColor] = useState<string>("green");
 
@@ -197,6 +204,11 @@ export default function MetricaEditSheet({
       setWebhookCampo(editingMetric.webhookCampo ?? "");
       setChatCampo(editingMetric.chatCampo ?? "total_mensajes");
       setChatAgregacion(editingMetric.chatAgregacion ?? "suma");
+      setChatSubtipo(editingMetric.chatSubtipo === "conteo_keyword" ? "conteo_keyword" : "standard");
+      setKeywords(editingMetric.keywords ?? []);
+      setKeywordInput("");
+      setMatchScope(editingMetric.matchScope ?? "mensajes_lead");
+      setCountMode(editingMetric.countMode ?? "chats");
     } else {
       setNombre("");
       setDescripcion("");
@@ -222,6 +234,11 @@ export default function MetricaEditSheet({
       setWebhookCampo("");
       setChatCampo("total_mensajes");
       setChatAgregacion("suma");
+      setChatSubtipo(tipoInicial === "chat" ? "standard" : "standard");
+      setKeywords([]);
+      setKeywordInput("");
+      setMatchScope("mensajes_lead");
+      setCountMode("chats");
     }
     setNuevaEntrada({});
   }, [editingMetric, tipoInicial, metricasManualData]);
@@ -292,7 +309,19 @@ export default function MetricaEditSheet({
     };
 
     if (tipo === "chat") {
-      config = { ...base, tipo: "chat" as const, chatCampo, chatAgregacion };
+      if (chatSubtipo === "conteo_keyword") {
+        config = {
+          ...base,
+          tipo: "chat" as const,
+          chatSubtipo: "conteo_keyword" as const,
+          keywords,
+          matchScope,
+          countMode,
+          normalizeAccents: true,
+        };
+      } else {
+        config = { ...base, tipo: "chat" as const, chatCampo, chatAgregacion };
+      }
       onSave(config);
       setSaving(false);
       onClose();
@@ -368,7 +397,7 @@ export default function MetricaEditSheet({
   const canSave =
     !!nombre.trim() &&
     (tipo === "chat"
-      ? !!chatCampo
+      ? (chatSubtipo === "conteo_keyword" ? keywords.length > 0 : !!chatCampo)
       : tipo === "webhook"
         ? !!webhookCampo.trim()
         : tipo === "fija"
@@ -612,37 +641,157 @@ export default function MetricaEditSheet({
 
           {tipo === "chat" && (
             <div className="space-y-3">
-              <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-1">
-                <p className="text-white font-medium">¿Cómo funciona?</p>
-                <p>Selecciona un campo de las conversaciones de chat y cómo quieres agregar ese valor en el período seleccionado.</p>
-              </div>
               <div>
-                <label className="block text-xs font-medium text-accent-cyan mb-1">Campo del chat *</label>
-                <select
-                  value={chatCampo}
-                  onChange={(e) => setChatCampo(e.target.value as ChatMetricaCampo)}
-                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
-                >
-                  {CHAT_CAMPOS.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-gray-500">
-                  {CHAT_CAMPOS.find((c) => c.value === chatCampo)?.desc}
-                </p>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Subtipo de métrica de chat</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChatSubtipo("standard")}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                      chatSubtipo === "standard"
+                        ? "bg-accent-cyan/20 text-accent-cyan border-accent-cyan/50"
+                        : "bg-surface-700 text-gray-400 border-surface-500 hover:border-accent-cyan/30"
+                    }`}
+                  >
+                    Campo del chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatSubtipo("conteo_keyword")}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                      chatSubtipo === "conteo_keyword"
+                        ? "bg-accent-purple/20 text-accent-purple border-accent-purple/50"
+                        : "bg-surface-700 text-gray-400 border-surface-500 hover:border-accent-purple/30"
+                    }`}
+                  >
+                    Conteo de palabra clave
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-accent-cyan mb-1">Tipo de agregación</label>
-                <select
-                  value={chatAgregacion}
-                  onChange={(e) => setChatAgregacion(e.target.value as NonNullable<MetricaConfig["chatAgregacion"]>)}
-                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
-                >
-                  {CHAT_AGREGACIONES.map((a) => (
-                    <option key={a.value} value={a.value}>{a.label}</option>
-                  ))}
-                </select>
-              </div>
+
+              {chatSubtipo === "standard" && (
+                <>
+                  <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-1">
+                    <p className="text-white font-medium">¿Cómo funciona?</p>
+                    <p>Selecciona un campo de las conversaciones de chat y cómo quieres agregar ese valor en el período seleccionado.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-cyan mb-1">Campo del chat *</label>
+                    <select
+                      value={chatCampo}
+                      onChange={(e) => setChatCampo(e.target.value as ChatMetricaCampo)}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+                    >
+                      {CHAT_CAMPOS.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      {CHAT_CAMPOS.find((c) => c.value === chatCampo)?.desc}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-cyan mb-1">Tipo de agregación</label>
+                    <select
+                      value={chatAgregacion}
+                      onChange={(e) => setChatAgregacion(e.target.value as NonNullable<MetricaConfig["chatAgregacion"]>)}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white"
+                    >
+                      {CHAT_AGREGACIONES.map((a) => (
+                        <option key={a.value} value={a.value}>{a.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {chatSubtipo === "conteo_keyword" && (
+                <>
+                  <div className="rounded-lg bg-accent-purple/5 border border-accent-purple/20 p-3 text-xs text-gray-400 space-y-1">
+                    <p className="text-white font-medium">Conteo de palabra clave</p>
+                    <p>Cuenta cuántos chats (o cuántas ocurrencias) contienen las palabras/frases que definas. Búsqueda sin acentos y case-insensitive.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-purple mb-1">Palabras clave *</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={keywordInput}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const kw = keywordInput.trim();
+                            if (kw && !keywords.includes(kw.toLowerCase())) {
+                              setKeywords((prev) => [...prev, kw.toLowerCase()]);
+                              setKeywordInput("");
+                            }
+                          }
+                        }}
+                        placeholder="Escribe y presiona Enter"
+                        className="flex-1 rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white text-xs focus:ring-2 focus:ring-accent-purple/40"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const kw = keywordInput.trim();
+                          if (kw && !keywords.includes(kw.toLowerCase())) {
+                            setKeywords((prev) => [...prev, kw.toLowerCase()]);
+                            setKeywordInput("");
+                          }
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple border border-accent-purple/50 text-xs font-medium hover:bg-accent-purple/30"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {keywords.map((kw) => (
+                          <span
+                            key={kw}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-purple/15 text-accent-purple text-[11px] border border-accent-purple/30"
+                          >
+                            {kw}
+                            <button
+                              type="button"
+                              onClick={() => setKeywords((prev) => prev.filter((k) => k !== kw))}
+                              className="hover:text-red-400"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {keywords.length === 0 && (
+                      <p className="text-[10px] text-amber-400 mt-1">Agrega al menos una palabra clave.</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-purple mb-1">Alcance de búsqueda</label>
+                    <select
+                      value={matchScope}
+                      onChange={(e) => setMatchScope(e.target.value as KeywordMatchScope)}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white text-xs"
+                    >
+                      <option value="mensajes_lead">Solo mensajes del lead</option>
+                      <option value="todo_el_chat">Todo el chat (lead + agente)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-accent-purple mb-1">Modo de conteo</label>
+                    <select
+                      value={countMode}
+                      onChange={(e) => setCountMode(e.target.value as KeywordCountMode)}
+                      className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-white text-xs"
+                    >
+                      <option value="chats">Chats que contienen la palabra (1 por chat)</option>
+                      <option value="ocurrencias">Total de ocurrencias (puede ser +1 por chat)</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

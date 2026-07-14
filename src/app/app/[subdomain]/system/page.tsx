@@ -305,7 +305,7 @@ export default function SystemPage() {
   const [metricasConfig, setMetricasConfig] = useState<MetricaConfig[]>([]);
   const [metricasManualData, setMetricasManualData] = useState<Record<string, MetricaManualEntry[]>>({});
   const [metricasSheetOpen, setMetricasSheetOpen] = useState(false);
-  const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija' | 'webhook'>('manual');
+  const [metricasSheetTipo, setMetricasSheetTipo] = useState<'manual' | 'automatica' | 'fija' | 'webhook' | 'chat'>('manual');
   const [cerradasCuentanComoCal, setCerradasCuentanComoCal] = useState(true);
   const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
@@ -468,7 +468,7 @@ export default function SystemPage() {
       const m = metricasConfig.find((x) => x.id === editParam);
       if (m) {
         setMetricasEditingId(m.id);
-        setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook');
+        setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook' | 'chat');
         setMetricasSheetOpen(true);
       }
     }
@@ -1414,7 +1414,7 @@ export default function SystemPage() {
                           m={m}
                           onEdit={() => {
                             setMetricasEditingId(m.id);
-                            setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook');
+                            setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook' | 'chat');
                             setMetricasSheetOpen(true);
                           }}
                           onDelete={() => {
@@ -1468,6 +1468,17 @@ export default function SystemPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/50 hover:bg-accent-purple/30"
                 >
                   <Plus className="w-4 h-4" /> Webhook / Ads
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMetricasEditingId(null);
+                    setMetricasSheetTipo('chat');
+                    setMetricasSheetOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500/20 text-amber-400 border border-amber-500/50 hover:bg-amber-500/30"
+                >
+                  <Plus className="w-4 h-4" /> Chat
                 </button>
               </div>
               {metricasDeleteConfirm && (
