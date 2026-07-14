@@ -19,10 +19,17 @@ interface CanalesState {
   videollamadas: string[] | null;
 }
 
+interface CategoriaCustom {
+  slug: string;
+  label: string;
+  descripcion: string;
+}
+
 interface CriteriosCalificacionData {
   categorias: string[] | null;
   canales: CanalesState;
   categoriasDisponibles: string[];
+  categoriasCustom: CategoriaCustom[];
 }
 
 const TABS_CONFIG: { id: CriteriosTab; label: string; icon: typeof Sparkles; helpTitulo: string; helpContenido: string; helpProbar: string }[] = [
@@ -119,6 +126,10 @@ export default function ConfiguracionPage() {
   const [criteriosSaving, setCriteriosSaving] = useState(false);
   const [criteriosLoaded, setCriteriosLoaded] = useState(false);
   const [criteriosTab, setCriteriosTab] = useState<CriteriosTab>("global");
+  const [categoriasCustom, setCategoriasCustom] = useState<CategoriaCustom[]>([]);
+  const [modalCustom, setModalCustom] = useState<"create" | "edit" | null>(null);
+  const [editingCustomIdx, setEditingCustomIdx] = useState<number>(-1);
+  const [formCustom, setFormCustom] = useState<{ label: string; descripcion: string }>({ label: "", descripcion: "" });
 
   // Canales activos
   const [canales, setCanales] = useState<CanalesActivosData>({ chats: false, llamadas: false, videollamadas: false });
@@ -134,6 +145,7 @@ export default function ConfiguracionPage() {
         setCriteriosData(data);
         setCriteriosSeleccionados(data.categorias ?? []);
         setCriteriosCanales(data.canales ?? { chats: null, llamadas: null, videollamadas: null });
+        setCategoriasCustom(data.categoriasCustom ?? []);
         setCriteriosLoaded(true);
       }
     } catch { /* ignore */ }
@@ -367,6 +379,7 @@ export default function ConfiguracionPage() {
         body: JSON.stringify({
           categorias: criteriosSeleccionados.length > 0 ? criteriosSeleccionados : null,
           canales: criteriosCanales,
+          categoriasCustom: categoriasCustom.length > 0 ? categoriasCustom : undefined,
         }),
       });
       if (!res.ok) throw new Error("Error al guardar");
@@ -413,6 +426,70 @@ export default function ConfiguracionPage() {
       });
     }
   };
+
+  const slugify = (text: string): string =>
+    text.toLowerCase().trim().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+
+  const openCreateCustom = () => {
+    setFormCustom({ label: "", descripcion: "" });
+    setEditingCustomIdx(-1);
+    setModalCustom("create");
+  };
+
+  const openEditCustom = (idx: number) => {
+    const cat = categoriasCustom[idx];
+    setFormCustom({ label: cat.label, descripcion: cat.descripcion });
+    setEditingCustomIdx(idx);
+    setModalCustom("edit");
+  };
+
+  const handleSubmitCustom = () => {
+    const label = formCustom.label.trim();
+    const descripcion = formCustom.descripcion.trim();
+    if (!label) return;
+    const slug = slugify(label);
+    if (!slug) return;
+
+    if (modalCustom === "create") {
+      const exists = categoriasCustom.some((c) => c.slug === slug);
+      if (exists) {
+        toast.error("Ya existe un criterio con ese nombre");
+        return;
+      }
+      setCategoriasCustom((prev) => [...prev, { slug, label, descripcion }]);
+    } else if (modalCustom === "edit" && editingCustomIdx >= 0) {
+      const exists = categoriasCustom.some((c, i) => c.slug === slug && i !== editingCustomIdx);
+      if (exists) {
+        toast.error("Ya existe un criterio con ese nombre");
+        return;
+      }
+      setCategoriasCustom((prev) =>
+        prev.map((c, i) => (i === editingCustomIdx ? { slug, label, descripcion } : c)),
+      );
+    }
+    setModalCustom(null);
+  };
+
+  const handleDeleteCustom = (idx: number) => {
+    const cat = categoriasCustom[idx];
+    setCategoriasCustom((prev) => prev.filter((_, i) => i !== idx));
+    setCriteriosSeleccionados((prev) => prev.filter((s) => s !== cat.slug));
+    setCriteriosCanales((prev) => {
+      const updated = { ...prev };
+      for (const canal of ["chats", "llamadas", "videollamadas"] as Canal[]) {
+        if (updated[canal]) {
+          const filtered = updated[canal]!.filter((s) => s !== cat.slug);
+          updated[canal] = filtered.length > 0 ? filtered : null;
+        }
+      }
+      return updated;
+    });
+  };
+
+  const allCategoriasDisponibles = [
+    ...(criteriosData?.categoriasDisponibles ?? []),
+    ...categoriasCustom.map((c) => c.slug),
+  ];
 
   const getSeleccionados = (): string[] => {
     if (criteriosTab === "global") return criteriosSeleccionados;
@@ -592,8 +669,8 @@ export default function ConfiguracionPage() {
               </div>
             </div>
 
-            {criteriosData?.categoriasDisponibles.length === 0 ? (
-              <div className="rounded-xl border border-accent-purple/20 bg-accent-purple/5 p-4 space-y-2">
+            {criteriosData?.categoriasDisponibles.length === 0 && categoriasCustom.length === 0 ? (
+              <div className="rounded-xl border border-accent-purple/20 bg-accent-purple/5 p-4 space-y-3">
                 <p className="text-sm font-medium text-accent-purple">
                   Define qué intereses detectados por IA califican como leads para tu negocio
                 </p>
@@ -601,6 +678,13 @@ export default function ConfiguracionPage() {
                   Cuando la IA analice las conversaciones nocturnas, verás aquí las categorías detectadas y podrás seleccionar cuáles considerarás leads calificados.
                   Por ahora no hay categorías disponibles — el análisis nocturno aún no ha procesado conversaciones.
                 </p>
+                <button
+                  type="button"
+                  onClick={openCreateCustom}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-purple/20 text-accent-purple text-xs font-medium border border-accent-purple/30 hover:bg-accent-purple/30 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Agregar criterio personalizado
+                </button>
               </div>
             ) : (
               <>
@@ -668,25 +752,68 @@ export default function ConfiguracionPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2 mb-4">
-                        {criteriosData?.categoriasDisponibles.map((cat) => {
+                        {allCategoriasDisponibles.map((cat) => {
                           const isSelected = selected.includes(cat);
+                          const customDef = categoriasCustom.find((c) => c.slug === cat);
+                          const displayLabel = customDef
+                            ? customDef.label
+                            : cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
                           return (
                             <button
                               key={cat}
                               type="button"
                               onClick={() => toggleCriterio(cat)}
+                              title={customDef?.descripcion}
                               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                                 isSelected
                                   ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
                                   : "bg-surface-700 text-gray-400 border-surface-500 hover:border-emerald-500/30 hover:text-gray-300"
-                              }`}
+                              } ${customDef ? "ring-1 ring-accent-purple/30" : ""}`}
                             >
                               {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                              {cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()}
+                              {displayLabel}
+                              {customDef && <Sparkles className="w-3 h-3 text-accent-purple/60" />}
                             </button>
                           );
                         })}
                       </div>
+
+                      {/* Custom categories list */}
+                      {categoriasCustom.length > 0 && (
+                        <div className="mb-4 space-y-1.5">
+                          <p className="text-[11px] text-gray-500 uppercase tracking-wide font-medium mb-1.5">Criterios personalizados</p>
+                          {categoriasCustom.map((cat, idx) => (
+                            <div key={cat.slug} className="flex items-center justify-between rounded-lg bg-surface-700/60 border border-accent-purple/20 px-3 py-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Sparkles className="w-3 h-3 text-accent-purple shrink-0" />
+                                  <span className="text-xs font-medium text-white">{cat.label}</span>
+                                  <span className="text-[10px] text-gray-500">({cat.slug})</span>
+                                </div>
+                                {cat.descripcion && (
+                                  <p className="text-[11px] text-gray-400 mt-0.5 ml-[18px] line-clamp-2">{cat.descripcion}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditCustom(idx)}
+                                  className="p-1 rounded hover:bg-surface-600 text-gray-400 hover:text-accent-cyan"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustom(idx)}
+                                  className="p-1 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-3">
                         <button
@@ -697,6 +824,13 @@ export default function ConfiguracionPage() {
                         >
                           {criteriosSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                           Guardar criterios
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openCreateCustom}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-purple/20 text-accent-purple text-xs font-medium border border-accent-purple/30 hover:bg-accent-purple/30 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Agregar criterio
                         </button>
                         {selected.length > 0 && (
                           <span className="text-xs text-gray-400">
@@ -1050,6 +1184,67 @@ export default function ConfiguracionPage() {
           </div>
         </div>
       )}
+      {modalCustom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalCustom(null)} aria-hidden />
+          <div className="relative w-full max-w-md rounded-xl bg-surface-800 border border-surface-500 shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-surface-500">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-accent-purple" />
+                {modalCustom === "edit" ? "Editar criterio" : "Agregar criterio personalizado"}
+              </h3>
+              <button type="button" onClick={() => setModalCustom(null)} className="p-1.5 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Nombre del criterio</label>
+                <input
+                  type="text"
+                  value={formCustom.label}
+                  onChange={(e) => setFormCustom((f) => ({ ...f, label: e.target.value }))}
+                  placeholder="Ej: Interesado en compra"
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-purple/40"
+                />
+                {formCustom.label.trim() && (
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Slug: <code className="bg-surface-700 px-1 rounded">{slugify(formCustom.label)}</code>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Explicación (qué significa este criterio)</label>
+                <textarea
+                  value={formCustom.descripcion}
+                  onChange={(e) => setFormCustom((f) => ({ ...f, descripcion: e.target.value }))}
+                  placeholder="Describe cuándo un lead debería recibir esta categoría. La IA usará esta explicación para clasificar las conversaciones."
+                  rows={3}
+                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-purple/40 resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalCustom(null)}
+                  className="flex-1 px-3 py-2 rounded-lg bg-surface-600 text-gray-300 text-sm font-medium hover:bg-surface-500"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitCustom}
+                  disabled={!formCustom.label.trim()}
+                  className="flex-1 px-3 py-2 rounded-lg bg-accent-purple text-white text-sm font-semibold hover:bg-accent-purple/90 disabled:opacity-50"
+                >
+                  {modalCustom === "edit" ? "Guardar" : "Agregar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {provisionalPassword && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
           <div className="bg-surface-800 rounded-2xl border border-surface-600 p-6 w-full max-w-md shadow-xl">
