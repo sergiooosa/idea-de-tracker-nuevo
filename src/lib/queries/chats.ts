@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { chatsLogs, cuentas, registrosDeLlamada } from "@/lib/db/schema";
-import type { ChatMessage, MetricaConfig, ChatMetricaCampo } from "@/lib/db/schema";
+import type { ChatMessage, MetricaConfig, ChatMetricaCampo, KeywordMatchScope, KeywordCountMode } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, isNull, or, desc, getTableColumns } from "drizzle-orm";
 import { zonedDayRange } from "@/lib/date-range";
 import type {
@@ -331,21 +331,125 @@ export function agregarChatValues(values: (number | null)[], agregacion: Metrica
   }
 }
 
+// ─── Keyword matching (mirrors Cerebro's computeKeywordMetrica) ─────────────
+
+const ACCENT_MAP: Record<string, string> = {
+  á: "a", é: "e", í: "i", ó: "o", ú: "u", ü: "u",
+  à: "a", è: "e", ì: "i", ò: "o", ù: "u",
+  ä: "a", ë: "e", ï: "i", ö: "o",
+  â: "a", ê: "e", î: "i", ô: "o", û: "u",
+  ñ: "n",
+};
+
+function removeAccents(text: string): string {
+  return text.replace(/[áéíóúüàèìòùäëïöâêîôûñ]/g, (ch) => ACCENT_MAP[ch] ?? ch);
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildKeywordRegex(keywords: string[], normalizeAccents: boolean): RegExp {
+  const patterns = keywords.map((kw) => {
+    let escaped = escapeRegex(kw.toLowerCase());
+    if (normalizeAccents) escaped = removeAccents(escaped);
+    return `\\b${escaped}\\b`;
+  });
+  return new RegExp(patterns.join("|"), "gi");
+}
+
+function extractTextsForScope(
+  messages: Array<{ role?: string; message?: string | null }>,
+  scope: KeywordMatchScope,
+): string[] {
+  const texts: string[] = [];
+  for (const msg of messages) {
+    if (!msg.message) continue;
+    if (scope === "todo_el_chat" || msg.role === "lead") {
+      texts.push(msg.message);
+    }
+  }
+  return texts;
+}
+
+/** @internal — exportado para tests unitarios */
+export function computeKeywordMetricaValue(
+  chats: ApiChatLead[],
+  config: MetricaConfig,
+): number {
+  // Sanitizar: descartar keywords vacías o solo-espacios. Una cadena vacía
+  // produce el patrón \b\b (match de ancho cero) que en countMode="ocurrencias"
+  // deja regex.lastIndex sin avanzar → loop infinito síncrono que congela el
+  // render. Filtrar aquí protege el path de config persistida (la UI ya valida).
+  const keywords = (config.keywords ?? []).map((k) => k.trim()).filter((k) => k.length > 0);
+  const matchScope: KeywordMatchScope = config.matchScope ?? "mensajes_lead";
+  const countMode: KeywordCountMode = config.countMode ?? "chats";
+  const normalizeAccents = config.normalizeAccents !== false;
+
+  if (keywords.length === 0) return 0;
+
+  const regex = buildKeywordRegex(keywords, normalizeAccents);
+  let total = 0;
+
+  for (const chat of chats) {
+    const messages = chat.messages ?? [];
+    const texts = extractTextsForScope(messages, matchScope);
+
+    let chatMatches = 0;
+    for (const text of texts) {
+      const haystack = normalizeAccents
+        ? removeAccents(text.toLowerCase())
+        : text.toLowerCase();
+      regex.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(haystack)) !== null) {
+        chatMatches++;
+        if (countMode === "chats") break;
+      }
+      if (countMode === "chats" && chatMatches > 0) break;
+    }
+
+    if (countMode === "chats") {
+      total += chatMatches > 0 ? 1 : 0;
+    } else {
+      total += chatMatches;
+    }
+  }
+
+  return total;
+}
+
+function isKeywordConfig(m: MetricaConfig): boolean {
+  return m.tipo === "chat" && m.chatSubtipo === "conteo_keyword";
+}
+
+function isStandardChatConfig(m: MetricaConfig): boolean {
+  return m.tipo === "chat" && !m.chatSubtipo;
+}
+
 /** @internal — exportado para tests unitarios */
 export function computeChatMetricas(
   metricasConfig: MetricaConfig[],
   chats: ApiChatLead[],
 ): Record<string, number | null> | undefined {
-  const chatMetricas = metricasConfig.filter((m) => m.tipo === "chat" && m.chatCampo);
-  if (chatMetricas.length === 0) return undefined;
+  const standardMetricas = metricasConfig.filter((m) => isStandardChatConfig(m) && m.chatCampo);
+  const keywordMetricas = metricasConfig.filter(isKeywordConfig);
+
+  if (standardMetricas.length === 0 && keywordMetricas.length === 0) return undefined;
 
   const result: Record<string, number | null> = {};
-  for (const metrica of chatMetricas) {
+
+  for (const metrica of standardMetricas) {
     const campo = metrica.chatCampo;
     if (!campo) continue;
     const values = chats.map((c) => extractChatCampoValue(c, campo));
     result[metrica.id] = agregarChatValues(values, metrica.chatAgregacion);
   }
+
+  for (const metrica of keywordMetricas) {
+    result[metrica.id] = computeKeywordMetricaValue(chats, metrica);
+  }
+
   return result;
 }
 

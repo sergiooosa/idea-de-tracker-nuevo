@@ -201,6 +201,9 @@ export type ChatMetricaCampo =
   | "humano_tomo_control"
   | "objeciones_detectadas";
 
+export type KeywordMatchScope = "mensajes_lead" | "todo_el_chat";
+export type KeywordCountMode = "chats" | "ocurrencias";
+
 /** Configuración de métrica (manual, automática, fija, webhook, ads, embudo_etapa, chat) */
 export interface MetricaConfig {
   id: string;
@@ -222,6 +225,12 @@ export interface MetricaConfig {
   chatCampo?: ChatMetricaCampo;
   /** For tipo="chat": how to aggregate across chats ("suma" | "promedio" | "conteo") */
   chatAgregacion?: "suma" | "promedio" | "conteo";
+  /** For tipo="chat" + chatSubtipo="conteo_keyword" */
+  chatSubtipo?: "conteo_keyword";
+  keywords?: string[];
+  matchScope?: KeywordMatchScope;
+  countMode?: KeywordCountMode;
+  normalizeAccents?: boolean;
   formato?: "numero" | "moneda" | "porcentaje" | "tiempo" | "decimal";
   color?: string;
   /** Tipo de visualización del KPI */
