@@ -30,6 +30,7 @@ interface CriteriosCalificacionData {
   canales: CanalesState;
   categoriasDisponibles: string[];
   categoriasCustom: CategoriaCustom[];
+  promptCalificacionChats: string | null;
 }
 
 const TABS_CONFIG: { id: CriteriosTab; label: string; icon: typeof Sparkles; helpTitulo: string; helpContenido: string; helpProbar: string }[] = [
@@ -130,6 +131,8 @@ export default function ConfiguracionPage() {
   const [modalCustom, setModalCustom] = useState<"create" | "edit" | null>(null);
   const [editingCustomIdx, setEditingCustomIdx] = useState<number>(-1);
   const [formCustom, setFormCustom] = useState<{ label: string; descripcion: string }>({ label: "", descripcion: "" });
+  const [promptCalificacionChats, setPromptCalificacionChats] = useState("");
+  const [promptChatsSaving, setPromptChatsSaving] = useState(false);
 
   // Canales activos
   const [canales, setCanales] = useState<CanalesActivosData>({ chats: false, llamadas: false, videollamadas: false });
@@ -146,6 +149,7 @@ export default function ConfiguracionPage() {
         setCriteriosSeleccionados(data.categorias ?? []);
         setCriteriosCanales(data.canales ?? { chats: null, llamadas: null, videollamadas: null });
         setCategoriasCustom(data.categoriasCustom ?? []);
+        setPromptCalificacionChats(data.promptCalificacionChats ?? "");
         setCriteriosLoaded(true);
       }
     } catch { /* ignore */ }
@@ -406,6 +410,28 @@ export default function ConfiguracionPage() {
       toast.error("Error al guardar los canales");
     }
     setCanalesSaving(false);
+  };
+
+  const handleSavePromptChats = async () => {
+    setPromptChatsSaving(true);
+    try {
+      const res = await fetch("/api/data/criterios-calificacion", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categorias: criteriosSeleccionados.length > 0 ? criteriosSeleccionados : null,
+          canales: criteriosCanales,
+          categoriasCustom: categoriasCustom.length > 0 ? categoriasCustom : undefined,
+          promptCalificacionChats: promptCalificacionChats.trim() || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Error al guardar");
+      toast.success("Prompt de calificación de chats guardado");
+      await loadCriterios();
+    } catch {
+      toast.error("Error al guardar el prompt");
+    }
+    setPromptChatsSaving(false);
   };
 
   const toggleCanal = (canal: keyof CanalesActivosData) => {
@@ -900,6 +926,42 @@ export default function ConfiguracionPage() {
             >
               {canalesSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               Guardar canales
+            </button>
+          </section>
+        )}
+
+        {/* ── Prompt de Calificación de Chats ── */}
+        {criteriosLoaded && puedeCriterios && (
+          <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-accent-purple" />
+                <h2 className="text-sm font-semibold text-white">Prompt de Calificación de Chats</h2>
+                <HelpTooltip
+                  titulo="¿Qué es el prompt de calificación de chats?"
+                  contenido="Aquí puedes escribir instrucciones personalizadas que la IA usará para determinar si un chat está calificado o no. Estas instrucciones complementan las categorías de calificación y permiten ajustar la clasificación a las necesidades específicas de tu negocio."
+                  comoProbar="Escribe tus instrucciones, guarda, y verifica que la IA clasifica los chats según tus criterios en el próximo análisis nocturno."
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+              Describe cómo se debe determinar si un chat está calificado o no. La IA usará estas instrucciones al clasificar los chats.
+            </p>
+            <textarea
+              value={promptCalificacionChats}
+              onChange={(e) => setPromptCalificacionChats(e.target.value)}
+              placeholder="Describe cómo se debe determinar si un chat está calificado o no. La IA usará estas instrucciones al clasificar los chats."
+              rows={5}
+              className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-purple/40 resize-y mb-3"
+            />
+            <button
+              type="button"
+              onClick={handleSavePromptChats}
+              disabled={promptChatsSaving}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 transition-colors"
+            >
+              {promptChatsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Guardar prompt
             </button>
           </section>
         )}
