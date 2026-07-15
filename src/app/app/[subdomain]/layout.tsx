@@ -142,7 +142,7 @@ const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.Elem
   { path: "/bandeja", navKey: "bandeja", label: "Bandeja", icon: Inbox },
   { path: "/acquisition", navKey: "adquisicion", label: "Resumen adquisición", icon: TrendingUp },
   { path: "/ads", navKey: "ads", label: "Ads & Inversión", icon: BarChart2 },
-  { path: "/comparaciones", navKey: "comparaciones", label: "Comparaciones", icon: GitCompareArrows },
+  { path: "/comparaciones", navKey: "comparaciones", label: "Proyecciones", icon: GitCompareArrows },
   { path: "/sesiones", navKey: "sesiones", label: "Sesiones de enfoque", icon: Sparkles, beta: true },
   { path: "/tablero-enfoque", navKey: "tablero-enfoque", label: "Tablero de operación", icon: Activity, beta: true },
   { path: "/asignacion", navKey: "asignacion", label: "Asignación de leads", icon: UserPlus, beta: true },

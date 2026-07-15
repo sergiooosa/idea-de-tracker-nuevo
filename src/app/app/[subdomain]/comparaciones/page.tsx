@@ -10,6 +10,7 @@ interface MetricItem {
   id: string;
   nombre: string;
   formato?: "numero" | "moneda" | "porcentaje" | "decimal" | "tiempo";
+  fija?: boolean;
 }
 
 interface MonthlySummaryRow {
@@ -182,8 +183,8 @@ export default function ComparacionesPage() {
       .then((data) => {
         const list = Array.isArray(data) ? data : (data as { metrics?: MetricItem[] }).metrics ?? [];
         setMetrics(list);
-        // Pre-select up to 5 metrics
-        setSelectedMetrics(list.slice(0, 5).map((m) => m.id));
+        const stdIds = list.filter((m) => m.fija).map((m) => m.id);
+        setSelectedMetrics(stdIds.length > 0 ? stdIds : list.slice(0, 5).map((m) => m.id));
       })
       .catch((err: unknown) => {
         console.error("[comparaciones] Error cargando métricas:", err);
@@ -232,7 +233,7 @@ export default function ComparacionesPage() {
   return (
     <>
       <PageHeader
-        title="Comparaciones"
+        title="Proyecciones"
         subtitle="Compara métricas entre dos meses"
       />
 
@@ -241,15 +242,10 @@ export default function ComparacionesPage() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="text-4xl mb-4">📊</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Sin métricas configuradas para comparar
+              Sin métricas disponibles
             </h3>
             <p className="text-gray-500 max-w-md">
-              La sección de comparativos funciona con métricas personalizadas.
-              Tu cuenta tiene métricas automáticas (leads, llamadas, reuniones)
-              que estarán disponibles aquí próximamente.
-            </p>
-            <p className="text-sm text-gray-400 mt-4">
-              ¿Necesitas métricas personalizadas? Contacta a tu administrador.
+              No se encontraron métricas para esta cuenta.
             </p>
           </div>
         ) : (

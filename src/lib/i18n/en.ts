@@ -11,7 +11,7 @@ export const en: Translations = {
     bandeja: "Inbox",
     adquisicion: "Acquisition",
     ads: "Ads & Investment",
-    comparaciones: "Comparisons",
+    comparaciones: "Projections",
     comisiones: "Commissions",
     reporte: "Monthly Report",
     sistema: "System",
