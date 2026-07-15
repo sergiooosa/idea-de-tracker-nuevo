@@ -359,6 +359,7 @@ export interface RazonPerdidaEntry {
 export interface CategoriaLlamada {
   id: string;
   nombre: string;
+  definicion?: string;
   temas: string[];
   prompt: string;
 }

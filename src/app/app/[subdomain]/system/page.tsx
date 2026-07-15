@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useT } from '@/contexts/LocaleContext';
 import type { Locale } from '@/lib/i18n';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -316,6 +316,7 @@ export default function SystemPage() {
   const [catNombre, setCatNombre] = useState('');
   const [catTemas, setCatTemas] = useState<string[]>([]);
   const [catPrompt, setCatPrompt] = useState('');
+  const [catDefinicion, setCatDefinicion] = useState('');
   const [catTemaInput, setCatTemaInput] = useState('');
 
   // Ads config state
@@ -788,16 +789,65 @@ export default function SystemPage() {
                         comoProbar="Crea una categoría (ej. 'Perfilamiento'), escribe su prompt y sus temas, y guarda. Ve al Paso 4, crea una regla con la condición que identifique ese tipo de llamada y elige la acción 'Asignar categoría'. Cuando entre una llamada que cumpla la condición, se evaluará con el prompt de esa categoría."
                       />
                     </div>
-                    <p className="text-xs text-gray-400">Crea categorías con un prompt de evaluación propio y temas específicos.</p>
+                    <p className="text-xs text-gray-400">Crea categorías con un prompt de evaluación propio y temas específicos. Para que una categoría se use, crea una regla en el Paso 4 con la acción &quot;Asignar categoría&quot;.</p>
                   </div>
                 </div>
 
+                {categoriasLlamadas.length === 0 && catEditId === null && (
+                  <div className="rounded-xl p-5 border border-dashed border-surface-500 bg-surface-800/50 text-center space-y-3">
+                    <div className="flex justify-center"><Tag className="w-8 h-8 text-gray-600" /></div>
+                    <p className="text-sm text-gray-400">Aún no hay categorías de llamada.</p>
+                    <p className="text-xs text-gray-500">Las categorías permiten evaluar cada tipo de llamada con su propio prompt. Puedes crear las tuyas o cargar plantillas de ejemplo.</p>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                      <button type="button" onClick={() => {
+                        setCatEditId(crypto.randomUUID());
+                        setCatNombre(''); setCatDefinicion(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput('');
+                      }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition-all">
+                        <Plus className="w-4 h-4" /> Crear categoría
+                      </button>
+                      <button type="button" onClick={() => {
+                        setCategoriasLlamadas([
+                          {
+                            id: crypto.randomUUID(),
+                            nombre: 'Perfilamiento',
+                            definicion: 'Primera llamada para conocer al prospecto: necesidad, presupuesto, zona de interés y plazo de compra.',
+                            temas: ['presupuesto', 'ubicación', 'plazo', 'necesidad', 'primera llamada'],
+                            prompt: '¿El asesor preguntó presupuesto? ¿Identificó la necesidad principal? ¿Preguntó zona de interés y plazo? ¿Agendó siguiente paso?',
+                          },
+                          {
+                            id: crypto.randomUUID(),
+                            nombre: 'Seguimiento',
+                            definicion: 'Llamada de seguimiento a un prospecto ya perfilado. Se busca avanzar al cierre o resolver objeciones.',
+                            temas: ['seguimiento', 'objeciones', 'avance', 'propuesta', 'cotización'],
+                            prompt: '¿El asesor retomó la conversación anterior? ¿Abordó objeciones? ¿Presentó opciones concretas? ¿Definió siguiente acción?',
+                          },
+                          {
+                            id: crypto.randomUUID(),
+                            nombre: 'Agendamiento / Cierre',
+                            definicion: 'Llamada donde se busca agendar visita o cerrar la venta. El prospecto ya está calificado.',
+                            temas: ['agendar', 'visita', 'cierre', 'contrato', 'apartado', 'firma'],
+                            prompt: '¿Se agendó visita o cita de cierre? ¿Se habló de proceso de compra/contrato? ¿Hubo compromiso concreto del prospecto?',
+                          },
+                        ]);
+                        toast.success('3 categorías de ejemplo cargadas — edítalas a tu medida');
+                      }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-surface-700 text-gray-300 border border-surface-500 hover:bg-surface-600 transition-all">
+                        <Sparkles className="w-4 h-4" /> Cargar categorías de ejemplo
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {categoriasLlamadas.length > 0 && (
                   <ul className="space-y-2 mb-3">
-                    {categoriasLlamadas.map((cat) => (
+                    {categoriasLlamadas.map((cat) => {
+                      const tieneRegla = tagRules.some((r) =>
+                        r.acciones.some((a) => a.tipo === 'asignar_categoria' && a.categoria_id === cat.id)
+                      );
+                      return (
                       <li key={cat.id} className="rounded-xl p-3 border-l-4 border-accent-purple/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500 flex items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-white truncate">{cat.nombre}</p>
+                          {cat.definicion && <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-1">{cat.definicion}</p>}
                           {cat.temas.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {cat.temas.map((t, i) => (
@@ -806,10 +856,18 @@ export default function SystemPage() {
                             </div>
                           )}
                           {cat.prompt && <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{cat.prompt}</p>}
+                          {!tieneRegla && (
+                            <button type="button" onClick={() => setCurrentStep(4)}
+                              className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-amber-400/90 hover:text-amber-300 transition-colors">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>Ninguna regla la enruta todavía — ir al Paso 4</span>
+                            </button>
+                          )}
                         </div>
                         <button type="button" onClick={() => {
                           setCatEditId(cat.id);
                           setCatNombre(cat.nombre);
+                          setCatDefinicion(cat.definicion ?? '');
                           setCatTemas([...cat.temas]);
                           setCatPrompt(cat.prompt);
                           setCatTemaInput('');
@@ -821,20 +879,37 @@ export default function SystemPage() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 )}
 
                 {catEditId !== null ? (
                   <div className="rounded-xl p-4 border border-accent-purple/30 bg-surface-700/50 space-y-3">
                     <div>
-                      <label className="block text-[11px] font-medium text-accent-purple mb-1">Nombre de la categoría</label>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="block text-[11px] font-medium text-accent-purple">Nombre de la categoría</label>
+                        <HelpTooltip titulo="Nombre" contenido="Nombre corto de la categoría (ej. Perfilamiento)." />
+                      </div>
                       <input type="text" value={catNombre} onChange={(e) => setCatNombre(e.target.value)}
                         placeholder="Ej: Perfilamiento, Seguimiento, Cierre"
                         className="w-full rounded-lg bg-surface-600 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-purple/40" />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-medium text-accent-purple mb-1">Temas</label>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="block text-[11px] font-medium text-accent-purple">Definición / ¿Cuándo aplica esta categoría?</label>
+                        <HelpTooltip titulo="Definición" contenido="Explica en tus palabras cuándo una llamada es de este tipo y cómo reconocerla. La IA lo usa para clasificar. Ej: 'Primera llamada para conocer necesidad y presupuesto.'" />
+                      </div>
+                      <textarea value={catDefinicion} onChange={(e) => setCatDefinicion(e.target.value)}
+                        placeholder="Ej: Primera llamada para conocer necesidad y presupuesto del prospecto."
+                        className="w-full rounded-lg bg-surface-600 border border-surface-500 p-2 text-sm text-white min-h-[60px] focus:ring-2 focus:ring-accent-purple/40" />
+                      <p className="text-[10px] text-gray-500 mt-0.5 italic">Definición = cuándo aplica / cómo reconocerla.</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="block text-[11px] font-medium text-accent-purple">Temas</label>
+                        <HelpTooltip titulo="Temas" contenido="Palabras/temas señal que suelen aparecer en este tipo de llamada (ej. presupuesto, ubicación, plazo). La IA los usa como pistas." />
+                      </div>
                       <div className="flex flex-wrap gap-1 mb-1.5">
                         {catTemas.map((t, i) => (
                           <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-accent-purple/15 text-accent-purple text-xs border border-accent-purple/30">
@@ -864,14 +939,18 @@ export default function SystemPage() {
                         </button>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-accent-purple mb-1">Prompt de evaluación</label>
+                    <div className="border-t border-surface-500 pt-3">
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="block text-[11px] font-medium text-accent-purple">Prompt de evaluación</label>
+                        <HelpTooltip titulo="Prompt de evaluación" contenido="Criterios de evaluación DENTRO de esta categoría: qué debe revisar la IA (ej. '¿preguntó presupuesto? ¿agendó siguiente paso?')." />
+                      </div>
                       <textarea value={catPrompt} onChange={(e) => setCatPrompt(e.target.value)}
                         placeholder="Evalúa esta llamada de perfilamiento según..."
                         className="w-full rounded-lg bg-surface-600 border border-surface-500 p-2 text-sm text-white min-h-[100px] focus:ring-2 focus:ring-accent-purple/40" />
+                      <p className="text-[10px] text-gray-500 mt-0.5 italic">Prompt = qué evaluar dentro de la llamada.</p>
                     </div>
                     <div className="flex gap-2 justify-end">
-                      <button type="button" onClick={() => { setCatEditId(null); setCatNombre(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput(''); }}
+                      <button type="button" onClick={() => { setCatEditId(null); setCatNombre(''); setCatDefinicion(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput(''); }}
                         className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white border border-surface-500 hover:border-surface-400">
                         Cancelar
                       </button>
@@ -879,27 +958,24 @@ export default function SystemPage() {
                         if (!catNombre.trim()) { toast.error('El nombre es obligatorio'); return; }
                         const existing = categoriasLlamadas.find((c) => c.id === catEditId);
                         if (existing) {
-                          setCategoriasLlamadas((prev) => prev.map((c) => c.id === catEditId ? { ...c, nombre: catNombre.trim(), temas: catTemas, prompt: catPrompt.trim() } : c));
+                          setCategoriasLlamadas((prev) => prev.map((c) => c.id === catEditId ? { ...c, nombre: catNombre.trim(), definicion: catDefinicion.trim() || undefined, temas: catTemas, prompt: catPrompt.trim() } : c));
                         } else {
-                          setCategoriasLlamadas((prev) => [...prev, { id: catEditId, nombre: catNombre.trim(), temas: catTemas, prompt: catPrompt.trim() }]);
+                          setCategoriasLlamadas((prev) => [...prev, { id: catEditId, nombre: catNombre.trim(), definicion: catDefinicion.trim() || undefined, temas: catTemas, prompt: catPrompt.trim() }]);
                         }
-                        setCatEditId(null); setCatNombre(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput('');
+                        setCatEditId(null); setCatNombre(''); setCatDefinicion(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput('');
                       }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30">
                         {categoriasLlamadas.some((c) => c.id === catEditId) ? 'Actualizar' : 'Agregar'}
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : categoriasLlamadas.length > 0 ? (
                   <button type="button" onClick={() => {
                     setCatEditId(crypto.randomUUID());
-                    setCatNombre('');
-                    setCatTemas([]);
-                    setCatPrompt('');
-                    setCatTemaInput('');
+                    setCatNombre(''); setCatDefinicion(''); setCatTemas([]); setCatPrompt(''); setCatTemaInput('');
                   }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-accent-purple/20 text-accent-purple border border-accent-purple/40 hover:bg-accent-purple/30 transition-all">
                     <Plus className="w-4 h-4" /> Añadir categoría
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           )}
