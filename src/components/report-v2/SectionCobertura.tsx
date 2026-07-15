@@ -8,6 +8,11 @@ interface Props {
   data: ReportV2Cobertura | null;
 }
 
+function displayName(mail: string): string {
+  const local = mail.split("@")[0];
+  return local.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function SectionCobertura({ data }: Props) {
   if (!data) return null;
 
@@ -18,7 +23,7 @@ export default function SectionCobertura({ data }: Props) {
       icon={Radio}
       title="Cobertura y Respuesta"
       helpTitulo="Cobertura y Respuesta"
-      helpContenido="Análisis de cómo se distribuyen los canales por lead (solo llamada, solo chat, ambos), a qué intento de contacto responden, y en qué franjas horarias hay mejor tasa de respuesta."
+      helpContenido="Análisis de cómo se distribuyen los canales por lead (solo llamada, solo chat, ambos), a qué intento de contacto responden, y en qué franjas horarias hay mejor tasa de respuesta. Cada franja muestra los asesores que realizaron llamadas en ese horario."
     >
       {/* Canales por lead */}
       <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40]/60 p-4">
@@ -90,6 +95,15 @@ export default function SectionCobertura({ data }: Props) {
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>
+                {f.asesores.length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 pl-1">
+                    {f.asesores.map((a) => (
+                      <span key={a.mail} className="text-[10px] text-[#5F7288]">
+                        {displayName(a.mail)} — {a.total}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

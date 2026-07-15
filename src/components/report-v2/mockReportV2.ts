@@ -156,12 +156,12 @@ export function getMockReportV2(canales: ('llamadas' | 'chats' | 'video')[]): Re
         { intento: '4+ intentos', count: 35, pct: 0.143 },
       ],
       franjasHorarias: [
-        { franja: '08:00–10:00', tasaRespuesta: 0.52, total: 45 },
-        { franja: '10:00–12:00', tasaRespuesta: 0.78, total: 89 },
-        { franja: '12:00–14:00', tasaRespuesta: 0.61, total: 67 },
-        { franja: '14:00–16:00', tasaRespuesta: 0.69, total: 72 },
-        { franja: '16:00–18:00', tasaRespuesta: 0.55, total: 38 },
-        { franja: '18:00–20:00', tasaRespuesta: 0.42, total: 25 },
+        { franja: '08:00–10:00', tasaRespuesta: 0.52, total: 45, asesores: [{ mail: 'carlos.lopez@ejemplo.com', total: 20 }, { mail: 'ana.garcia@ejemplo.com', total: 15 }] },
+        { franja: '10:00–12:00', tasaRespuesta: 0.78, total: 89, asesores: [{ mail: 'carlos.lopez@ejemplo.com', total: 35 }, { mail: 'maria.perez@ejemplo.com', total: 30 }] },
+        { franja: '12:00–14:00', tasaRespuesta: 0.61, total: 67, asesores: [{ mail: 'ana.garcia@ejemplo.com', total: 40 }, { mail: 'carlos.lopez@ejemplo.com', total: 27 }] },
+        { franja: '14:00–16:00', tasaRespuesta: 0.69, total: 72, asesores: [{ mail: 'maria.perez@ejemplo.com', total: 38 }] },
+        { franja: '16:00–18:00', tasaRespuesta: 0.55, total: 38, asesores: [{ mail: 'carlos.lopez@ejemplo.com', total: 22 }] },
+        { franja: '18:00–20:00', tasaRespuesta: 0.42, total: 25, asesores: [] },
       ],
     },
     conversaciones: {

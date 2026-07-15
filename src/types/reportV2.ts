@@ -189,7 +189,7 @@ export interface ReportV2Cobertura {
   /** A qué # de intento contesta el lead (1/2/3/4+). */
   aQueIntentoContesta: ReportV2Distribucion[];
   /** Tasa de respuesta por franja horaria. */
-  franjasHorarias: Array<{ franja: string; tasaRespuesta: number; n: number }>;
+  franjasHorarias: Array<{ franja: string; tasaRespuesta: number; total: number; asesores: Array<{ mail: string; total: number }> }>;
 }
 
 // ─── comparativo ─────────────────────────────────────────────────────────────
