@@ -34,6 +34,7 @@ interface CerebroCriterios {
     videollamadas?: { categorias_calificadas: string[]; umbral_minimo: number };
   };
   categorias_custom?: CategoriaCustom[];
+  prompt_calificacion_chats?: string | null;
 }
 
 interface DashboardCanales {
@@ -46,9 +47,10 @@ function cerebroToDashboard(c: CerebroCriterios | null): {
   categorias: string[] | null;
   canales: DashboardCanales;
   categoriasCustom: CategoriaCustom[];
+  promptCalificacionChats: string | null;
 } {
   if (!c) {
-    return { categorias: null, canales: { chats: null, llamadas: null, videollamadas: null }, categoriasCustom: [] };
+    return { categorias: null, canales: { chats: null, llamadas: null, videollamadas: null }, categoriasCustom: [], promptCalificacionChats: null };
   }
   const canales: DashboardCanales = { chats: null, llamadas: null, videollamadas: null };
   for (const canal of CANALES) {
@@ -61,6 +63,7 @@ function cerebroToDashboard(c: CerebroCriterios | null): {
     categorias: c.categorias_calificadas.length > 0 ? c.categorias_calificadas : null,
     canales,
     categoriasCustom: c.categorias_custom ?? [],
+    promptCalificacionChats: c.prompt_calificacion_chats ?? null,
   };
 }
 
@@ -68,12 +71,14 @@ function dashboardToCerebro(
   categorias: string[] | null,
   canales: DashboardCanales | undefined,
   categoriasCustom?: CategoriaCustom[],
+  promptCalificacionChats?: string | null,
 ): CerebroCriterios | null {
   const hasGlobal = categorias && categorias.length > 0;
   const hasCanales = canales && CANALES.some((c) => canales[c] && canales[c]!.length > 0);
   const hasCustom = categoriasCustom && categoriasCustom.length > 0;
+  const hasPrompt = typeof promptCalificacionChats === "string" && promptCalificacionChats.trim().length > 0;
 
-  if (!hasGlobal && !hasCanales && !hasCustom) return null;
+  if (!hasGlobal && !hasCanales && !hasCustom && !hasPrompt) return null;
 
   const result: CerebroCriterios = {
     categorias_calificadas: categorias ?? [],
@@ -92,6 +97,12 @@ function dashboardToCerebro(
 
   if (hasCustom) {
     result.categorias_custom = categoriasCustom;
+  }
+
+  if (hasPrompt) {
+    result.prompt_calificacion_chats = promptCalificacionChats!.trim();
+  } else if (promptCalificacionChats === null) {
+    result.prompt_calificacion_chats = null;
   }
 
   return result;
@@ -127,7 +138,7 @@ export async function GET(req: Request) {
       console.warn("[criterios-calificacion] No se pudo consultar Cerebro:", err);
     }
 
-    const { categorias, canales, categoriasCustom } = cerebroToDashboard(criteriosRaw);
+    const { categorias, canales, categoriasCustom, promptCalificacionChats } = cerebroToDashboard(criteriosRaw);
 
     const categoriasRows = await db
       .selectDistinct({ cat: chatsLogs.ia_categoria })
@@ -140,7 +151,7 @@ export async function GET(req: Request) {
       .map((r) => r.cat)
       .filter((c): c is string => c != null && c.trim().length > 0);
 
-    return NextResponse.json({ categorias, canales, categoriasDisponibles, categoriasCustom });
+    return NextResponse.json({ categorias, canales, categoriasDisponibles, categoriasCustom, promptCalificacionChats });
   });
 }
 
@@ -160,10 +171,11 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "categorias requerido" }, { status: 400 });
     }
 
-    const { categorias, canales, categoriasCustom } = body as {
+    const { categorias, canales, categoriasCustom, promptCalificacionChats } = body as {
       categorias: string[] | null;
       canales?: DashboardCanales;
       categoriasCustom?: CategoriaCustom[];
+      promptCalificacionChats?: string | null;
     };
     if (categorias !== null && !Array.isArray(categorias)) {
       return NextResponse.json({ error: "categorias debe ser un array o null" }, { status: 400 });
@@ -177,7 +189,7 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const cerebroPayload = dashboardToCerebro(categorias, canales, categoriasCustom);
+    const cerebroPayload = dashboardToCerebro(categorias, canales, categoriasCustom, promptCalificacionChats);
 
     const cerebroRes = await fetch(
       `${API_BASE_URL}/api/cuentas/${idCuenta}/criterios-calificacion`,
