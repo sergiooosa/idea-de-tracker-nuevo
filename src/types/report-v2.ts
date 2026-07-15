@@ -135,10 +135,16 @@ export interface ReportV2CoberturaIntentoContesta {
   pct: number; // 0-1
 }
 
+export interface ReportV2CoberturaFranjaAsesor {
+  mail: string;
+  total: number;
+}
+
 export interface ReportV2CoberturaFranja {
   franja: string;
   tasaRespuesta: number; // 0-1
   total: number;
+  asesores: ReportV2CoberturaFranjaAsesor[];
 }
 
 export interface ReportV2Cobertura {

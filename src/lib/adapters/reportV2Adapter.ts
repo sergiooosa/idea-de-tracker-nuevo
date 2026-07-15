@@ -209,7 +209,8 @@ export function adaptReportV2(api: ReportV2): ReportV2Data {
       franjasHorarias: api.cobertura.franjasHorarias.map((f) => ({
         franja: f.franja,
         tasaRespuesta: f.tasaRespuesta,
-        total: f.n,
+        total: f.total,
+        asesores: f.asesores ?? [],
       })),
     },
     conversaciones: {

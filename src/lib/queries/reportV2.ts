@@ -96,7 +96,7 @@ interface LlamadasCoberturaResult {
   unSoloIntento: number;
   dosMasIntPorCloser: Record<string, number>;
   aQueIntentoContesta: Array<{ intento: number; leads: number }>;
-  franjasHorarias: Array<{ franja: string; total: number; contestaron: number }>;
+  franjasHorarias: Array<{ franja: string; total: number; contestaron: number; asesores: Array<{ mail: string; total: number }> }>;
   mejorFranja: string | null;
 }
 
@@ -108,7 +108,7 @@ async function getLlamadasCobertura(
 ): Promise<LlamadasCoberturaResult> {
   const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
-  const [intentoRows, franjaRows] = await Promise.all([
+  const [intentoRows, franjaRows, asesorFranjaRows] = await Promise.all([
     // Intentos por lead: count total + primer intento efectivo
     db.execute<{
       lead_id: string;
@@ -150,6 +150,21 @@ async function getLlamadasCobertura(
       GROUP BY 1
       ORDER BY 1
     `),
+
+    // Asesores por franja horaria
+    db.execute<{ hora: string; closer_mail: string; total: string }>(sql`
+      SELECT
+        EXTRACT(HOUR FROM ts AT TIME ZONE COALESCE((SELECT zona_horaria_iana FROM cuentas WHERE id_cuenta = ${idCuenta}), 'America/Mexico_City'))::int::text AS hora,
+        closer_mail,
+        COUNT(*)::text AS total
+      FROM log_llamadas
+      WHERE id_cuenta = ${idCuenta}
+        AND ts BETWEEN ${fromTs} AND ${toTs}
+        AND tipo_evento NOT IN ('pdte', 'contacto_creado')
+        AND closer_mail IS NOT NULL
+      GROUP BY 1, closer_mail
+      ORDER BY 1, 3 DESC
+    `),
   ]);
 
   // Procesar intentos
@@ -177,13 +192,22 @@ async function getLlamadasCobertura(
     .map(([k, v]) => ({ intento: Number(k), leads: v }))
     .sort((a, b) => a.intento - b.intento);
 
+  // Asesores agrupados por hora
+  const asesoresPorHora: Record<string, Array<{ mail: string; total: number }>> = {};
+  for (const r of asesorFranjaRows.rows) {
+    const hora = r.hora;
+    if (!asesoresPorHora[hora]) asesoresPorHora[hora] = [];
+    asesoresPorHora[hora].push({ mail: r.closer_mail, total: Number(r.total) });
+  }
+
   // Franjas horarias
   const franjasHorarias = franjaRows.rows.map((r) => {
     const hora = Number(r.hora);
     const total = Number(r.total);
     const contestaron = Number(r.contestaron);
     const label = `${String(hora).padStart(2, "0")}:00–${String(hora + 1).padStart(2, "0")}:00`;
-    return { franja: label, total, contestaron };
+    const asesores = (asesoresPorHora[r.hora] ?? []).sort((a, b) => b.total - a.total).slice(0, 5);
+    return { franja: label, total, contestaron, asesores };
   });
 
   let mejorFranja: string | null = null;
@@ -204,6 +228,7 @@ async function getLlamadasCobertura(
       franja: f.franja,
       total: f.total,
       contestaron: f.contestaron,
+      asesores: f.asesores,
     })),
     mejorFranja,
   };
@@ -576,7 +601,8 @@ export async function buildReportV2(
     franjasHorarias: coberturaLL.franjasHorarias.map((f) => ({
       franja: f.franja,
       tasaRespuesta: f.total > 0 ? f.contestaron / f.total : 0,
-      n: f.total,
+      total: f.total,
+      asesores: f.asesores,
     })),
   };
 
