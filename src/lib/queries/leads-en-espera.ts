@@ -131,6 +131,7 @@ async function getLeadsChat(
     .select({
       nombre_lead: chatsLogs.nombre_lead,
       asesor_asignado: chatsLogs.asesor_asignado,
+      notas_extra: chatsLogs.notas_extra,
       origen: chatsLogs.origen,
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
       min_sin_llamar: sql<number>`ROUND(EXTRACT(EPOCH FROM (NOW() - ${chatsLogs.primer_msg_lead_at}))/60)::int`,
@@ -146,22 +147,27 @@ async function getLeadsChat(
         range.fromDate ? gte(chatsLogs.primer_msg_lead_at, range.fromDate) : undefined,
         range.toDate ? lte(chatsLogs.primer_msg_lead_at, range.toDate) : undefined,
         closerEmails.length > 0
-          ? inArray(chatsLogs.asesor_asignado, closerEmails)
+          ? sql`COALESCE(${chatsLogs.asesor_asignado}, NULLIF(TRIM(${chatsLogs.notas_extra}), 'por asignar')) IN (${sql.join(closerEmails.map(e => sql`${e}`), sql`, `)})`
           : undefined,
       ),
     )
     .orderBy(sql`ROUND(EXTRACT(EPOCH FROM (NOW() - ${chatsLogs.primer_msg_lead_at}))/60)::int DESC`);
 
-  return rows.map((row) => ({
-    nombre_lead: row.nombre_lead ?? "Lead sin nombre",
-    nombre_closer: row.asesor_asignado,
-    closer_mail: row.asesor_asignado,
-    creativo_origen: row.origen,
-    min_sin_llamar: Number(row.min_sin_llamar) || 0,
-    phone: null,
-    mail_lead: null,
-    canal_origen: "chat" as const,
-  }));
+  return rows.map((row) => {
+    const resolvedCloser = row.asesor_asignado?.trim()
+      || (row.notas_extra?.trim() !== "por asignar" ? row.notas_extra?.trim() : null)
+      || null;
+    return {
+      nombre_lead: row.nombre_lead ?? "Lead sin nombre",
+      nombre_closer: resolvedCloser,
+      closer_mail: resolvedCloser,
+      creativo_origen: row.origen,
+      min_sin_llamar: Number(row.min_sin_llamar) || 0,
+      phone: null,
+      mail_lead: null,
+      canal_origen: "chat" as const,
+    };
+  });
 }
 
 function agruparPorCloser(leads: LeadEnEspera[]): CloserConLeadsEnEspera[] {
