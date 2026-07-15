@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useT } from '@/contexts/LocaleContext';
 import type { Locale } from '@/lib/i18n';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -270,7 +270,7 @@ export default function SystemPage() {
   const t = useT();
   const searchParams = useSearchParams();
   const stepParam = searchParams.get('step');
-  const TOTAL_STEPS = 11;
+  const TOTAL_STEPS = 12;
   const initialStep = Math.min(TOTAL_STEPS, Math.max(1, Number(stepParam) || 1));
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [saving, setSaving] = useState(false);
@@ -318,6 +318,39 @@ export default function SystemPage() {
   const [catPrompt, setCatPrompt] = useState('');
   const [catDefinicion, setCatDefinicion] = useState('');
   const [catTemaInput, setCatTemaInput] = useState('');
+
+  // Coach de ventas state
+  interface SeccionGuion {
+    id: string;
+    nombre: string;
+    criterio: string;
+    tipo: 'must_have' | 'deseable';
+  }
+  interface GuionCoach {
+    id: string;
+    id_cuenta: number;
+    categoria_llamada_id: string;
+    version: number;
+    secciones: SeccionGuion[];
+    umbral: number;
+    activo: boolean;
+    created_at: string | null;
+    updated_at: string | null;
+  }
+  const [coachHabilitado, setCoachHabilitado] = useState<boolean | null>(null);
+  const [guionesCoach, setGuionesCoach] = useState<GuionCoach[]>([]);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachEditCatId, setCoachEditCatId] = useState<string | null>(null);
+  const [coachSecciones, setCoachSecciones] = useState<SeccionGuion[]>([]);
+  const [coachUmbral, setCoachUmbral] = useState(70);
+  const [coachSaving, setCoachSaving] = useState(false);
+
+  const DEFAULT_SECCIONES: SeccionGuion[] = [
+    { id: 'apertura', nombre: 'Apertura', criterio: '', tipo: 'must_have' },
+    { id: 'descubrimiento', nombre: 'Descubrimiento', criterio: '', tipo: 'must_have' },
+    { id: 'objeciones', nombre: 'Manejo de objeciones', criterio: '', tipo: 'deseable' },
+    { id: 'cierre', nombre: 'Cierre / CTA', criterio: '', tipo: 'must_have' },
+  ];
 
   // Ads config state
   const [metaAdsActivo, setMetaAdsActivo] = useState(false);
@@ -463,6 +496,37 @@ export default function SystemPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const loadCoachData = useCallback(async () => {
+    setCoachLoading(true);
+    try {
+      const res = await fetch('/api/data/coach-guiones');
+      if (res.status === 403) {
+        const body = await res.json().catch(() => null);
+        if (body?.coachDisabled) {
+          setCoachHabilitado(false);
+          setCoachLoading(false);
+          return;
+        }
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setCoachHabilitado(true);
+        setGuionesCoach(Array.isArray(data.guiones) ? data.guiones : []);
+      } else {
+        setCoachHabilitado(null);
+      }
+    } catch {
+      setCoachHabilitado(null);
+    }
+    setCoachLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (currentStep === 12 && coachHabilitado === null && !coachLoading) {
+      loadCoachData();
+    }
+  }, [currentStep, coachHabilitado, coachLoading, loadCoachData]);
+
   const editParam = searchParams.get('edit');
   useEffect(() => {
     if (editParam && !loadingConfig && currentStep === 5) {
@@ -599,6 +663,55 @@ export default function SystemPage() {
     }
   };
 
+  const saveCoachGuion = async (categoriaId: string) => {
+    setCoachSaving(true);
+    try {
+      const res = await fetch('/api/data/coach-guiones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoria_llamada_id: categoriaId,
+          secciones: coachSecciones.filter((s) => s.criterio.trim()),
+          umbral: coachUmbral,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        toast.error(err?.error ?? 'Error al guardar guion');
+        setCoachSaving(false);
+        return;
+      }
+      const saved = await res.json();
+      setGuionesCoach((prev) => {
+        const filtered = prev.filter((g) => g.categoria_llamada_id !== categoriaId);
+        return [...filtered, saved];
+      });
+      toast.success('Guion guardado');
+      setCoachEditCatId(null);
+    } catch {
+      toast.error('Error al guardar guion');
+    }
+    setCoachSaving(false);
+  };
+
+  const deleteCoachGuion = async (categoriaId: string) => {
+    setCoachSaving(true);
+    try {
+      const res = await fetch(`/api/data/coach-guiones?categoriaId=${encodeURIComponent(categoriaId)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok || res.status === 204) {
+        setGuionesCoach((prev) => prev.filter((g) => g.categoria_llamada_id !== categoriaId));
+        toast.success('Guion eliminado');
+      } else {
+        toast.error('Error al eliminar guion');
+      }
+    } catch {
+      toast.error('Error al eliminar guion');
+    }
+    setCoachSaving(false);
+  };
+
   if (loadingConfig) {
     return (
       <>
@@ -625,6 +738,7 @@ export default function SystemPage() {
             { id: 9, title: 'OpenAI Key', icon: Key, color: 'green' },
             { id: 10, title: 'Fuente financiera', icon: Database, color: 'blue' },
             { id: 11, title: 'Integraciones de Ads', icon: BarChart3, color: 'purple' },
+            { id: 12, title: 'Coach de ventas', icon: ShieldCheck, color: 'green' },
           ].map((s) => {
             const Icon = s.icon;
             const active = currentStep === s.id;
@@ -635,7 +749,7 @@ export default function SystemPage() {
               amber: active ? 'bg-accent-amber text-black border-accent-amber shadow-[0_0_16px_-4px_rgba(255,176,32,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-amber hover:border-accent-amber/50',
               green: active ? 'bg-accent-green text-black border-accent-green shadow-[0_0_16px_-4px_rgba(0,230,118,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-green hover:border-accent-green/50',
             };
-            const isBetaStep: boolean = false;
+            const isBetaStep = s.id === 12;
             return (
               <button key={s.id} type="button" onClick={() => setCurrentStep(s.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${colorClasses[s.color]}`}>
@@ -2678,6 +2792,246 @@ export default function SystemPage() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Guardar configuración de Ads
               </button>
+            </div>
+          )}
+
+          {currentStep === 12 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-accent-green/30">
+                <div className="rounded-lg p-2 bg-accent-green/20 border border-accent-green/40"><ShieldCheck className="w-5 h-5 text-accent-green" /></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Coach de ventas</h3>
+                  <p className="text-sm text-gray-400">Sube un guion modelo por categoría de llamada. La IA evalúa cada llamada contra el guion y aplica tags + notas si incumple.</p>
+                </div>
+              </div>
+
+              {coachLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-accent-green mr-2" />
+                  <span className="text-sm text-gray-400">Cargando configuración del coach...</span>
+                </div>
+              )}
+
+              {coachHabilitado === false && !coachLoading && (
+                <div className="rounded-xl p-5 border border-surface-500 bg-surface-800/50 text-center space-y-2">
+                  <ShieldCheck className="w-8 h-8 text-gray-600 mx-auto" />
+                  <p className="text-sm text-gray-400">El Coach de ventas no está habilitado para esta cuenta.</p>
+                  <p className="text-xs text-gray-500">Contacta al equipo de AutoKPI para activar esta función.</p>
+                </div>
+              )}
+
+              {coachHabilitado === null && !coachLoading && (
+                <div className="rounded-xl p-5 border border-amber-500/30 bg-amber-500/5 text-center space-y-2">
+                  <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
+                  <p className="text-sm text-gray-400">No se pudo verificar el estado del coach.</p>
+                  <button type="button" onClick={loadCoachData} className="text-xs text-accent-cyan hover:underline">Reintentar</button>
+                </div>
+              )}
+
+              {coachHabilitado === true && !coachLoading && (
+                <div className="space-y-4">
+                  {categoriasLlamadas.length === 0 && (
+                    <div className="rounded-xl p-4 border border-amber-500/30 bg-amber-500/5 flex items-start gap-3">
+                      <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-white font-medium">Primero crea categorías de llamada</p>
+                        <p className="text-xs text-gray-400 mt-1">Para configurar el coach, necesitas tener al menos una categoría de llamada definida en el Paso 3.</p>
+                        <button type="button" onClick={() => setCurrentStep(3)} className="text-xs text-accent-cyan hover:underline mt-1">Ir al Paso 3</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {categoriasLlamadas.length > 0 && (
+                    <>
+                      <div className="rounded-xl p-3 border border-accent-green/20 bg-accent-green/5 flex items-start gap-2">
+                        <Info className="w-4 h-4 text-accent-green shrink-0 mt-0.5" />
+                        <p className="text-xs text-gray-400">Cada categoría puede tener su propio guion. La IA evalúa cada llamada con transcript válido contra las secciones del guion. Secciones <span className="text-accent-green font-medium">must-have</span> que falten generan tag de incumplimiento; secciones <span className="text-gray-300">deseables</span> solo generan una nota suave.</p>
+                      </div>
+
+                      <ul className="space-y-3">
+                        {categoriasLlamadas.map((cat) => {
+                          const guion = guionesCoach.find((g) => g.categoria_llamada_id === cat.id);
+                          const isEditing = coachEditCatId === cat.id;
+
+                          return (
+                            <li key={cat.id} className="rounded-xl border border-surface-500 bg-gradient-to-b from-surface-700/90 to-surface-800/90 overflow-hidden">
+                              <div className="p-3 flex items-center gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-white truncate">{cat.nombre}</p>
+                                    {guion && (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent-green/15 text-accent-green border border-accent-green/30">
+                                        v{guion.version}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {guion ? (
+                                    <p className="text-[11px] text-gray-500 mt-0.5">
+                                      {guion.secciones.length} secciones · Umbral: {guion.umbral}%
+                                      {guion.secciones.filter((s) => s.tipo === 'must_have').length > 0 && (
+                                        <> · <span className="text-accent-green">{guion.secciones.filter((s) => s.tipo === 'must_have').length} must-have</span></>
+                                      )}
+                                    </p>
+                                  ) : (
+                                    <p className="text-[11px] text-gray-500 mt-0.5">Sin guion configurado</p>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isEditing) {
+                                      setCoachEditCatId(null);
+                                    } else {
+                                      setCoachEditCatId(cat.id);
+                                      if (guion) {
+                                        setCoachSecciones(guion.secciones.map((s) => ({ ...s })));
+                                        setCoachUmbral(guion.umbral);
+                                      } else {
+                                        setCoachSecciones(DEFAULT_SECCIONES.map((s) => ({ ...s })));
+                                        setCoachUmbral(70);
+                                      }
+                                    }
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                                    isEditing
+                                      ? 'bg-surface-600 text-gray-300 border-surface-500'
+                                      : guion
+                                        ? 'bg-accent-green/20 text-accent-green border-accent-green/40 hover:bg-accent-green/30'
+                                        : 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/40 hover:bg-accent-cyan/30'
+                                  }`}
+                                >
+                                  {isEditing ? 'Cerrar' : guion ? 'Editar guion' : 'Configurar guion'}
+                                </button>
+                                {guion && !isEditing && (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteCoachGuion(cat.id)}
+                                    disabled={coachSaving}
+                                    className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400 disabled:opacity-50"
+                                    title="Eliminar guion"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {isEditing && (
+                                <div className="border-t border-surface-500 p-4 space-y-4">
+                                  {guion && (
+                                    <div className="rounded-lg p-2.5 bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+                                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                      <p className="text-[11px] text-amber-300/90">Editar el guion crea una nueva versión (v{guion.version + 1}). Las llamadas pendientes se re-evaluarán con el nuevo guion.</p>
+                                    </div>
+                                  )}
+
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <label className="text-xs font-medium text-accent-green">Secciones del guion</label>
+                                      <button
+                                        type="button"
+                                        onClick={() => setCoachSecciones((prev) => [
+                                          ...prev,
+                                          { id: crypto.randomUUID(), nombre: '', criterio: '', tipo: 'deseable' },
+                                        ])}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-accent-green/20 text-accent-green border border-accent-green/40 hover:bg-accent-green/30"
+                                      >
+                                        <Plus className="w-3 h-3" /> Sección
+                                      </button>
+                                    </div>
+
+                                    {coachSecciones.map((sec, idx) => (
+                                      <div key={sec.id} className="rounded-lg p-3 bg-surface-600/50 border border-surface-500 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="text"
+                                            value={sec.nombre}
+                                            onChange={(e) => setCoachSecciones((prev) => prev.map((s, i) => i === idx ? { ...s, nombre: e.target.value } : s))}
+                                            placeholder="Nombre de la sección"
+                                            className="flex-1 rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-accent-green/40"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => setCoachSecciones((prev) => prev.map((s, i) => i === idx ? { ...s, tipo: s.tipo === 'must_have' ? 'deseable' : 'must_have' } : s))}
+                                            className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                                              sec.tipo === 'must_have'
+                                                ? 'bg-accent-green/20 text-accent-green border-accent-green/40'
+                                                : 'bg-surface-700 text-gray-400 border-surface-500 hover:border-gray-400'
+                                            }`}
+                                          >
+                                            {sec.tipo === 'must_have' ? 'Must-have' : 'Deseable'}
+                                          </button>
+                                          {coachSecciones.length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setCoachSecciones((prev) => prev.filter((_, i) => i !== idx))}
+                                              className="p-1 text-gray-500 hover:text-red-400"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+                                        <textarea
+                                          value={sec.criterio}
+                                          onChange={(e) => setCoachSecciones((prev) => prev.map((s, i) => i === idx ? { ...s, criterio: e.target.value } : s))}
+                                          placeholder="¿Qué debe cubrir el asesor en esta sección? (criterio de evaluación)"
+                                          className="w-full rounded-lg bg-surface-700 border border-surface-500 p-2 text-sm text-white min-h-[60px] focus:ring-2 focus:ring-accent-green/40"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="pt-2 border-t border-surface-500">
+                                    <label className="text-xs font-medium text-accent-green mb-2 block">Umbral de cumplimiento: {coachUmbral}%</label>
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={100}
+                                        step={5}
+                                        value={coachUmbral}
+                                        onChange={(e) => setCoachUmbral(Number(e.target.value))}
+                                        className="flex-1 accent-accent-green"
+                                      />
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={coachUmbral}
+                                        onChange={(e) => setCoachUmbral(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                        className="w-16 rounded-lg bg-surface-700 border border-surface-500 px-2 py-1.5 text-sm text-white text-center focus:ring-2 focus:ring-accent-green/40"
+                                      />
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 mt-1">Si el score total queda debajo de este umbral, se aplica el tag de incumplimiento.</p>
+                                  </div>
+
+                                  <div className="flex gap-2 justify-end pt-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCoachEditCatId(null)}
+                                      className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white border border-surface-500 hover:border-surface-400"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => saveCoachGuion(cat.id)}
+                                      disabled={coachSaving || coachSecciones.filter((s) => s.criterio.trim() && s.nombre.trim()).length === 0}
+                                      className="px-4 py-1.5 rounded-lg text-xs font-medium bg-accent-green/20 text-accent-green border border-accent-green/40 hover:bg-accent-green/30 disabled:opacity-50 flex items-center gap-1.5"
+                                    >
+                                      {coachSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                      {guion ? 'Actualizar guion' : 'Guardar guion'}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
