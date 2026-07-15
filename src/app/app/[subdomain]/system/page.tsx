@@ -841,7 +841,7 @@ export default function SystemPage() {
                   <ul className="space-y-2 mb-3">
                     {categoriasLlamadas.map((cat) => {
                       const tieneRegla = tagRules.some((r) =>
-                        r.acciones.some((a) => a.tipo === 'asignar_categoria' && a.valor === cat.id)
+                        r.acciones.some((a) => a.tipo === 'asignar_categoria' && a.categoria_id === cat.id)
                       );
                       return (
                       <li key={cat.id} className="rounded-xl p-3 border-l-4 border-accent-purple/60 bg-gradient-to-b from-surface-700/90 to-surface-800/90 border border-surface-500 flex items-start gap-3">
