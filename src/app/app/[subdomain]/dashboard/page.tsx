@@ -29,18 +29,6 @@ const defaultDateFrom = subDays(defaultDateTo, 7);
 const OBJECTION_PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6'];
 const LOSS_REASON_PIE_COLORS = ['#f43f5e', '#fb923c', '#a78bfa', '#38bdf8', '#34d399', '#fbbf24'];
 
-export const DASHBOARD_PANEL_KEYS = [
-  'panel_ads',
-  'panel_kpis',
-  'panel_ventas',
-  'panel_metas',
-  'panel_etiquetas',
-  'panel_objeciones',
-  'panel_volumen',
-  'panel_ranking',
-  'panel_razones_perdida',
-] as const;
-
 const RANKING_COLS = [
   { key: 'leads', label: 'Leads trabajados' },
   { key: 'generados', label: 'Leads nuevos' },
