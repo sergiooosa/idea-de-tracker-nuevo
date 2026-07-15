@@ -29,6 +29,18 @@ const defaultDateFrom = subDays(defaultDateTo, 7);
 const OBJECTION_PIE_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6'];
 const LOSS_REASON_PIE_COLORS = ['#f43f5e', '#fb923c', '#a78bfa', '#38bdf8', '#34d399', '#fbbf24'];
 
+export const DASHBOARD_PANEL_KEYS = [
+  'panel_ads',
+  'panel_kpis',
+  'panel_ventas',
+  'panel_metas',
+  'panel_etiquetas',
+  'panel_objeciones',
+  'panel_volumen',
+  'panel_ranking',
+  'panel_razones_perdida',
+] as const;
+
 const RANKING_COLS = [
   { key: 'leads', label: 'Leads trabajados' },
   { key: 'generados', label: 'Leads nuevos' },
@@ -80,6 +92,10 @@ export default function DashboardPage() {
   const razonesPerdida = data?.razonesPerdida ?? [];
   const volumeByDay = data?.volumeByDay ?? [];
   const advisorRanking = data?.advisorRanking ?? [];
+
+  const seccionesOcultas: string[] = Array.isArray(data?.configuracion_ui?.secciones_ocultas)
+    ? (data.configuracion_ui.secciones_ocultas as string[])
+    : [];
 
   // Extraer columnas webhook dinámicamente
   const webhookRankingCols = useMemo(() => {
@@ -220,7 +236,7 @@ export default function DashboardPage() {
         </section>
 
         {/* 📊 Ads Summary Widget — top of dashboard, before KPIs */}
-        {data?.adsSummary?.hasAds && (
+        {data?.adsSummary?.hasAds && !seccionesOcultas.includes('panel_ads') && (
           <section className="rounded-lg p-3 section-futuristic">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -258,7 +274,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <section>
+        {!seccionesOcultas.includes('panel_kpis') && <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">KPIs operativos</h2>
             <Link
@@ -375,9 +391,9 @@ export default function DashboardPage() {
               </>
             );
           })()}
-        </section>
+        </section>}
 
-        <section>
+        {!seccionesOcultas.includes('panel_ventas') && <section>
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <GitBranch className="w-3.5 h-3.5 text-accent-purple" />
             Proceso de ventas
@@ -400,7 +416,7 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </section>
+        </section>}
 
         {(data?.segmentacionCalificadoCanal?.length ?? 0) > 0 && (
           <SegmentacionCalificados
@@ -411,7 +427,7 @@ export default function DashboardPage() {
         )}
 
         {/* 🎯 Progreso de Metas por Canal */}
-        {(data?.alertasMetas?.length ?? 0) > 0 && (() => {
+        {(data?.alertasMetas?.length ?? 0) > 0 && !seccionesOcultas.includes('panel_metas') && (() => {
           const alertas = data!.alertasMetas!;
           const cumplidas = alertas.filter((a) => a.cumple).length;
           const canales: Array<{ key: "llamadas" | "videollamadas" | "chats" | "general"; label: string; emoji: string; borderColor: string; textColor: string }> = [
@@ -645,7 +661,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {Object.keys(data?.tagCounts ?? {}).length > 0 && (
+        {Object.keys(data?.tagCounts ?? {}).length > 0 && !seccionesOcultas.includes('panel_etiquetas') && (
           <section>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <TagIcon className="w-3.5 h-3.5 text-accent-amber" />
@@ -673,7 +689,7 @@ export default function DashboardPage() {
         )}
 
         <div className="grid md:grid-cols-2 gap-3">
-          <section className="rounded-lg p-3 section-futuristic">
+          {!seccionesOcultas.includes('panel_objeciones') && <section className="rounded-lg p-3 section-futuristic">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5 text-accent-red" />
@@ -718,8 +734,8 @@ export default function DashboardPage() {
                 </ul>
               </div>
             )}
-          </section>
-          <section className="rounded-lg p-3 section-futuristic">
+          </section>}
+          {!seccionesOcultas.includes('panel_volumen') && <section className="rounded-lg p-3 section-futuristic">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Volumen: llamadas, citas y cierres</h2>
               <button type="button" onClick={toggleVolumen} className="p-1 rounded hover:bg-surface-600 text-gray-500 hover:text-gray-300 transition-colors" title={showVolumen ? 'Ocultar' : 'Mostrar'}>
@@ -742,10 +758,10 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               </div>
             )}
-          </section>
+          </section>}
         </div>
 
-        {razonesPerdida.length > 0 && (
+        {razonesPerdida.length > 0 && !seccionesOcultas.includes('panel_razones_perdida') && (
           <section className="rounded-lg p-3 section-futuristic">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -794,7 +810,7 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <section>
+        {!seccionesOcultas.includes('panel_ranking') && <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranking por asesor</h2>
             <div className="relative" ref={rankingColsPopoverRef}>
@@ -921,7 +937,7 @@ export default function DashboardPage() {
               </table>
             </div>
           </div>
-        </section>
+        </section>}
       </div>
 
       {modalObjeciones && (
