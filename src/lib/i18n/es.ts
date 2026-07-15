@@ -9,7 +9,7 @@ export const es = {
     bandeja: "Bandeja",
     adquisicion: "Resumen adquisición",
     ads: "Ads & Inversión",
-    comparaciones: "Comparaciones",
+    comparaciones: "Proyecciones",
     comisiones: "Comisiones",
     reporte: "Reporte mensual",
     sistema: "Control del sistema",

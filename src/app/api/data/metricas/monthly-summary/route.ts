@@ -4,19 +4,17 @@ import { db } from "@/lib/db";
 import { cuentas, metricasWebhook } from "@/lib/db/schema";
 import { eq, and, gte, lt, inArray, sql } from "drizzle-orm";
 import type { MetricaConfig } from "@/lib/db/schema";
+import { STANDARD_METRICS, computeStandardMetrics } from "@/lib/queries/standard-metrics";
 
-/**
- * GET /api/data/metricas/monthly-summary
- *
- * Aggregates metricas_webhook by month for comparison between two months.
- *
- * Query params:
- *   metricIds[]  — array of campo IDs to include
- *   from         — YYYY-MM (Mes A)
- *   to           — YYYY-MM (Mes B)
- *
- * Response: { rows: [{ metricId, nombre, formato, mesA, mesB }] }
- */
+function monthBounds(ym: string): { dateFrom: string; dateTo: string } {
+  const [year, month] = ym.split("-").map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    dateFrom: `${ym}-01`,
+    dateTo: `${ym}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
 export async function GET(req: Request) {
   return withAuth(req, async (idCuenta) => {
     const { searchParams } = new URL(req.url);
@@ -32,7 +30,6 @@ export async function GET(req: Request) {
       );
     }
 
-    // Validate YYYY-MM format
     if (!/^\d{4}-\d{2}$/.test(from) || !/^\d{4}-\d{2}$/.test(to)) {
       return NextResponse.json(
         { error: "from y to deben estar en formato YYYY-MM" },
@@ -40,106 +37,138 @@ export async function GET(req: Request) {
       );
     }
 
-    // Compute inclusive date bounds for each month
-    function monthBounds(ym: string): { start: string; end: string } {
-      const [year, month] = ym.split("-").map(Number);
-      const start = `${ym}-01`;
-      const nextMonth = month === 12 ? 1 : month + 1;
-      const nextYear = month === 12 ? year + 1 : year;
-      const end = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
-      return { start, end };
-    }
+    const stdIds = metricIds.filter((id) => id.startsWith("std:"));
+    const webhookIds = metricIds.filter((id) => !id.startsWith("std:"));
 
     const boundsA = monthBounds(from);
     const boundsB = monthBounds(to);
 
-    // Fetch metricas_config for name/format enrichment
-    const [cuenta] = await db
-      .select({ metricas_config: cuentas.metricas_config })
-      .from(cuentas)
-      .where(eq(cuentas.id_cuenta, idCuenta))
-      .limit(1);
+    const stdNamesMap = new Map(STANDARD_METRICS.map((m) => [m.id, m]));
 
-    const allConfig: MetricaConfig[] = cuenta?.metricas_config ?? [];
-    const configByCampo = new Map<string, MetricaConfig>();
-    for (const cfg of allConfig) {
-      if (cfg.tipo === "webhook" && cfg.webhookCampo) {
-        configByCampo.set(cfg.webhookCampo, cfg);
+    const results: {
+      metricId: string;
+      nombre: string;
+      formato: string;
+      mesA: number | null;
+      mesB: number | null;
+    }[] = [];
+
+    if (stdIds.length > 0) {
+      const [stdA, stdB] = await Promise.all([
+        computeStandardMetrics(idCuenta, boundsA.dateFrom, boundsA.dateTo),
+        computeStandardMetrics(idCuenta, boundsB.dateFrom, boundsB.dateTo),
+      ]);
+
+      for (const id of stdIds) {
+        const def = stdNamesMap.get(id);
+        if (!def) continue;
+        results.push({
+          metricId: id,
+          nombre: def.nombre,
+          formato: def.formato,
+          mesA: stdA[id] ?? null,
+          mesB: stdB[id] ?? null,
+        });
       }
     }
 
-    // Determine which campos to query
-    let camposToQuery: string[] = metricIds.filter((id) => id.length > 0);
+    if (webhookIds.length > 0 || (metricIds.length === 0 && stdIds.length === 0)) {
+      const [cuenta] = await db
+        .select({ metricas_config: cuentas.metricas_config })
+        .from(cuentas)
+        .where(eq(cuentas.id_cuenta, idCuenta))
+        .limit(1);
 
-    if (camposToQuery.length === 0) {
-      const rows = await db
-        .selectDistinct({ campo: metricasWebhook.campo })
-        .from(metricasWebhook)
-        .where(eq(metricasWebhook.id_cuenta, idCuenta));
-      camposToQuery = rows.map((r) => r.campo);
-    }
+      const allConfig: MetricaConfig[] = cuenta?.metricas_config ?? [];
+      const configByCampo = new Map<string, MetricaConfig>();
+      for (const cfg of allConfig) {
+        if (cfg.tipo === "webhook" && cfg.webhookCampo) {
+          configByCampo.set(cfg.webhookCampo, cfg);
+        }
+      }
 
-    if (camposToQuery.length === 0) {
-      return NextResponse.json({ rows: [] });
-    }
+      let camposToQuery = webhookIds.filter((id) => id.length > 0);
 
-    // Aggregate SUM per campo for each month using drizzle ORM
-    const [mesARows, mesBRows] = await Promise.all([
-      db
-        .select({
-          campo: metricasWebhook.campo,
-          total: sql<string>`COALESCE(SUM(${metricasWebhook.valor}::numeric), 0)`,
-        })
-        .from(metricasWebhook)
-        .where(
-          and(
-            eq(metricasWebhook.id_cuenta, idCuenta),
-            inArray(metricasWebhook.campo, camposToQuery),
-            gte(metricasWebhook.fecha, boundsA.start),
-            lt(metricasWebhook.fecha, boundsA.end),
-          ),
-        )
-        .groupBy(metricasWebhook.campo),
-      db
-        .select({
-          campo: metricasWebhook.campo,
-          total: sql<string>`COALESCE(SUM(${metricasWebhook.valor}::numeric), 0)`,
-        })
-        .from(metricasWebhook)
-        .where(
-          and(
-            eq(metricasWebhook.id_cuenta, idCuenta),
-            inArray(metricasWebhook.campo, camposToQuery),
-            gte(metricasWebhook.fecha, boundsB.start),
-            lt(metricasWebhook.fecha, boundsB.end),
-          ),
-        )
-        .groupBy(metricasWebhook.campo),
-    ]);
+      if (camposToQuery.length === 0 && metricIds.length === 0) {
+        const rows = await db
+          .selectDistinct({ campo: metricasWebhook.campo })
+          .from(metricasWebhook)
+          .where(eq(metricasWebhook.id_cuenta, idCuenta));
+        camposToQuery = rows.map((r) => r.campo);
+      }
 
-    const mapA = new Map<string, number>();
-    for (const row of mesARows) {
-      mapA.set(row.campo, parseFloat(row.total));
-    }
-    const mapB = new Map<string, number>();
-    for (const row of mesBRows) {
-      mapB.set(row.campo, parseFloat(row.total));
-    }
-
-    // Only return campos that have data in at least one of the two months
-    const rows = camposToQuery
-      .filter((campo) => mapA.has(campo) || mapB.has(campo))
-      .map((campo) => {
-        const cfg = configByCampo.get(campo);
-        return {
-          metricId: campo,
-          nombre: cfg?.nombre ?? campo,
-          formato: cfg?.formato ?? "numero",
-          mesA: mapA.get(campo) ?? null,
-          mesB: mapB.get(campo) ?? null,
+      if (camposToQuery.length > 0) {
+        const webhookBoundsA = {
+          start: `${from}-01`,
+          end: (() => {
+            const [y, m] = from.split("-").map(Number);
+            const nm = m === 12 ? 1 : m + 1;
+            const ny = m === 12 ? y + 1 : y;
+            return `${ny}-${String(nm).padStart(2, "0")}-01`;
+          })(),
         };
-      });
+        const webhookBoundsB = {
+          start: `${to}-01`,
+          end: (() => {
+            const [y, m] = to.split("-").map(Number);
+            const nm = m === 12 ? 1 : m + 1;
+            const ny = m === 12 ? y + 1 : y;
+            return `${ny}-${String(nm).padStart(2, "0")}-01`;
+          })(),
+        };
 
-    return NextResponse.json({ rows });
+        const [mesARows, mesBRows] = await Promise.all([
+          db
+            .select({
+              campo: metricasWebhook.campo,
+              total: sql<string>`COALESCE(SUM(${metricasWebhook.valor}::numeric), 0)`,
+            })
+            .from(metricasWebhook)
+            .where(
+              and(
+                eq(metricasWebhook.id_cuenta, idCuenta),
+                inArray(metricasWebhook.campo, camposToQuery),
+                gte(metricasWebhook.fecha, webhookBoundsA.start),
+                lt(metricasWebhook.fecha, webhookBoundsA.end),
+              ),
+            )
+            .groupBy(metricasWebhook.campo),
+          db
+            .select({
+              campo: metricasWebhook.campo,
+              total: sql<string>`COALESCE(SUM(${metricasWebhook.valor}::numeric), 0)`,
+            })
+            .from(metricasWebhook)
+            .where(
+              and(
+                eq(metricasWebhook.id_cuenta, idCuenta),
+                inArray(metricasWebhook.campo, camposToQuery),
+                gte(metricasWebhook.fecha, webhookBoundsB.start),
+                lt(metricasWebhook.fecha, webhookBoundsB.end),
+              ),
+            )
+            .groupBy(metricasWebhook.campo),
+        ]);
+
+        const mapA = new Map<string, number>();
+        for (const row of mesARows) mapA.set(row.campo, parseFloat(row.total));
+        const mapB = new Map<string, number>();
+        for (const row of mesBRows) mapB.set(row.campo, parseFloat(row.total));
+
+        for (const campo of camposToQuery) {
+          if (!mapA.has(campo) && !mapB.has(campo)) continue;
+          const cfg = configByCampo.get(campo);
+          results.push({
+            metricId: campo,
+            nombre: cfg?.nombre ?? campo,
+            formato: cfg?.formato ?? "numero",
+            mesA: mapA.get(campo) ?? null,
+            mesB: mapB.get(campo) ?? null,
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ rows: results });
   });
 }
