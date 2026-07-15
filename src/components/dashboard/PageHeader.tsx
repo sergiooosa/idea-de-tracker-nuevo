@@ -4,6 +4,10 @@ import Link from "next/link";
 import { ArrowLeft } from 'lucide-react';
 import ReportProblemButton from "./ReportProblemButton";
 
+// AUT-1554: Juan pidió ocultar la función de reportar tickets desde el sistema.
+// Para volver a mostrarla cuando lo indique, cambiar esta constante a `true`.
+const MOSTRAR_REPORTAR_TICKETS = false;
+
 export default function PageHeader({
   title,
   subtitle,
@@ -39,7 +43,7 @@ export default function PageHeader({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {action && <div>{action}</div>}
-          <ReportProblemButton />
+          {MOSTRAR_REPORTAR_TICKETS && <ReportProblemButton />}
         </div>
       </div>
     </header>
