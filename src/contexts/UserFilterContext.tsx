@@ -31,7 +31,6 @@ export interface UserFilterContextValue {
 
 export const UserFilterContext = createContext<UserFilterContextValue | null>(null);
 
-const LS_KEY = "autokpi_solo_mis_datos";
 const LS_ASESORES = "autokpi_asesores_seleccionados";
 
 function parseStoredAsesores(raw: string | null): string[] {
@@ -47,10 +46,17 @@ function parseStoredAsesores(raw: string | null): string[] {
 export function UserFilterProvider({ children }: { children: ReactNode }) {
   const { session, loading: sessionLoading, canViewAll, canEdit } = useSession();
 
-  const [soloMisDatos, setSoloMisDatos] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(LS_KEY) === "true";
-  });
+  // "Solo mis datos" es un filtro de VISTA, NO una preferencia persistida.
+  // AUT-1563: el código viejo forzaba `true` y lo persistía en un localStorage
+  // compartido por origen para CADA no-admin; luego cualquier admin que abriera
+  // el dashboard en ese mismo navegador heredaba el `true` y veía TODO en 0
+  // (un manager no tiene llamadas propias) sin causa visible. Un filtro que
+  // pone en 0 el dashboard entero no debe sobrevivir a un reload.
+  // Por eso: los admin arrancan viendo TODO (false) y el toggle vive solo en
+  // memoria durante la sesión; los no-admin siempre ven solo lo suyo (derivado).
+  const [soloMisDatosPref, setSoloMisDatosPref] = useState(false);
+
+  const soloMisDatos = canViewAll ? soloMisDatosPref : true;
 
   const [asesoresSeleccionados, setAsesoresSeleccionadosState] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -79,16 +85,6 @@ export function UserFilterProvider({ children }: { children: ReactNode }) {
   const asesorSeleccionado = asesoresSeleccionados.length > 0 ? asesoresSeleccionados[0] : "";
 
   useEffect(() => {
-    localStorage.setItem(LS_KEY, String(soloMisDatos));
-  }, [soloMisDatos]);
-
-  useEffect(() => {
-    if (!sessionLoading && session && !canViewAll) {
-      setSoloMisDatos(true);
-    }
-  }, [sessionLoading, session, canViewAll]);
-
-  useEffect(() => {
     if (!canViewAll || sessionLoading) return;
     fetch("/api/data/asesores")
       .then((r) => (r.ok ? r.json() : []))
@@ -98,7 +94,7 @@ export function UserFilterProvider({ children }: { children: ReactNode }) {
 
   const toggleSoloMisDatos = () => {
     if (!canViewAll) return;
-    setSoloMisDatos((prev) => !prev);
+    setSoloMisDatosPref((prev) => !prev);
   };
 
   const effectiveCloserEmails = useMemo(() => {
