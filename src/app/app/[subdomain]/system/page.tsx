@@ -2800,7 +2800,13 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-green/30">
                 <div className="rounded-lg p-2 bg-accent-green/20 border border-accent-green/40"><ShieldCheck className="w-5 h-5 text-accent-green" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Coach de ventas</h3>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-lg font-semibold text-white">Coach de ventas</h3>
+                    <HelpTooltip
+                      titulo="¿Qué es el Coach de ventas?"
+                      contenido="El Coach de ventas evalúa automáticamente cada llamada contra un guion modelo que tú defines por categoría. La IA compara lo que dijo el asesor con las secciones del guion y genera un score de cumplimiento. Si el score queda debajo del umbral, se aplica un tag de incumplimiento y una nota con lo que faltó."
+                    />
+                  </div>
                   <p className="text-sm text-gray-400">Sube un guion modelo por categoría de llamada. La IA evalúa cada llamada contra el guion y aplica tags + notas si incumple.</p>
                 </div>
               </div>
@@ -2926,7 +2932,13 @@ export default function SystemPage() {
 
                                   <div className="space-y-3">
                                     <div className="flex items-center justify-between">
-                                      <label className="text-xs font-medium text-accent-green">Secciones del guion</label>
+                                      <div className="flex items-center gap-1.5">
+                                        <label className="text-xs font-medium text-accent-green">Secciones del guion</label>
+                                        <HelpTooltip
+                                          titulo="Secciones del guion"
+                                          contenido="Cada sección representa un bloque del guion que el asesor debe cubrir durante la llamada. Las secciones 'must-have' son obligatorias: si faltan, se genera un tag de incumplimiento. Las secciones 'deseables' son recomendadas pero su ausencia solo genera una nota suave, sin penalizar el score."
+                                        />
+                                      </div>
                                       <button
                                         type="button"
                                         onClick={() => setCoachSecciones((prev) => [
@@ -2970,6 +2982,13 @@ export default function SystemPage() {
                                             </button>
                                           )}
                                         </div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                          <label className="text-[11px] text-gray-400">Criterio de evaluación</label>
+                                          <HelpTooltip
+                                            titulo="Criterio de evaluación"
+                                            contenido="Describe qué debe decir o cubrir el asesor en esta sección. La IA compara el transcript de la llamada contra este criterio para determinar si la sección se cumplió. Sé específico: en vez de 'saludar', escribe 'el asesor debe presentarse con nombre, empresa y preguntar el nombre del prospecto'."
+                                          />
+                                        </div>
                                         <textarea
                                           value={sec.criterio}
                                           onChange={(e) => setCoachSecciones((prev) => prev.map((s, i) => i === idx ? { ...s, criterio: e.target.value } : s))}
@@ -2981,7 +3000,13 @@ export default function SystemPage() {
                                   </div>
 
                                   <div className="pt-2 border-t border-surface-500">
-                                    <label className="text-xs font-medium text-accent-green mb-2 block">Umbral de cumplimiento: {coachUmbral}%</label>
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                      <label className="text-xs font-medium text-accent-green">Umbral de cumplimiento: {coachUmbral}%</label>
+                                      <HelpTooltip
+                                        titulo="Umbral de cumplimiento"
+                                        contenido="Porcentaje mínimo de secciones must-have que el asesor debe cubrir para que la llamada se considere 'cumple'. Si el score queda por debajo de este umbral, se aplica automáticamente un tag de incumplimiento y una nota con las secciones faltantes. Ej: con umbral 70% y 10 secciones must-have, el asesor debe cubrir al menos 7."
+                                      />
+                                    </div>
                                     <div className="flex items-center gap-3">
                                       <input
                                         type="range"
