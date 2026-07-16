@@ -2,7 +2,7 @@ export const es = {
   nav: {
     dashboard: "Panel ejecutivo",
     performance: "Rendimiento",
-    videollamadas: "Videollamadas",
+    videollamadas: "Citas",
     llamadas: "Llamadas",
     chats: "Chats",
     asesor: "Panel asesor",
@@ -59,7 +59,7 @@ export const es = {
       fecha: "Fecha",
       resultado: "Resultado",
       reunion: "Reunión",
-      noData: "No hay videollamadas en este período",
+      noData: "No hay citas en este período",
       kpis: {
         agendadas: "Agendadas",
         asistidas: "Asistidas",
@@ -137,7 +137,7 @@ export const es = {
     canales: {
       titulo: "Resumen por Canal",
       llamadas: "Llamadas",
-      videollamadas: "Videollamadas",
+      videollamadas: "Citas",
       chats: "Chats",
     },
   },
