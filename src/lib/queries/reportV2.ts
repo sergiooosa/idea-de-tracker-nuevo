@@ -424,7 +424,7 @@ export async function buildReportV2(
     .limit(1);
   const tz = tzRow?.zona_horaria_iana ?? null;
 
-  const enrichment = opts.enrichment ?? await getEnrichmentFromDb(idCuenta, from, to, tz);
+  const enrichment = opts.enrichment ?? await getEnrichmentFromDb(idCuenta, from, to, tz, opts.geminiApiKey);
 
   // ── Queries paralelas ─────────────────────────────────────────────────────
   const [

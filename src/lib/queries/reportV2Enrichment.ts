@@ -100,6 +100,43 @@ function toDistribution(counts: Map<string, number>, denominador: number): Repor
     }));
 }
 
+function canonicalLabelKey(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[.,;:!?"'()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toCanonicalDistribution(
+  rawCounts: Map<string, number>,
+  denominador: number,
+): ReportV2Distribucion[] {
+  const canonCount = new Map<string, number>();
+  const canonBest = new Map<string, { label: string; count: number }>();
+  for (const [label, count] of rawCounts) {
+    if (label === "") continue;
+    const key = canonicalLabelKey(label);
+    if (!key) continue;
+    canonCount.set(key, (canonCount.get(key) ?? 0) + count);
+    const best = canonBest.get(key);
+    if (!best || count > best.count) canonBest.set(key, { label, count });
+  }
+  return [...canonCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_N)
+    .map(([key, count]) => {
+      const best = canonBest.get(key);
+      return {
+        label: best ? best.label : key,
+        count,
+        pct: denominador > 0 ? count / denominador : 0,
+      };
+    });
+}
+
 const MAX_PRESUPUESTO = 100_000_000;
 
 function parseFirstNumber(text: string): number | null {
@@ -161,11 +198,95 @@ function buildConversacionCanal(
   };
 }
 
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+interface GeminiClusterResponse {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+  }>;
+}
+
+async function clusterLabelsWithGemini(
+  labels: Map<string, number>,
+  apiKey: string,
+  campo: string,
+): Promise<Map<string, string> | null> {
+  if (labels.size <= 1) return null;
+  const entries = [...labels.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 30)
+    .map(([l, c]) => `${l} (${c})`);
+
+  const prompt = [
+    `Eres un asistente que agrupa etiquetas de "${campo}" que significan lo mismo.`,
+    "Recibe una lista de etiquetas con sus conteos.",
+    "Devuelve SOLO un JSON válido: un objeto donde cada key es la etiqueta original exacta",
+    "y el value es la categoría canónica en español a la que pertenece.",
+    "Si una etiqueta ya es su propia categoría, repítela como value.",
+    "No inventes categorías que no estén representadas en los datos.",
+    "",
+    "Etiquetas:",
+    entries.join("\n"),
+  ].join("\n");
+
+  try {
+    const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as GeminiClusterResponse;
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const mapping = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    const result = new Map<string, string>();
+    for (const [original, canonical] of Object.entries(mapping)) {
+      if (typeof canonical === "string" && canonical.trim()) {
+        result.set(original, canonical.trim());
+      }
+    }
+    return result.size > 0 ? result : null;
+  } catch {
+    return null;
+  }
+}
+
+function applySemanticClustering(
+  distribution: ReportV2Distribucion[],
+  clusterMap: Map<string, string>,
+  denominador: number,
+): ReportV2Distribucion[] {
+  const grouped = new Map<string, number>();
+  for (const item of distribution) {
+    const canonical = clusterMap.get(item.label) ?? item.label;
+    grouped.set(canonical, (grouped.get(canonical) ?? 0) + item.count);
+  }
+  return [...grouped.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_N)
+    .map(([label, count]) => ({
+      label,
+      count,
+      pct: denominador > 0 ? count / denominador : 0,
+    }));
+}
+
 export async function getEnrichmentFromDb(
   idCuenta: number,
   from: string,
   to: string,
   tz?: string | null,
+  geminiApiKey?: string | null,
 ): Promise<ReportV2Enrichment> {
   const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
 
@@ -308,11 +429,32 @@ export async function getEnrichmentFromDb(
     .slice(0, 5)
     .map(([razon]) => razon);
 
+  let motivo = toCanonicalDistribution(motivoCounts, iaDenominador);
+  let perfil = toCanonicalDistribution(perfilCounts, iaDenominador);
+
+  const gKey = geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || null;
+  if (gKey && motivo.length > 1) {
+    const labelCounts = new Map<string, number>();
+    for (const m of motivo) labelCounts.set(m.label, m.count);
+    const clusterMap = await clusterLabelsWithGemini(labelCounts, gKey, "motivo de interés");
+    if (clusterMap) {
+      motivo = applySemanticClustering(motivo, clusterMap, iaDenominador);
+    }
+  }
+  if (gKey && perfil.length > 1) {
+    const labelCounts = new Map<string, number>();
+    for (const p of perfil) labelCounts.set(p.label, p.count);
+    const clusterMap = await clusterLabelsWithGemini(labelCounts, gKey, "perfil de comprador");
+    if (clusterMap) {
+      perfil = applySemanticClustering(perfil, clusterMap, iaDenominador);
+    }
+  }
+
   return {
     parcial,
     demografiaIA: {
-      motivo: toDistribution(motivoCounts, iaDenominador),
-      perfil: toDistribution(perfilCounts, iaDenominador),
+      motivo,
+      perfil,
       edadDominante,
       presupuestoProm,
       iaDenominador,
