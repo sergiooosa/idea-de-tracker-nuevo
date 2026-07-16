@@ -53,7 +53,7 @@ export const es = {
   performance: {
     titulo: "Rendimiento",
     videollamadas: {
-      titulo: "Videollamadas",
+      titulo: "Citas",
       lead: "Lead",
       closer: "Closer",
       fecha: "Fecha",
