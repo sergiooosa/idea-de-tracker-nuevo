@@ -322,30 +322,138 @@ async function getUbicacionLada(
   return { items, denominador };
 }
 
-async function getNuevosReactivados(
+async function getLeadsUnicosNuevosReactivados(
   idCuenta: number,
   from: string,
   to: string,
   tz?: string | null,
-): Promise<{ nuevos: number; reactivados: number }> {
-  // registros_de_llamada: un registro por lead con estado actual.
-  // Consideramos "nuevo" = fecha_primera_llamada dentro del periodo.
-  // "reactivado" = fecha_primera_llamada antes del periodo pero tiene actividad en él.
+): Promise<{ total: number; nuevos: number; reactivados: number }> {
   const { fromDate: fromTs, toDate: toTs } = zonedDayRange(from, to, tz);
-  const rows = await db.execute<{ nuevos: string; reactivados: string }>(sql`
-    SELECT
-      SUM(CASE
-        WHEN fecha_primera_llamada BETWEEN ${fromTs} AND ${toTs} THEN 1 ELSE 0
-      END)::text AS nuevos,
-      SUM(CASE
-        WHEN fecha_primera_llamada < ${fromTs} THEN 1 ELSE 0
-      END)::text AS reactivados
-    FROM registros_de_llamada
-    WHERE id_cuenta::text = ${String(idCuenta)}
-      AND fecha_evento BETWEEN ${fromTs} AND ${toTs}
-  `);
-  const r = rows.rows[0];
-  return { nuevos: Number(r?.nuevos ?? 0), reactivados: Number(r?.reactivados ?? 0) };
+
+  const [callLeads, chatLeads, videoLeads] = await Promise.all([
+    db.execute<{
+      lead_key: string | null;
+      ghl_contact_id: string | null;
+      first_ever: string | null;
+    }>(sql`
+      WITH call_leads AS (
+        SELECT
+          COALESCE(ghl_contact_id, mail_lead, phone_raw_format) AS lead_key,
+          ghl_contact_id,
+          fecha_primera_llamada
+        FROM registros_de_llamada
+        WHERE id_cuenta::text = ${String(idCuenta)}
+          AND fecha_evento BETWEEN ${fromTs} AND ${toTs}
+          AND COALESCE(ghl_contact_id, mail_lead, phone_raw_format) IS NOT NULL
+      ),
+      first_log AS (
+        SELECT
+          COALESCE(contact_id_ghl, mail_lead, phone) AS lead_key,
+          MIN(ts) AS first_ts
+        FROM log_llamadas
+        WHERE id_cuenta = ${idCuenta}
+          AND tipo_evento NOT IN ('pdte', 'contacto_creado')
+          AND COALESCE(contact_id_ghl, mail_lead, phone) IN (
+            SELECT lead_key FROM call_leads WHERE fecha_primera_llamada IS NULL
+          )
+        GROUP BY COALESCE(contact_id_ghl, mail_lead, phone)
+      )
+      SELECT
+        cl.lead_key,
+        cl.ghl_contact_id,
+        COALESCE(cl.fecha_primera_llamada, fl.first_ts)::text AS first_ever
+      FROM call_leads cl
+      LEFT JOIN first_log fl ON fl.lead_key = cl.lead_key
+    `),
+
+    db.execute<{
+      lead_key: string | null;
+      ghl_contact_id: string | null;
+      first_ever: string | null;
+    }>(sql`
+      WITH period_leads AS (
+        SELECT DISTINCT COALESCE(id_lead, nombre_lead) AS lk
+        FROM chats_logs
+        WHERE id_cuenta = ${idCuenta}
+          AND fecha_y_hora_z BETWEEN ${fromTs} AND ${toTs}
+          AND COALESCE(id_lead, nombre_lead) IS NOT NULL
+      )
+      SELECT
+        pl.lk AS lead_key,
+        MAX(c.id_lead) AS ghl_contact_id,
+        MIN(c.fecha_y_hora_z)::text AS first_ever
+      FROM period_leads pl
+      JOIN chats_logs c
+        ON COALESCE(c.id_lead, c.nombre_lead) = pl.lk
+        AND c.id_cuenta = ${idCuenta}
+      GROUP BY pl.lk
+    `),
+
+    db.execute<{
+      lead_key: string | null;
+      ghl_contact_id: string | null;
+      first_ever: string | null;
+    }>(sql`
+      WITH period_leads AS (
+        SELECT DISTINCT COALESCE(ghl_contact_id, email_lead, nombre_de_lead) AS lk
+        FROM resumenes_diarios_agendas
+        WHERE id_cuenta = ${idCuenta}
+          AND fecha BETWEEN ${from}::date AND ${to}::date
+          AND excluida_dashboard = false
+          AND COALESCE(ghl_contact_id, email_lead, nombre_de_lead) IS NOT NULL
+      )
+      SELECT
+        pl.lk AS lead_key,
+        MAX(v.ghl_contact_id) AS ghl_contact_id,
+        MIN(v.fecha)::text AS first_ever
+      FROM period_leads pl
+      JOIN resumenes_diarios_agendas v
+        ON COALESCE(v.ghl_contact_id, v.email_lead, v.nombre_de_lead) = pl.lk
+        AND v.id_cuenta = ${idCuenta}
+        AND v.excluida_dashboard = false
+      GROUP BY pl.lk
+    `),
+  ]);
+
+  const seen = new Set<string>();
+  let nuevos = 0;
+  let reactivados = 0;
+  const fromDate = new Date(fromTs);
+
+  function processLead(
+    leadKey: string | null,
+    ghlId: string | null,
+    firstEver: string | null,
+  ): void {
+    if (!leadKey) return;
+    const dedupKey = ghlId ?? leadKey;
+    if (seen.has(dedupKey)) return;
+    seen.add(dedupKey);
+
+    if (firstEver == null) {
+      nuevos++;
+      return;
+    }
+
+    const firstDate = new Date(firstEver);
+    if (firstDate < fromDate) {
+      reactivados++;
+    } else {
+      nuevos++;
+    }
+  }
+
+  for (const r of callLeads.rows) {
+    processLead(r.lead_key, r.ghl_contact_id, r.first_ever);
+  }
+  for (const r of chatLeads.rows) {
+    processLead(r.lead_key, r.ghl_contact_id, r.first_ever);
+  }
+  for (const r of videoLeads.rows) {
+    processLead(r.lead_key, r.ghl_contact_id, r.first_ever);
+  }
+
+  return { total: seen.size, nuevos, reactivados };
 }
 
 async function getCitasPorAsesor(
@@ -441,7 +549,7 @@ export async function buildReportV2(
     getLlamadasCobertura(idCuenta, from, to, tz),
     getCanalesPorLead(idCuenta, from, to, tz),
     getUbicacionLada(idCuenta, from, to, tz),
-    getNuevosReactivados(idCuenta, from, to, tz),
+    getLeadsUnicosNuevosReactivados(idCuenta, from, to, tz),
     getCitasPorAsesor(idCuenta, from, to),
   ]);
 
@@ -453,7 +561,8 @@ export async function buildReportV2(
   };
 
   // ── kpis ──────────────────────────────────────────────────────────────────
-  const leadsAnalizados = contact.totalGeneral;
+  // AUT-1611: leadsAnalizados = leads únicos del periodo = nuevos + reactivados
+  const leadsAnalizados = nrSplit.total;
   const citasAgendadas = video.total;
   const citasRealizadas = video.total - video.noShows;
   const kpis = {
@@ -505,6 +614,8 @@ export async function buildReportV2(
   ];
 
   // ── estadoFinal ───────────────────────────────────────────────────────────
+  // AUT-1611: conteos de interacciones (eventos), no leads únicos — miden
+  // intensidad de contacto, no cobertura de pipeline.
   const estadoFinal = {
     enConversacion: contact.contestoGeneral,
     calificados: contact.calificoGeneral,
@@ -609,15 +720,18 @@ export async function buildReportV2(
   // ── comparativo ───────────────────────────────────────────────────────────
   let comparativo: ReportV2["comparativo"] = null;
   if (opts.periodoPrevio) {
-    const [callsPrev, chatsPrev, videoPrev, contactPrev] = await Promise.all([
+    const [callsPrev, chatsPrev, videoPrev, contactPrev, nrSplitPrev] = await Promise.all([
       getReportCalls(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
       getReportChats(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
       getReportVideocalls(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
       getReportContactabilidadCanal(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
+      getLeadsUnicosNuevosReactivados(idCuenta, opts.periodoPrevio.from, opts.periodoPrevio.to, tz),
     ]);
     const prevCitas = videoPrev.total;
     const prevCitasReal = videoPrev.total - videoPrev.noShows;
     const prevShowRate = prevCitas > 0 ? prevCitasReal / prevCitas : 0;
+    // AUT-1611: tasas de contacto/calificación usan conteo de eventos (interacciones),
+    // no leads únicos — miden intensidad operativa por intento, no cobertura de pipeline.
     const prevTasaConv = contactPrev.totalGeneral > 0
       ? contactPrev.calificoGeneral / contactPrev.totalGeneral : 0;
     const currTasaConv = contact.totalGeneral > 0
@@ -629,7 +743,7 @@ export async function buildReportV2(
 
     comparativo = {
       filas: [
-        comparativoRow("Leads analizados", leadsAnalizados, contactPrev.totalGeneral, true, "number"),
+        comparativoRow("Leads analizados", leadsAnalizados, nrSplitPrev.total, true, "number"),
         comparativoRow("Tasa contactabilidad", currTasaCont * 100, prevTasaCont * 100, true, "pct"),
         comparativoRow("Tasa calificación", currTasaConv * 100, prevTasaConv * 100, true, "pct"),
         ...(canalesActivos.llamadas
