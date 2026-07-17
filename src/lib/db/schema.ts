@@ -518,7 +518,6 @@ export const registrosDeLlamada = pgTable("registros_de_llamada", {
   id_user_ghl: text("id_user_ghl"),
   ghl_contact_id: text("ghl_contact_id"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
-  excluido_metricas: boolean("excluido_metricas").notNull().default(false),
 });
 
 /* ------------------------------------------------------------------ */
