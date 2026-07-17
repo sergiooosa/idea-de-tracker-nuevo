@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Trophy, ChevronDown, ChevronUp, Users } from "lucide-react";
 import clsx from "clsx";
 import type { DashboardAdvisorRow } from "@/types";
+import HelpTooltip from "@/components/dashboard/HelpTooltip";
 
 const fm = (n: number) =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${n.toLocaleString("es-CO")}`;
@@ -91,6 +92,11 @@ export default function AdvisorRankingWidget({ advisorRanking }: Props) {
       <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
         <Users className="w-4 h-4" />
         Ranking por asesor
+        <HelpTooltip
+          titulo="Ranking por asesor"
+          contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score."
+          comoProbar="Haz click en 'Llamadas' para ver quién hizo más llamadas; vuelve a hacer click para ver quién hizo menos. Repite con cualquier otra columna."
+        />
       </h2>
       <div className="rounded-lg border border-surface-500 overflow-hidden">
         <div className="overflow-x-auto">
