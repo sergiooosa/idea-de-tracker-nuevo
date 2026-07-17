@@ -2,6 +2,7 @@ import {
   pgTable,
   serial,
   bigserial,
+  bigint,
   text,
   integer,
   jsonb,
@@ -518,7 +519,6 @@ export const registrosDeLlamada = pgTable("registros_de_llamada", {
   id_user_ghl: text("id_user_ghl"),
   ghl_contact_id: text("ghl_contact_id"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
-  excluido_metricas: boolean("excluido_metricas").notNull().default(false),
 });
 
 /* ------------------------------------------------------------------ */
@@ -844,7 +844,7 @@ export const enfoqueResultado = pgTable("enfoque_resultado", {
 ]);
 
 export const eventosLlamadasTiempoReal = pgTable("eventos_llamadas_tiempo_real", {
-  id_evento: serial("id_evento").primaryKey(),
+  id_evento: bigint("id_evento", { mode: "number" }).primaryKey(),
   id_cuenta: integer("id_cuenta"),
   fecha_hora_evento: timestamp("fecha_hora_evento", { withTimezone: true }),
   closer: varchar("closer"),
