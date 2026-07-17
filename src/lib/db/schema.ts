@@ -518,6 +518,7 @@ export const registrosDeLlamada = pgTable("registros_de_llamada", {
   id_user_ghl: text("id_user_ghl"),
   ghl_contact_id: text("ghl_contact_id"),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
+  excluido_metricas: boolean("excluido_metricas").notNull().default(false),
 });
 
 /* ------------------------------------------------------------------ */
@@ -841,6 +842,15 @@ export const enfoqueResultado = pgTable("enfoque_resultado", {
   index("idx_enfoque_resultado_sesion").on(table.id_sesion),
   index("idx_enfoque_resultado_cuenta").on(table.id_cuenta),
 ]);
+
+export const eventosLlamadasTiempoReal = pgTable("eventos_llamadas_tiempo_real", {
+  id_evento: serial("id_evento").primaryKey(),
+  id_cuenta: integer("id_cuenta"),
+  fecha_hora_evento: timestamp("fecha_hora_evento", { withTimezone: true }),
+  closer: varchar("closer"),
+  correo_closer: varchar("correo_closer"),
+  objeciones_ia: jsonb("objeciones_ia").$type<ObjecionIA[]>(),
+});
 
 export const enfoqueAdminAudit = pgTable("enfoque_admin_audit", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),

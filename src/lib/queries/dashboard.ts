@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, cuentas, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, cuentas, chatsLogs, metasCuenta, metricasWebhook, usuariosDashboard, eventosLlamadasTiempoReal } from "@/lib/db/schema";
 import { normalizeEmbudoEtapas } from "@/lib/db/schema";
 import type { EmbudoEtapa, MetricaConfig, ChatMessage } from "@/lib/db/schema";
 import { calcMetricaManual, calcMetricaAutomatica, DEFAULT_METRICAS_CONFIG, DEFAULT_EMBUDO_CONFIG, parseMetricasConfig, normalizeMetricasConfig, KPI_DEFAULT_KEYS, type MetricaEngineContext } from "@/lib/metricas-engine";
@@ -718,27 +718,21 @@ export async function getDashboard(
     String(a.date).localeCompare(String(b.date)),
   );
 
-  // Objeciones
+  // Objeciones — fase 1: Fathom (videollamadas)
   const objMap: Record<string, { count: number; quotes: Set<string> }> = {};
-  for (const a of filteredAgendas) {
-    if (!Array.isArray(a.objeciones_ia)) continue;
-    for (const obj of a.objeciones_ia) {
+  const mergeObjeciones = (list: Array<{ objecion?: string; categoria?: string }>) => {
+    for (const obj of list) {
       const key = (obj?.categoria ?? obj?.objecion ?? "").toLowerCase().trim();
       if (!key) continue;
       if (!objMap[key]) objMap[key] = { count: 0, quotes: new Set() };
       objMap[key].count++;
       if (obj.objecion) objMap[key].quotes.add(obj.objecion);
     }
+  };
+  for (const a of filteredAgendas) {
+    if (Array.isArray(a.objeciones_ia)) mergeObjeciones(a.objeciones_ia);
   }
-  const totalObj = Object.values(objMap).reduce((s, o) => s + o.count, 0);
-  const objeciones: DashboardObjecion[] = Object.entries(objMap)
-    .map(([name, { count, quotes }]) => ({
-      name,
-      count,
-      percent: totalObj > 0 ? Math.round((count / totalObj) * 100) : 0,
-      tipos: quotes.size,
-    }))
-    .sort((a, b) => b.count - a.count);
+  // Fases 2 y 3 (chats + Call-AI) se agregan después de consultar chatRows y callAiRows
 
   // Razones de pérdida
   const rpConfig = Array.isArray(cuentaRow?.razones_perdida_config) ? cuentaRow.razones_perdida_config : [];
@@ -1033,9 +1027,48 @@ export async function getDashboard(
       fecha_y_hora_z: chatsLogs.fecha_y_hora_z,
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
       primer_msg_at: chatsLogs.primer_msg_at,
+      ia_objeciones: chatsLogs.ia_objeciones,
     })
     .from(chatsLogs)
     .where(and(...chatConditions));
+
+  // ----------------------------------------------------------------
+  // Objeciones — fase 2: chats
+  // ----------------------------------------------------------------
+  for (const c of chatRows) {
+    if (Array.isArray(c.ia_objeciones)) mergeObjeciones(c.ia_objeciones);
+  }
+
+  // ----------------------------------------------------------------
+  // Objeciones — fase 3: Call-AI (llamadas en tiempo real)
+  // ----------------------------------------------------------------
+  const callAiConditions: Parameters<typeof and>[0][] = [
+    eq(eventosLlamadasTiempoReal.id_cuenta, idCuenta),
+    gte(eventosLlamadasTiempoReal.fecha_hora_evento, fromDate),
+    lte(eventosLlamadasTiempoReal.fecha_hora_evento, toDate),
+    isNotNull(eventosLlamadasTiempoReal.objeciones_ia),
+  ];
+  if (emails.length > 0) {
+    callAiConditions.push(inArray(eventosLlamadasTiempoReal.correo_closer, emails));
+  }
+  const callAiRows = await db
+    .select({ objeciones_ia: eventosLlamadasTiempoReal.objeciones_ia })
+    .from(eventosLlamadasTiempoReal)
+    .where(and(...callAiConditions));
+  for (const r of callAiRows) {
+    if (Array.isArray(r.objeciones_ia)) mergeObjeciones(r.objeciones_ia);
+  }
+
+  // Objeciones — resultado final unificado
+  const totalObj = Object.values(objMap).reduce((s, o) => s + o.count, 0);
+  const objeciones: DashboardObjecion[] = Object.entries(objMap)
+    .map(([name, { count, quotes }]) => ({
+      name,
+      count,
+      percent: totalObj > 0 ? Math.round((count / totalObj) * 100) : 0,
+      tipos: quotes.size,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   // ----------------------------------------------------------------
   // Funnel unificado — agregar leads de chats al distribucionEmbudo
