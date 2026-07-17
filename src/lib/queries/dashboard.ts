@@ -720,6 +720,12 @@ export async function getDashboard(
 
   // Objeciones — fase 1: Fathom (videollamadas)
   const objMap: Record<string, { count: number; quotes: Set<string> }> = {};
+  const toList = (x: unknown): Array<{ objecion?: string; categoria?: string }> =>
+    Array.isArray(x)
+      ? (x as Array<{ objecion?: string; categoria?: string }>)
+      : (x && typeof x === "object" && Array.isArray((x as { objeciones?: unknown }).objeciones))
+        ? (x as { objeciones: Array<{ objecion?: string; categoria?: string }> }).objeciones
+        : [];
   const mergeObjeciones = (list: Array<{ objecion?: string; categoria?: string }>) => {
     for (const obj of list) {
       const key = (obj?.categoria ?? obj?.objecion ?? "").toLowerCase().trim();
@@ -730,7 +736,7 @@ export async function getDashboard(
     }
   };
   for (const a of filteredAgendas) {
-    if (Array.isArray(a.objeciones_ia)) mergeObjeciones(a.objeciones_ia);
+    mergeObjeciones(toList(a.objeciones_ia));
   }
   // Fases 2 y 3 (chats + Call-AI) se agregan después de consultar chatRows y callAiRows
 
@@ -1036,7 +1042,7 @@ export async function getDashboard(
   // Objeciones — fase 2: chats
   // ----------------------------------------------------------------
   for (const c of chatRows) {
-    if (Array.isArray(c.ia_objeciones)) mergeObjeciones(c.ia_objeciones);
+    mergeObjeciones(toList(c.ia_objeciones));
   }
 
   // ----------------------------------------------------------------
@@ -1056,7 +1062,7 @@ export async function getDashboard(
     .from(eventosLlamadasTiempoReal)
     .where(and(...callAiConditions));
   for (const r of callAiRows) {
-    if (Array.isArray(r.objeciones_ia)) mergeObjeciones(r.objeciones_ia);
+    mergeObjeciones(toList(r.objeciones_ia));
   }
 
   // Objeciones — resultado final unificado
