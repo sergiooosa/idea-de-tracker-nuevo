@@ -11,9 +11,9 @@ import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import HelpTooltip from '@/components/dashboard/HelpTooltip';
 import { useApiData } from '@/hooks/useApiData';
-import type { DashboardResponse, LeadDetailItem } from '@/types';
+import type { DashboardResponse, DashboardAdvisorRow, LeadDetailItem } from '@/types';
 import Link from 'next/link';
-import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap, SlidersHorizontal, Download } from 'lucide-react';
+import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap, SlidersHorizontal, Download, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { exportDashboardToExcel } from '@/lib/export-excel';
 import { subDays, format } from 'date-fns';
 import clsx from 'clsx';
@@ -47,6 +47,25 @@ const RANKING_COLS = [
 type RankingColKey = typeof RANKING_COLS[number]['key'];
 const ALL_RANKING_COL_KEYS: RankingColKey[] = RANKING_COLS.map(c => c.key);
 
+type RankingSortKey = 'score' | RankingColKey;
+
+function rankingSortValue(row: DashboardAdvisorRow, key: RankingSortKey): number {
+  switch (key) {
+    case 'score': return row.callsMade + row.meetingsBooked + row.meetingsAttended + row.revenue / 1000;
+    case 'leads': return row.totalLeads;
+    case 'generados': return row.leadsGenerados;
+    case 'con_actividad': return row.leadsConActividad;
+    case 'llamadas': return row.callsMade;
+    case 'tiempo_lead': return row.speedToLeadAvg ?? 0;
+    case 'agendadas': return row.meetingsBooked;
+    case 'asistidas': return row.meetingsAttended;
+    case 'facturacion': return row.revenue;
+    case 'efectivo': return row.cashCollected;
+    case 'tasa_contacto': return row.contactRate;
+    case 'tasa_agend': return row.bookingRate;
+  }
+}
+
 export default function DashboardPage() {
   const t = useT();
   const [dateFrom, setDateFrom] = useState(format(defaultDateFrom, 'yyyy-MM-dd'));
@@ -63,6 +82,22 @@ export default function DashboardPage() {
   const [rankingColsVisible, setRankingColsVisible] = useState<RankingColKey[]>(ALL_RANKING_COL_KEYS);
   const [rankingColsInitialized, setRankingColsInitialized] = useState(false);
   const rankingColsPopoverRef = useRef<HTMLDivElement>(null);
+  const [rankingSortKey, setRankingSortKey] = useState<RankingSortKey>('score');
+  const [rankingSortAsc, setRankingSortAsc] = useState(false);
+
+  const toggleRankingSort = (key: RankingSortKey) => {
+    if (rankingSortKey === key) {
+      setRankingSortAsc(v => !v);
+    } else {
+      setRankingSortKey(key);
+      setRankingSortAsc(false);
+    }
+  };
+
+  const RankingSortIcon = ({ col }: { col: RankingSortKey }) =>
+    rankingSortKey === col ? (
+      rankingSortAsc ? <ChevronUp className="w-3 h-3 inline ml-0.5" /> : <ChevronDown className="w-3 h-3 inline ml-0.5" />
+    ) : null;
 
   const toggleObjeciones = () => setShowObjeciones((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showObj', String(next)); return next; });
   const toggleVolumen = () => setShowVolumen((v) => { const next = !v; if (typeof window !== 'undefined') localStorage.setItem('dash_showVol', String(next)); return next; });
@@ -802,7 +837,15 @@ export default function DashboardPage() {
 
         {!seccionesOcultas.includes('panel_ranking') && <section>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranking por asesor</h2>
+            <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <Users className="w-4 h-4" />
+              Ranking por asesor
+              <HelpTooltip
+                titulo="Ranking por asesor"
+                contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score."
+                comoProbar="Haz click en 'Llamadas' para ver quién hizo más llamadas; vuelve a hacer click para ver quién hizo menos. Repite con cualquier otra columna."
+              />
+            </h2>
             <div className="relative" ref={rankingColsPopoverRef}>
               <button
                 type="button"
@@ -837,28 +880,27 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium">Asesor</th>
-                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium"><span title="Leads únicos con actividad (llamada o cita) en el período. Incluye leads de períodos anteriores que recibieron atención ahora.">Leads trabajados ⓘ</span></th>}
-                    {rankingColsVisible.includes('generados') && <th className="px-2 py-2 font-medium"><span title="Leads NUEVOS que llegaron al CRM en este período asignados a este asesor. Diferente a 'Leads trabajados' que incluye leads de períodos anteriores.">Leads nuevos ⓘ</span></th>}
-                    {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium"><span title="Leads únicos que recibieron al menos una llamada o cita en el período (incluyendo leads antiguos). Similar a 'Leads trabajados' pero contando también los que solo tienen teléfono sin email.">Con actividad ⓘ</span></th>}
-                    {rankingColsVisible.includes('llamadas') && <th className="px-2 py-2 font-medium">Llamadas</th>}
-                    {rankingColsVisible.includes('tiempo_lead') && <th className="px-2 py-2 font-medium">Tiempo al lead</th>}
-                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium"><span title="Citas/videollamadas agendadas únicas en el período (leads únicos, sin contar múltiples estados del mismo lead). Este número es el mismo que aparece en el panel ejecutivo.">Citas agendadas ⓘ</span></th>}
-                    {rankingColsVisible.includes('asistidas') && <th className="px-2 py-2 font-medium"><span title="Leads que se presentaron a su cita (asistieron).">Citas asistidas ⓘ</span></th>}
-                    {rankingColsVisible.includes('facturacion') && <th className="px-2 py-2 font-medium">Facturación</th>}
-                    {rankingColsVisible.includes('efectivo') && <th className="px-2 py-2 font-medium">Efectivo</th>}
-                    {rankingColsVisible.includes('tasa_contacto') && <th className="px-2 py-2 font-medium">Tasa contacto</th>}
-                    {rankingColsVisible.includes('tasa_agend') && <th className="px-2 py-2 font-medium">Tasa agend.</th>}
+                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('leads')}><span title="Leads únicos con actividad (llamada o cita) en el período. Incluye leads de períodos anteriores que recibieron atención ahora.">Leads trabajados ⓘ</span><RankingSortIcon col="leads" /></th>}
+                    {rankingColsVisible.includes('generados') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('generados')}><span title="Leads NUEVOS que llegaron al CRM en este período asignados a este asesor. Diferente a 'Leads trabajados' que incluye leads de períodos anteriores.">Leads nuevos ⓘ</span><RankingSortIcon col="generados" /></th>}
+                    {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('con_actividad')}><span title="Leads únicos que recibieron al menos una llamada o cita en el período (incluyendo leads antiguos). Similar a 'Leads trabajados' pero contando también los que solo tienen teléfono sin email.">Con actividad ⓘ</span><RankingSortIcon col="con_actividad" /></th>}
+                    {rankingColsVisible.includes('llamadas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('llamadas')}>Llamadas<RankingSortIcon col="llamadas" /></th>}
+                    {rankingColsVisible.includes('tiempo_lead') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('tiempo_lead')}>Tiempo al lead<RankingSortIcon col="tiempo_lead" /></th>}
+                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('agendadas')}><span title="Citas/videollamadas agendadas únicas en el período (leads únicos, sin contar múltiples estados del mismo lead). Este número es el mismo que aparece en el panel ejecutivo.">Citas agendadas ⓘ</span><RankingSortIcon col="agendadas" /></th>}
+                    {rankingColsVisible.includes('asistidas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('asistidas')}><span title="Leads que se presentaron a su cita (asistieron).">Citas asistidas ⓘ</span><RankingSortIcon col="asistidas" /></th>}
+                    {rankingColsVisible.includes('facturacion') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('facturacion')}>Facturación<RankingSortIcon col="facturacion" /></th>}
+                    {rankingColsVisible.includes('efectivo') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('efectivo')}>Efectivo<RankingSortIcon col="efectivo" /></th>}
+                    {rankingColsVisible.includes('tasa_contacto') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('tasa_contacto')}>Tasa contacto<RankingSortIcon col="tasa_contacto" /></th>}
+                    {rankingColsVisible.includes('tasa_agend') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('tasa_agend')}>Tasa agend.<RankingSortIcon col="tasa_agend" /></th>}
                     {webhookRankingCols.map((col) => (
                       <th key={col.key} className="px-2 py-2 font-medium">{col.label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {advisorRanking
+                  {[...advisorRanking]
                     .sort((a, b) => {
-                      const sa = a.callsMade + a.meetingsBooked + a.meetingsAttended + a.revenue / 1000;
-                      const sb = b.callsMade + b.meetingsBooked + b.meetingsAttended + b.revenue / 1000;
-                      return sb - sa;
+                      const diff = rankingSortValue(b, rankingSortKey) - rankingSortValue(a, rankingSortKey);
+                      return rankingSortAsc ? -diff : diff;
                     })
                     .map((a, i) => (
                       <React.Fragment key={a.advisorEmail ?? a.advisorName}>
