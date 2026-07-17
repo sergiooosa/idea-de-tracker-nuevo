@@ -9,6 +9,7 @@ import SegmentacionCalificados from '@/components/dashboard/SegmentacionCalifica
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
+import HelpTooltip from '@/components/dashboard/HelpTooltip';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse, LeadDetailItem } from '@/types';
 import Link from 'next/link';
@@ -682,6 +683,7 @@ export default function DashboardPage() {
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5 text-accent-red" />
                 Objeciones más comunes
+                <HelpTooltip titulo="Objeciones más comunes" contenido="Objeciones detectadas por IA en videollamadas (Fathom), chats (WhatsApp) y llamadas en tiempo real (Call-AI)." />
               </h2>
               <button type="button" onClick={toggleObjeciones} className="p-1 rounded hover:bg-surface-600 text-gray-500 hover:text-gray-300 transition-colors" title={showObjeciones ? 'Ocultar' : 'Mostrar'}>
                 {showObjeciones ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
