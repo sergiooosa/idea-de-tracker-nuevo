@@ -1,8 +1,27 @@
 "use client";
 
-import { Trophy, AlertTriangle, Star } from 'lucide-react';
-import type { ReportV2RankingAsesores } from '@/types/report-v2';
+import { useState, useMemo } from 'react';
+import { Trophy, AlertTriangle, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import type { ReportV2RankingAsesores, ReportV2AsesorTabla } from '@/types/report-v2';
 import ReportSection from './ReportSection';
+
+type SortKey = keyof Pick<
+  ReportV2AsesorTabla,
+  'leads' | 'seguimiento' | 'llamadas' | 'contactoPct' | 'spdLead' | 'intProm' | 'dosIntPct' | 'citas' | 'asistieron' | 'score'
+>;
+
+const COLUMNS: Array<{ key: SortKey; label: string; align: 'right' }> = [
+  { key: 'leads', label: 'Leads', align: 'right' },
+  { key: 'seguimiento', label: 'Seg.', align: 'right' },
+  { key: 'llamadas', label: 'Llam.', align: 'right' },
+  { key: 'contactoPct', label: 'Contact%', align: 'right' },
+  { key: 'spdLead', label: 'Spd', align: 'right' },
+  { key: 'intProm', label: 'Int.', align: 'right' },
+  { key: 'dosIntPct', label: '2+Int%', align: 'right' },
+  { key: 'citas', label: 'Citas', align: 'right' },
+  { key: 'asistieron', label: 'Asist.', align: 'right' },
+  { key: 'score', label: 'Score', align: 'right' },
+];
 
 interface Props {
   data: ReportV2RankingAsesores | null;
@@ -22,20 +41,53 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+function SortIcon({ active, asc }: { active: boolean; asc: boolean }) {
+  if (!active) return null;
+  return asc
+    ? <ChevronUp className="w-3 h-3 inline ml-0.5" />
+    : <ChevronDown className="w-3 h-3 inline ml-0.5" />;
+}
+
+function sortValue(row: ReportV2AsesorTabla, key: SortKey): number {
+  const v = row[key];
+  if (v === null) return -Infinity;
+  return v;
+}
+
 export default function SectionRankingAsesores({ data }: Props) {
+  const [sortKey, setSortKey] = useState<SortKey>('score');
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const sorted = useMemo(() => {
+    if (!data) return [];
+    return [...data.tabla].sort((a, b) => {
+      const diff = sortValue(b, sortKey) - sortValue(a, sortKey);
+      return sortAsc ? -diff : diff;
+    });
+  }, [data, sortKey, sortAsc]);
+
   if (!data) return null;
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortAsc((v) => !v);
+    } else {
+      setSortKey(key);
+      setSortAsc(false);
+    }
+  };
 
   return (
     <ReportSection
       icon={Trophy}
       title="Ranking de Asesores"
       helpTitulo="Ranking de Asesores"
-      helpContenido="Clasificación de asesores con score compuesto (0-100) basado en volumen, tasa de contacto, velocidad de respuesta, seguimiento y citas. Incluye destacados, tabla detallada y alertas de bajo rendimiento."
+      helpContenido="Clasificación de asesores con score compuesto (0-100) basado en volumen, tasa de contacto, velocidad de respuesta, seguimiento y citas. Haz clic en cualquier columna para ordenar por esa métrica."
     >
       {/* Destacados */}
       {data.destacados.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {data.destacados.map((d, i) => (
+          {data.destacados.map((d) => (
             <div
               key={`${d.nombre}-${d.razon}`}
               className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-center"
@@ -50,26 +102,26 @@ export default function SectionRankingAsesores({ data }: Props) {
       )}
 
       {/* Tabla */}
-      {data.tabla.length > 0 && (
+      {sorted.length > 0 && (
         <div className="rounded-lg bg-[#0E1626] border border-[#1E2B40]/60 overflow-x-auto">
           <table className="w-full text-xs min-w-[700px]">
             <thead>
               <tr className="border-b border-[#1E2B40]">
                 <th className="text-left px-3 py-2.5 text-[#5F7288] font-medium">Asesor</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Leads</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Seg.</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Llam.</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Contact%</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Spd</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Int.</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">2+Int%</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Citas</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Asist.</th>
-                <th className="text-right px-2 py-2.5 text-[#5F7288] font-medium">Score</th>
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className="text-right px-2 py-2.5 font-medium cursor-pointer select-none transition-colors hover:text-[#E7EFF8] text-[#5F7288]"
+                    onClick={() => toggleSort(col.key)}
+                  >
+                    {col.label}
+                    <SortIcon active={sortKey === col.key} asc={sortAsc} />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {data.tabla.map((a) => (
+              {sorted.map((a) => (
                 <tr key={a.nombre} className="border-b border-[#1E2B40]/40 last:border-0 hover:bg-[#152238]/50">
                   <td className="px-3 py-2.5 text-[#E7EFF8] font-medium">{a.nombre}</td>
                   <td className="px-2 py-2.5 text-right text-[#8DA2B8]">{a.leads}</td>
