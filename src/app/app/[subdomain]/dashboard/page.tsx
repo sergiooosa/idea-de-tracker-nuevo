@@ -802,7 +802,7 @@ export default function DashboardPage() {
 
         {!seccionesOcultas.includes('panel_ranking') && <section>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranking por asesor</h2>
+            <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Ranking por asesor<HelpTooltip titulo="Ranking por asesor" contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score." comoProbar="Haz click en 'Llamadas' para ver quién hizo más llamadas; vuelve a hacer click para ver quién hizo menos. Repite con cualquier otra columna." /></h2>
             <div className="relative" ref={rankingColsPopoverRef}>
               <button
                 type="button"
