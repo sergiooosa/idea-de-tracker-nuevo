@@ -624,6 +624,7 @@ export interface AsesorLeadCRM {
   speedToLead: string;
   notasLlamadas: { date: string; text: string }[];
   leadNote: string | null;
+  excluido: boolean;
 }
 
 // ── Canal: Videollamadas ──────────────────────────────────────────────────────

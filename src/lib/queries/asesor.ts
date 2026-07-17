@@ -220,8 +220,25 @@ export async function getAsesorData(
     metricasSumaMap[r.campo] = Number(r.total ?? 0);
   }
 
+  // ── Excluir leads marcados como excluido_metricas de los KPIs ─────────────
+  // Column may not exist yet — query safely with raw SQL
+  const excludedRegIds: Set<number> = await (async () => {
+    try {
+      const rows = await db.execute(sql`
+        SELECT id_registro FROM registros_de_llamada
+        WHERE id_cuenta = ${idCuentaStr}
+          AND excluido_metricas = true
+      `);
+      return new Set((rows.rows as Array<{ id_registro: number }>).map((r) => r.id_registro));
+    } catch {
+      return new Set<number>();
+    }
+  })();
+  const regRowsForKpi = regRows.filter((r) => !excludedRegIds.has(r.id_registro));
+  const callRowsForKpi = callRows.filter((c) => !c.id_registro || !excludedRegIds.has(c.id_registro));
+
   // ── CALCULAR KPIs ─────────────────────────────────────────────────────────
-  const contestadas = callRows.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
+  const contestadas = callRowsForKpi.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
 
   // leadsAsignados = leads únicos incluyendo pdte (son leads asignados)
   const leadKeyFromCall = (c: { mail_lead: string | null; phone: string | null; id: number }) =>
@@ -231,9 +248,9 @@ export async function getAsesorData(
   const leadKeyFromReg = (r: { mail_lead: string | null; phone_raw_format: string | null; id_registro: number }) =>
     r.mail_lead?.trim() || r.phone_raw_format?.trim() || `reg:${r.id_registro}`;
 
-  const leadsFromCalls = new Set(callRows.map(leadKeyFromCall).filter(Boolean));
+  const leadsFromCalls = new Set(callRowsForKpi.map(leadKeyFromCall).filter(Boolean));
   const leadsFromAgendas = new Set(agendaRows.map(leadKeyFromAgenda).filter(Boolean));
-  const leadsFromRegistros = new Set(regRows.map(leadKeyFromReg).filter(Boolean));
+  const leadsFromRegistros = new Set(regRowsForKpi.map(leadKeyFromReg).filter(Boolean));
   const allLeads = new Set([...leadsFromCalls, ...leadsFromAgendas]);
 
   // KPIs de videollamadas
@@ -275,9 +292,9 @@ export async function getAsesorData(
 
   const kpis: AsesorKpis = {
     leadsAsignados: allLeads.size,
-    llamadasRealizadas: callRows.length,
+    llamadasRealizadas: callRowsForKpi.length,
     llamadasContestadas: contestadas,
-    tasaContacto: callRows.length > 0 ? (contestadas / callRows.length) * 100 : 0,
+    tasaContacto: callRowsForKpi.length > 0 ? (contestadas / callRowsForKpi.length) * 100 : 0,
     reunionesAgendadas: new Set(agendaRows.map(agendaDedupKey)).size,
     reunionesAsistidas: videoAsistidas,
     reunionesCalificadas: videoCalificadas,
@@ -327,6 +344,7 @@ export async function getAsesorData(
       speedToLead: r.speed_to_lead ? `${parseFloat(r.speed_to_lead) || 0} min` : "—",
       notasLlamadas: notasArr,
       leadNote: null,
+      excluido: excludedRegIds.has(r.id_registro),
     };
   }
   const leads = Object.values(leadMap);
@@ -432,7 +450,7 @@ export async function getAsesorData(
   const enAmbos = [...leadsFromCalls].filter((e) => leadsFromAgendas.has(e)).length;
   const soloRegistros = [...leadsFromRegistros].filter((e) => !leadsFromCalls.has(e) && !leadsFromAgendas.has(e)).length;
   const porTipo: Record<string, number> = {};
-  for (const c of callRows) { const t = c.tipo_evento || "sin_tipo"; porTipo[t] = (porTipo[t] ?? 0) + 1; }
+  for (const c of callRowsForKpi) { const t = c.tipo_evento || "sin_tipo"; porTipo[t] = (porTipo[t] ?? 0) + 1; }
 
   const breakdown: AsesorBreakdown = {
     leadsAsignados: {
@@ -444,7 +462,7 @@ export async function getAsesorData(
       soloRegistros,
       enAmbos,
     },
-    llamadasRealizadas: { total: callRows.length, porTipo },
+    llamadasRealizadas: { total: callRowsForKpi.length, porTipo },
     llamadasContestadas: { total: contestadas },
     reunionesAgendadas: { total: new Set(agendaRows.map(agendaDedupKey)).size },
   };
@@ -483,4 +501,18 @@ export async function getAsesoresList(idCuenta: number): Promise<ApiAdvisor[]> {
   for (const r of callRows) { if (r.closer_mail) advisorMap.set(r.closer_mail, r.nombre_closer ?? r.closer_mail); }
   for (const a of agendaRows) { if (a.closer && !advisorMap.has(a.closer)) advisorMap.set(a.closer, a.closer); }
   return [...advisorMap.entries()].map(([email, name]) => ({ id: email, name, email }));
+}
+
+export async function toggleExcluirLead(
+  idRegistro: number,
+  idCuenta: number,
+  excluir: boolean,
+): Promise<boolean> {
+  const result = await db.execute(sql`
+    UPDATE registros_de_llamada
+    SET excluido_metricas = ${excluir}
+    WHERE id_registro = ${idRegistro}
+      AND id_cuenta = ${String(idCuenta)}
+  `);
+  return (result.rowCount ?? 0) > 0;
 }

@@ -516,6 +516,7 @@ export function generateAsesor(): AsesorResponse {
     })),
     leadNote: Math.random() > 0.6 ? faker.lorem.sentence() : null,
     ghlContactId: null,
+    excluido: false,
   }));
 
   return {
