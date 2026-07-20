@@ -666,14 +666,21 @@ export async function getDashboard(
       }
       const leadsConActividadDetalle = Array.from(uniqueActivosMap.values());
 
+      const newLeadKeys = new Set(uniqueNewLeadsMap.keys());
+      const leadsReactivadosDetalle = Array.from(uniqueActivosMap.entries())
+        .filter(([k]) => !newLeadKeys.has(k))
+        .map(([, v]) => v);
+
       return {
         advisorName: ac[0]?.nombre_closer ?? aa[0]?.closer ?? key,
         advisorEmail: ac[0]?.closer_mail ?? null,
         totalLeads: aLeads,
         leadsGenerados: leadsGeneradosDetalle.length,
         leadsConActividad: leadsConActividadDetalle.length,
+        leadsReactivados: leadsReactivadosDetalle.length,
         leadsGeneradosDetalle,
         leadsConActividadDetalle,
+        leadsReactivadosDetalle,
         callsMade: ac.length,
         speedToLeadAvg: aSpeeds.length > 0 ? aSpeeds.reduce((s, v) => s + v, 0) / aSpeeds.length : null,
         // Deduplicar agendas por lead único (igual que el KPI global meetingsBooked)

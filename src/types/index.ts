@@ -449,8 +449,10 @@ export interface DashboardAdvisorRow {
   totalLeads: number;
   leadsGenerados: number;
   leadsConActividad: number;
+  leadsReactivados: number;
   leadsGeneradosDetalle: LeadDetailItem[];
   leadsConActividadDetalle: LeadDetailItem[];
+  leadsReactivadosDetalle: LeadDetailItem[];
   callsMade: number;
   speedToLeadAvg: number | null;
   meetingsBooked: number;

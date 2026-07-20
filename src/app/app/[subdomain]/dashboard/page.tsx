@@ -33,6 +33,7 @@ const LOSS_REASON_PIE_COLORS = ['#f43f5e', '#fb923c', '#a78bfa', '#38bdf8', '#34
 const RANKING_COLS = [
   { key: 'leads', label: 'Leads trabajados' },
   { key: 'generados', label: 'Leads nuevos' },
+  { key: 'reactivados', label: 'Leads reactivados' },
   { key: 'con_actividad', label: 'Con actividad' },
   { key: 'llamadas', label: 'Llamadas' },
   { key: 'tiempo_lead', label: 'Tiempo al lead' },
@@ -54,6 +55,7 @@ function rankingSortValue(row: DashboardAdvisorRow, key: RankingSortKey): number
     case 'score': return row.callsMade + row.meetingsBooked + row.meetingsAttended + row.revenue / 1000;
     case 'leads': return row.totalLeads;
     case 'generados': return row.leadsGenerados;
+    case 'reactivados': return row.leadsReactivados;
     case 'con_actividad': return row.leadsConActividad;
     case 'llamadas': return row.callsMade;
     case 'tiempo_lead': return row.speedToLeadAvg ?? 0;
@@ -84,6 +86,7 @@ export default function DashboardPage() {
   const rankingColsPopoverRef = useRef<HTMLDivElement>(null);
   const [rankingSortKey, setRankingSortKey] = useState<RankingSortKey>('score');
   const [rankingSortAsc, setRankingSortAsc] = useState(false);
+  const [leadFilter, setLeadFilter] = useState<'todos' | 'nuevos' | 'reactivados'>('todos');
 
   const toggleRankingSort = (key: RankingSortKey) => {
     if (rankingSortKey === key) {
@@ -134,6 +137,14 @@ export default function DashboardPage() {
       .sort()
       .map((field) => ({ key: field, label: field }));
   }, [advisorRanking]);
+
+  const filteredAdvisorRanking = useMemo(() => {
+    if (leadFilter === 'todos') return advisorRanking;
+    return advisorRanking.map((a) => ({
+      ...a,
+      totalLeads: leadFilter === 'nuevos' ? a.leadsGenerados : a.leadsReactivados,
+    }));
+  }, [advisorRanking, leadFilter]);
 
   // Inicializar columnas de ranking desde la config del tenant (solo la primera vez que llegan datos)
   useEffect(() => {
@@ -838,15 +849,43 @@ export default function DashboardPage() {
 
         {!seccionesOcultas.includes('panel_ranking') && <section>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              <Users className="w-4 h-4" />
-              Ranking por asesor
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <Users className="w-4 h-4" />
+                Ranking por asesor
+                <HelpTooltip
+                  titulo="Ranking por asesor"
+                  contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score."
+                  comoProbar="Haz click en 'Llamadas' para ver quién hizo más llamadas; vuelve a hacer click para ver quién hizo menos. Repite con cualquier otra columna."
+                />
+              </h2>
+              <div className="flex items-center rounded-lg border border-surface-500 overflow-hidden">
+                {([
+                  { value: 'todos', label: 'Todos' },
+                  { value: 'nuevos', label: 'Nuevos' },
+                  { value: 'reactivados', label: 'Reactivados' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setLeadFilter(opt.value)}
+                    className={clsx(
+                      'px-2.5 py-1 text-[11px] font-medium transition-colors',
+                      leadFilter === opt.value
+                        ? 'bg-accent-cyan/20 text-accent-cyan'
+                        : 'text-gray-500 hover:text-gray-300 hover:bg-surface-700',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
               <HelpTooltip
-                titulo="Ranking por asesor"
-                contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score."
-                comoProbar="Haz click en 'Llamadas' para ver quién hizo más llamadas; vuelve a hacer click para ver quién hizo menos. Repite con cualquier otra columna."
+                titulo="Filtro: Nuevos vs Reactivados"
+                contenido="Filtra los leads del ranking según su origen. 'Nuevos' son leads que llegaron al CRM por primera vez en el período seleccionado (evento de contacto creado). 'Reactivados' son leads que ya existían antes del período pero tuvieron actividad (llamada o cita) durante el mismo — útil para medir campañas de reactivación. 'Todos' muestra ambos sin filtro."
+                comoProbar="Selecciona 'Nuevos' para ver solo leads captados en este período. Selecciona 'Reactivados' para ver leads antiguos con actividad reciente."
               />
-            </h2>
+            </div>
             <div className="relative" ref={rankingColsPopoverRef}>
               <button
                 type="button"
@@ -881,8 +920,9 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="bg-surface-700 text-left text-gray-400">
                     <th className="px-2 py-2 font-medium">Asesor</th>
-                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('leads')}><span title="Leads únicos con actividad (llamada o cita) en el período. Incluye leads de períodos anteriores que recibieron atención ahora.">Leads trabajados ⓘ</span><RankingSortIcon col="leads" /></th>}
+                    {rankingColsVisible.includes('leads') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('leads')}><span title="Leads únicos con actividad (llamada o cita) en el período. Incluye leads de períodos anteriores que recibieron atención ahora.">{leadFilter === 'nuevos' ? 'Leads nuevos' : leadFilter === 'reactivados' ? 'Leads reactivados' : 'Leads trabajados'} ⓘ</span><RankingSortIcon col="leads" /></th>}
                     {rankingColsVisible.includes('generados') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('generados')}><span title="Leads NUEVOS que llegaron al CRM en este período asignados a este asesor. Diferente a 'Leads trabajados' que incluye leads de períodos anteriores.">Leads nuevos ⓘ</span><RankingSortIcon col="generados" /></th>}
+                    {rankingColsVisible.includes('reactivados') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('reactivados')}><span title="Leads que ya existían antes del período pero tuvieron actividad (llamada o cita) durante el mismo. Útil para medir campañas de reactivación.">Reactivados ⓘ</span><RankingSortIcon col="reactivados" /></th>}
                     {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('con_actividad')}><span title="Leads únicos que recibieron al menos una llamada o cita en el período (incluyendo leads antiguos). Similar a 'Leads trabajados' pero contando también los que solo tienen teléfono sin email.">Con actividad ⓘ</span><RankingSortIcon col="con_actividad" /></th>}
                     {rankingColsVisible.includes('llamadas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('llamadas')}>Llamadas<RankingSortIcon col="llamadas" /></th>}
                     {rankingColsVisible.includes('tiempo_lead') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('tiempo_lead')}>Tiempo al lead<RankingSortIcon col="tiempo_lead" /></th>}
@@ -898,7 +938,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...advisorRanking]
+                  {[...filteredAdvisorRanking]
                     .sort((a, b) => {
                       const diff = rankingSortValue(b, rankingSortKey) - rankingSortValue(a, rankingSortKey);
                       return rankingSortAsc ? -diff : diff;
@@ -924,6 +964,17 @@ export default function DashboardPage() {
                                 className={clsx('tabular-nums', a.leadsGenerados > 0 ? 'text-accent-amber underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
                               >
                                 {a.leadsGenerados}
+                              </button>
+                            </td>
+                          )}
+                          {rankingColsVisible.includes('reactivados') && (
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); if (a.leadsReactivados > 0) setModalLeads({ titulo: `Leads reactivados — ${a.advisorName}`, leads: a.leadsReactivadosDetalle }); }}
+                                className={clsx('tabular-nums', a.leadsReactivados > 0 ? 'text-accent-purple underline decoration-dashed underline-offset-2 cursor-pointer hover:text-white' : 'text-gray-500')}
+                              >
+                                {a.leadsReactivados}
                               </button>
                             </td>
                           )}
@@ -955,10 +1006,11 @@ export default function DashboardPage() {
                         {expandedAdvisor === (a.advisorEmail ?? a.advisorName) && (
                           <tr className="bg-surface-800/60">
                             <td colSpan={1 + rankingColsVisible.length} className="px-4 py-3">
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                                <div><span className="text-gray-500 block">Llamadas telefónicas</span><span className="text-accent-cyan font-semibold">{a.callsMade}</span></div>
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                                <div><span className="text-gray-500 block">Leads nuevos</span><span className="text-accent-amber font-semibold">{a.leadsGenerados}</span></div>
+                                <div><span className="text-gray-500 block">Reactivados</span><span className="text-accent-purple font-semibold">{a.leadsReactivados}</span></div>
+                                <div><span className="text-gray-500 block">Llamadas</span><span className="text-accent-cyan font-semibold">{a.callsMade}</span></div>
                                 <div><span className="text-gray-500 block">Citas</span><span className="text-accent-purple font-semibold">{a.meetingsBooked}</span></div>
-                                <div><span className="text-gray-500 block">Asistidas</span><span className="text-white font-semibold">{a.meetingsAttended}</span></div>
                                 <div><span className="text-gray-500 block">Speed to lead</span><span className="text-gray-300 font-semibold">{a.speedToLeadAvg != null ? minFmt(a.speedToLeadAvg) : '—'}</span></div>
                               </div>
                             </td>
