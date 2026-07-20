@@ -180,9 +180,14 @@ export default function PerformanceVideollamadasPage() {
     const cerr = ms.filter((r) => r.outcome === 'cerrada' || r.outcome === 'cerrado').length;
     const fact = ms.reduce((s, r) => s + r.facturacion, 0);
     const cash = ms.reduce((s, r) => s + r.cashCollected, 0);
+    // Dedup por lead único (incluye canceladas) para alinear con advisorMetrics del
+    // servidor y con el headline agendadas (AUT-1683). Antes era ms.length (conteo crudo).
+    const agendadas = new Set(
+      ms.map((r) => r.idcliente?.trim() || r.leadEmail?.trim().toLowerCase() || r.ghl_contact_id?.trim() || `nokey_${r.id}`)
+    ).size;
     return {
       advisorName: ms[0]?.closer ?? '',
-      agendadas: ms.length,
+      agendadas,
       asistencias: asist,
       cerradas: cerr,
       pctCierre: asist > 0 ? (cerr / asist) * 100 : 0,

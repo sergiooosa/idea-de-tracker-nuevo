@@ -855,7 +855,7 @@ export default function DashboardPage() {
                 Ranking por asesor
                 <HelpTooltip
                   titulo="Ranking por asesor"
-                  contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score."
+                  contenido="Compara el desempeño de cada asesor. Puedes ORDENAR el ranking por cualquier métrica: haz click en el encabezado de la columna (Leads, Llamadas, Agendadas, Asistidas, Facturación, etc.). Un primer click ordena de mayor a menor y un segundo click invierte el orden; la flecha indica la columna y el sentido activos. Por defecto se ordena por Score. Nota: la suma de 'Citas agendadas' por asesor puede ser mayor al total AGENDADAS de la cabecera cuando un mismo lead se agenda con más de un closer — cada asesor recibe crédito de su propia cita, mientras que el total general cuenta al lead una sola vez."
                   comoProbar="Haz click en 'Llamadas' para ver quién hizo más llamadas; vuelve a hacer click para ver quién hizo menos. Repite con cualquier otra columna."
                 />
               </h2>

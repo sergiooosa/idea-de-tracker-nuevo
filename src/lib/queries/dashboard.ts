@@ -626,6 +626,17 @@ export async function getDashboard(
         .map((c) => parseFloat(c.speed_to_lead!) || 0)
         .filter((v) => v > 0);
 
+      // Citas agendadas por asesor (dedup por lead único dentro de cada closer).
+      // INCLUYE canceladas para alinear con el headline AGENDADAS (invariante AUT-701:
+      // una cita cancelada estuvo agendada). Antes se excluían aquí, causando que el
+      // desglose per-asesor quedara por debajo del headline (AUT-1683, ej. columna 4vs5).
+      // Nota: un lead agendado con 2 closers distintos suma en ambos ⇒ la suma per-asesor
+      // puede superar el headline (dedup global por lead). Decisión de negocio Opción A
+      // (Juan, AUT-1683): cada closer recibe crédito de su propia cita; ver (?) en la UI.
+      const aMeetingsBooked = new Set(
+        aa.map((a) => agendaDedupKey(a))
+      ).size;
+
       // Leads generados: nuevos contactos del periodo asignados a este asesor
       const advisorNewLeads = newLeadsMap[key] ?? [];
       const uniqueNewLeadsMap = new Map<string, (typeof advisorNewLeads)[0]>();
@@ -683,23 +694,14 @@ export async function getDashboard(
         leadsReactivadosDetalle,
         callsMade: ac.length,
         speedToLeadAvg: aSpeeds.length > 0 ? aSpeeds.reduce((s, v) => s + v, 0) / aSpeeds.length : null,
-        // Deduplicar agendas por lead único (igual que el KPI global meetingsBooked)
-        // Un lead puede tener múltiples registros (PDTE → ofertada → cerrada) → sin dedup
-        // la tabla de asesores mostraba más agendas que el panel ejecutivo para el mismo rango.
-        meetingsBooked: new Set(
-          aa
-            .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
-            .map((a) => agendaDedupKey(a))
-        ).size,
+        // Deduplicar agendas por lead único (igual que el KPI global meetingsBooked).
+        // Incluye canceladas (ver aMeetingsBooked arriba) para reconciliar con el headline.
+        meetingsBooked: aMeetingsBooked,
         meetingsAttended: aAsistidas,
         revenue: aRevenue,
         cashCollected: aCash,
         contactRate: aLeads > 0 ? aLeadsContactados / aLeads : 0,
-        bookingRate: aLeads > 0 ? new Set(
-          aa
-            .filter((a) => !(a.categoria ?? "").toLowerCase().includes("cancel"))
-            .map((a) => agendaDedupKey(a))
-        ).size / aLeads : 0,
+        bookingRate: aLeads > 0 ? aMeetingsBooked / aLeads : 0,
         metricasWebhook: webhookPorUsuario[ac[0]?.closer_mail ?? key] ?? {},
       };
     },
