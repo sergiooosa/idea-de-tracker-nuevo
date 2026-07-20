@@ -110,7 +110,6 @@ async function getLeadsLlamada(
               WHERE c.id_cuenta = ${idCuenta}
               AND c.id_lead = ${registrosDeLlamada.ghl_contact_id}
               AND c.id_lead IS NOT NULL
-              AND EXISTS (SELECT 1 FROM jsonb_array_elements(c.chat) elem WHERE elem->>'role' = 'agent')
             )`
           : undefined,
       ),
