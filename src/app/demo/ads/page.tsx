@@ -1,12 +1,12 @@
 "use client";
 
-import { DemoSessionProvider } from "@/contexts/DemoSessionContext";
-import AdsPage from "@/app/app/[subdomain]/ads/page";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function DemoAdsPage() {
-  return (
-    <DemoSessionProvider>
-      <AdsPage />
-    </DemoSessionProvider>
-  );
+export default function DemoAdsRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/demo/acquisition');
+  }, [router]);
+  return null;
 }

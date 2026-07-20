@@ -15,7 +15,6 @@ import {
   BadgeDollarSign,
   BarChart2,
   RefreshCw,
-  Megaphone,
   GitCompareArrows,
   Inbox,
 } from "lucide-react";
@@ -27,8 +26,7 @@ const NAV_ITEMS = [
   { path: "/demo/performance/videollamadas", label: "Citas", icon: BarChart2 },
   { path: "/demo/performance/chats", label: "Chats", icon: BadgeDollarSign },
   { path: "/demo/asesor", label: "Panel asesor", icon: UserCheck },
-  { path: "/demo/acquisition", label: "Adquisición", icon: TrendingUp },
-  { path: "/demo/ads", label: "Ads & Inversión", icon: Megaphone },
+  { path: "/demo/acquisition", label: "Adquisición & Ads", icon: TrendingUp },
   { path: "/demo/comparaciones", label: "Comparaciones", icon: GitCompareArrows },
   { path: "/demo/comisiones", label: "Comisiones", icon: BadgeDollarSign },
   { path: "/demo/bandeja", label: "Bandeja", icon: Inbox },
