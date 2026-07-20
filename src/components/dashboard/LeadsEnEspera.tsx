@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail, MessageSquare, PhoneCall } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail, MessageSquare, PhoneCall, Ban } from "lucide-react";
 import { useApiData } from "@/hooks/useApiData";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import type { CanalLeadsEnEspera } from "@/lib/queries/leads-en-espera";
+import HelpTooltip from "@/components/dashboard/HelpTooltip";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -66,13 +67,13 @@ const URGENCIA_STYLES: Record<UrgenciaNivel, { badge: string; dot: string }> = {
 const CANAL_OPTIONS: { value: CanalLeadsEnEspera; label: string; icon: typeof Phone }[] = [
   { value: "llamada", label: "Llamada", icon: PhoneCall },
   { value: "chat", label: "Chat", icon: MessageSquare },
-  { value: "general", label: "Todo", icon: AlertCircle },
+  { value: "ninguno", label: "Ninguno", icon: Ban },
 ];
 
 const CANAL_SUBTITULO: Record<CanalLeadsEnEspera, string> = {
   llamada: "primera llamada",
   chat: "primera respuesta en chat",
-  general: "primer contacto",
+  ninguno: "ningún tipo de contacto",
 };
 
 function CanalSelector({ canal, onChange }: { canal: CanalLeadsEnEspera; onChange: (c: CanalLeadsEnEspera) => void }) {
@@ -108,9 +109,9 @@ function LeadRow({ lead, asesorBasePath, canal }: { lead: LeadEnEspera; asesorBa
     ? `${asesorBasePath}?advisor=${encodeURIComponent(lead.closer_mail)}`
     : null;
 
-  const badgeLabel = canal === "chat"
-    ? "sin responder"
-    : canal === "general" && lead.canal_origen === "chat"
+  const badgeLabel = canal === "ninguno"
+    ? "sin contacto"
+    : canal === "chat"
       ? "sin responder"
       : "sin llamar";
 
@@ -127,7 +128,7 @@ function LeadRow({ lead, asesorBasePath, canal }: { lead: LeadEnEspera; asesorBa
             </span>
           )}
         </div>
-        {canal === "general" && lead.canal_origen && (
+        {canal === "ninguno" && lead.canal_origen && (
           <span className={`hidden shrink-0 rounded px-1.5 py-0.5 text-xs sm:inline ${
             lead.canal_origen === "chat"
               ? "bg-blue-500/15 text-blue-400"
@@ -245,6 +246,10 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
             <h2 className="text-base font-semibold text-slate-100">Leads sin contacto inicial</h2>
+            <HelpTooltip
+              titulo="Leads sin contacto inicial"
+              contenido={`Muestra leads que llevan más de ${data?.umbral_min ?? 60} min sin recibir contacto.\n\n• Llamada — leads sin primera llamada realizada\n• Chat — leads cuyo primer mensaje no ha sido respondido por un agente\n• Ninguno — leads sin ningún tipo de contacto (ni llamada ni respuesta en chat)`}
+            />
           </div>
           <CanalSelector canal={canal} onChange={setCanal} />
         </div>
@@ -266,6 +271,10 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
           <h2 className="text-base font-semibold text-slate-100">
             Leads sin contacto inicial
           </h2>
+          <HelpTooltip
+            titulo="Leads sin contacto inicial"
+            contenido={`Leads que llevan más de ${data.umbral_min} min sin recibir contacto.\n\n• Llamada — leads sin primera llamada realizada\n• Chat — leads cuyo primer mensaje no ha sido respondido por un agente\n• Ninguno — leads sin ningún tipo de contacto (ni llamada ni respuesta en chat)`}
+          />
           <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
             {data.total}
           </span>

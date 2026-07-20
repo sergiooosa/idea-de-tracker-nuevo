@@ -3,7 +3,7 @@ import { registrosDeLlamada, logLlamadas, cuentas, chatsLogs } from "@/lib/db/sc
 import { eq, and, isNull, lt, gt, gte, lte, sql, inArray, isNotNull } from "drizzle-orm";
 import { zonedDayRange } from "@/lib/date-range";
 
-export type CanalLeadsEnEspera = "llamada" | "chat" | "general";
+export type CanalLeadsEnEspera = "llamada" | "chat" | "ninguno";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -62,6 +62,7 @@ async function getLeadsLlamada(
   umbralTs: Date,
   range: DateRange,
   closerEmails: string[],
+  soloSinNingunContacto = false,
 ): Promise<LeadEnEspera[]> {
   const idCuentaStr = String(idCuenta);
   const ventanaActividad = new Date(
@@ -103,6 +104,15 @@ async function getLeadsLlamada(
         closerEmails.length > 0
           ? inArray(registrosDeLlamada.closer_mail, closerEmails)
           : undefined,
+        soloSinNingunContacto
+          ? sql`NOT EXISTS (
+              SELECT 1 FROM chats_logs c
+              WHERE c.id_cuenta = ${idCuenta}
+              AND c.id_lead = ${registrosDeLlamada.ghl_contact_id}
+              AND c.id_lead IS NOT NULL
+              AND EXISTS (SELECT 1 FROM jsonb_array_elements(c.chat) elem WHERE elem->>'role' = 'agent')
+            )`
+          : undefined,
       ),
     )
     .orderBy(sql`ROUND(EXTRACT(EPOCH FROM (NOW() - ${registrosDeLlamada.fecha_evento}))/60)::int DESC`);
@@ -124,6 +134,7 @@ async function getLeadsChat(
   umbralTs: Date,
   range: DateRange,
   closerEmails: string[],
+  soloSinNingunContacto = false,
 ): Promise<LeadEnEspera[]> {
   // Leads de chat sin contacto: el lead envió un primer mensaje hace > umbral
   // y ningún agente/asesor ha respondido aún en la conversación.
@@ -148,6 +159,15 @@ async function getLeadsChat(
         range.toDate ? lte(chatsLogs.primer_msg_lead_at, range.toDate) : undefined,
         closerEmails.length > 0
           ? sql`COALESCE(${chatsLogs.asesor_asignado}, NULLIF(TRIM(${chatsLogs.notas_extra}), 'por asignar')) IN (${sql.join(closerEmails.map(e => sql`${e}`), sql`, `)})`
+          : undefined,
+        soloSinNingunContacto
+          ? sql`NOT EXISTS (
+              SELECT 1 FROM registros_de_llamada r
+              WHERE r.id_cuenta = ${String(idCuenta)}
+              AND r.ghl_contact_id = ${chatsLogs.id_lead}
+              AND ${chatsLogs.id_lead} IS NOT NULL
+              AND r.fecha_primera_llamada IS NOT NULL
+            )`
           : undefined,
       ),
     )
@@ -219,8 +239,8 @@ export async function getLeadsEnEspera(
     leads = await getLeadsChat(idCuenta, umbralTs, range, emails);
   } else {
     const [llamadas, chats] = await Promise.all([
-      getLeadsLlamada(idCuenta, umbralTs, range, emails),
-      getLeadsChat(idCuenta, umbralTs, range, emails),
+      getLeadsLlamada(idCuenta, umbralTs, range, emails, true),
+      getLeadsChat(idCuenta, umbralTs, range, emails, true),
     ]);
     leads = [...llamadas, ...chats];
   }
