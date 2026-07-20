@@ -9,7 +9,7 @@ export const PERMISOS_DISPONIBLES = [
   { id: "ver_rendimiento", label: "Ver Rendimiento" },
   { id: "ver_asesor", label: "Ver Panel asesor" },
   { id: "ver_bandeja", label: "Ver Bandeja" },
-  { id: "ver_acquisition", label: "Ver Resumen adquisición" },
+  { id: "ver_acquisition", label: "Ver Adquisición & Ads" },
   { id: "ver_system", label: "Ver Control del sistema" },
   { id: "ver_configuracion", label: "Ver Configuración" },
   { id: "ver_documentacion", label: "Ver Documentación" },

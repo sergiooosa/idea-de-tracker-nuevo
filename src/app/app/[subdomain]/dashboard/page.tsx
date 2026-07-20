@@ -282,7 +282,7 @@ export default function DashboardPage() {
                   </span>
                 )}
               </h2>
-              <Link href="/ads" className="text-[10px] text-accent-cyan hover:text-white transition-colors">
+              <Link href="/acquisition" className="text-[10px] text-accent-cyan hover:text-white transition-colors">
                 Ver detalle →
               </Link>
             </div>

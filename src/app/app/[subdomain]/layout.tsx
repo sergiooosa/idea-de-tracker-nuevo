@@ -23,7 +23,6 @@ import {
   EyeOff,
   ChevronDown,
   BadgeDollarSign,
-  BarChart2,
   Building2,
   Check,
   GitCompareArrows,
@@ -114,7 +113,7 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
   );
 }
 
-export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "ads" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion";
+export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion";
 
 const NAV_KEY_TO_PATH: Record<NavKey, string> = {
   dashboard: "/dashboard",
@@ -123,7 +122,6 @@ const NAV_KEY_TO_PATH: Record<NavKey, string> = {
   comisiones: "/comisiones",
   bandeja: "/bandeja",
   adquisicion: "/acquisition",
-  ads: "/ads",
   comparaciones: "/comparaciones",
   sistema: "/system",
   documentacion: "/documentacion",
@@ -140,8 +138,7 @@ const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.Elem
   { path: "/asesor", navKey: "asesor", label: "Panel asesor", icon: UserCheck },
   { path: "/comisiones", navKey: "comisiones", label: "Comisiones", icon: BadgeDollarSign },
   { path: "/bandeja", navKey: "bandeja", label: "Bandeja", icon: Inbox },
-  { path: "/acquisition", navKey: "adquisicion", label: "Resumen adquisición", icon: TrendingUp },
-  { path: "/ads", navKey: "ads", label: "Ads & Inversión", icon: BarChart2 },
+  { path: "/acquisition", navKey: "adquisicion", label: "Adquisición & Ads", icon: TrendingUp },
   { path: "/comparaciones", navKey: "comparaciones", label: "Proyecciones", icon: GitCompareArrows },
   { path: "/sesiones", navKey: "sesiones", label: "Sesiones de enfoque", icon: Sparkles, beta: true },
   { path: "/tablero-enfoque", navKey: "tablero-enfoque", label: "Tablero de operación", icon: Activity, beta: true },
@@ -245,12 +242,10 @@ function SoloMisDatosToggle() {
 function NavFiltered({
   onLinkClick,
   dashboards = [],
-  hasAds = null,
   seccionesOcultas = [],
 }: {
   onLinkClick?: () => void;
   dashboards?: { id: string; nombre: string; icono?: string }[];
-  hasAds?: boolean | null;
   seccionesOcultas?: string[];
 }) {
   const pathname = usePathname();
@@ -278,18 +273,6 @@ function NavFiltered({
     <>
       {navFiltered.map(({ path, navKey, label, icon: Icon, beta }) => (
         <React.Fragment key={`${path}-${navKey}`}>
-          {/* Ads item: grayed out with tooltip when ads not configured */}
-          {path === "/ads" && hasAds === false ? (
-            <div
-              title="Conecta una plataforma de Ads en Sistema → Integraciones de Ads para activar esta sección"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium border border-transparent text-gray-600 cursor-not-allowed opacity-50 select-none"
-              aria-disabled="true"
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {t.nav[navKey] ?? label}
-              <span className="ml-auto text-[9px] text-gray-600 uppercase tracking-wide font-semibold border border-gray-700 rounded px-1 py-0.5">No conectado</span>
-            </div>
-          ) : (
           <Link
             href={path}
             onClick={onLinkClick}
@@ -304,7 +287,6 @@ function NavFiltered({
             {t.nav[navKey] ?? label}
             {beta && <span className="ml-auto text-[9px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-accent-purple/20 text-accent-purple border border-accent-purple/30">Beta</span>}
           </Link>
-          )}
           {path === "/dashboard" && dashboards.length > 0 && (
             <div className="space-y-1 ml-3">
               {dashboards.map((dash) => (
@@ -334,15 +316,13 @@ function NavFiltered({
 function NavFilteredMobile({
   onClose,
   dashboards = [],
-  hasAds = null,
   seccionesOcultas = [],
 }: {
   onClose: () => void;
   dashboards?: { id: string; nombre: string; icono?: string }[];
-  hasAds?: boolean | null;
   seccionesOcultas?: string[];
 }) {
-  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} hasAds={hasAds} seccionesOcultas={seccionesOcultas} />;
+  return <NavFiltered onLinkClick={onClose} dashboards={dashboards} seccionesOcultas={seccionesOcultas} />;
 }
 
 function PermissionGuard({ children, seccionesOcultas = [] }: { children: React.ReactNode; seccionesOcultas?: string[] }) {
@@ -380,7 +360,6 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [locale, setLocale] = useState<Locale | null>(null);
   const [dashboardsNav, setDashboardsNav] = useState<{ id: string; nombre: string; icono?: string }[]>([]);
-  const [hasAds, setHasAds] = useState<boolean | null>(null); // null = loading
   const [seccionesOcultas, setSeccionesOcultas] = useState<string[]>([]);
   const [ghlTokenStatus, setGhlTokenStatus] = useState<"ok" | "invalid" | "unknown" | null>(null);
   const [ghlPendingCount, setGhlPendingCount] = useState(0);
@@ -399,7 +378,6 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d?.idioma) setLocale(d.idioma as Locale);
-        if (typeof d?.hasAds === "boolean") setHasAds(d.hasAds);
         if (Array.isArray(d?.seccionesOcultas)) setSeccionesOcultas(d.seccionesOcultas);
       })
       .catch(() => { /* fallback */ });
@@ -595,7 +573,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
         <nav className="flex-1 p-2 overflow-y-auto">
-          <NavFiltered dashboards={dashboardsNav} hasAds={hasAds} seccionesOcultas={seccionesOcultas} />
+          <NavFiltered dashboards={dashboardsNav} seccionesOcultas={seccionesOcultas} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
@@ -635,7 +613,7 @@ function TenantLayoutInner({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex-1 p-2">
-          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} hasAds={hasAds} seccionesOcultas={seccionesOcultas} />
+          <NavFilteredMobile onClose={() => setSidebarOpen(false)} dashboards={dashboardsNav} seccionesOcultas={seccionesOcultas} />
         </nav>
         <div className="p-2 space-y-1 border-t border-surface-500/80">
           {session?.platformAdmin && (
