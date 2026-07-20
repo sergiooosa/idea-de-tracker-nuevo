@@ -350,10 +350,13 @@ export async function getVideollamadas(
   for (const [name, meetings] of Object.entries(byAdvisor)) {
     const asist = meetings.filter((m) => m.attended).length;
     const cerr = meetings.filter((m) => m.outcome === "cerrada" || m.outcome === "cerrado").length;
-    // Deduplicar por asesor también
+    // Deduplicar por asesor también. INCLUYE canceladas para alinear con el headline
+    // agendadas (invariante AUT-208/AUT-701: una cita cancelada estuvo agendada).
+    // Antes se excluían aquí, dejando el desglose per-asesor por debajo del headline
+    // (AUT-1683). Un lead agendado con 2 closers suma en ambos ⇒ Opción A (Juan): cada
+    // closer recibe crédito de su propia cita; la suma puede superar el headline.
     const uniqueBooked = new Set(
       meetings
-        .filter((m) => !m.canceled)
         .map((m) => m.idcliente?.trim() || m.leadEmail?.trim().toLowerCase() || m.ghl_contact_id?.trim() || `nokey_${m.id}`)
     );
     // Omitir asesores sin actividad real (solo registros cancelados y sin asistencias)
