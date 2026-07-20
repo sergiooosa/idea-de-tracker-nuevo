@@ -24,7 +24,7 @@ export default function ModalRegistrosVideollamadas({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div className="relative w-full max-w-2xl max-h-[85vh] rounded-xl bg-surface-800 border border-surface-500 shadow-xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b border-surface-500 shrink-0">
-          <h3 className="font-semibold text-white">Videollamadas · {leadName}</h3>
+          <h3 className="font-semibold text-white">Citas · {leadName}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -35,7 +35,7 @@ export default function ModalRegistrosVideollamadas({
         </div>
         <div className="overflow-y-auto p-4">
           {registros.length === 0 ? (
-            <p className="text-gray-400 text-sm">No hay videollamadas en el rango de fechas seleccionado.</p>
+            <p className="text-gray-400 text-sm">No hay citas en el rango de fechas seleccionado.</p>
           ) : (
             <ul className="space-y-3">
               {registros.map((m) => (

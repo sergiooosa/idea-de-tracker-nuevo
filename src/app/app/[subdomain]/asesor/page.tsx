@@ -314,7 +314,7 @@ function TabLlamadas({
             color="blue"
             className="[&>p:nth-child(2)]:text-base [&>p:first-child]:text-[9px] [&>p:first-child]:mt-1 rounded-lg pl-3"
             tooltip={{
-              significado: 'Leads únicos con los que el asesor tuvo actividad (llamada o videollamada) en el período — incluyendo leads que llegaron antes del rango pero recibieron atención ahora.',
+              significado: 'Leads únicos con los que el asesor tuvo actividad (llamada o cita) en el período — incluyendo leads que llegaron antes del rango pero recibieron atención ahora.',
               calculo: '⚠️ ¿Por qué este número es mayor que "Leads generados" del panel ejecutivo?\n\n"Leads generados" (panel ejecutivo) = leads NUEVOS que llegaron al CRM en este período.\n\n"Leads trabajados" (este panel) = todos los leads con actividad en el período, sin importar cuándo llegaron.\n\nEjemplo: un lead que llegó en febrero pero recibió una llamada esta semana cuenta aquí, pero NO en "Leads generados".',
             }}
             onClick={breakdown ? () => setExpandedKpi('leadsAsignados') : undefined}
@@ -667,7 +667,7 @@ function TabVideollamadas({
       <section>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
           KPIs del período
-          <SectionInfo text="Métricas de videollamadas del asesor seleccionado." />
+          <SectionInfo text="Métricas de citas del asesor seleccionado." />
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 [grid-auto-rows:minmax(64px,auto)]">
           <KPICard
@@ -706,8 +706,8 @@ function TabVideollamadas({
       {/* Pipeline */}
       <section>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          Pipeline de videollamadas
-          <SectionInfo text="Videollamadas agrupadas por etapa del embudo." />
+          Pipeline de citas
+          <SectionInfo text="Citas agrupadas por etapa del embudo." />
         </h2>
         {/* Filtros de estado */}
         <div className="flex flex-wrap items-center gap-1.5 mb-2">
@@ -733,11 +733,11 @@ function TabVideollamadas({
         </div>
         {videollamadas.length === 0 ? (
           <div className="rounded-lg border border-surface-500 px-3 py-4 text-center text-gray-500 text-xs">
-            No hay videollamadas en el rango seleccionado.
+            No hay citas en el rango seleccionado.
           </div>
         ) : videollamadasFiltradas.length === 0 ? (
           <div className="rounded-lg border border-surface-500 px-3 py-4 text-center text-gray-500 text-xs">
-            Ninguna videollamada coincide con el filtro seleccionado.
+            Ninguna cita coincide con el filtro seleccionado.
           </div>
         ) : (
           <div className="overflow-x-auto pb-2">
@@ -1291,7 +1291,7 @@ export default function AsesorPage() {
                       case 'llamadas':
                         return 'Llamadas';
                       case 'videollamadas':
-                        return 'Videollamadas';
+                        return 'Citas';
                       case 'chats':
                         return 'Chats';
                       case 'personalizadas':

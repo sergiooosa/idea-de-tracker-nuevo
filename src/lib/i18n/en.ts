@@ -4,7 +4,7 @@ export const en: Translations = {
   nav: {
     dashboard: "Executive Panel",
     performance: "Performance",
-    videollamadas: "Video Calls",
+    videollamadas: "Appointments",
     llamadas: "Phone Calls",
     chats: "Chats",
     asesor: "Advisor Panel",
@@ -55,13 +55,13 @@ export const en: Translations = {
   performance: {
     titulo: "Performance",
     videollamadas: {
-      titulo: "Video Calls",
+      titulo: "Appointments",
       lead: "Lead",
       closer: "Closer",
       fecha: "Date",
       resultado: "Result",
-      reunion: "Meeting",
-      noData: "No video calls in this period",
+      reunion: "Appointment",
+      noData: "No appointments in this period",
       kpis: {
         agendadas: "Scheduled",
         asistidas: "Attended",
@@ -117,7 +117,7 @@ export const en: Translations = {
       leadsAsignados: "Worked leads (period)",
       llamadasRealizadas: "Calls made",
       llamadasContestadas: "Calls answered",
-      reunionesAgendadas: "Meetings scheduled",
+      reunionesAgendadas: "Appointments scheduled",
       tasaContacto: "Contact rate",
       tasaAgendamiento: "Booking rate",
       chatsAsignados: "Chats assigned",
@@ -139,7 +139,7 @@ export const en: Translations = {
     canales: {
       titulo: "By Channel",
       llamadas: "Calls",
-      videollamadas: "Video Calls",
+      videollamadas: "Appointments",
       chats: "Chats",
     },
   },

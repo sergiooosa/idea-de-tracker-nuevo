@@ -143,7 +143,7 @@ export default function AcquisitionPage() {
               <div className="rounded-lg border border-surface-500 bg-surface-700/40 p-3 space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-300">
                   <span>🎥</span>
-                  <span>Videollamadas</span>
+                  <span>Citas</span>
                 </div>
                 <div className="text-2xl font-bold text-accent-cyan">{byChannel.videollamadas.leads}</div>
                 <div className="text-[10px] text-gray-400 uppercase font-medium tracking-wide">leads únicos</div>
@@ -308,7 +308,7 @@ export default function AcquisitionPage() {
                   <th className="px-2 py-2 font-medium"><span className="inline-flex items-center">Llamados <KpiTooltip significado="Leads con al menos una llamada." calculo="Emails con evento en log_llamadas." /></span></th>
                   <th className="px-2 py-2 font-medium"><span className="inline-flex items-center">Contestaron <KpiTooltip significado="Leads que contestaron." calculo="Eventos tipo efectiva_*." /></span></th>
                   <th className="px-2 py-2 font-medium"><span className="inline-flex items-center">Agendaron <KpiTooltip significado="Citas agendadas." calculo="Registros en resumenes_diarios_agendas." /></span></th>
-                  <th className="px-2 py-2 font-medium"><span className="inline-flex items-center">Asistieron <KpiTooltip significado="Asistieron a la reunión." calculo="Categoría Cerrada/Ofertada/No_Ofertada." /></span></th>
+                  <th className="px-2 py-2 font-medium"><span className="inline-flex items-center">Asistieron <KpiTooltip significado="Asistieron a la cita." calculo="Categoría Cerrada/Ofertada/No_Ofertada." /></span></th>
                   <th className="px-2 py-2 font-medium"><span className="inline-flex items-center">Facturación <KpiTooltip significado="Ingresos por ventas." calculo="Suma facturación de cerradas." /></span></th>
                   <th className="px-2 py-2 font-medium">{t.adquisicion.contactRate}</th>
                   <th className="px-2 py-2 font-medium">{t.adquisicion.bookingRate}</th>

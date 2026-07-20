@@ -117,8 +117,8 @@ function VideoBlock({ data }: { data: ReportV2CanalVideo }) {
   return (
     <ReportSection
       icon={Video}
-      title="Canal: Videollamadas"
-      helpTitulo="Desglose de Videollamadas"
+      title="Canal: Citas"
+      helpTitulo="Desglose de Citas"
       helpContenido="Métricas del canal de video: citas agendadas vs realizadas, show rate, reagendamientos, no-shows, duración promedio y cuántos avanzaron en el proceso."
     >
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

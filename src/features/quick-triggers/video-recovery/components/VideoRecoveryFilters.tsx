@@ -36,9 +36,9 @@ export function VideoRecoveryFilters({
   return (
     <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4 space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-white">Recuperador de videollamadas</h2>
+        <h2 className="text-sm font-semibold text-white">Recuperador de citas</h2>
         <p className="text-xs text-gray-400 mt-1">
-          Consulta reuniones por rango, revisa la previsualizacion y recupera por lotes.
+          Consulta citas por rango, revisa la previsualizacion y recupera por lotes.
         </p>
       </div>
 
@@ -167,7 +167,7 @@ export function VideoRecoveryFilters({
       <div className="flex justify-end">
         <Button type="button" onClick={onSubmit} disabled={loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Buscar reuniones
+          Buscar citas
         </Button>
       </div>
     </section>

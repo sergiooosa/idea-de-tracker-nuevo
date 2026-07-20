@@ -30,7 +30,7 @@ interface EditRecordSheetProps {
 
 const TYPE_LABELS: Record<RecordType, string> = {
   llamada: "Llamada",
-  videollamada: "Videollamada",
+  videollamada: "Cita",
   chat: "Chat",
 };
 

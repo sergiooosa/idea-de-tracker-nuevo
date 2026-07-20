@@ -49,7 +49,7 @@ const CANAL_ICONS: Record<SegmentoCanal, typeof Phone> = {
 const CANAL_LABELS: Record<SegmentoCanal, string> = {
   llamada: "Llamadas",
   chat: "Chats",
-  videollamada: "Videollamadas",
+  videollamada: "Citas",
 };
 
 type CounterColor = "accent-green" | "accent-red" | "accent-purple" | "accent-amber";

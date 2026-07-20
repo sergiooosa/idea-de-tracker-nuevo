@@ -21,7 +21,7 @@ export function getMockReportV2(canales: ('llamadas' | 'chats' | 'video')[]): Re
       showRate: 0.736,
     },
     narrativa:
-      'Durante junio se analizaron 342 leads, de los cuales 289 fueron nuevos y 53 reactivados. La tasa de contacto general fue del 68%, con el canal de llamadas mostrando el mejor rendimiento en velocidad de respuesta (promedio 12 min). Se detectaron 23 leads sin actividad en más de 5 días, concentrados principalmente en el asesor Carlos Ruiz. El show rate de videollamadas se mantiene en 73.6%, por encima del benchmark del sector (65%).',
+      'Durante junio se analizaron 342 leads, de los cuales 289 fueron nuevos y 53 reactivados. La tasa de contacto general fue del 68%, con el canal de llamadas mostrando el mejor rendimiento en velocidad de respuesta (promedio 12 min). Se detectaron 23 leads sin actividad en más de 5 días, concentrados principalmente en el asesor Carlos Ruiz. El show rate de citas se mantiene en 73.6%, por encima del benchmark del sector (65%).',
     funnel: {
       analizados: 342,
       steps: [
@@ -260,7 +260,7 @@ export function getMockReportV2(canales: ('llamadas' | 'chats' | 'video')[]): Re
               { label: 'Malo', count: 5, pct: 0.08 },
             ],
             narrativa:
-              'Las videollamadas muestran los mejores indicadores: 66% de recepción positiva, 81% entiende el contexto, y 64% logra un buen cierre. El formato visual favorece el engagement (69% alto).',
+              'Las citas muestran los mejores indicadores: 66% de recepción positiva, 81% entiende el contexto, y 64% logra un buen cierre. El formato visual favorece el engagement (69% alto).',
             totalAnalizadas: 64,
           }
         : null,
@@ -300,7 +300,7 @@ export function getMockReportV2(canales: ('llamadas' | 'chats' | 'video')[]): Re
     conclusiones: [
       'Incrementar velocidad de respuesta en llamadas: 12 min promedio es alto. Meta: < 5 min.',
       'Asesor Carlos Ruiz necesita coaching urgente: 9 leads abandonados y speed-to-lead de 22 min.',
-      'El canal de videollamadas muestra los mejores indicadores de engagement (69% alto) — priorizar agendamiento.',
+      'El canal de citas muestra los mejores indicadores de engagement (69% alto) — priorizar agendamiento.',
       'Implementar técnicas de cierre para chats: solo 28% logra buen cierre vs 44% en llamadas.',
       'La objeción #1 es precio (45 menciones) — revisar si el pitch está anclando valor antes de mencionar costo.',
     ],

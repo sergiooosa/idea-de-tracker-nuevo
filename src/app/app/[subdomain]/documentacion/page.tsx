@@ -389,7 +389,7 @@ function FaqSection() {
   const faqs = [
     {
       q: "Pongo las mismas fechas en el panel ejecutivo, en llamadas y en el panel asesor, pero me salen números distintos. ¿Está fallando algo?",
-      a: "No, es que cada panel mide una cosa diferente y usa su propia fecha de referencia. El panel ejecutivo cuenta las citas por la fecha en que está programada la reunión. El panel de llamadas cuenta por la fecha en que se realizó la llamada. El panel asesor cuenta por la fecha en que el lead tuvo actividad. Si un lead entró el lunes, lo llamaste el miércoles y la cita quedó para el viernes, ese lead aparece en distintos paneles según qué rango de fechas uses. Lo más confiable es usar el mismo rango amplio en todos los paneles (por ejemplo, todo el mes) para ver el cuadro completo.",
+      a: "No, es que cada panel mide una cosa diferente y usa su propia fecha de referencia. El panel ejecutivo cuenta las citas por la fecha en que está programada la cita. El panel de llamadas cuenta por la fecha en que se realizó la llamada. El panel asesor cuenta por la fecha en que el lead tuvo actividad. Si un lead entró el lunes, lo llamaste el miércoles y la cita quedó para el viernes, ese lead aparece en distintos paneles según qué rango de fechas uses. Lo más confiable es usar el mismo rango amplio en todos los paneles (por ejemplo, todo el mes) para ver el cuadro completo.",
     },
     {
       q: "Tengo un asesor que aparece dos veces en la lista (ej: Héctor y Héctor). ¿Por qué?",
@@ -409,7 +409,7 @@ function FaqSection() {
     },
     {
       q: "Tengo la API Externa activada y el Panel Ejecutivo muestra ingresos, pero las comisiones aparecen en $0. ¿Por qué?",
-      a: "El módulo de comisiones siempre calcula sobre los datos nativos del sistema (videollamadas y llamadas registradas vía Fathom/Twilio), sin importar si tienes activada la fuente de datos externa. La API Externa solo afecta cómo se muestran los KPIs de ingresos en el Panel Ejecutivo, no la base de cálculo de comisiones. Para que las comisiones funcionen, los cierres deben estar registrados como reuniones en el sistema nativo con el valor de facturación correspondiente.",
+      a: "El módulo de comisiones siempre calcula sobre los datos nativos del sistema (citas y llamadas registradas vía Fathom/Twilio), sin importar si tienes activada la fuente de datos externa. La API Externa solo afecta cómo se muestran los KPIs de ingresos en el Panel Ejecutivo, no la base de cálculo de comisiones. Para que las comisiones funcionen, los cierres deben estar registrados como citas en el sistema nativo con el valor de facturación correspondiente.",
     },
     {
       q: "¿Por qué el análisis de IA no siempre clasifica las llamadas?",
@@ -610,8 +610,8 @@ function ApiSection() {
       <Card className="bg-accent-amber/5 border-accent-amber/30">
         <CardContent className="pt-4 text-xs text-amber-300 space-y-1.5">
           <p className="font-semibold text-accent-amber">⚠️ Limitación actual: Comisiones y API Externa</p>
-          <p>El módulo de <strong className="text-white">Comisiones</strong> siempre calcula sobre los datos nativos del sistema (llamadas y videollamadas de Fathom/Twilio), independientemente de si tienes API Externa activada.</p>
-          <p>Si tu equipo registra cierres <strong className="text-white">exclusivamente</strong> vía API externa, las comisiones aparecerán en $0. Para que las comisiones funcionen, los cierres deben estar registrados como videollamadas o llamadas en el sistema nativo.</p>
+          <p>El módulo de <strong className="text-white">Comisiones</strong> siempre calcula sobre los datos nativos del sistema (llamadas y citas de Fathom/Twilio), independientemente de si tienes API Externa activada.</p>
+          <p>Si tu equipo registra cierres <strong className="text-white">exclusivamente</strong> vía API externa, las comisiones aparecerán en $0. Para que las comisiones funcionen, los cierres deben estar registrados como citas o llamadas en el sistema nativo.</p>
           <p className="text-gray-500">Para ventas por closer vía API externa, contacta al equipo técnico.</p>
         </CardContent>
       </Card>
@@ -634,9 +634,9 @@ function EmbudoSection() {
     },
     {
       icon: "🎥",
-      titulo: "Videollamadas (Fathom)",
+      titulo: "Citas (Fathom)",
       pasos: [
-        "Asesor realiza la videollamada con Fathom activo",
+        "Asesor realiza la cita con Fathom activo",
         "Fathom genera automáticamente el resumen y la transcripción",
         "El sistema recibe la transcripción y la analiza con IA",
         "Se registra el resultado en el panel: asistió, propuesta enviada, cerrada, etc.",
@@ -701,9 +701,9 @@ function EmbudoSection() {
 
       <Card className="bg-accent-cyan/5 border-accent-cyan/20">
         <CardContent className="pt-4 text-xs text-gray-400 space-y-1">
-          <p>📊 <strong className="text-white">Panel ejecutivo</strong> — resumen de todo: leads, llamadas, citas, ingresos. Fecha de referencia: fecha de la reunión.</p>
+          <p>📊 <strong className="text-white">Panel ejecutivo</strong> — resumen de todo: leads, llamadas, citas, ingresos. Fecha de referencia: fecha de la cita.</p>
           <p>📞 <strong className="text-white">Rendimiento → Llamadas</strong> — detalle de cada llamada. Fecha de referencia: cuándo se realizó la llamada.</p>
-          <p>🎥 <strong className="text-white">Rendimiento → Videollamadas</strong> — detalle de cada videollamada. Fecha de referencia: fecha de la reunión.</p>
+          <p>🎥 <strong className="text-white">Rendimiento → Citas</strong> — detalle de cada cita. Fecha de referencia: fecha de la cita.</p>
           <p>👤 <strong className="text-white">Panel asesor</strong> — vista individual por asesor. Fecha de referencia: cuándo tuvo actividad el lead.</p>
           <p className="text-gray-500 pt-1">⚠️ Por esto los números pueden variar ligeramente entre paneles con el mismo rango de fechas — cada uno mide un momento diferente del proceso.</p>
         </CardContent>
@@ -807,7 +807,7 @@ function EtiquetasSection() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-gray-400">
           {[
-            { n: 1, text: "Cerebro recibe webhook de llamada o videollamada." },
+            { n: 1, text: "Cerebro recibe webhook de llamada o cita." },
             { n: 2, text: <>Llama a <code className="bg-surface-700 px-1 py-0.5 rounded text-accent-cyan">GET /webhooks/config/:subdominio</code> para obtener las reglas actuales.</> },
             { n: 3, text: "La IA evalúa la transcripción y detecta condiciones (ver tabla abajo)." },
             { n: 4, text: "Para cada regla cuya condición match, ejecutar TODAS las acciones de esa regla (acciones[]): asignar etiquetas, cambiar etapa, incrementar métricas." },
@@ -905,7 +905,7 @@ function MetricasSection() {
           <CardTitle className="text-sm text-gray-300">Ubicación</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-gray-400">
-          Cada métrica puede mostrarse en <strong className="text-white">Panel Ejecutivo</strong>, <strong className="text-white">Rendimiento</strong> (videollamadas) o <strong className="text-white">Ambos</strong>.
+          Cada métrica puede mostrarse en <strong className="text-white">Panel Ejecutivo</strong>, <strong className="text-white">Rendimiento</strong> (citas) o <strong className="text-white">Ambos</strong>.
         </CardContent>
       </Card>
 
@@ -938,7 +938,7 @@ function BYOKSection({ hasKey }: { hasKey: boolean }) {
         <div>
           <h3 className="text-lg font-semibold text-white">Bring Your Own Key (OpenAI)</h3>
           <p className="text-sm text-gray-400 mt-1">
-            Conecta tu propia API Key de OpenAI para procesar análisis de llamadas y videollamadas sin límites
+            Conecta tu propia API Key de OpenAI para procesar análisis de llamadas y citas sin límites
             ni colas compartidas.
           </p>
         </div>
@@ -1027,7 +1027,7 @@ function CostosIASection() {
           <tbody className="divide-y divide-surface-600">
             <tr>
               <td className="px-4 py-2.5 text-white font-medium">GPT-4o-mini</td>
-              <td className="px-4 py-2.5 text-gray-400">Clasificación de llamadas, videollamadas y chats</td>
+              <td className="px-4 py-2.5 text-gray-400">Clasificación de llamadas, citas y chats</td>
               <td className="px-4 py-2.5">
                 <div className="text-accent-amber font-mono text-xs space-y-0.5">
                   <div>$0.15 / 1M tokens entrada</div>

@@ -60,11 +60,11 @@ const TABS_CONFIG: { id: CriteriosTab; label: string; icon: typeof Sparkles; hel
   },
   {
     id: "videollamadas",
-    label: "Videollamadas",
+    label: "Citas",
     icon: Video,
-    helpTitulo: "Criterios de Videollamadas (Fathom)",
-    helpContenido: "Las categorías seleccionadas aquí aplican solo a las videollamadas/reuniones. Si dejas vacío, se usarán los criterios globales para este canal.",
-    helpProbar: "Selecciona categorías específicas para videollamadas, guarda, y verifica que solo se aplican a las videollamadas en Performance.",
+    helpTitulo: "Criterios de Citas (Fathom)",
+    helpContenido: "Las categorías seleccionadas aquí aplican solo a las citas. Si dejas vacío, se usarán los criterios globales para este canal.",
+    helpProbar: "Selecciona categorías específicas para citas, guarda, y verifica que solo se aplican a las citas en Performance.",
   },
 ];
 
@@ -689,7 +689,7 @@ export default function ConfiguracionPage() {
                 <h2 className="text-sm font-semibold text-white">Criterios de Calificación</h2>
                 <HelpTooltip
                   titulo="¿Qué son los Criterios de Calificación?"
-                  contenido={`Aquí eliges qué categorías de interés (detectadas automáticamente por la IA al analizar tus conversaciones) cuentan como un lead calificado para tu negocio.\n\nPuedes definir criterios globales que aplican a todos los canales, o criterios específicos por canal (Chats, Llamadas, Videollamadas). Si un canal tiene criterios propios, se usarán esos en lugar de los globales.`}
+                  contenido={`Aquí eliges qué categorías de interés (detectadas automáticamente por la IA al analizar tus conversaciones) cuentan como un lead calificado para tu negocio.\n\nPuedes definir criterios globales que aplican a todos los canales, o criterios específicos por canal (Chats, Llamadas, Citas). Si un canal tiene criterios propios, se usarán esos en lugar de los globales.`}
                   comoProbar="Selecciona categorías en la pestaña Global o en un canal específico, guarda, y verifica en Performance que las conversaciones se marcan correctamente como Calificado."
                 />
               </div>
@@ -881,7 +881,7 @@ export default function ConfiguracionPage() {
                 <h2 className="text-sm font-semibold text-white">Canales del Embudo IA</h2>
                 <HelpTooltip
                   titulo="¿Qué son los Canales del Embudo IA?"
-                  contenido={`Indica qué canales de comunicación usa tu equipo de ventas: Chats (WhatsApp), Llamadas (Twilio) y/o Videollamadas (Fathom).\n\nLa IA del embudo solo analizará y calculará métricas de los canales que marques como activos. Desactivar un canal que no usas evita ruido y métricas vacías en tus reportes.`}
+                  contenido={`Indica qué canales de comunicación usa tu equipo de ventas: Chats (WhatsApp), Llamadas (Twilio) y/o Citas (Fathom).\n\nLa IA del embudo solo analizará y calculará métricas de los canales que marques como activos. Desactivar un canal que no usas evita ruido y métricas vacías en tus reportes.`}
                   comoProbar="Activa solo los canales que tu equipo realmente usa y pulsa 'Guardar canales'. Revisa el embudo/Performance y confirma que solo aparecen métricas de los canales activos."
                 />
               </div>
@@ -893,7 +893,7 @@ export default function ConfiguracionPage() {
               {([
                 { key: "chats" as const, label: "Chats (WhatsApp)", icon: MessageSquare, desc: "Conversaciones de WhatsApp y chat" },
                 { key: "llamadas" as const, label: "Llamadas (Twilio)", icon: Phone, desc: "Llamadas telefónicas grabadas" },
-                { key: "videollamadas" as const, label: "Videollamadas (Fathom)", icon: Video, desc: "Reuniones con transcripción" },
+                { key: "videollamadas" as const, label: "Citas (Fathom)", icon: Video, desc: "Citas con transcripción" },
               ]).map(({ key, label, icon: Icon, desc }) => (
                 <button
                   key={key}

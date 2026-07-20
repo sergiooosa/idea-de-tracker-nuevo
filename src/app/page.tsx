@@ -41,9 +41,9 @@ const STATS = [
 const FEATURES = [
   {
     icon: Video,
-    title: "Videollamadas analizadas con IA",
+    title: "Citas analizadas con IA",
     description:
-      "Cada videollamada de ventas es transcrita, analizada y puntuada automáticamente. Detecta objeciones, sentimiento y oportunidades de mejora.",
+      "Cada cita de ventas es transcrita, analizada y puntuada automáticamente. Detecta objeciones, sentimiento y oportunidades de mejora.",
     color: "blue",
     gradient: "from-blue-500/20",
     iconBg: "text-blue-400",
@@ -106,7 +106,7 @@ const STEPS = [
     number: "01",
     title: "Conectas tu stack comercial",
     description:
-      "Integra tu CRM, herramientas de videollamada, teléfono y canales de chat en menos de 10 minutos. Sin código, sin fricción.",
+      "Integra tu CRM, herramientas de citas, teléfono y canales de chat en menos de 10 minutos. Sin código, sin fricción.",
   },
   {
     number: "02",
@@ -172,7 +172,7 @@ const NOTIFICATIONS = [
     dot: "bg-emerald-400",
   },
   {
-    text: "Videollamada analizada: score 92/100",
+    text: "Cita analizada: score 92/100",
     time: "hace 8 min",
     dot: "bg-blue-400",
   },
@@ -257,7 +257,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-400 md:text-xl">
-            AutoKPI centraliza cada videollamada, llamada telefónica y chat de
+            AutoKPI centraliza cada cita, llamada telefónica y chat de
             tu equipo comercial. La IA analiza cada conversación y te dice dónde
             se están cayendo las ventas — en tiempo real.
           </p>

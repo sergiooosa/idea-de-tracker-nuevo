@@ -15,7 +15,7 @@ export const PERMISOS_DISPONIBLES = [
   { id: "ver_documentacion", label: "Ver Documentación" },
   { id: "ver_todo", label: "Ver todo (acceso completo a datos)" },
   { id: "ver_solo_propios", label: "Solo ver sus propios datos" },
-  { id: "editar_registros", label: "Editar registros (llamadas, videollamadas, chats)" },
+  { id: "editar_registros", label: "Editar registros (llamadas, citas, chats)" },
   { id: "configurar_sistema", label: "Configurar sistema (prompts, reglas, embudo)" },
   { id: "gestionar_usuarios", label: "Gestionar usuarios" },
   { id: "gestionar_roles", label: "Gestionar roles" },

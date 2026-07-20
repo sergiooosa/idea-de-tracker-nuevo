@@ -88,7 +88,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   // ─── BLOQUE 3: Pipeline de citas ──────────────────────────────────────────
   {
     id: "base-reuniones-agendadas",
-    nombre: "Reuniones agendadas",
+    nombre: "Citas agendadas",
     descripcion: "Citas agendadas en el periodo (fuente: sistema)",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
@@ -99,8 +99,8 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   },
   {
     id: "base-reuniones-calificadas",
-    nombre: "Reuniones calificadas",
-    descripcion: "Reuniones con leads que cumplieron el perfil de cliente ideal",
+    nombre: "Citas calificadas",
+    descripcion: "Citas con leads que cumplieron el perfil de cliente ideal",
     tipo: "manual",
     paneles: ["panel_ejecutivo"],
     orden: 6,
@@ -113,7 +113,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   },
   {
     id: "base-reuniones-asistidas",
-    nombre: "Reuniones asistidas",
+    nombre: "Citas asistidas",
     descripcion: "Shows — leads que se presentaron a la cita",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
@@ -124,7 +124,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   },
   {
     id: "base-reuniones-cerradas",
-    nombre: "Reuniones cerradas",
+    nombre: "Citas cerradas",
     descripcion: "Citas que terminaron en venta",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
@@ -135,7 +135,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   },
   {
     id: "base-reuniones-canceladas",
-    nombre: "Reuniones canceladas",
+    nombre: "Citas canceladas",
     descripcion: "Citas canceladas antes de realizarse",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
@@ -204,7 +204,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   {
     id: "base-ticket-promedio",
     nombre: "Ticket promedio",
-    descripcion: "Facturación ÷ Reuniones cerradas",
+    descripcion: "Facturación ÷ Citas cerradas",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
     orden: 14,
@@ -218,7 +218,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   {
     id: "base-cpa-calificada",
     nombre: "Costo por agenda calificada",
-    descripcion: "Inversión ÷ Reuniones calificadas",
+    descripcion: "Inversión ÷ Citas calificadas",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
     orden: 15,
@@ -232,7 +232,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   {
     id: "base-costo-por-show",
     nombre: "Costo por show",
-    descripcion: "Inversión ÷ Reuniones asistidas",
+    descripcion: "Inversión ÷ Citas asistidas",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
     orden: 16,
@@ -246,7 +246,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   {
     id: "base-cac",
     nombre: "CAC",
-    descripcion: "Costo de Adquisición de Cliente (Inversión ÷ Reuniones cerradas)",
+    descripcion: "Costo de Adquisición de Cliente (Inversión ÷ Citas cerradas)",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
     orden: 17,
@@ -288,7 +288,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   {
     id: "base-revenue-por-show",
     nombre: "Revenue por Show",
-    descripcion: "Facturación ÷ Reuniones asistidas",
+    descripcion: "Facturación ÷ Citas asistidas",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
     orden: 20,
@@ -302,7 +302,7 @@ export const PLANTILLA_METRICAS_BASE: MetricaConfig[] = [
   {
     id: "base-pct-calificacion",
     nombre: "% Calificación",
-    descripcion: "Reuniones calificadas ÷ Reuniones agendadas",
+    descripcion: "Citas calificadas ÷ Citas agendadas",
     tipo: "automatica",
     paneles: ["panel_ejecutivo"],
     orden: 21,

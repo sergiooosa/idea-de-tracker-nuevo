@@ -59,7 +59,7 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
 const DEFAULT_PROMPT_VENTAS =
   "Somos una empresa de formación en ventas. Ofrecemos programas de 90 días con mentoría y seguimiento.";
 const DEFAULT_PROMPT_VIDEO =
-  "Evalúa la videollamada según: 1) Claridad del valor ofrecido, 2) Manejo de objeciones, 3) Cierre o siguiente paso definido. Asigna puntaje 1-10 por criterio.";
+  "Evalúa la cita según: 1) Claridad del valor ofrecido, 2) Manejo de objeciones, 3) Cierre o siguiente paso definido. Asigna puntaje 1-10 por criterio.";
 const DEFAULT_PROMPT_LLAMADAS =
   "Evalúa la llamada telefónica según: 1) Saludo y presentación, 2) Calificación del lead (interés, autoridad, necesidad), 3) Manejo de objeciones, 4) Cierre o siguiente paso (agendar, callback). Asigna puntaje 1-10 por criterio.";
 

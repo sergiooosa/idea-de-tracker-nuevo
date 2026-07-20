@@ -96,7 +96,7 @@ export default function ModalTranscripcionIA({
                 <FileText className="w-8 h-8 text-gray-600" />
                 <p className="text-sm text-gray-500">Transcripción no disponible</p>
                 <p className="text-[11px] text-gray-600">
-                  Las nuevas videollamadas procesadas por Fathom incluirán la transcripción aquí.
+                  Las nuevas citas procesadas por Fathom incluirán la transcripción aquí.
                 </p>
               </div>
             )
@@ -111,7 +111,7 @@ export default function ModalTranscripcionIA({
                 <Sparkles className="w-8 h-8 text-gray-600" />
                 <p className="text-sm text-gray-500">Análisis IA no disponible</p>
                 <p className="text-[11px] text-gray-600">
-                  El análisis se genera automáticamente cuando Fathom procesa la videollamada.
+                  El análisis se genera automáticamente cuando Fathom procesa la cita.
                 </p>
               </div>
             )
@@ -127,7 +127,7 @@ export default function ModalTranscripcionIA({
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-green/20 border border-accent-green/50 text-accent-green font-medium text-sm hover:bg-accent-green/30 transition-colors"
             >
-              <ExternalLink className="w-4 h-4" /> Ver grabación de la videollamada
+              <ExternalLink className="w-4 h-4" /> Ver grabación de la cita
             </a>
           ) : (
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-600 text-gray-500 text-sm">

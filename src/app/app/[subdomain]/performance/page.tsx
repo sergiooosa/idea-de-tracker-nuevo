@@ -25,14 +25,14 @@ const fm = formatCurrency;
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
 const kpiTooltips = {
-  agendadas: { significado: 'Citas o presentaciones programadas. Vienen de los calendarios usados para citas o presentaciones.', calculo: 'Eventos de videollamada de los calendarios de citas/presentaciones en el rango.' },
-  asistidas: { significado: 'Reuniones a las que el lead asistió (videollamadas y citas GHL).', calculo: 'Citas con attended = true (interacción real verificada).' },
-  canceladas: { significado: 'Reuniones canceladas antes de realizarse. Provienen de las canceladas en GHL.', calculo: 'Videollamadas con canceled = true en GHL.' },
-  efectivas: { significado: 'Ventas cerradas. Las que Fathom determina como cerradas.', calculo: 'Videollamadas que Fathom marca como cerradas.' },
-  cerradasVendidas: { significado: 'Reuniones que terminaron en venta (conteo absoluto).', calculo: 'Registros con categoría cerrada/cerrado. Mismo numerador que Tasa de cierre.' },
+  agendadas: { significado: 'Citas o presentaciones programadas. Vienen de los calendarios usados para citas o presentaciones.', calculo: 'Eventos de cita de los calendarios de citas/presentaciones en el rango.' },
+  asistidas: { significado: 'Citas a las que el lead asistió (citas y citas GHL).', calculo: 'Citas con attended = true (interacción real verificada).' },
+  canceladas: { significado: 'Citas canceladas antes de realizarse. Provienen de las canceladas en GHL.', calculo: 'Citas con canceled = true en GHL.' },
+  efectivas: { significado: 'Ventas cerradas. Las que Fathom determina como cerradas.', calculo: 'Citas que Fathom marca como cerradas.' },
+  cerradasVendidas: { significado: 'Citas que terminaron en venta (conteo absoluto).', calculo: 'Registros con categoría cerrada/cerrado. Mismo numerador que Tasa de cierre.' },
   noShows: { significado: 'Leads que no se presentaron a la cita agendada.', calculo: 'Registros con categoría no_show en el período seleccionado.' },
-  revenue: { significado: 'Lo que se vendió (ingresos por ventas).', calculo: 'Suma del monto vendido en reuniones cerradas.' },
-  cashCollected: { significado: 'Lo que se recolectó (efectivo cobrado por cierres).', calculo: 'Suma de cashCollected por reunión.' },
+  revenue: { significado: 'Lo que se vendió (ingresos por ventas).', calculo: 'Suma del monto vendido en citas cerradas.' },
+  cashCollected: { significado: 'Lo que se recolectó (efectivo cobrado por cierres).', calculo: 'Suma de cashCollected por cita.' },
   ticket: { significado: 'Valor promedio por venta.', calculo: 'Efectivo cobrado total / número de ventas.' },
 };
 
@@ -223,7 +223,7 @@ export default function PerformanceVideollamadasPage() {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[300px]">
-        <div className="text-gray-400 text-sm animate-pulse">Cargando datos de videollamadas...</div>
+        <div className="text-gray-400 text-sm animate-pulse">Cargando datos de citas...</div>
       </div>
     );
   }
@@ -254,7 +254,7 @@ export default function PerformanceVideollamadasPage() {
             onChange={(e) => setLeadSearch(e.target.value)}
             placeholder="Buscar: nombre, email, ID contacto, tags, resumen…"
             className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-accent-purple"
-            aria-label="Buscar en videollamadas"
+            aria-label="Buscar en citas"
           />
         </div>
       </div>
@@ -346,8 +346,8 @@ export default function PerformanceVideollamadasPage() {
             <span className="text-base font-bold text-emerald-400">{leadsCalificados}</span>
             <span className="text-[10px] text-gray-500">de {agg.asistidas} asistidas</span>
             <KpiTooltip
-              significado="Reuniones donde el lead fue calificado — cumple criterios para avanzar en el proceso de venta."
-              calculo="Conteo de videollamadas con categoría calificada o cerrada en el período."
+              significado="Citas donde el lead fue calificado — cumple criterios para avanzar en el proceso de venta."
+              calculo="Conteo de citas con categoría calificada o cerrada en el período."
             />
           </div>
         </div>
@@ -413,7 +413,7 @@ export default function PerformanceVideollamadasPage() {
           {(data?.registros?.length ?? 0) === 0 ? (
             <div className="px-3 py-4 text-center text-gray-500 text-xs">{t.performance.videollamadas.noData}</div>
           ) : leadSearch.trim() && registrosFiltrados.length === 0 ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">Ninguna reunión coincide con «{leadSearch.trim()}».</div>
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">Ninguna cita coincide con «{leadSearch.trim()}».</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -463,7 +463,7 @@ export default function PerformanceVideollamadasPage() {
                             <tr className="bg-surface-800/90">
                               <td colSpan={8} className="p-0">
                                 <div className="px-3 py-2 border-t border-surface-500">
-                                  <div className="text-[10px] text-gray-400 mb-1.5">Leads de {metrics?.advisorName ?? advisorMeetings[0]?.closer ?? advisorKey} (clic en la fila abre reuniones)</div>
+                                  <div className="text-[10px] text-gray-400 mb-1.5">Leads de {metrics?.advisorName ?? advisorMeetings[0]?.closer ?? advisorKey} (clic en la fila abre citas)</div>
                                   <div className="rounded-lg border border-surface-500 overflow-x-auto max-h-[400px] overflow-y-auto">
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-surface-700">
@@ -471,7 +471,7 @@ export default function PerformanceVideollamadasPage() {
                                           <th className="px-2 py-2 font-medium">Nombre</th>
                                           <th className="px-2 py-2 font-medium">Correo</th>
                                           <th className="px-2 py-2 font-medium" title="¿Lead calificado?">Calificado</th>
-                                          <th className="px-2 py-2 font-medium">Reuniones realizadas</th>
+                                          <th className="px-2 py-2 font-medium">Citas realizadas</th>
                                           <th className="px-2 py-2 font-medium">Resultado</th>
                                           <th className="px-2 py-2 font-medium w-8" />
                                         </tr>
