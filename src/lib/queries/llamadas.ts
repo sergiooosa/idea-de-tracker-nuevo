@@ -346,6 +346,15 @@ export async function getLlamadas(
     const displayName = u.nombre_closer?.trim() ?? u.nombre?.trim();
     if (displayName) nombreToEmailMap[displayName.toLowerCase()] = emailKey;
   }
+  // Enrich with nombre_closer→closer_mail from log_llamadas (covers full names
+  // like "Beatriz Jimenez" that usuarios_dashboard.nombre doesn't have)
+  for (const r of rows) {
+    const mail = r.closer_mail?.trim().toLowerCase();
+    const name = r.nombre_closer?.trim().toLowerCase();
+    if (mail && name && !name.includes("@") && !nombreToEmailMap[name]) {
+      nombreToEmailMap[name] = mail;
+    }
+  }
   function agendaCanonicalKey(rawCloser: string): string {
     const lc = rawCloser.toLowerCase().trim();
     if (lc.includes("@")) return lc;

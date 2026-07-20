@@ -303,6 +303,21 @@ export async function getVideollamadas(
     }
   }
 
+  // Enrich with nombre_closer→closer_mail from log_llamadas (covers full names
+  // like "Beatriz Jimenez" that usuarios_dashboard.nombre doesn't have)
+  const closerPairs = await db
+    .select({ nombre_closer: logLlamadas.nombre_closer, closer_mail: logLlamadas.closer_mail })
+    .from(logLlamadas)
+    .where(and(eq(logLlamadas.id_cuenta, idCuenta), isNotNull(logLlamadas.nombre_closer), isNotNull(logLlamadas.closer_mail)))
+    .groupBy(logLlamadas.nombre_closer, logLlamadas.closer_mail);
+  for (const p of closerPairs) {
+    const name = p.nombre_closer?.trim().toLowerCase();
+    const mail = p.closer_mail?.trim().toLowerCase();
+    if (name && mail && !name.includes("@") && !nombreToEmail[name]) {
+      nombreToEmail[name] = mail;
+    }
+  }
+
   // Canonical key: use email as the single source of truth.
   // rawCloser can be stored as a name ("Angel Llobet") or as an email
   // ("angel@serenthys.com") depending on the source system. We normalise
