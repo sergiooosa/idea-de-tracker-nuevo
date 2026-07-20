@@ -657,11 +657,12 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Top closers de chats */}
+            {/* Vendedor con más chats en el periodo */}
             {data!.chatKpis!.topClosers.length > 0 && (
               <div>
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 font-medium flex items-center gap-1">
-                  <UserCircle className="w-3 h-3" /> Top closers (chats)
+                  <UserCircle className="w-3 h-3" /> Vendedor con más chats
+                  <HelpTooltip titulo="Vendedor con más chats" contenido="Vendedor con más chats con clientes en el periodo seleccionado. Mide volumen de conversaciones, no cierres." />
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {data!.chatKpis!.topClosers.map(({ name, count }, i) => (

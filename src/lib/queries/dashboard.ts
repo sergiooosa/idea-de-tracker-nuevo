@@ -1184,7 +1184,7 @@ export async function getDashboard(
         distribucionCanales[channel] = (distribucionCanales[channel] ?? 0) + 1;
       }
 
-      // Top closers — de notas_extra
+      // Vendedor con más chats — de notas_extra
       const closer = row.notas_extra?.trim();
       if (closer) {
         closerCounts[closer] = (closerCounts[closer] ?? 0) + 1;
