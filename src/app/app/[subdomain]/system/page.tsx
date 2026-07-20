@@ -201,7 +201,7 @@ const EMBUDO_COLORS = ['#06b6d4', '#8b5cf6', '#22c55e', '#f97316', '#ef4444', '#
 
 const sections = ['Performance', 'Panel asesor', 'Resumen adquisición', 'Panel ejecutivo', 'Otro'];
 const panelsBySection: Record<string, string[]> = {
-  Performance: ['Llamadas', 'Videollamadas', 'Chats'],
+  Performance: ['Llamadas', 'Citas', 'Chats'],
   'Panel asesor': ['KPIs período'],
   'Resumen adquisición': ['Tabla por canal'],
   'Panel ejecutivo': ['KPIs globales', 'Ranking asesores'],
@@ -728,7 +728,7 @@ export default function SystemPage() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2">
           {[
             { id: 1, title: 'Contexto de empresa', icon: Building2, color: 'blue' },
-            { id: 2, title: 'Eval. videollamadas', icon: Video, color: 'purple' },
+            { id: 2, title: 'Eval. citas', icon: Video, color: 'purple' },
             { id: 3, title: 'Eval. llamadas', icon: Phone, color: 'cyan' },
             { id: 4, title: 'Reglas de etiquetas', icon: Tag, color: 'amber' },
             { id: 5, title: 'Métricas custom', icon: BarChart3, color: 'green' },
@@ -809,19 +809,19 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
                 <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><Video className="w-5 h-5 text-accent-purple" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Evaluación de videollamadas</h3>
-                  <p className="text-sm text-gray-400">Prompt / rúbrica para evaluar reuniones (criterios, puntajes).</p>
+                  <h3 className="text-lg font-semibold text-white">Evaluación de citas</h3>
+                  <p className="text-sm text-gray-400">Prompt / rúbrica para evaluar citas (criterios, puntajes).</p>
                 </div>
               </div>
               <textarea value={promptEvaluacion} onChange={(e) => setPromptEvaluacion(e.target.value)}
                 className="w-full rounded-lg bg-surface-700/80 border border-surface-500 p-3 text-sm text-white placeholder-gray-500 min-h-[180px] focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50 transition-colors"
-                placeholder="Evalúa la videollamada según..." />
+                placeholder="Evalúa la cita según..." />
               <p className="text-[11px] text-gray-500 mt-1">Se recomienda ser lo más completo posible para que la IA entienda tu negocio de la mejor manera.</p>
 
-              {/* ── Sección: Notas en GHL después de videollamada ── */}
+              {/* ── Sección: Notas en GHL después de cita ── */}
               <div className="rounded-xl border border-accent-amber/30 bg-accent-amber/5 p-4 space-y-4">
                 <h4 className="text-sm font-semibold text-accent-amber flex items-center gap-2">
-                  📝 Notas en GHL después de videollamada
+                  📝 Notas en GHL después de cita
                 </h4>
                 <p className="text-sm text-gray-400">
                   Cuando Fathom envía una grabación, el sistema puede guardar notas automáticamente en el contacto de GHL.
@@ -850,7 +850,7 @@ export default function SystemPage() {
                   <div className="flex-1 space-y-1">
                     <span className="text-sm text-white font-medium">Nota con transcripción completa</span>
                     <p className="text-[11px] text-gray-500">
-                      Guarda el texto completo de la reunión en GHL. <span className="text-accent-amber">⚠️</span> Las transcripciones largas (&gt;65k caracteres) pueden fallar por límite de GHL. Recomendado solo si realmente lo necesitas.
+                      Guarda el texto completo de la cita en GHL. <span className="text-accent-amber">⚠️</span> Las transcripciones largas (&gt;65k caracteres) pueden fallar por límite de GHL. Recomendado solo si realmente lo necesitas.
                     </p>
                   </div>
                   <button
@@ -1103,7 +1103,7 @@ export default function SystemPage() {
                     <h3 className="text-lg font-semibold text-white">Reglas de etiquetas</h3>
                     <HelpTooltip
                       titulo="¿Qué son las reglas de etiquetas?"
-                      contenido={`Cada regla es una condición escrita en tus palabras. Después de cada llamada, videollamada o chat, el sistema revisa si esa condición se cumple:\n\n• Si se cumple → ejecuta la acción (pone la etiqueta, escribe en un campo de GHL, o la IA genera texto y lo guarda en un campo).\n• Si no se cumple → no hace nada.\n\nEjemplo: condición "el lead menciona un presupuesto mayor a 5000" → acción "Poner etiqueta" → Presupuesto_mayor_5000.`}
+                      contenido={`Cada regla es una condición escrita en tus palabras. Después de cada llamada, cita o chat, el sistema revisa si esa condición se cumple:\n\n• Si se cumple → ejecuta la acción (pone la etiqueta, escribe en un campo de GHL, o la IA genera texto y lo guarda en un campo).\n• Si no se cumple → no hace nada.\n\nEjemplo: condición "el lead menciona un presupuesto mayor a 5000" → acción "Poner etiqueta" → Presupuesto_mayor_5000.`}
                       comoProbar="Crea una regla con la condición en tus palabras (ej. 'menciona presupuesto mayor a 5000'), elige la acción y guarda. Espera a que entre una llamada o chat que cumpla la condición: la etiqueta (o el valor del campo) aparecerá en el perfil del lead."
                     />
                   </div>
@@ -1175,7 +1175,7 @@ export default function SystemPage() {
                               <button key={canal} type="button" onClick={() => toggleFuente(canal)}
                                 className={`px-2 py-1 rounded text-[11px] font-medium border transition-colors ${r.fuentes.includes(canal) && !isAllSources ? 'bg-accent-cyan/20 text-accent-cyan border-accent-cyan/40' : !isAllSources ? 'bg-surface-600 text-gray-400 border-surface-500 hover:border-gray-400' : 'bg-surface-600 text-gray-500 border-surface-500 opacity-50'}`}
                                 disabled={isAllSources}>
-                                {canal === 'llamadas' ? 'Llamadas' : canal === 'videollamadas' ? 'Video' : 'Chats'}
+                                {canal === 'llamadas' ? 'Llamadas' : canal === 'videollamadas' ? 'Citas' : 'Chats'}
                               </button>
                             ))}
                           </div>
@@ -1254,8 +1254,8 @@ export default function SystemPage() {
                                       Mini-prompt
                                       <HelpTooltip
                                         titulo="Llenar campo de GHL con IA"
-                                        contenido={'Si se cumple la condición en la llamada/videollamada, la IA escribe en ese campo de GHL lo que le pidas en el mini-prompt. Ej: condición "el lead menciona un inmueble" → campo "inmueble_interes" → prompt "escribe el inmueble que mencionó".'}
-                                        comoProbar={'Crea la regla, espera una llamada/videollamada que cumpla la condición, y revisa el campo del contacto en GHL — verás el texto generado por la IA.'}
+                                        contenido={'Si se cumple la condición en la llamada/cita, la IA escribe en ese campo de GHL lo que le pidas en el mini-prompt. Ej: condición "el lead menciona un inmueble" → campo "inmueble_interes" → prompt "escribe el inmueble que mencionó".'}
+                                        comoProbar={'Crea la regla, espera una llamada/cita que cumpla la condición, y revisa el campo del contacto en GHL — verás el texto generado por la IA.'}
                                       />
                                     </label>
                                     <textarea value={a.prompt ?? ''} onChange={(e) => updateAccion(ai, { prompt: e.target.value })}
@@ -1829,9 +1829,9 @@ export default function SystemPage() {
               <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">🎥</span>
-                  <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Canal Videollamadas</h4>
+                  <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Canal Citas</h4>
                 </div>
-                <p className="text-[11px] text-gray-500">Metas para el canal de videollamadas / agendas (closers). Solo configura si usas este canal.</p>
+                <p className="text-[11px] text-gray-500">Metas para el canal de citas / agendas (closers). Solo configura si usas este canal.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-purple-300 mb-1">Citas semanales agendadas</label>
@@ -1859,7 +1859,7 @@ export default function SystemPage() {
                     <input type="number" min={0} value={metas.meta_revenue_video ?? metas.meta_revenue_mensual ?? ''} onChange={(e) => setMetas((m) => ({ ...m, meta_revenue_video: e.target.value ? Math.max(0, +e.target.value) : null, meta_revenue_mensual: e.target.value ? Math.max(0, +e.target.value) : null }))}
                       placeholder="Sin meta"
                       className="w-full rounded-lg bg-surface-600 border border-purple-500/30 px-2 py-1.5 text-sm text-white focus:ring-2 focus:ring-purple-500/40" />
-                    <p className="text-[10px] text-gray-600 mt-0.5">Revenue total mensual a alcanzar por videollamadas.</p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">Revenue total mensual a alcanzar por citas.</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -2005,7 +2005,7 @@ export default function SystemPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">Sistema de Embudo</h3>
-                  <p className="text-sm text-gray-400">Define las etapas clave donde clasificas a tus leads. La IA automatiza este proceso en videollamadas.</p>
+                  <p className="text-sm text-gray-400">Define las etapas clave donde clasificas a tus leads. La IA automatiza este proceso en citas.</p>
                 </div>
               </div>
 
@@ -2014,9 +2014,9 @@ export default function SystemPage() {
               {/* ─────────────────────────────────────────────────── */}
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                  🔒 Resultados de videollamada (la IA los determina)
+                  🔒 Resultados de cita (la IA los determina)
                 </h4>
-                <p className="text-xs text-gray-500">Estas 3 etapas son los únicos resultados posibles que la IA puede clasificar cuando analiza una videollamada. No Show y Cancelada los determina el sistema automáticamente — no necesitan configuración.</p>
+                <p className="text-xs text-gray-500">Estas 3 etapas son los únicos resultados posibles que la IA puede clasificar cuando analiza una cita. No Show y Cancelada los determina el sistema automáticamente — no necesitan configuración.</p>
                 
                 <div className="grid gap-3">
                   {embudoEtapas.filter((e) => e.es_fija && e.id !== 'no_show' && e.id !== 'cancelada').map((etapa, idx) => {
@@ -2192,7 +2192,7 @@ export default function SystemPage() {
               <div className="flex items-center gap-2 pb-2 border-b border-accent-amber/30">
                 <div className="rounded-lg p-2 bg-accent-amber/20 border border-accent-amber/40"><MessageSquare className="w-5 h-5 text-accent-amber" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Chats: Speed to Lead e IA <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Configura cómo se mide el Speed to Lead en chats y cuándo se ejecuta el análisis IA nocturno. La IA clasifica cada chat automáticamente igual que llamadas y videollamadas.</span></span></h3>
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">Chats: Speed to Lead e IA <span className="relative group"><HelpCircle className="w-4 h-4 text-gray-500 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2 rounded-lg bg-surface-900 border border-surface-500 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-normal">Configura cómo se mide el Speed to Lead en chats y cuándo se ejecuta el análisis IA nocturno. La IA clasifica cada chat automáticamente igual que llamadas y citas.</span></span></h3>
                   <p className="text-sm text-gray-400">Configuración de chatbot, Speed to Lead y análisis IA nocturno para chats.</p>
                 </div>
               </div>
@@ -2257,7 +2257,7 @@ export default function SystemPage() {
                 <h4 className="text-sm font-semibold text-accent-purple flex items-center gap-2">🤖 Análisis automático de chats</h4>
                 <p className="text-sm text-gray-400">
                   El sistema analiza tus conversaciones de chat cada noche y clasifica automáticamente cada lead en tu embudo,
-                  igual que con llamadas y videollamadas.
+                  igual que con llamadas y citas.
                 </p>
 
                 {/* Hora del análisis */}
@@ -2393,7 +2393,7 @@ export default function SystemPage() {
                     <span className="text-sm font-semibold text-white">Nativa con IA</span>
                   </div>
                   <p className="text-xs text-gray-400 ml-6">
-                    La facturación se extrae de las reuniones clasificadas como &quot;Cerrada&quot; en <code className="text-accent-cyan">resumenes_diarios_agendas</code>.
+                    La facturación se extrae de las citas clasificadas como &quot;Cerrada&quot; en <code className="text-accent-cyan">resumenes_diarios_agendas</code>.
                   </p>
                 </button>
                 <button
@@ -2422,7 +2422,7 @@ export default function SystemPage() {
               </div>
               {fuenteFinanciera === 'api_externa' && (
                 <div className="rounded-lg border border-accent-amber/40 bg-accent-amber/5 px-3 py-2 text-sm text-amber-300">
-                  <strong className="text-accent-amber">⚠️ Importante sobre comisiones:</strong> Con API Externa activada, el panel ejecutivo mostrará los ingresos de tu sistema externo, pero el módulo de <strong>Comisiones</strong> siempre calcula sobre los datos nativos (llamadas y videollamadas registradas en el sistema). Si tus cierres se registran exclusivamente vía API externa, las comisiones aparecerán en $0.
+                  <strong className="text-accent-amber">⚠️ Importante sobre comisiones:</strong> Con API Externa activada, el panel ejecutivo mostrará los ingresos de tu sistema externo, pero el módulo de <strong>Comisiones</strong> siempre calcula sobre los datos nativos (llamadas y citas registradas en el sistema). Si tus cierres se registran exclusivamente vía API externa, las comisiones aparecerán en $0.
                 </div>
               )}
 

@@ -88,7 +88,7 @@ export default function DemoModal({ open, onOpenChange }: DemoModalProps) {
             <div>
               <h2 className="text-lg font-semibold">Demo en Vivo — AutoKPI</h2>
               <p className="text-sm text-slate-400">
-                30 minutos · Videollamada · Sin compromiso
+                30 minutos · Cita · Sin compromiso
               </p>
             </div>
           </div>
@@ -298,7 +298,7 @@ export default function DemoModal({ open, onOpenChange }: DemoModalProps) {
               <p className="text-slate-400 text-sm mb-4 max-w-sm">
                 Recibirás un email de confirmación en{" "}
                 <span className="text-white font-medium">{formData.email}</span>{" "}
-                con el enlace de videollamada.
+                con el enlace de cita.
               </p>
               <p className="text-slate-500 text-xs mb-6 max-w-sm">
                 Prepárate para ver en vivo cómo AutoKPI puede transformar la

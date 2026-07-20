@@ -138,7 +138,7 @@ export default function NuevoRegistroModal({
 
   const tipoLabels: Record<TipoRegistro, string> = {
     llamada: "📞 Nueva llamada",
-    videollamada: "🎥 Nueva videollamada",
+    videollamada: "🎥 Nueva cita",
     chat: "💬 Nuevo chat",
   };
 
@@ -287,7 +287,7 @@ export default function NuevoRegistroModal({
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Fecha de reunión</label>
+                <label className="block text-xs text-gray-400 mb-1">Fecha de cita</label>
                 <input
                   type="datetime-local"
                   value={fechaReunion}

@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AutoKPI — Mide todo lo que pasa en tu equipo de ventas",
   description:
-    "AutoKPI centraliza videollamadas, llamadas y chats de tu equipo comercial. La IA analiza cada conversación y te dice dónde se pierden deals.",
+    "AutoKPI centraliza citas, llamadas y chats de tu equipo comercial. La IA analiza cada conversación y te dice dónde se pierden deals.",
 };
 
 export default function RootLayout({

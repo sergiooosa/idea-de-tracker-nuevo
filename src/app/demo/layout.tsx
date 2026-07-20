@@ -24,7 +24,7 @@ import clsx from "clsx";
 const NAV_ITEMS = [
   { path: "/demo/dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
   { path: "/demo/performance/llamadas", label: "Llamadas", icon: BarChart3 },
-  { path: "/demo/performance/videollamadas", label: "Videollamadas", icon: BarChart2 },
+  { path: "/demo/performance/videollamadas", label: "Citas", icon: BarChart2 },
   { path: "/demo/performance/chats", label: "Chats", icon: BadgeDollarSign },
   { path: "/demo/asesor", label: "Panel asesor", icon: UserCheck },
   { path: "/demo/acquisition", label: "Adquisición", icon: TrendingUp },

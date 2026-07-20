@@ -211,7 +211,7 @@ export function VideoRecoveryPage() {
     <>
       <PageHeader
         title="Activadores rápidos"
-        subtitle="Recuperador de videollamadas"
+        subtitle="Recuperador de citas"
         action={
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber border border-accent-amber/40 font-medium uppercase shrink-0">
             Beta
@@ -242,13 +242,13 @@ export function VideoRecoveryPage() {
 
         {uiState === "loadingPreview" ? (
           <div className="rounded-xl border border-surface-500 bg-surface-800/80 p-4 text-gray-300">
-            Buscando reuniones...
+            Buscando citas...
           </div>
         ) : null}
 
         {uiState !== "idle" && uiState !== "loadingPreview" && previewItems.length === 0 ? (
           <div className="rounded-xl border border-surface-500 bg-surface-800/80 p-4 text-gray-300">
-            No se encontraron reuniones para ese rango.
+            No se encontraron citas para ese rango.
           </div>
         ) : null}
 

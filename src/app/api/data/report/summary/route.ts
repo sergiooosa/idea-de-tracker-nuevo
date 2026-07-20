@@ -122,7 +122,7 @@ function buildPrompt(data: ReportResponse, empresa: string): string {
   if (videocalls) {
     lines.push(
       ``,
-      `VIDEOLLAMADAS (Bloque 4):`,
+      `CITAS (Bloque 4):`,
       `- Total citas: ${videocalls.total}`,
       `- Calificadas: ${videocalls.calificadas}`,
       `- No shows: ${videocalls.noShows}`,
@@ -176,7 +176,7 @@ function buildPrompt(data: ReportResponse, empresa: string): string {
     lines.push(``, `FUNNEL DE LEADS (Bloque 5):`);
     if (totalLlamadas > 0) lines.push(`- Llamadas: ${funnel.llamadas.contactados} contactados / ${funnel.llamadas.sinContacto} sin contacto de ${totalLlamadas} total`);
     if (totalChats > 0) lines.push(`- Chats: ${funnel.chats.contactados} contactados / ${funnel.chats.sinContacto} sin contacto de ${totalChats} total`);
-    if (totalVideo > 0) lines.push(`- Videollamadas: ${funnel.videollamadas.contactados} realizadas / ${funnel.videollamadas.sinContacto} sin ocurrir de ${totalVideo} total`);
+    if (totalVideo > 0) lines.push(`- Citas: ${funnel.videollamadas.contactados} realizadas / ${funnel.videollamadas.sinContacto} sin ocurrir de ${totalVideo} total`);
   }
 
   // --- CRM Health ---

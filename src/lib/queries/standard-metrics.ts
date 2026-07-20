@@ -23,8 +23,8 @@ export const STANDARD_METRICS: StandardMetricDef[] = [
   { id: "std:llamadas_contestadas", nombre: "Llamadas contestadas", formato: "numero", fija: true },
   { id: "std:speed_to_lead", nombre: "Speed to Lead", formato: "tiempo", fija: true },
   { id: "std:tasa_contestacion", nombre: "Tasa de contestación", formato: "porcentaje", fija: true },
-  { id: "std:reuniones_agendadas", nombre: "Reuniones agendadas", formato: "numero", fija: true },
-  { id: "std:reuniones_asistidas", nombre: "Reuniones asistidas", formato: "numero", fija: true },
+  { id: "std:reuniones_agendadas", nombre: "Citas agendadas", formato: "numero", fija: true },
+  { id: "std:reuniones_asistidas", nombre: "Citas asistidas", formato: "numero", fija: true },
 ];
 
 export async function computeStandardMetrics(

@@ -58,7 +58,7 @@ export const es = {
       closer: "Closer",
       fecha: "Fecha",
       resultado: "Resultado",
-      reunion: "Reunión",
+      reunion: "Cita",
       noData: "No hay citas en este período",
       kpis: {
         agendadas: "Agendadas",
@@ -115,7 +115,7 @@ export const es = {
       leadsAsignados: "Leads trabajados (período)",
       llamadasRealizadas: "Llamadas realizadas",
       llamadasContestadas: "Llamadas contestadas",
-      reunionesAgendadas: "Reuniones agendadas",
+      reunionesAgendadas: "Citas agendadas",
       tasaContacto: "Tasa de contacto",
       tasaAgendamiento: "Tasa de agendamiento",
       chatsAsignados: "Chats asignados",

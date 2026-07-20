@@ -254,7 +254,7 @@ export default function DashboardPage() {
               href="/dashboard/acciones-rapidas/video-recovery"
               className="inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
             >
-              Recopilar videollamadas
+              Recopilar citas
             </Link>
           </div>
         </section>
@@ -456,7 +456,7 @@ export default function DashboardPage() {
           const cumplidas = alertas.filter((a) => a.cumple).length;
           const canales: Array<{ key: "llamadas" | "videollamadas" | "chats" | "general"; label: string; emoji: string; borderColor: string; textColor: string }> = [
             { key: "llamadas",      label: "Llamadas",      emoji: "📞", borderColor: "border-blue-500/30",   textColor: "text-blue-400" },
-            { key: "videollamadas", label: "Videollamadas", emoji: "🎥", borderColor: "border-purple-500/30", textColor: "text-purple-400" },
+            { key: "videollamadas", label: "Citas", emoji: "🎥", borderColor: "border-purple-500/30", textColor: "text-purple-400" },
             { key: "chats",         label: "Chats",         emoji: "💬", borderColor: "border-green-500/30",  textColor: "text-green-400" },
             { key: "general",       label: "General",       emoji: "📊", borderColor: "border-surface-500",   textColor: "text-gray-400" },
           ];
@@ -719,7 +719,7 @@ export default function DashboardPage() {
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5 text-accent-red" />
                 Objeciones más comunes
-                <HelpTooltip titulo="Objeciones más comunes" contenido="Objeciones detectadas por IA en videollamadas (Fathom), chats (WhatsApp) y llamadas en tiempo real (Call-AI)." />
+                <HelpTooltip titulo="Objeciones más comunes" contenido="Objeciones detectadas por IA en citas (Fathom), chats (WhatsApp) y llamadas en tiempo real (Call-AI)." />
               </h2>
               <button type="button" onClick={toggleObjeciones} className="p-1 rounded hover:bg-surface-600 text-gray-500 hover:text-gray-300 transition-colors" title={showObjeciones ? 'Ocultar' : 'Mostrar'}>
                 {showObjeciones ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -886,7 +886,7 @@ export default function DashboardPage() {
                     {rankingColsVisible.includes('con_actividad') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('con_actividad')}><span title="Leads únicos que recibieron al menos una llamada o cita en el período (incluyendo leads antiguos). Similar a 'Leads trabajados' pero contando también los que solo tienen teléfono sin email.">Con actividad ⓘ</span><RankingSortIcon col="con_actividad" /></th>}
                     {rankingColsVisible.includes('llamadas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('llamadas')}>Llamadas<RankingSortIcon col="llamadas" /></th>}
                     {rankingColsVisible.includes('tiempo_lead') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('tiempo_lead')}>Tiempo al lead<RankingSortIcon col="tiempo_lead" /></th>}
-                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('agendadas')}><span title="Citas/videollamadas agendadas únicas en el período (leads únicos, sin contar múltiples estados del mismo lead). Este número es el mismo que aparece en el panel ejecutivo.">Citas agendadas ⓘ</span><RankingSortIcon col="agendadas" /></th>}
+                    {rankingColsVisible.includes('agendadas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('agendadas')}><span title="Citas agendadas únicas en el período (leads únicos, sin contar múltiples estados del mismo lead). Este número es el mismo que aparece en el panel ejecutivo.">Citas agendadas ⓘ</span><RankingSortIcon col="agendadas" /></th>}
                     {rankingColsVisible.includes('asistidas') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('asistidas')}><span title="Leads que se presentaron a su cita (asistieron).">Citas asistidas ⓘ</span><RankingSortIcon col="asistidas" /></th>}
                     {rankingColsVisible.includes('facturacion') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('facturacion')}>Facturación<RankingSortIcon col="facturacion" /></th>}
                     {rankingColsVisible.includes('efectivo') && <th className="px-2 py-2 font-medium cursor-pointer hover:text-white" onClick={() => toggleRankingSort('efectivo')}>Efectivo<RankingSortIcon col="efectivo" /></th>}
@@ -957,7 +957,7 @@ export default function DashboardPage() {
                             <td colSpan={1 + rankingColsVisible.length} className="px-4 py-3">
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                                 <div><span className="text-gray-500 block">Llamadas telefónicas</span><span className="text-accent-cyan font-semibold">{a.callsMade}</span></div>
-                                <div><span className="text-gray-500 block">Videollamadas</span><span className="text-accent-purple font-semibold">{a.meetingsBooked}</span></div>
+                                <div><span className="text-gray-500 block">Citas</span><span className="text-accent-purple font-semibold">{a.meetingsBooked}</span></div>
                                 <div><span className="text-gray-500 block">Asistidas</span><span className="text-white font-semibold">{a.meetingsAttended}</span></div>
                                 <div><span className="text-gray-500 block">Speed to lead</span><span className="text-gray-300 font-semibold">{a.speedToLeadAvg != null ? minFmt(a.speedToLeadAvg) : '—'}</span></div>
                               </div>

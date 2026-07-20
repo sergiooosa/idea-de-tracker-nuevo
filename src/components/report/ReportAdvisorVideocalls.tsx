@@ -146,7 +146,7 @@ export default function ReportAdvisorVideocalls({ data }: Props) {
         <div className="flex items-center gap-2">
           <Video className="w-4 h-4 text-accent-purple shrink-0" />
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Asesores · Videollamadas (Fathom)
+            Asesores · Citas
           </h3>
         </div>
         <div className="text-xs text-gray-500">

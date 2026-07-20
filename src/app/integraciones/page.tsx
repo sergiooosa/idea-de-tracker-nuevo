@@ -56,7 +56,7 @@ export default function IntegracionesPage() {
             ¿Para qué sirve esta API?
           </h2>
           <p className="mb-4 leading-relaxed text-slate-300">
-            Hasta hoy, el sistema dependía de que la IA escuchara videollamadas
+            Hasta hoy, el sistema dependía de que la IA escuchara citas
             o llamadas y extrajera si se vendieron $500 o $1.000. Pero en la vida
             real, los dueños de negocio quieren ver en su dashboard la plata
             exacta que entró a su banco (Stripe, PayPal, su propio CRM).

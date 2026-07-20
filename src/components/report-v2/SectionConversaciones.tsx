@@ -69,7 +69,7 @@ function CanalBlock({ data }: { data: ReportV2ConversacionesCanal }) {
     ? 'Llamadas'
     : data.canal === 'chats'
       ? 'Chats'
-      : 'Videollamadas';
+      : 'Citas';
 
   const dimensions: [string, ReportV2ConversacionDistribucion[]][] = [
     ['recepcionTono', data.recepcionTono],
