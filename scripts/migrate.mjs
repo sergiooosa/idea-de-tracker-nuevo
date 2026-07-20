@@ -33,6 +33,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = join(HERE, "..", "migrations");
 const TABLE = "_dashboard_migrations";
 
+// Release/commit para auditoría de migraciones (AUT-1688). Coolify inyecta
+// SOURCE_COMMIT en el build; GIT_SHA se puede setear explícitamente.
+const GIT_SHA = process.env.GIT_SHA || process.env.SOURCE_COMMIT || null;
+
 const log = (...a) => console.log("[migrate]", ...a);
 const errlog = (...a) => console.error("[migrate]", ...a);
 
@@ -80,6 +84,14 @@ async function main() {
          applied_at timestamptz NOT NULL DEFAULT now()
        )`,
     );
+    // Auditoría (AUT-1688): rol/usuario y release que aplicó cada migración.
+    // Idempotente para no romper la tabla de tracking ya existente en prod.
+    await client.query(
+      `ALTER TABLE public.${TABLE} ADD COLUMN IF NOT EXISTS applied_by text`,
+    );
+    await client.query(
+      `ALTER TABLE public.${TABLE} ADD COLUMN IF NOT EXISTS git_sha text`,
+    );
 
     const files = readdirSync(MIGRATIONS_DIR)
       .filter((f) => f.endsWith(".sql"))
@@ -125,12 +137,18 @@ async function main() {
           }
         } else {
           await client.query("BEGIN");
+          // Timeout defensivo por migración (paridad con Cerebro, AUT-1688).
+          // SET LOCAL solo aplica dentro de la transacción; los archivos
+          // CONCURRENTLY corren en autocommit y quedan sin límite a propósito
+          // (un build de índice legítimo puede exceder 30s).
+          await client.query("SET LOCAL statement_timeout = '30s'");
           await client.query(sql);
           await client.query("COMMIT");
         }
         await client.query(
-          `INSERT INTO public.${TABLE} (filename) VALUES ($1) ON CONFLICT DO NOTHING`,
-          [f],
+          `INSERT INTO public.${TABLE} (filename, applied_by, git_sha)
+           VALUES ($1, current_user, $2) ON CONFLICT DO NOTHING`,
+          [f, GIT_SHA],
         );
         log(`✓ ${f}`);
       } catch (e) {
