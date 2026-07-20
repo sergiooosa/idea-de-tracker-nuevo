@@ -36,6 +36,8 @@ import {
   HelpCircle,
   FileText,
   AlertTriangle,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
@@ -81,14 +83,32 @@ function SectionInfo({ text }: { text: string }) {
   );
 }
 
-function CRMCard({ lead, ghlLocationId }: { lead: AsesorLeadCRM; ghlLocationId?: string | null }) {
+function CRMCard({ lead, ghlLocationId, onToggleExcluir }: { lead: AsesorLeadCRM; ghlLocationId?: string | null; onToggleExcluir?: (id: string, excluir: boolean) => void }) {
   const [showNotas, setShowNotas] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const hasNotas = lead.notasLlamadas.length > 0 || (lead.leadNote?.trim()?.length ?? 0) > 0;
 
   return (
-    <div className="group rounded-lg border border-surface-500/80 bg-surface-700/60 hover:bg-surface-700/80 hover:border-accent-cyan/30 pl-2.5 pr-2 py-1.5 text-xs transition-all duration-200 border-l-[3px] border-l-accent-cyan/50 shadow-sm">
-      <div className="font-medium text-white text-[11px] leading-tight truncate" title={lead.name}>
-        {lead.name}
+    <div className={`group rounded-lg border pl-2.5 pr-2 py-1.5 text-xs transition-all duration-200 border-l-[3px] shadow-sm ${lead.excluido ? 'border-surface-600/60 bg-surface-800/40 border-l-gray-600/40 opacity-60' : 'border-surface-500/80 bg-surface-700/60 hover:bg-surface-700/80 hover:border-accent-cyan/30 border-l-accent-cyan/50'}`}>
+      <div className="flex items-center gap-1">
+        <div className={`font-medium text-[11px] leading-tight truncate flex-1 ${lead.excluido ? 'text-gray-500 line-through' : 'text-white'}`} title={lead.name}>
+          {lead.name}
+        </div>
+        {onToggleExcluir && (
+          <button
+            type="button"
+            disabled={toggling}
+            onClick={async () => {
+              setToggling(true);
+              await onToggleExcluir(lead.id, !lead.excluido);
+              setToggling(false);
+            }}
+            className={`shrink-0 p-0.5 rounded transition-colors ${lead.excluido ? 'text-gray-500 hover:text-accent-cyan' : 'text-gray-600 opacity-0 group-hover:opacity-100 hover:text-amber-400'}`}
+            title={lead.excluido ? 'Incluir en métricas' : 'Excluir de métricas'}
+          >
+            {lead.excluido ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-2 mt-1 text-[10px]">
         <span className="inline-flex items-center gap-0.5 text-accent-cyan font-medium">
@@ -269,6 +289,7 @@ function TabLlamadas({
   expandedKpi,
   setExpandedKpi,
   breakdown,
+  onToggleExcluirLead,
 }: {
   kpis: AsesorKpis;
   leads: AsesorLeadCRM[];
@@ -280,6 +301,7 @@ function TabLlamadas({
   expandedKpi: string | null;
   setExpandedKpi: (val: string | null) => void;
   breakdown?: any;
+  onToggleExcluirLead?: (id: string, excluir: boolean) => void;
 }) {
   const t = useT();
 
@@ -435,7 +457,7 @@ function TabLlamadas({
                     {leadsByEstado[estado.id].length === 0 ? (
                       <p className="text-[10px] text-gray-500 py-3 text-center">Ninguno</p>
                     ) : (
-                      leadsByEstado[estado.id].map((lead) => <CRMCard key={lead.id} lead={lead} ghlLocationId={ghlLocationId} />)
+                      leadsByEstado[estado.id].map((lead) => <CRMCard key={lead.id} lead={lead} ghlLocationId={ghlLocationId} onToggleExcluir={onToggleExcluirLead} />)
                     )}
                   </div>
                 </div>
@@ -1119,7 +1141,16 @@ export default function AsesorPage() {
     return base;
   }, [dateFrom, dateTo, canViewAll, asesorSeleccionado]);
 
-  const { data, loading } = useApiData<AsesorResponse>('/api/data/asesor', apiParams);
+  const { data, loading, refetch } = useApiData<AsesorResponse>('/api/data/asesor', apiParams);
+
+  const handleToggleExcluirLead = async (id: string, excluir: boolean) => {
+    await fetch('/api/data/asesor', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: Number(id), excluido_metricas: excluir }),
+    });
+    refetch();
+  };
 
   // Merge suggestions — only load when user can configure system (admin)
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -1335,6 +1366,7 @@ export default function AsesorPage() {
                   expandedKpi={expandedKpi}
                   setExpandedKpi={setExpandedKpi}
                   breakdown={breakdown}
+                  onToggleExcluirLead={handleToggleExcluirLead}
                 />
               )}
               {validActiveTab === 'videollamadas' && (
