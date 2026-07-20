@@ -244,6 +244,14 @@ export default function AdvisorRankingWidget({ advisorRanking }: Props) {
                             </div>
                             <div>
                               <span className="text-gray-500 block">
+                                Reactivados
+                              </span>
+                              <span className="text-accent-purple font-semibold">
+                                {a.leadsReactivados}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 block">
                                 Con actividad
                               </span>
                               <span className="text-accent-cyan font-semibold">

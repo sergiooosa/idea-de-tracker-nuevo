@@ -44,7 +44,7 @@ export function exportDashboardToExcel(
 
   // Sheet 2: Ranking por asesor
   const rankingHeaders = [
-    'Asesor', 'Leads trabajados', 'Leads nuevos', 'Con actividad',
+    'Asesor', 'Leads trabajados', 'Leads nuevos', 'Leads reactivados', 'Con actividad',
     'Llamadas', 'Speed to lead (min)', 'Citas agendadas', 'Citas asistidas',
     'Facturación', 'Efectivo', 'Tasa contacto', 'Tasa agend.',
   ];
@@ -62,6 +62,7 @@ export function exportDashboardToExcel(
       a.advisorName,
       a.totalLeads,
       a.leadsGenerados,
+      a.leadsReactivados,
       a.leadsConActividad,
       a.callsMade,
       a.speedToLeadAvg,
