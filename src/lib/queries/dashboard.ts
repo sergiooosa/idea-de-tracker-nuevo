@@ -1440,19 +1440,36 @@ export async function getDashboard(
       videollamada: { cal: 0, noCal: 0, calAg: 0, calNoAg: 0, noCalAg: 0, noCalNoAg: 0 },
     };
 
+    // Videollamadas: agendas con Fathom recording
     for (const a of filteredAgendas) {
+      if (!a.fathom_recording_id) continue;
       const cat = (a.categoria ?? "").toLowerCase().trim();
       if (!cat || cat === "pdte" || cat === "pendiente") continue;
       const isQualified = effectiveQualifiedSet.has(cat);
       const hasAgenda = a.fecha_reunion != null;
-      const canal: SegmentoCanal = a.fathom_recording_id ? "videollamada" : "llamada";
-      const c = counters[canal];
+      const c = counters.videollamada;
       if (isQualified) {
         c.cal++;
         if (hasAgenda) c.calAg++; else c.calNoAg++;
       } else {
         c.noCal++;
         if (hasAgenda) c.noCalAg++; else c.noCalNoAg++;
+      }
+    }
+
+    // Llamadas: log_llamadas (fuente real de datos de llamadas)
+    const SKIP_CALL_ESTADOS = new Set(["no_contestada", ""]);
+    for (const call of filteredCalls) {
+      const estado = (call.estado_resultado ?? "").toLowerCase().trim();
+      if (SKIP_CALL_ESTADOS.has(estado)) continue;
+      const isQualified = effectiveQualifiedSet.has(estado);
+      const c = counters.llamada;
+      if (isQualified) {
+        c.cal++;
+        c.calNoAg++;
+      } else {
+        c.noCal++;
+        c.noCalNoAg++;
       }
     }
 
