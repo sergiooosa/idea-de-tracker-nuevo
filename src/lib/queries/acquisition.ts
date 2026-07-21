@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbudoEtapas, metricasWebhook, usuariosDashboard } from "@/lib/db/schema";
+import { resumenesDiariosAgendas, logLlamadas, chatsLogs, cuentas, normalizeEmbudoEtapas, metricasWebhook, usuariosDashboard, registrosDeLlamada } from "@/lib/db/schema";
 import { zonedDayRange } from "@/lib/date-range";
 import type { EmbudoEtapa } from "@/lib/db/schema";
 import { eq, and, or, gte, lte, isNull, isNotNull, sql } from "drizzle-orm";
@@ -68,6 +68,7 @@ export async function getAcquisition(
   idCuenta: number,
   dateFrom: string,
   dateTo: string,
+  leadFilter: "todos" | "nuevos" | "reactivados" = "todos",
 ): Promise<AcquisitionResponse> {
   const [cuentaRow] = await db
     .select({ embudo_personalizado: cuentas.embudo_personalizado, zona_horaria_iana: cuentas.zona_horaria_iana })
@@ -159,7 +160,58 @@ export async function getAcquisition(
   ]);
 
   // ----------------------------------------------------------------
-  // TABLA EXISTENTE — lógica original sin cambios
+  // LEAD FILTER — nuevos vs reactivados via registros_de_llamada
+  // ----------------------------------------------------------------
+  let filterSet: Set<string> | null = null;
+
+  if (leadFilter !== "todos") {
+    const regRows = await db
+      .select({
+        mail_lead: registrosDeLlamada.mail_lead,
+        ghl_contact_id: registrosDeLlamada.ghl_contact_id,
+        fecha_primera_llamada: registrosDeLlamada.fecha_primera_llamada,
+      })
+      .from(registrosDeLlamada)
+      .where(
+        and(
+          sql`${registrosDeLlamada.id_cuenta}::text = ${String(idCuenta)}`,
+          gte(registrosDeLlamada.fecha_evento, fromDate),
+          lte(registrosDeLlamada.fecha_evento, toDate),
+        ),
+      );
+
+    const newKeys = new Set<string>();
+    const reactivatedKeys = new Set<string>();
+
+    for (const r of regRows) {
+      const keys: string[] = [];
+      if (r.mail_lead?.trim()) keys.push(r.mail_lead.trim().toLowerCase());
+      if (r.ghl_contact_id?.trim()) keys.push(r.ghl_contact_id.trim());
+
+      const isNew = r.fecha_primera_llamada != null &&
+        r.fecha_primera_llamada >= fromDate &&
+        r.fecha_primera_llamada <= toDate;
+
+      for (const k of keys) {
+        if (isNew) {
+          newKeys.add(k);
+        } else {
+          reactivatedKeys.add(k);
+        }
+      }
+    }
+
+    filterSet = leadFilter === "nuevos" ? newKeys : reactivatedKeys;
+  }
+
+  function passesFilter(leadKey: string | null): boolean {
+    if (!filterSet) return true;
+    if (!leadKey) return false;
+    return filterSet.has(leadKey.trim().toLowerCase());
+  }
+
+  // ----------------------------------------------------------------
+  // TABLA — lógica con filtro aplicado
   // ----------------------------------------------------------------
   const origenMap: Record<string, {
     leadEmails: Set<string>;
@@ -190,6 +242,7 @@ export async function getAcquisition(
   }
 
   for (const a of agendas) {
+    if (!passesFilter(a.email_lead?.trim() || a.ghl_contact_id?.trim() || null)) continue;
     const bucket = getOrCreate(a.origen ?? "sin_origen");
     if (a.email_lead) bucket.leadEmails.add(a.email_lead);
     const leadKey = a.email_lead?.trim() || a.ghl_contact_id?.trim() || `ag:${a.id_registro_agenda}`;
@@ -213,8 +266,9 @@ export async function getAcquisition(
   }
 
   for (const c of calls) {
-    const bucket = getOrCreate(c.creativo_origen ?? "sin_origen");
     const leadKey = c.mail_lead?.trim() || c.contact_id_ghl?.trim() || null;
+    if (!passesFilter(leadKey)) continue;
+    const bucket = getOrCreate(c.creativo_origen ?? "sin_origen");
     if (leadKey) {
       bucket.leadEmails.add(leadKey);
       // Solo contar como "llamado" si no es evento administrativo (pdte/contacto_creado)
@@ -249,6 +303,7 @@ export async function getAcquisition(
 
   for (const ch of chats) {
     if (!ch.origen) continue;
+    if (!passesFilter(ch.id_lead ?? null)) continue;
     const bucket = getOrCreate(ch.origen);
     if (ch.id_lead) {
       bucket.leadEmails.add(ch.id_lead);
