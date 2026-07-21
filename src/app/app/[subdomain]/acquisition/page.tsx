@@ -8,6 +8,8 @@ import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { formatCurrency } from '@/lib/format';
+import HelpTooltip from '@/components/dashboard/HelpTooltip';
+import clsx from 'clsx';
 import { AlertTriangle, DollarSign, Target, TrendingDown, BarChart2 } from 'lucide-react';
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -126,9 +128,10 @@ export default function AcquisitionPage() {
   const [dateFrom, setDateFrom] = useState(format(defaultFrom, 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(defaultTo, 'yyyy-MM-dd'));
   const [filterSource, setFilterSource] = useState('');
+  const [leadFilter, setLeadFilter] = useState<'todos' | 'nuevos' | 'reactivados'>('todos');
   const [expandedOrigen, setExpandedOrigen] = useState<string | null>(null);
 
-  const { data, loading } = useApiData<AcqResponse>('/api/data/acquisition', { from: dateFrom, to: dateTo });
+  const { data, loading } = useApiData<AcqResponse>('/api/data/acquisition', { from: dateFrom, to: dateTo, leadFilter });
   const { data: adsData, loading: adsLoading } = useApiData<AdsResponse>('/api/data/ads', { from: dateFrom, to: dateTo });
   const rows = data?.rows ?? [];
   const sources = data?.sources ?? [];
@@ -152,6 +155,32 @@ export default function AcquisitionPage() {
             <option value="">Todas las fuentes</option>
             {sources.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
+          <div className="flex items-center rounded-lg border border-surface-500 overflow-hidden">
+            {([
+              { value: 'todos', label: 'Todos' },
+              { value: 'nuevos', label: 'Nuevos' },
+              { value: 'reactivados', label: 'Reactivados' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setLeadFilter(opt.value)}
+                className={clsx(
+                  'px-2.5 py-1 text-[11px] font-medium transition-colors',
+                  leadFilter === opt.value
+                    ? 'bg-accent-cyan/20 text-accent-cyan'
+                    : 'text-gray-500 hover:text-gray-300 hover:bg-surface-700',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <HelpTooltip
+            titulo="Filtro: Nuevos vs Reactivados"
+            contenido="Filtra los leads de adquisición según su tipo. 'Nuevos' son leads cuya primera llamada ocurrió dentro del período seleccionado. 'Reactivados' son leads que ya existían antes del período pero tuvieron actividad durante el mismo — útil para medir campañas de reactivación."
+            comoProbar="Selecciona 'Nuevos' para ver solo leads captados en este período. Selecciona 'Reactivados' para ver leads antiguos con actividad reciente."
+          />
         </div>
 
         {/* ── Alerta de precisión Meta ── */}
