@@ -11,10 +11,10 @@ export async function GET(req: Request) {
       const { searchParams } = new URL(req.url);
       const from = searchParams.get("from") ?? undefined;
       const to = searchParams.get("to") ?? undefined;
-      const canalParam = searchParams.get("canal") ?? "llamada";
+      const canalParam = searchParams.get("canal") ?? "ninguno";
       const canal: CanalLeadsEnEspera = CANALES_VALIDOS.has(canalParam as CanalLeadsEnEspera)
         ? (canalParam as CanalLeadsEnEspera)
-        : "llamada";
+        : "ninguno";
       const closerEmails = enforceCloserFilter(
         undefined,
         ctx.email,

@@ -14,6 +14,7 @@ export interface LeadEnEspera {
   phone: string | null;
   mail_lead: string | null;
   canal_origen?: "llamada" | "chat";
+  contact_id?: string | null;
 }
 
 export interface CloserConLeadsEnEspera {
@@ -90,6 +91,7 @@ async function getLeadsLlamada(
       creativo_origen: registrosDeLlamada.creativo_origen,
       phone: registrosDeLlamada.phone_raw_format,
       mail_lead: registrosDeLlamada.mail_lead,
+      ghl_contact_id: registrosDeLlamada.ghl_contact_id,
       min_sin_llamar: sql<number>`ROUND(EXTRACT(EPOCH FROM (NOW() - ${registrosDeLlamada.fecha_evento}))/60)::int`,
     })
     .from(registrosDeLlamada)
@@ -126,6 +128,7 @@ async function getLeadsLlamada(
     phone: row.phone,
     mail_lead: row.mail_lead,
     canal_origen: "llamada" as const,
+    contact_id: row.ghl_contact_id,
   }));
 }
 
@@ -144,6 +147,7 @@ async function getLeadsChat(
       asesor_asignado: chatsLogs.asesor_asignado,
       notas_extra: chatsLogs.notas_extra,
       origen: chatsLogs.origen,
+      id_lead: chatsLogs.id_lead,
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
       min_sin_llamar: sql<number>`ROUND(EXTRACT(EPOCH FROM (NOW() - ${chatsLogs.primer_msg_lead_at}))/60)::int`,
     })
@@ -186,6 +190,7 @@ async function getLeadsChat(
       phone: null,
       mail_lead: null,
       canal_origen: "chat" as const,
+      contact_id: row.id_lead,
     };
   });
 }
@@ -226,7 +231,7 @@ export async function getLeadsEnEspera(
   dateFrom?: string,
   dateTo?: string,
   closerEmails?: string[],
-  canal: CanalLeadsEnEspera = "llamada",
+  canal: CanalLeadsEnEspera = "ninguno",
 ): Promise<LeadsEnEsperaResponse> {
   const umbralTs = new Date(Date.now() - UMBRAL_MINUTOS * 60 * 1000);
   const range = await resolveDateRange(idCuenta, dateFrom, dateTo);
@@ -242,7 +247,16 @@ export async function getLeadsEnEspera(
       getLeadsLlamada(idCuenta, umbralTs, range, emails, true),
       getLeadsChat(idCuenta, umbralTs, range, emails, true),
     ]);
-    leads = [...llamadas, ...chats];
+    const merged = [...llamadas, ...chats];
+    const seen = new Map<string, LeadEnEspera>();
+    for (const lead of merged) {
+      const key = lead.contact_id ?? `${lead.canal_origen}:${lead.nombre_lead}`;
+      const existing = seen.get(key);
+      if (!existing || lead.min_sin_llamar > existing.min_sin_llamar) {
+        seen.set(key, lead);
+      }
+    }
+    leads = Array.from(seen.values());
   }
 
   const grupos = agruparPorCloser(leads);
