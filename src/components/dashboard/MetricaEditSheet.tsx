@@ -88,7 +88,7 @@ interface MetricaEditSheetProps {
   onSave: (
     config: MetricaConfig,
     manualData?: MetricaManualEntry[],
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 export default function MetricaEditSheet({
@@ -285,7 +285,7 @@ export default function MetricaEditSheet({
     setEntradas((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!nombre.trim()) return;
     setSaving(true);
 
@@ -308,90 +308,94 @@ export default function MetricaEditSheet({
       orden, formato, color,
     };
 
-    if (tipo === "chat") {
-      if (chatSubtipo === "conteo_keyword") {
-        config = {
-          ...base,
-          tipo: "chat" as const,
-          chatSubtipo: "conteo_keyword" as const,
-          keywords,
-          matchScope,
-          countMode,
-          normalizeAccents: true,
-        };
+    try {
+      if (tipo === "chat") {
+        if (chatSubtipo === "conteo_keyword") {
+          config = {
+            ...base,
+            tipo: "chat" as const,
+            chatSubtipo: "conteo_keyword" as const,
+            keywords,
+            matchScope,
+            countMode,
+            normalizeAccents: true,
+          };
+        } else {
+          config = { ...base, tipo: "chat" as const, chatCampo, chatAgregacion };
+        }
+        await onSave(config);
+        setSaving(false);
+        onClose();
+        return;
+      } else if (tipo === "webhook") {
+        config = { ...base, tipo: "webhook" as const, webhookCampo: webhookCampo.trim() };
+        await onSave(config);
+        setSaving(false);
+        onClose();
+        return;
+      } else if (tipo === "fija") {
+        config = { ...base, tipo: "fija" as const, valorFijo: valorFijo.trim() || "0" };
+        await onSave(config);
+      } else if (tipo === "manual") {
+        if (campos.length === 0) {
+          setSaving(false);
+          return;
+        }
+        const validCampos = campos
+          .filter((c) => c.nombre.trim())
+          .map((c) => ({
+            ...c,
+            nombre: c.nombre.trim(),
+            esClaveFiltro: c.tipo === "fecha" ? c.esClaveFiltro : undefined,
+          }));
+        if (validCampos.length === 0) {
+          setSaving(false);
+          return;
+        }
+        config = { ...base, tipo: "manual" as const, campos: validCampos };
+        await onSave(config, entradas);
       } else {
-        config = { ...base, tipo: "chat" as const, chatCampo, chatAgregacion };
+        const formula: MetricaFormulaConfig = { tipo: formulaTipo };
+        if (formulaTipo === "directo" && fuente[0]) {
+          formula.fuente = fuente[0];
+        } else if (
+          ["suma", "promedio", "multiplicacion"].includes(formulaTipo) &&
+          fuente.length > 0
+        ) {
+          formula.fuentes = fuente;
+        } else if (["division", "resta"].includes(formulaTipo) && fuente.length === 2) {
+          formula.fuentes = fuente;
+        } else if (formulaTipo === "condicion" && fuente[0]) {
+          formula.fuente = fuente[0];
+          formula.operador = operador;
+          if (comparacionMode === "variable" && comparacionFuente[0]) {
+            formula.valorComparacion = `ref:${comparacionFuente[0]}`;
+          } else {
+            const cmp = valorComparacion.trim();
+            formula.valorComparacion =
+              cmp === "true" ? true : cmp === "false" ? false : parseFloat(cmp) || 0;
+          }
+          if (siCumpleMode === "variable" && siCumpleFuente[0]) {
+            formula.valorSiCumple = `ref:${siCumpleFuente[0]}`;
+          } else {
+            formula.valorSiCumple =
+              valorSiCumple.trim() === "" ? 0 : parseFloat(valorSiCumple) || valorSiCumple;
+          }
+          if (siNoMode === "variable" && siNoFuente[0]) {
+            formula.valorSiNo = `ref:${siNoFuente[0]}`;
+          } else {
+            formula.valorSiNo =
+              valorSiNo.trim() === "" ? 0 : parseFloat(valorSiNo) || valorSiNo;
+          }
+        }
+        config = { ...base, tipo: "automatica" as const, formula };
+        await onSave(config);
       }
-      onSave(config);
       setSaving(false);
       onClose();
-      return;
-    } else if (tipo === "webhook") {
-      config = { ...base, tipo: "webhook" as const, webhookCampo: webhookCampo.trim() };
-      onSave(config);
+    } catch {
       setSaving(false);
-      onClose();
-      return;
-    } else if (tipo === "fija") {
-      config = { ...base, tipo: "fija" as const, valorFijo: valorFijo.trim() || "0" };
-      onSave(config);
-    } else if (tipo === "manual") {
-      if (campos.length === 0) {
-        setSaving(false);
-        return;
-      }
-      const validCampos = campos
-        .filter((c) => c.nombre.trim())
-        .map((c) => ({
-          ...c,
-          nombre: c.nombre.trim(),
-          esClaveFiltro: c.tipo === "fecha" ? c.esClaveFiltro : undefined,
-        }));
-      if (validCampos.length === 0) {
-        setSaving(false);
-        return;
-      }
-      config = { ...base, tipo: "manual" as const, campos: validCampos };
-      onSave(config, entradas);
-    } else {
-      const formula: MetricaFormulaConfig = { tipo: formulaTipo };
-      if (formulaTipo === "directo" && fuente[0]) {
-        formula.fuente = fuente[0];
-      } else if (
-        ["suma", "promedio", "multiplicacion"].includes(formulaTipo) &&
-        fuente.length > 0
-      ) {
-        formula.fuentes = fuente;
-      } else if (["division", "resta"].includes(formulaTipo) && fuente.length === 2) {
-        formula.fuentes = fuente;
-      } else if (formulaTipo === "condicion" && fuente[0]) {
-        formula.fuente = fuente[0];
-        formula.operador = operador;
-        if (comparacionMode === "variable" && comparacionFuente[0]) {
-          formula.valorComparacion = `ref:${comparacionFuente[0]}`;
-        } else {
-          const cmp = valorComparacion.trim();
-          formula.valorComparacion =
-            cmp === "true" ? true : cmp === "false" ? false : parseFloat(cmp) || 0;
-        }
-        if (siCumpleMode === "variable" && siCumpleFuente[0]) {
-          formula.valorSiCumple = `ref:${siCumpleFuente[0]}`;
-        } else {
-          formula.valorSiCumple =
-            valorSiCumple.trim() === "" ? 0 : parseFloat(valorSiCumple) || valorSiCumple;
-        }
-        if (siNoMode === "variable" && siNoFuente[0]) {
-          formula.valorSiNo = `ref:${siNoFuente[0]}`;
-        } else {
-          formula.valorSiNo =
-            valorSiNo.trim() === "" ? 0 : parseFloat(valorSiNo) || valorSiNo;
-        }
-      }
-      config = { ...base, tipo: "automatica" as const, formula };
-      onSave(config);
     }
-    setSaving(false);
-    onClose();
   };
 
   const canSave =
