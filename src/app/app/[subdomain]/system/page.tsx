@@ -1730,7 +1730,7 @@ export default function SystemPage() {
                       } else {
                         toast.error('Error al guardar la configuración de métricas');
                       }
-                      return;
+                      throw new Error('save_failed');
                     }
 
                     setMetricasConfig(sorted);
@@ -1743,8 +1743,6 @@ export default function SystemPage() {
                       });
                       setMetricasManualData(nextManual);
                     }
-                    setMetricasSheetOpen(false);
-                    setMetricasEditingId(null);
                   }}
                 />
               )}
