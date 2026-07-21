@@ -65,9 +65,9 @@ const URGENCIA_STYLES: Record<UrgenciaNivel, { badge: string; dot: string }> = {
 };
 
 const CANAL_OPTIONS: { value: CanalLeadsEnEspera; label: string; icon: typeof Phone }[] = [
+  { value: "ninguno", label: "Ninguno", icon: Ban },
   { value: "llamada", label: "Llamada", icon: PhoneCall },
   { value: "chat", label: "Chat", icon: MessageSquare },
-  { value: "ninguno", label: "Ninguno", icon: Ban },
 ];
 
 const CANAL_SUBTITULO: Record<CanalLeadsEnEspera, string> = {
@@ -219,7 +219,7 @@ function CloserCard({ grupo, asesorBasePath, canal }: { grupo: CloserConLeadsEnE
 }
 
 export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
-  const [canal, setCanal] = useState<CanalLeadsEnEspera>("llamada");
+  const [canal, setCanal] = useState<CanalLeadsEnEspera>("ninguno");
   const pathname = usePathname();
   const asesorBasePath = pathname.replace(/\/[^/]*$/, "/asesor");
   const { data, loading, error } = useApiData<LeadsEnEsperaResponse>(
