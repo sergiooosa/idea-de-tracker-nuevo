@@ -140,10 +140,12 @@ export default function DashboardPage() {
 
   const filteredAdvisorRanking = useMemo(() => {
     if (leadFilter === 'todos') return advisorRanking;
-    return advisorRanking.map((a) => ({
-      ...a,
-      totalLeads: leadFilter === 'nuevos' ? a.leadsGenerados : a.leadsReactivados,
-    }));
+    return advisorRanking
+      .filter((a) => leadFilter === 'nuevos' ? a.leadsGenerados > 0 : a.leadsReactivados > 0)
+      .map((a) => ({
+        ...a,
+        totalLeads: leadFilter === 'nuevos' ? a.leadsGenerados : a.leadsReactivados,
+      }));
   }, [advisorRanking, leadFilter]);
 
   // Inicializar columnas de ranking desde la config del tenant (solo la primera vez que llegan datos)
