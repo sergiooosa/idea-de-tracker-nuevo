@@ -132,11 +132,47 @@ async function getLeadsLlamada(
   }));
 }
 
+/**
+ * Mapa nombre_closer (normalizado) → email real del asesor, derivado de
+ * registros_de_llamada del propio tenant (fuente autoritativa dentro de la cuenta).
+ * Sirve para que los leads de chat — cuyo `chats_logs.asesor_asignado` guarda el
+ * NOMBRE del asesor, no su email — puedan agruparse junto a los leads de llamada
+ * (que sí traen email) y para que el link a /asesor funcione (advisor=email).
+ * Ver AUT-1723: sin esto, Beatriz aparecía duplicada (tarjeta llamada + tarjeta chat).
+ */
+async function getCloserEmailMap(idCuenta: number): Promise<Map<string, string>> {
+  const rows = await db
+    .select({
+      nombre_closer: registrosDeLlamada.nombre_closer,
+      closer_mail: registrosDeLlamada.closer_mail,
+    })
+    .from(registrosDeLlamada)
+    .where(
+      and(
+        eq(registrosDeLlamada.id_cuenta, String(idCuenta)),
+        isNotNull(registrosDeLlamada.nombre_closer),
+        sql`${registrosDeLlamada.closer_mail} LIKE '%@%'`,
+      ),
+    )
+    .groupBy(registrosDeLlamada.nombre_closer, registrosDeLlamada.closer_mail);
+
+  const mapa = new Map<string, string>();
+  for (const row of rows) {
+    const nombre = row.nombre_closer?.trim().toLowerCase();
+    const email = row.closer_mail?.trim();
+    if (nombre && email) {
+      mapa.set(nombre, email);
+    }
+  }
+  return mapa;
+}
+
 async function getLeadsChat(
   idCuenta: number,
   umbralTs: Date,
   range: DateRange,
   closerEmails: string[],
+  closerEmailMap: Map<string, string>,
   soloSinNingunContacto = false,
 ): Promise<LeadEnEspera[]> {
   // Leads de chat sin contacto: el lead envió un primer mensaje hace > umbral
@@ -181,10 +217,16 @@ async function getLeadsChat(
     const resolvedCloser = row.asesor_asignado?.trim()
       || (row.notas_extra?.trim() !== "por asignar" ? row.notas_extra?.trim() : null)
       || null;
+    // Resolver el email real del asesor a partir del nombre (chats_logs no lo guarda).
+    // Si existe en el mapa del tenant, el lead de chat lleva el email → agrupa junto al
+    // lead de llamada del mismo closer y el link a /asesor funciona. Fallback: el nombre.
+    const resolvedMail = resolvedCloser
+      ? (closerEmailMap.get(resolvedCloser.toLowerCase()) ?? resolvedCloser)
+      : null;
     return {
       nombre_lead: row.nombre_lead ?? "Lead sin nombre",
       nombre_closer: resolvedCloser,
-      closer_mail: resolvedCloser,
+      closer_mail: resolvedMail,
       creativo_origen: row.origen,
       min_sin_llamar: Number(row.min_sin_llamar) || 0,
       phone: null,
@@ -241,11 +283,13 @@ export async function getLeadsEnEspera(
   if (canal === "llamada") {
     leads = await getLeadsLlamada(idCuenta, umbralTs, range, emails);
   } else if (canal === "chat") {
-    leads = await getLeadsChat(idCuenta, umbralTs, range, emails);
+    const closerEmailMap = await getCloserEmailMap(idCuenta);
+    leads = await getLeadsChat(idCuenta, umbralTs, range, emails, closerEmailMap);
   } else {
+    const closerEmailMap = await getCloserEmailMap(idCuenta);
     const [llamadas, chats] = await Promise.all([
       getLeadsLlamada(idCuenta, umbralTs, range, emails, true),
-      getLeadsChat(idCuenta, umbralTs, range, emails, true),
+      getLeadsChat(idCuenta, umbralTs, range, emails, closerEmailMap, true),
     ]);
     const merged = [...llamadas, ...chats];
     const seen = new Map<string, LeadEnEspera>();
