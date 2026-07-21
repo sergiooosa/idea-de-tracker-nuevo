@@ -186,16 +186,16 @@ export async function getAcquisition(
     for (const r of regRows) {
       const keys: string[] = [];
       if (r.mail_lead?.trim()) keys.push(r.mail_lead.trim().toLowerCase());
-      if (r.ghl_contact_id?.trim()) keys.push(r.ghl_contact_id.trim());
+      if (r.ghl_contact_id?.trim()) keys.push(r.ghl_contact_id.trim().toLowerCase());
 
-      const isNew = r.fecha_primera_llamada != null &&
-        r.fecha_primera_llamada >= fromDate &&
-        r.fecha_primera_llamada <= toDate;
+      const fpl = r.fecha_primera_llamada;
+      const isNew = fpl != null && fpl >= fromDate && fpl <= toDate;
+      const isReactivated = fpl != null && fpl < fromDate;
 
       for (const k of keys) {
         if (isNew) {
           newKeys.add(k);
-        } else {
+        } else if (isReactivated) {
           reactivatedKeys.add(k);
         }
       }
