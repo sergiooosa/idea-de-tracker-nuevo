@@ -485,6 +485,18 @@ export interface DashboardObjecionDetail {
   quote: string;
 }
 
+export type ObjecionCanal = 'videollamada' | 'chat' | 'llamada';
+
+export interface DashboardObjecionConDetalle extends DashboardObjecion {
+  details: DashboardObjecionDetail[];
+}
+
+export interface DashboardObjecionesPorCanal {
+  canal: ObjecionCanal;
+  label: string;
+  objeciones: DashboardObjecionConDetalle[];
+}
+
 export interface DashboardRazonPerdida {
   id: string;
   name: string;
@@ -586,6 +598,7 @@ export interface DashboardResponse {
   advisorRanking: DashboardAdvisorRow[];
   volumeByDay: DashboardVolumeDay[];
   objeciones: DashboardObjecion[];
+  objecionesPorCanal?: DashboardObjecionesPorCanal[];
   razonesPerdida?: DashboardRazonPerdida[];
   advisors: ApiAdvisor[];
   fuenteDatosFinancieros: "nativa" | "api_externa";

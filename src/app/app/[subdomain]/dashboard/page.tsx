@@ -11,7 +11,7 @@ import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import HelpTooltip from '@/components/dashboard/HelpTooltip';
 import { useApiData } from '@/hooks/useApiData';
-import type { DashboardResponse, DashboardAdvisorRow, LeadDetailItem } from '@/types';
+import type { DashboardResponse, DashboardAdvisorRow, LeadDetailItem, DashboardObjecionConDetalle, DashboardObjecionesPorCanal } from '@/types';
 import Link from 'next/link';
 import { Target, X, UserCircle, Trophy, GitBranch, Pencil, Eye, EyeOff, HelpCircle, Tag as TagIcon, Zap, SlidersHorizontal, Download, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { exportDashboardToExcel } from '@/lib/export-excel';
@@ -74,6 +74,8 @@ export default function DashboardPage() {
   const [dateTo, setDateTo] = useState(format(defaultDateTo, 'yyyy-MM-dd'));
   const [modalObjeciones, setModalObjeciones] = useState(false);
   const [selectedObjeccion, setSelectedObjeccion] = useState<string | null>(null);
+  const [objecionCanalFilter, setObjecionCanalFilter] = useState<'todos' | 'videollamada' | 'chat' | 'llamada'>('todos');
+  const [modalObjecionDetalle, setModalObjecionDetalle] = useState<{ name: string; details: DashboardObjecionConDetalle['details'] } | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showObjeciones, setShowObjeciones] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showObj') !== 'false' : true);
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
@@ -116,6 +118,7 @@ export default function DashboardPage() {
     avgAttempts: 0, attemptsToFirstContactAvg: 0, noShows: 0, pendientesAgendas: 0,
   };
   const objeciones = data?.objeciones ?? [];
+  const objecionesPorCanal: DashboardObjecionesPorCanal[] = data?.objecionesPorCanal ?? [];
   const razonesPerdida = data?.razonesPerdida ?? [];
   const volumeByDay = data?.volumeByDay ?? [];
   const advisorRanking = data?.advisorRanking ?? [];
@@ -123,6 +126,12 @@ export default function DashboardPage() {
   const seccionesOcultas: string[] = Array.isArray(data?.configuracion_ui?.secciones_ocultas)
     ? (data.configuracion_ui.secciones_ocultas as string[])
     : [];
+
+  // Objeciones filtradas por canal
+  const objecionesVisibles: DashboardObjecionConDetalle[] = useMemo(() => {
+    if (objecionCanalFilter === 'todos') return objeciones as DashboardObjecionConDetalle[];
+    return objecionesPorCanal.find((c) => c.canal === objecionCanalFilter)?.objeciones ?? [];
+  }, [objecionCanalFilter, objeciones, objecionesPorCanal]);
 
   // Extraer columnas webhook dinámicamente
   const webhookRankingCols = useMemo(() => {
@@ -739,38 +748,70 @@ export default function DashboardPage() {
               </button>
             </div>
             {showObjeciones && (
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 items-start">
-                <div className="h-36 sm:h-40 w-full min-h-[140px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
-                      <Pie data={objeciones} dataKey="count" nameKey="name" cx="50%" cy="45%" innerRadius="58%" outerRadius="78%" paddingAngle={2}>
-                        {objeciones.map((_, i) => (
-                          <Cell key={i} fill={OBJECTION_PIE_COLORS[i % OBJECTION_PIE_COLORS.length]} stroke="transparent" />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a' }}
-                        formatter={(_, name, props) => {
-                          const p = props?.payload as { count?: number; percent?: number } | undefined;
-                          return [`${p?.count ?? 0}x (${p?.percent ?? 0}%)`, String(name).charAt(0).toUpperCase() + String(name).slice(1)];
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+              <div>
+                {/* Canal filter tabs */}
+                {objecionesPorCanal.length > 0 && (
+                  <div className="flex gap-1 mb-2 flex-wrap">
+                    {(['todos', ...objecionesPorCanal.map((c) => c.canal)] as const).map((tab) => {
+                      const label = tab === 'todos' ? 'Todos' : objecionesPorCanal.find((c) => c.canal === tab)?.label ?? tab;
+                      return (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setObjecionCanalFilter(tab)}
+                          className={clsx(
+                            'px-2 py-0.5 rounded text-xs font-medium transition-colors',
+                            objecionCanalFilter === tab
+                              ? 'bg-accent-red text-white'
+                              : 'bg-surface-700 text-gray-400 hover:bg-surface-600 hover:text-white',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 items-start">
+                  <div className="h-36 sm:h-40 w-full min-h-[140px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
+                        <Pie data={objecionesVisibles} dataKey="count" nameKey="name" cx="50%" cy="45%" innerRadius="58%" outerRadius="78%" paddingAngle={2}>
+                          {objecionesVisibles.map((_, i) => (
+                            <Cell key={i} fill={OBJECTION_PIE_COLORS[i % OBJECTION_PIE_COLORS.length]} stroke="transparent" />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#0f172a' }}
+                          formatter={(_, name, props) => {
+                            const p = props?.payload as { count?: number; percent?: number } | undefined;
+                            return [`${p?.count ?? 0}x (${p?.percent ?? 0}%)`, String(name).charAt(0).toUpperCase() + String(name).slice(1)];
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="space-y-1">
+                    {objecionesVisibles.map((o, i) => (
+                      <li key={o.name}>
+                        <button
+                          type="button"
+                          onClick={() => setModalObjecionDetalle({ name: o.name, details: (o as DashboardObjecionConDetalle).details ?? [] })}
+                          className="w-full flex items-center justify-between gap-2 rounded-md bg-surface-700 px-2.5 py-1.5 text-left hover:bg-surface-600"
+                        >
+                          <span className="flex items-center gap-2 font-medium text-white capitalize">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: OBJECTION_PIE_COLORS[i % OBJECTION_PIE_COLORS.length] }} />
+                            {o.name}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-accent-red/20 text-accent-red text-sm font-medium">{o.count}x</span>
+                        </button>
+                      </li>
+                    ))}
+                    {objecionesVisibles.length === 0 && (
+                      <li className="text-xs text-gray-500 py-2 text-center">Sin objeciones en este canal</li>
+                    )}
+                  </ul>
                 </div>
-                <ul className="space-y-1">
-                  {objeciones.map((o, i) => (
-                    <li key={o.name}>
-                      <button type="button" onClick={() => { setSelectedObjeccion(o.name); setModalObjeciones(true); }} className="w-full flex items-center justify-between gap-2 rounded-md bg-surface-700 px-2.5 py-1.5 text-left hover:bg-surface-600">
-                        <span className="flex items-center gap-2 font-medium text-white capitalize">
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: OBJECTION_PIE_COLORS[i % OBJECTION_PIE_COLORS.length] }} />
-                          {o.name}
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-accent-red/20 text-accent-red text-sm font-medium">{o.count}x</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
           </section>}
@@ -1027,26 +1068,31 @@ export default function DashboardPage() {
         </section>}
       </div>
 
-      {modalObjeciones && (
+      {modalObjecionDetalle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => { setModalObjeciones(false); setSelectedObjeccion(null); }} aria-hidden />
+          <div className="absolute inset-0 bg-black/60" onClick={() => setModalObjecionDetalle(null)} aria-hidden />
           <div className="relative w-full max-w-lg max-h-[85vh] rounded-xl bg-surface-800 border border-surface-500 shadow-xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-surface-500 shrink-0">
-              <h3 className="font-semibold text-white">{selectedObjeccion ? `Objeciones: ${selectedObjeccion}` : 'Objeciones'}</h3>
-              <button type="button" onClick={() => { setModalObjeciones(false); setSelectedObjeccion(null); }} className="p-2 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+              <h3 className="font-semibold text-white capitalize">Objeción: {modalObjecionDetalle.name}</h3>
+              <button type="button" onClick={() => setModalObjecionDetalle(null)} className="p-2 rounded-lg hover:bg-surface-600 text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <div className="overflow-y-auto p-4">
-              <ul className="space-y-2">
-                {objeciones.map((o, i) => (
-                  <li key={o.name} className="flex items-center justify-between rounded-lg bg-surface-700 px-3 py-2">
-                    <span className="flex items-center gap-2 font-medium text-white capitalize">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: OBJECTION_PIE_COLORS[i % OBJECTION_PIE_COLORS.length] }} />
-                      {o.name}
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-accent-red/20 text-accent-red text-sm font-medium">{o.count}x ({o.percent}%)</span>
-                  </li>
-                ))}
-              </ul>
+              {modalObjecionDetalle.details.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Sin detalle disponible</p>
+              ) : (
+                <ul className="space-y-3">
+                  {modalObjecionDetalle.details.map((d, i) => (
+                    <li key={i} className="rounded-lg bg-surface-700 p-3 space-y-1">
+                      <p className="text-sm text-white italic">&ldquo;{d.quote}&rdquo;</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
+                        {d.leadName && <span><span className="text-gray-500">Lead:</span> {d.leadName}</span>}
+                        {d.advisorName && <span><span className="text-gray-500">Asesor:</span> {d.advisorName}</span>}
+                        {d.datetime && <span><span className="text-gray-500">Fecha:</span> {new Date(d.datetime).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</span>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
