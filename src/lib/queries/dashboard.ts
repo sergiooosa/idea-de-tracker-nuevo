@@ -13,6 +13,10 @@ import type {
   DashboardAdvisorRow,
   DashboardVolumeDay,
   DashboardObjecion,
+  DashboardObjecionDetail,
+  DashboardObjecionConDetalle,
+  DashboardObjecionesPorCanal,
+  ObjecionCanal,
   DashboardResponse,
   DashboardAdsSummary,
   ApiAdvisor,
@@ -727,25 +731,53 @@ export async function getDashboard(
     String(a.date).localeCompare(String(b.date)),
   );
 
-  // Objeciones — fase 1: Fathom (videollamadas)
-  const objMap: Record<string, { count: number; quotes: Set<string> }> = {};
+  // Objeciones — estructura por canal con detalle literal
+  type ObjEntry = { count: number; quotes: Set<string>; details: DashboardObjecionDetail[] };
+  const objMapGlobal: Record<string, ObjEntry> = {};
+  const objMapByCanal: Record<ObjecionCanal, Record<string, ObjEntry>> = {
+    videollamada: {},
+    chat: {},
+    llamada: {},
+  };
   const toList = (x: unknown): Array<{ objecion?: string; categoria?: string }> =>
     Array.isArray(x)
       ? (x as Array<{ objecion?: string; categoria?: string }>)
       : (x && typeof x === "object" && Array.isArray((x as { objeciones?: unknown }).objeciones))
         ? (x as { objeciones: Array<{ objecion?: string; categoria?: string }> }).objeciones
         : [];
-  const mergeObjeciones = (list: Array<{ objecion?: string; categoria?: string }>) => {
+  const mergeObjeciones = (
+    list: Array<{ objecion?: string; categoria?: string }>,
+    canal: ObjecionCanal,
+    ctx: { leadName: string; advisorName: string; datetime: string },
+  ) => {
     for (const obj of list) {
       const key = (obj?.categoria ?? obj?.objecion ?? "").toLowerCase().trim();
       if (!key) continue;
-      if (!objMap[key]) objMap[key] = { count: 0, quotes: new Set() };
-      objMap[key].count++;
-      if (obj.objecion) objMap[key].quotes.add(obj.objecion);
+      const detail: DashboardObjecionDetail = {
+        leadName: ctx.leadName,
+        advisorName: ctx.advisorName,
+        datetime: ctx.datetime,
+        quote: obj.objecion ?? key,
+      };
+      // Global map
+      if (!objMapGlobal[key]) objMapGlobal[key] = { count: 0, quotes: new Set(), details: [] };
+      objMapGlobal[key].count++;
+      if (obj.objecion) objMapGlobal[key].quotes.add(obj.objecion);
+      objMapGlobal[key].details.push(detail);
+      // Per-canal map
+      if (!objMapByCanal[canal][key]) objMapByCanal[canal][key] = { count: 0, quotes: new Set(), details: [] };
+      objMapByCanal[canal][key].count++;
+      if (obj.objecion) objMapByCanal[canal][key].quotes.add(obj.objecion);
+      objMapByCanal[canal][key].details.push(detail);
     }
   };
+  // Fase 1: Fathom (videollamadas)
   for (const a of filteredAgendas) {
-    mergeObjeciones(toList(a.objeciones_ia));
+    mergeObjeciones(toList(a.objeciones_ia), 'videollamada', {
+      leadName: a.nombre_de_lead ?? '',
+      advisorName: a.closer ?? '',
+      datetime: a.fecha_reunion ? String(a.fecha_reunion) : String(a.fecha),
+    });
   }
   // Fases 2 y 3 (chats + Call-AI) se agregan después de consultar chatRows y callAiRows
 
@@ -1043,6 +1075,8 @@ export async function getDashboard(
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
       primer_msg_at: chatsLogs.primer_msg_at,
       ia_objeciones: chatsLogs.ia_objeciones,
+      nombre_lead: chatsLogs.nombre_lead,
+      asesor_asignado: chatsLogs.asesor_asignado,
     })
     .from(chatsLogs)
     .where(and(...chatConditions));
@@ -1051,7 +1085,11 @@ export async function getDashboard(
   // Objeciones — fase 2: chats
   // ----------------------------------------------------------------
   for (const c of chatRows) {
-    mergeObjeciones(toList(c.ia_objeciones));
+    mergeObjeciones(toList(c.ia_objeciones), 'chat', {
+      leadName: c.nombre_lead ?? '',
+      advisorName: c.asesor_asignado ?? '',
+      datetime: c.fecha_y_hora_z ? String(c.fecha_y_hora_z) : '',
+    });
   }
 
   // ----------------------------------------------------------------
@@ -1067,23 +1105,42 @@ export async function getDashboard(
     callAiConditions.push(inArray(eventosLlamadasTiempoReal.correo_closer, emails));
   }
   const callAiRows = await db
-    .select({ objeciones_ia: eventosLlamadasTiempoReal.objeciones_ia })
+    .select({
+      objeciones_ia: eventosLlamadasTiempoReal.objeciones_ia,
+      closer: eventosLlamadasTiempoReal.closer,
+      correo_closer: eventosLlamadasTiempoReal.correo_closer,
+      fecha_hora_evento: eventosLlamadasTiempoReal.fecha_hora_evento,
+    })
     .from(eventosLlamadasTiempoReal)
     .where(and(...callAiConditions));
   for (const r of callAiRows) {
-    mergeObjeciones(toList(r.objeciones_ia));
+    mergeObjeciones(toList(r.objeciones_ia), 'llamada', {
+      leadName: '',
+      advisorName: r.closer ?? r.correo_closer ?? '',
+      datetime: r.fecha_hora_evento ? String(r.fecha_hora_evento) : '',
+    });
   }
 
-  // Objeciones — resultado final unificado
-  const totalObj = Object.values(objMap).reduce((s, o) => s + o.count, 0);
-  const objeciones: DashboardObjecion[] = Object.entries(objMap)
-    .map(([name, { count, quotes }]) => ({
-      name,
-      count,
-      percent: totalObj > 0 ? Math.round((count / totalObj) * 100) : 0,
-      tipos: quotes.size,
-    }))
-    .sort((a, b) => b.count - a.count);
+  // Objeciones — resultado final unificado + por canal
+  const buildObjecionList = (map: Record<string, ObjEntry>): DashboardObjecionConDetalle[] => {
+    const total = Object.values(map).reduce((s, o) => s + o.count, 0);
+    return Object.entries(map)
+      .map(([name, { count, quotes, details }]) => ({
+        name,
+        count,
+        percent: total > 0 ? Math.round((count / total) * 100) : 0,
+        tipos: quotes.size,
+        details,
+      }))
+      .sort((a, b) => b.count - a.count);
+  };
+  const objeciones: DashboardObjecion[] = buildObjecionList(objMapGlobal);
+  const CANAL_LABELS: Record<ObjecionCanal, string> = { videollamada: 'Videollamadas', chat: 'Chats', llamada: 'Llamadas' };
+  const objecionesPorCanal: DashboardObjecionesPorCanal[] = (
+    ['videollamada', 'chat', 'llamada'] as ObjecionCanal[]
+  )
+    .filter((c) => Object.keys(objMapByCanal[c]).length > 0)
+    .map((c) => ({ canal: c, label: CANAL_LABELS[c], objeciones: buildObjecionList(objMapByCanal[c]) }));
 
   // ----------------------------------------------------------------
   // Funnel unificado — agregar leads de chats al distribucionEmbudo
@@ -1505,6 +1562,7 @@ export async function getDashboard(
     advisorRanking,
     volumeByDay,
     objeciones,
+    objecionesPorCanal: objecionesPorCanal.length > 0 ? objecionesPorCanal : undefined,
     razonesPerdida: razonesPerdida.length > 0 ? razonesPerdida : undefined,
     advisors,
     fuenteDatosFinancieros: fuenteFinanciera ?? "nativa",
