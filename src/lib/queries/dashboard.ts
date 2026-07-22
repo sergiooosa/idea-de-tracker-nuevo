@@ -686,6 +686,49 @@ export async function getDashboard(
         .filter(([k]) => !newLeadKeys.has(k))
         .map(([, v]) => v);
 
+      const computeFilteredMetrics = (leadKeys: Set<string>): {
+        totalLeads: number; callsMade: number; speedToLeadAvg: number | null;
+        meetingsBooked: number; meetingsAttended: number; revenue: number;
+        cashCollected: number; contactRate: number; bookingRate: number;
+      } => {
+        const fCalls = ac.filter((c) => {
+          const lk = c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || String(c.id);
+          return leadKeys.has(lk);
+        });
+        const fAgendas = aa.filter((a) => {
+          const lk = a.email_lead?.trim().toLowerCase() || `agenda_${a.id_registro_agenda}`;
+          return leadKeys.has(lk);
+        });
+        const fContestadas = new Set(
+          fCalls
+            .filter((c) => esLlamadaContestada(c.tipo_evento ?? "", c.estado_resultado))
+            .map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id))
+        ).size;
+        const fLeads = new Set([
+          ...fCalls.map((c) => c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id)),
+          ...fAgendas.map((a) => agendaDedupKey(a)),
+        ]).size;
+        const fMeetings = new Set(fAgendas.map((a) => agendaDedupKey(a))).size;
+        const fAttended = fAgendas.filter((a) => attendedSet.has((a.categoria ?? "").toLowerCase().trim()) && hasRealInteraction(a)).length;
+        const fSpeeds = fCalls.filter((c) => c.speed_to_lead).map((c) => parseFloat(c.speed_to_lead!) || 0).filter((v) => v > 0);
+        const fRevenueClosedSet = fAgendas.filter((a) => closedSet.has((a.categoria ?? "").toLowerCase().trim()))
+          .reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+        const fRevenueAny = fAgendas.reduce((s, a) => s + (parseFloat(a.facturacion || "0") || 0), 0);
+        const fRevenue = useExterna ? 0 : (fRevenueClosedSet > 0 ? fRevenueClosedSet : fRevenueAny);
+        const fCash = useExterna ? 0 : fAgendas.reduce((s, a) => s + (parseFloat(a.cash_collected || "0") || 0), 0);
+        return {
+          totalLeads: fLeads,
+          callsMade: fCalls.length,
+          speedToLeadAvg: fSpeeds.length > 0 ? fSpeeds.reduce((s, v) => s + v, 0) / fSpeeds.length : null,
+          meetingsBooked: fMeetings,
+          meetingsAttended: fAttended,
+          revenue: fRevenue,
+          cashCollected: fCash,
+          contactRate: fLeads > 0 ? fContestadas / fLeads : 0,
+          bookingRate: fLeads > 0 ? fMeetings / fLeads : 0,
+        };
+      };
+
       return {
         advisorName: ac[0]?.nombre_closer ?? aa[0]?.closer ?? key,
         advisorEmail: ac[0]?.closer_mail ?? null,
@@ -698,8 +741,6 @@ export async function getDashboard(
         leadsReactivadosDetalle,
         callsMade: ac.length,
         speedToLeadAvg: aSpeeds.length > 0 ? aSpeeds.reduce((s, v) => s + v, 0) / aSpeeds.length : null,
-        // Deduplicar agendas por lead único (igual que el KPI global meetingsBooked).
-        // Incluye canceladas (ver aMeetingsBooked arriba) para reconciliar con el headline.
         meetingsBooked: aMeetingsBooked,
         meetingsAttended: aAsistidas,
         revenue: aRevenue,
@@ -707,6 +748,10 @@ export async function getDashboard(
         contactRate: aLeads > 0 ? aLeadsContactados / aLeads : 0,
         bookingRate: aLeads > 0 ? aMeetingsBooked / aLeads : 0,
         metricasWebhook: webhookPorUsuario[ac[0]?.closer_mail ?? key] ?? {},
+        metricsNuevos: computeFilteredMetrics(newLeadKeys),
+        metricsReactivados: computeFilteredMetrics(
+          new Set(Array.from(uniqueActivosMap.keys()).filter((k) => !newLeadKeys.has(k)))
+        ),
       };
     },
   );
