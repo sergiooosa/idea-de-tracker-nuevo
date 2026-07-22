@@ -206,7 +206,7 @@ async function getLeadsChat(
               WHERE r.id_cuenta = ${String(idCuenta)}
               AND r.ghl_contact_id = ${chatsLogs.id_lead}
               AND ${chatsLogs.id_lead} IS NOT NULL
-              AND r.fecha_primera_llamada IS NOT NULL
+              AND (r.fecha_primera_llamada IS NOT NULL OR r.estado != 'pdte')
             )`
           : undefined,
       ),
