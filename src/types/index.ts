@@ -443,6 +443,18 @@ export interface LeadDetailItem {
   ultimaActividad: string | null;
 }
 
+export interface AdvisorFilteredMetrics {
+  totalLeads: number;
+  callsMade: number;
+  speedToLeadAvg: number | null;
+  meetingsBooked: number;
+  meetingsAttended: number;
+  revenue: number;
+  cashCollected: number;
+  contactRate: number;
+  bookingRate: number;
+}
+
 export interface DashboardAdvisorRow {
   advisorName: string;
   advisorEmail: string | null;
@@ -462,6 +474,8 @@ export interface DashboardAdvisorRow {
   contactRate: number;
   bookingRate: number;
   metricasWebhook?: Record<string, number>;
+  metricsNuevos?: AdvisorFilteredMetrics;
+  metricsReactivados?: AdvisorFilteredMetrics;
 }
 
 export interface DashboardVolumeDay {
