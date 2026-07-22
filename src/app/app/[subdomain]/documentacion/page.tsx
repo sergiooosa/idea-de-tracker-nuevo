@@ -1,5 +1,8 @@
 "use client";
 
+// AUT-1737: ocultar "Costos de IA". Cambiar a `true` para reactivar.
+const MOSTRAR_COSTOS_IA = false;
+
 import { useState } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { useApiData } from "@/hooks/useApiData";
@@ -1163,10 +1166,12 @@ export default function DocumentacionPage() {
                 <Key className="w-3.5 h-3.5" />
                 OpenAI Key
               </TabsTrigger>
+              {MOSTRAR_COSTOS_IA && (
               <TabsTrigger value="costos" className="flex items-center gap-1.5">
                 <span>💰</span>
                 Costos de IA
               </TabsTrigger>
+              )}
               <TabsTrigger value="webhooks" className="flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5" />
                 Webhooks
@@ -1203,9 +1208,11 @@ export default function DocumentacionPage() {
               <BYOKSection hasKey={hasOpenAIKey} />
             </TabsContent>
 
+            {MOSTRAR_COSTOS_IA && (
             <TabsContent value="costos">
               <CostosIASection />
             </TabsContent>
+            )}
             <TabsContent value="webhooks">
               <WebhookMetricasSection />
             </TabsContent>
