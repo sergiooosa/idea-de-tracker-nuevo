@@ -25,13 +25,19 @@ interface CategoriaCustom {
   descripcion: string;
 }
 
+interface CerebroCanalData {
+  categorias_calificadas: string[];
+  umbral_minimo: number;
+  califica?: boolean;
+}
+
 interface CerebroCriterios {
   categorias_calificadas: string[];
   umbral_minimo: number;
   canales?: {
-    chats?: { categorias_calificadas: string[]; umbral_minimo: number };
-    llamadas?: { categorias_calificadas: string[]; umbral_minimo: number };
-    videollamadas?: { categorias_calificadas: string[]; umbral_minimo: number };
+    chats?: CerebroCanalData;
+    llamadas?: CerebroCanalData;
+    videollamadas?: CerebroCanalData;
   };
   categorias_custom?: CategoriaCustom[];
   prompt_calificacion_chats?: string | null;
@@ -43,25 +49,47 @@ interface DashboardCanales {
   videollamadas: string[] | null;
 }
 
+interface DashboardCalifica {
+  chats: boolean;
+  llamadas: boolean;
+  videollamadas: boolean;
+}
+
+const CALIFICA_DEFAULTS: DashboardCalifica = { chats: true, llamadas: false, videollamadas: true };
+
 function cerebroToDashboard(c: CerebroCriterios | null): {
   categorias: string[] | null;
   canales: DashboardCanales;
+  califica: DashboardCalifica;
   categoriasCustom: CategoriaCustom[];
   promptCalificacionChats: string | null;
 } {
   if (!c) {
-    return { categorias: null, canales: { chats: null, llamadas: null, videollamadas: null }, categoriasCustom: [], promptCalificacionChats: null };
+    return {
+      categorias: null,
+      canales: { chats: null, llamadas: null, videollamadas: null },
+      califica: { ...CALIFICA_DEFAULTS },
+      categoriasCustom: [],
+      promptCalificacionChats: null,
+    };
   }
   const canales: DashboardCanales = { chats: null, llamadas: null, videollamadas: null };
+  const califica: DashboardCalifica = { ...CALIFICA_DEFAULTS };
   for (const canal of CANALES) {
     const canalData = c.canales?.[canal];
-    if (canalData && canalData.categorias_calificadas.length > 0) {
-      canales[canal] = canalData.categorias_calificadas;
+    if (canalData) {
+      if (canalData.categorias_calificadas.length > 0) {
+        canales[canal] = canalData.categorias_calificadas;
+      }
+      if (typeof canalData.califica === "boolean") {
+        califica[canal] = canalData.califica;
+      }
     }
   }
   return {
     categorias: c.categorias_calificadas.length > 0 ? c.categorias_calificadas : null,
     canales,
+    califica,
     categoriasCustom: c.categorias_custom ?? [],
     promptCalificacionChats: c.prompt_calificacion_chats ?? null,
   };
@@ -72,25 +100,32 @@ function dashboardToCerebro(
   canales: DashboardCanales | undefined,
   categoriasCustom?: CategoriaCustom[],
   promptCalificacionChats?: string | null,
+  califica?: DashboardCalifica,
 ): CerebroCriterios | null {
   const hasGlobal = categorias && categorias.length > 0;
   const hasCanales = canales && CANALES.some((c) => canales[c] && canales[c]!.length > 0);
   const hasCustom = categoriasCustom && categoriasCustom.length > 0;
   const hasPrompt = typeof promptCalificacionChats === "string" && promptCalificacionChats.trim().length > 0;
+  const hasCalifica = califica && CANALES.some((c) => califica[c] !== CALIFICA_DEFAULTS[c]);
 
-  if (!hasGlobal && !hasCanales && !hasCustom && !hasPrompt) return null;
+  if (!hasGlobal && !hasCanales && !hasCustom && !hasPrompt && !hasCalifica) return null;
 
   const result: CerebroCriterios = {
     categorias_calificadas: categorias ?? [],
     umbral_minimo: 1,
   };
 
-  if (hasCanales && canales) {
+  if ((hasCanales && canales) || (hasCalifica && califica)) {
     result.canales = {};
     for (const canal of CANALES) {
-      const cats = canales[canal];
-      if (cats && cats.length > 0) {
-        result.canales[canal] = { categorias_calificadas: cats, umbral_minimo: 1 };
+      const cats = canales?.[canal];
+      const canalCalifica = califica?.[canal];
+      if ((cats && cats.length > 0) || typeof canalCalifica === "boolean") {
+        result.canales[canal] = {
+          categorias_calificadas: cats ?? [],
+          umbral_minimo: 1,
+          ...(typeof canalCalifica === "boolean" ? { califica: canalCalifica } : {}),
+        };
       }
     }
   }
@@ -110,7 +145,7 @@ function dashboardToCerebro(
 
 /**
  * GET /api/data/criterios-calificacion
- * Returns: { categorias, canales, categoriasDisponibles }
+ * Returns: { categorias, canales, califica, categoriasDisponibles, categoriasCustom, promptCalificacionChats }
  */
 export async function GET(req: Request) {
   return withAuth(req, async (idCuenta) => {
@@ -138,7 +173,7 @@ export async function GET(req: Request) {
       console.warn("[criterios-calificacion] No se pudo consultar Cerebro:", err);
     }
 
-    const { categorias, canales, categoriasCustom, promptCalificacionChats } = cerebroToDashboard(criteriosRaw);
+    const { categorias, canales, califica, categoriasCustom, promptCalificacionChats } = cerebroToDashboard(criteriosRaw);
 
     const categoriasRows = await db
       .selectDistinct({ cat: chatsLogs.ia_categoria })
@@ -151,13 +186,13 @@ export async function GET(req: Request) {
       .map((r) => r.cat)
       .filter((c): c is string => c != null && c.trim().length > 0);
 
-    return NextResponse.json({ categorias, canales, categoriasDisponibles, categoriasCustom, promptCalificacionChats });
+    return NextResponse.json({ categorias, canales, califica, categoriasDisponibles, categoriasCustom, promptCalificacionChats });
   });
 }
 
 /**
  * PATCH /api/data/criterios-calificacion
- * Body: { categorias: string[] | null, canales?: { chats, llamadas, videollamadas } }
+ * Body: { categorias, canales?, categoriasCustom?, promptCalificacionChats?, califica? }
  */
 export async function PATCH(req: Request) {
   return withAuthFull(req, async (ctx) => {
@@ -171,11 +206,12 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "categorias requerido" }, { status: 400 });
     }
 
-    const { categorias, canales, categoriasCustom, promptCalificacionChats } = body as {
+    const { categorias, canales, categoriasCustom, promptCalificacionChats, califica } = body as {
       categorias: string[] | null;
       canales?: DashboardCanales;
       categoriasCustom?: CategoriaCustom[];
       promptCalificacionChats?: string | null;
+      califica?: DashboardCalifica;
     };
     if (categorias !== null && !Array.isArray(categorias)) {
       return NextResponse.json({ error: "categorias debe ser un array o null" }, { status: 400 });
@@ -189,7 +225,7 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const cerebroPayload = dashboardToCerebro(categorias, canales, categoriasCustom, promptCalificacionChats);
+    const cerebroPayload = dashboardToCerebro(categorias, canales, categoriasCustom, promptCalificacionChats, califica);
 
     const cerebroRes = await fetch(
       `${API_BASE_URL}/api/cuentas/${idCuenta}/criterios-calificacion`,
