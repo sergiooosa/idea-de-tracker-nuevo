@@ -209,6 +209,7 @@ export default function ConfiguracionPage() {
   const [systemSaving, setSystemSaving] = useState(false);
 
   const [canales, setCanales] = useState<CanalesActivosData>({ chats: false, llamadas: false, videollamadas: false });
+  const [canalesSaving, setCanalesSaving] = useState(false);
   const [canalesLoaded, setCanalesLoaded] = useState(false);
 
   const [expandedCanal, setExpandedCanal] = useState<Canal | null>("chats");
@@ -414,6 +415,20 @@ export default function ConfiguracionPage() {
     } catch { toast.error("Error al guardar la configuración"); }
     setSystemSaving(false);
   };
+
+  const handleSaveCanales = async () => {
+    setCanalesSaving(true);
+    try {
+      const res = await fetch("/api/data/canales-activos", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(canales),
+      });
+      if (!res.ok) throw new Error("Error al guardar"); toast.success("Canales activos guardados"); await loadCanales();
+    } catch { toast.error("Error al guardar los canales"); }
+    setCanalesSaving(false);
+  };
+
+  const toggleCanal = (canal: keyof CanalesActivosData) => { setCanales((prev) => ({ ...prev, [canal]: !prev[canal] })); };
 
   const addEmbudoEtapa = (canal: Canal) => {
     const maxOrden = embudoEtapas.reduce((max, e) => Math.max(max, e.orden), 0);
@@ -650,8 +665,50 @@ export default function ConfiguracionPage() {
           </section>
         )}
 
+        {/* ── Canales Activos ── */}
+        {canalesLoaded && puedeCriterios && (
+          <section className="rounded-xl border border-surface-500 bg-surface-800/80 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Phone className="w-5 h-5 text-accent-cyan" />
+                <h2 className="text-sm font-semibold text-white">Canales del Embudo IA</h2>
+                <HelpTooltip
+                  titulo="¿Qué son los Canales del Embudo IA?"
+                  contenido={`Indica qué canales de comunicación usa tu equipo de ventas: Chats (WhatsApp), Llamadas (Twilio) y/o Citas (Fathom).\n\nLa IA del embudo solo analizará y calculará métricas de los canales que marques como activos. Desactivar un canal que no usas evita ruido y métricas vacías en tus reportes.`}
+                  comoProbar="Activa solo los canales que tu equipo realmente usa y pulsa 'Guardar canales'. Revisa el embudo/Performance y confirma que solo aparecen métricas de los canales activos."
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+              Indica qué canales de comunicación usa tu equipo de ventas. La IA del embudo solo analizará los canales activos.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              {([
+                { key: "chats" as const, label: "Chats (WhatsApp)", icon: MessageSquare, desc: "Conversaciones de WhatsApp y chat" },
+                { key: "llamadas" as const, label: "Llamadas (Twilio)", icon: Phone, desc: "Llamadas telefónicas grabadas" },
+                { key: "videollamadas" as const, label: "Citas (Fathom)", icon: Video, desc: "Citas con transcripción" },
+              ]).map(({ key, label, icon: Icon, desc }) => (
+                <button key={key} type="button" onClick={() => toggleCanal(key)}
+                  className={`flex flex-col items-start gap-2 p-3 rounded-lg border text-left transition-all ${canales[key] ? "bg-accent-cyan/10 border-accent-cyan/50 text-white" : "bg-surface-700 border-surface-500 text-gray-400 hover:border-accent-cyan/30"}`}>
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-4 h-4 ${canales[key] ? "text-accent-cyan" : "text-gray-500"}`} />
+                    <span className="text-sm font-medium">{label}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">{desc}</span>
+                  {canales[key] && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-accent-cyan"><CheckCircle2 className="w-3 h-3" /> Activo</span>}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={handleSaveCanales} disabled={canalesSaving}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-cyan text-black text-sm font-semibold hover:bg-accent-cyan/90 disabled:opacity-50 transition-colors">
+              {canalesSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Guardar canales
+            </button>
+          </section>
+        )}
+
         {/* ── Secciones por canal ── */}
-        {criteriosLoaded && systemConfigLoaded && puedeCriterios && CANAL_CONFIG.map((cfg) => {
+        {criteriosLoaded && systemConfigLoaded && puedeCriterios && CANAL_CONFIG.filter((cfg) => canales[cfg.id]).map((cfg) => {
           const Icon = cfg.icon;
           const isExpanded = expandedCanal === cfg.id;
           const canalCalifica = califica[cfg.id];
