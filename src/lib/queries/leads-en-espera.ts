@@ -112,7 +112,6 @@ async function getLeadsLlamada(
               WHERE c.id_cuenta = ${idCuenta}
               AND c.id_lead = ${registrosDeLlamada.ghl_contact_id}
               AND c.id_lead IS NOT NULL
-              AND EXISTS (SELECT 1 FROM jsonb_array_elements(c.chat) elem WHERE elem->>'role' = 'agent')
             )`
           : undefined,
       ),
@@ -186,6 +185,7 @@ async function getLeadsChat(
       id_lead: chatsLogs.id_lead,
       primer_msg_lead_at: chatsLogs.primer_msg_lead_at,
       min_sin_llamar: sql<number>`ROUND(EXTRACT(EPOCH FROM (NOW() - ${chatsLogs.primer_msg_lead_at}))/60)::int`,
+      phone: sql<string | null>`(SELECT r.phone_raw_format FROM registros_de_llamada r WHERE r.ghl_contact_id = ${chatsLogs.id_lead} AND r.id_cuenta = ${String(idCuenta)} LIMIT 1)`,
     })
     .from(chatsLogs)
     .where(
@@ -229,7 +229,7 @@ async function getLeadsChat(
       closer_mail: resolvedMail,
       creativo_origen: row.origen,
       min_sin_llamar: Number(row.min_sin_llamar) || 0,
-      phone: null,
+      phone: row.phone ?? null,
       mail_lead: null,
       canal_origen: "chat" as const,
       contact_id: row.id_lead,
@@ -286,21 +286,7 @@ export async function getLeadsEnEspera(
     const closerEmailMap = await getCloserEmailMap(idCuenta);
     leads = await getLeadsChat(idCuenta, umbralTs, range, emails, closerEmailMap);
   } else {
-    const closerEmailMap = await getCloserEmailMap(idCuenta);
-    const [llamadas, chats] = await Promise.all([
-      getLeadsLlamada(idCuenta, umbralTs, range, emails, true),
-      getLeadsChat(idCuenta, umbralTs, range, emails, closerEmailMap, true),
-    ]);
-    const merged = [...llamadas, ...chats];
-    const seen = new Map<string, LeadEnEspera>();
-    for (const lead of merged) {
-      const key = lead.contact_id ?? `${lead.canal_origen}:${lead.nombre_lead}`;
-      const existing = seen.get(key);
-      if (!existing || lead.min_sin_llamar > existing.min_sin_llamar) {
-        seen.set(key, lead);
-      }
-    }
-    leads = Array.from(seen.values());
+    leads = await getLeadsLlamada(idCuenta, umbralTs, range, emails, true);
   }
 
   const grupos = agruparPorCloser(leads);
