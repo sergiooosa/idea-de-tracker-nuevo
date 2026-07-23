@@ -160,11 +160,16 @@ export async function getAcquisition(
   ]);
 
   // ----------------------------------------------------------------
-  // LEAD FILTER — nuevos vs reactivados via registros_de_llamada
+  // LEAD FILTER — nuevos vs reactivados (all sources)
   // ----------------------------------------------------------------
   let filterSet: Set<string> | null = null;
 
   if (leadFilter !== "todos") {
+    const newKeys = new Set<string>();
+    const reactivatedKeys = new Set<string>();
+    const classifiedKeys = new Set<string>();
+
+    // 1. registros_de_llamada — fecha_primera_llamada
     const regRows = await db
       .select({
         mail_lead: registrosDeLlamada.mail_lead,
@@ -180,22 +185,81 @@ export async function getAcquisition(
         ),
       );
 
-    const newKeys = new Set<string>();
-    const reactivatedKeys = new Set<string>();
-
     for (const r of regRows) {
       const keys: string[] = [];
       if (r.mail_lead?.trim()) keys.push(r.mail_lead.trim().toLowerCase());
       if (r.ghl_contact_id?.trim()) keys.push(r.ghl_contact_id.trim().toLowerCase());
 
       const fpl = r.fecha_primera_llamada;
-      const isNew = fpl != null && fpl >= fromDate && fpl <= toDate;
+      const isNew = fpl == null || (fpl >= fromDate && fpl <= toDate);
       const isReactivated = fpl != null && fpl < fromDate;
 
       for (const k of keys) {
-        if (isNew) {
+        classifiedKeys.add(k);
+        if (isNew) newKeys.add(k);
+        else if (isReactivated) reactivatedKeys.add(k);
+      }
+    }
+
+    // 2. chats — first appearance in chats_logs for unclassified chat leads
+    const chatLeadIds = new Set(
+      chats
+        .map((ch) => ch.id_lead?.trim().toLowerCase())
+        .filter((id): id is string => !!id && !classifiedKeys.has(id)),
+    );
+
+    if (chatLeadIds.size > 0) {
+      const chatFirstRows = await db.execute<{ id_lead: string; first_chat: Date }>(
+        sql`
+          SELECT id_lead, MIN(fecha_y_hora_z) AS first_chat
+          FROM chats_logs
+          WHERE id_cuenta = ${idCuenta}
+            AND id_lead IN (${sql.join([...chatLeadIds].map((id) => sql`${id}`), sql`, `)})
+          GROUP BY id_lead
+        `,
+      );
+
+      for (const row of chatFirstRows.rows) {
+        const k = (row as { id_lead: string; first_chat: Date }).id_lead?.trim().toLowerCase();
+        const firstChat = (row as { id_lead: string; first_chat: Date }).first_chat;
+        if (!k || !firstChat) continue;
+        if (firstChat >= fromDate && firstChat <= toDate) {
           newKeys.add(k);
-        } else if (isReactivated) {
+        } else if (firstChat < fromDate) {
+          reactivatedKeys.add(k);
+        }
+        classifiedKeys.add(k);
+      }
+    }
+
+    // 3. agendas — first appearance for unclassified agenda leads
+    const agendaLeadKeys = new Set(
+      agendas
+        .map((a) => (a.email_lead?.trim() || a.ghl_contact_id?.trim() || "").toLowerCase())
+        .filter((k) => k && !classifiedKeys.has(k)),
+    );
+
+    if (agendaLeadKeys.size > 0) {
+      const agendaFirstRows = await db.execute<{ lead_key: string; first_agenda: Date }>(
+        sql`
+          SELECT
+            LOWER(TRIM(COALESCE(NULLIF(TRIM(email_lead),''), ghl_contact_id))) AS lead_key,
+            MIN(COALESCE(fecha_reunion, fecha::timestamptz)) AS first_agenda
+          FROM resumenes_diarios_agendas
+          WHERE id_cuenta = ${idCuenta}
+            AND LOWER(TRIM(COALESCE(NULLIF(TRIM(email_lead),''), ghl_contact_id)))
+              IN (${sql.join([...agendaLeadKeys].map((k) => sql`${k}`), sql`, `)})
+          GROUP BY lead_key
+        `,
+      );
+
+      for (const row of agendaFirstRows.rows) {
+        const k = (row as { lead_key: string; first_agenda: Date }).lead_key;
+        const firstAgenda = (row as { lead_key: string; first_agenda: Date }).first_agenda;
+        if (!k || !firstAgenda) continue;
+        if (firstAgenda >= fromDate && firstAgenda <= toDate) {
+          newKeys.add(k);
+        } else if (firstAgenda < fromDate) {
           reactivatedKeys.add(k);
         }
       }
