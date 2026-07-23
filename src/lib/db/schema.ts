@@ -58,6 +58,17 @@ export interface ConfiguracionUI {
   secciones_ocultas?: string[];
 }
 
+export interface ReglaExclusionCoach {
+  canal: "llamada" | "chat" | "videollamada" | "todos";
+  campo: "estado_resultado" | "tipo_evento" | "canal";
+  operador: "eq" | "neq" | "contains" | "not_contains";
+  valor: string;
+}
+
+export interface ExclusionesCoach {
+  reglas: ReglaExclusionCoach[];
+}
+
 export interface DynamicValueRange {
   min: number;
   label: string;
@@ -407,6 +418,7 @@ export const cuentas = pgTable("cuentas", {
   razones_perdida_config: jsonb("razones_perdida_config").$type<RazonPerdidaOption[]>(),
   razones_perdida_data: jsonb("razones_perdida_data").$type<RazonPerdidaEntry[]>(),
   categorias_llamadas: jsonb("categorias_llamadas").$type<CategoriaLlamada[]>(),
+  exclusiones_coach: jsonb("exclusiones_coach").$type<ExclusionesCoach>(),
 });
 
 /* ------------------------------------------------------------------ */
