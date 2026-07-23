@@ -128,15 +128,6 @@ function LeadRow({ lead, asesorBasePath, canal }: { lead: LeadEnEspera; asesorBa
             </span>
           )}
         </div>
-        {canal === "ninguno" && lead.canal_origen && (
-          <span className={`hidden shrink-0 rounded px-1.5 py-0.5 text-xs sm:inline ${
-            lead.canal_origen === "chat"
-              ? "bg-blue-500/15 text-blue-400"
-              : "bg-green-500/15 text-green-400"
-          }`}>
-            {lead.canal_origen === "chat" ? "Chat" : "Llamada"}
-          </span>
-        )}
         {lead.creativo_origen && (
           <span className="hidden shrink-0 rounded px-1.5 py-0.5 text-xs bg-slate-700 text-slate-400 sm:inline">
             {lead.creativo_origen}
