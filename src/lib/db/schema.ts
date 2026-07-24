@@ -419,6 +419,8 @@ export const cuentas = pgTable("cuentas", {
   razones_perdida_data: jsonb("razones_perdida_data").$type<RazonPerdidaEntry[]>(),
   categorias_llamadas: jsonb("categorias_llamadas").$type<CategoriaLlamada[]>(),
   exclusiones_coach: jsonb("exclusiones_coach").$type<ExclusionesCoach>(),
+  gemini_api_key: text("gemini_api_key"),
+  gemini_premium_status: text("gemini_premium_status").$type<"active" | "paused_invalid_key" | "paused_quota_exceeded" | null>(),
 });
 
 /* ------------------------------------------------------------------ */

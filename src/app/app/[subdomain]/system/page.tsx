@@ -30,6 +30,7 @@ import DashboardsManager from '@/components/dashboard/DashboardsManager';
 import type { MetricaConfig, MetricaManualEntry, CategoriaLlamada, ExclusionesCoach, ReglaExclusionCoach } from '@/lib/db/schema';
 import ChatRecoverySection from '@/features/quick-triggers/chat-recovery/ChatRecoverySection';
 import HelpTooltip from '@/components/dashboard/HelpTooltip';
+import PremiumGate from '@/components/dashboard/PremiumGate';
 
 interface DynamicValueRangeLocal {
   min: number;
@@ -163,7 +164,7 @@ interface SystemConfig {
   metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
   dashboards_personalizados?: import('@/lib/db/schema').DashboardPersonalizado[];
   embudo_personalizado: EmbudoEtapa[];
-  has_openai_key: boolean; fuente_datos_financieros: 'nativa' | 'api_externa';
+  has_openai_key: boolean; has_gemini_key: boolean; gemini_premium_status: 'active' | 'paused_invalid_key' | 'paused_quota_exceeded' | null; fuente_datos_financieros: 'nativa' | 'api_externa';
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfig;
   chat_analisis_hora?: number;
@@ -270,7 +271,7 @@ export default function SystemPage() {
   const t = useT();
   const searchParams = useSearchParams();
   const stepParam = searchParams.get('step');
-  const TOTAL_STEPS = 12;
+  const TOTAL_STEPS = 13;
   const initialStep = Math.min(TOTAL_STEPS, Math.max(1, Number(stepParam) || 1));
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [saving, setSaving] = useState(false);
@@ -286,6 +287,9 @@ export default function SystemPage() {
 
   const [openaiKey, setOpenaiKey] = useState('');
   const [hasOpenaiKey, setHasOpenaiKey] = useState(false);
+  const [geminiKey, setGeminiKey] = useState('');
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [geminiPremiumStatus, setGeminiPremiumStatus] = useState<'active' | 'paused_invalid_key' | 'paused_quota_exceeded' | null>(null);
   const [embudoEtapas, setEmbudoEtapas] = useState<EmbudoEtapa[]>([]);
   const [chatConfig, setChatConfig] = useState<ChatConfig>({
     tiene_chatbot: false,
@@ -430,6 +434,8 @@ export default function SystemPage() {
           : [];
         setEmbudoEtapas(loadedEmbudo.length > 0 ? loadedEmbudo : DEFAULT_EMBUDO_CONFIG);
         setHasOpenaiKey(cfg.has_openai_key ?? false);
+        setHasGeminiKey(cfg.has_gemini_key ?? false);
+        setGeminiPremiumStatus(cfg.gemini_premium_status ?? null);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
         setSeccionChatsDashboard(cfg.seccion_chats_dashboard !== false);
         if (cfg.idioma === 'en' || cfg.idioma === 'es') setCurrentIdioma(cfg.idioma);
@@ -592,6 +598,7 @@ export default function SystemPage() {
         categorias_llamadas: categoriasLlamadas,
       };
       if (openaiKey) payload.openai_api_key = openaiKey;
+      if (geminiKey) payload.gemini_api_key = geminiKey;
       const res = await fetch('/api/data/system-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -610,6 +617,11 @@ export default function SystemPage() {
       if (openaiKey) {
         setHasOpenaiKey(true);
         setOpenaiKey('');
+      }
+      if (geminiKey) {
+        setHasGeminiKey(true);
+        setGeminiPremiumStatus('active');
+        setGeminiKey('');
       }
       toast.success('Configuración guardada');
       setSaving(false);
@@ -789,6 +801,7 @@ export default function SystemPage() {
             { id: 10, title: 'Fuente financiera', icon: Database, color: 'blue' },
             { id: 11, title: 'Integraciones de Ads', icon: BarChart3, color: 'purple' },
             { id: 12, title: 'Coach de ventas', icon: ShieldCheck, color: 'green' },
+            { id: 13, title: 'Gemini Key', icon: Sparkles, color: 'purple' },
           ].map((s) => {
             const Icon = s.icon;
             const active = currentStep === s.id;
@@ -799,7 +812,7 @@ export default function SystemPage() {
               amber: active ? 'bg-accent-amber text-black border-accent-amber shadow-[0_0_16px_-4px_rgba(255,176,32,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-amber hover:border-accent-amber/50',
               green: active ? 'bg-accent-green text-black border-accent-green shadow-[0_0_16px_-4px_rgba(0,230,118,0.5)]' : 'bg-surface-700/80 text-gray-400 border-surface-500 hover:text-accent-green hover:border-accent-green/50',
             };
-            const isBetaStep = s.id === 12;
+            const isBetaStep = s.id === 12 || s.id === 13;
             return (
               <button key={s.id} type="button" onClick={() => setCurrentStep(s.id)}
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${colorClasses[s.color]}`}>
@@ -2859,6 +2872,7 @@ export default function SystemPage() {
                 </div>
               </div>
 
+              <PremiumGate hasGeminiKey={hasGeminiKey} premiumStatus={geminiPremiumStatus}>
               {coachLoading && (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-5 h-5 animate-spin text-accent-green mr-2" />
@@ -3350,6 +3364,76 @@ export default function SystemPage() {
                   </div>
                 </div>
               )}
+              </PremiumGate>
+            </div>
+          )}
+
+          {currentStep === 13 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
+                <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><Sparkles className="w-5 h-5 text-accent-purple" /></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Llave de Gemini (IA Premium)</h3>
+                  <p className="text-sm text-gray-400">Conectá tu llave de Google AI para desbloquear el análisis cualitativo con Gemini.</p>
+                </div>
+                <HelpTooltip
+                  titulo="Llave de Gemini"
+                  contenido="Gemini potencia el análisis cualitativo del reporte: objeciones, frases repetitivas, conclusiones, narrativas y el coach de ventas. Sin llave, estas secciones se muestran como bloqueadas."
+                  comoProbar="Ingresá tu API Key de Google AI Studio (aistudio.google.com) y guardá. Los reportes generados a partir de ese momento incluirán análisis cualitativo."
+                />
+                <span className={`ml-auto px-2 py-0.5 rounded text-xs font-semibold ${hasGeminiKey ? (geminiPremiumStatus && geminiPremiumStatus !== 'active' ? 'bg-accent-amber/20 text-accent-amber' : 'bg-accent-green/20 text-accent-green') : 'bg-surface-600 text-gray-500'}`}>
+                  {hasGeminiKey
+                    ? geminiPremiumStatus === 'paused_invalid_key'
+                      ? 'Llave inválida'
+                      : geminiPremiumStatus === 'paused_quota_exceeded'
+                        ? 'Sin saldo'
+                        : 'Activa'
+                    : 'No configurada'}
+                </span>
+              </div>
+
+              {geminiPremiumStatus === 'paused_invalid_key' && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Tu llave fue rechazada por Google. Ingresá una nueva llave válida.
+                </div>
+              )}
+              {geminiPremiumStatus === 'paused_quota_exceeded' && (
+                <div className="rounded-lg border border-accent-amber/30 bg-accent-amber/5 px-3 py-2 text-sm text-amber-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Tu llave de Gemini se quedó sin saldo. Recargá tu cuenta en Google AI Studio para reactivar.
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                  {hasGeminiKey ? 'Reemplazar API Key' : 'Ingresar API Key'}
+                </label>
+                <input
+                  type="password"
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder="AIza..."
+                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:ring-2 focus:ring-accent-purple/50 focus:border-accent-purple/50"
+                />
+                <p className="text-[11px] text-gray-500 mt-1.5">Tu key se guarda de forma segura y solo se usa para generar análisis cualitativos de tus conversaciones.</p>
+              </div>
+
+              <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 px-3 py-2 text-sm text-gray-400 space-y-1">
+                <p><strong className="text-accent-purple">Funciones que desbloquea:</strong></p>
+                <ul className="list-disc list-inside text-gray-500 space-y-0.5">
+                  <li>Análisis de objeciones frecuentes de leads</li>
+                  <li>Frases repetitivas y patrones de conversación</li>
+                  <li>Conclusiones y narrativa ejecutiva por IA</li>
+                  <li>Análisis cualitativo por canal (llamadas, chats, video)</li>
+                  <li>Coach de ventas inteligente</li>
+                </ul>
+              </div>
+
+              <div className="rounded-lg border border-surface-500 bg-surface-800/60 px-3 py-2 text-sm text-gray-400">
+                <strong className="text-white">¿Dónde consigo la llave?</strong>
+                <p className="text-xs text-gray-500 mt-1">Andá a <code className="text-accent-purple">aistudio.google.com/apikey</code>, creá un proyecto y generá una API Key. El modelo usado es <code className="text-accent-purple">gemini-2.5-flash</code>.</p>
+              </div>
             </div>
           )}
         </div>

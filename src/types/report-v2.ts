@@ -254,6 +254,8 @@ export interface ReportV2Data {
     subdominio: string;
     canalesActivos: ('llamadas' | 'chats' | 'video')[];
   };
+  hasGeminiKey: boolean;
+  geminiPremiumStatus: "active" | "paused_invalid_key" | "paused_quota_exceeded" | null;
   periodo: { from: string; to: string; dias: number };
   kpis: ReportV2KPIs | null;
   narrativa: ReportV2Narrativa | null;

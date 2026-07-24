@@ -29,6 +29,7 @@ import { generateNarrativa } from "./reportV2Narrative";
 import type {
   ReportV2,
   ReportV2Canal,
+  ReportV2Meta,
   ReportV2Periodo,
   ReportV2AsesorRow,
   ReportV2FunnelStage,
@@ -851,7 +852,7 @@ export async function buildReportV2(
       }
     : null;
 
-  const meta = {
+  const meta: ReportV2Meta = {
     cuentaId: idCuenta,
     nombre: account.nombre,
     subdominio: account.subdominio,
@@ -859,6 +860,8 @@ export async function buildReportV2(
     periodoPrevio,
     canalesActivos,
     enriquecimientoParcial: enrichment.parcial,
+    hasGeminiKey: !!opts.geminiApiKey,
+    geminiPremiumStatus: null,
   };
 
   // Ensamblar ANTES de la narrativa (Gemini resume los agregados).
