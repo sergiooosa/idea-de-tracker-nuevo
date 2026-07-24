@@ -24,10 +24,13 @@ export async function GET(req: Request) {
 
   const conditions = [gte(accesosDashboard.created_at, desde)];
 
-  if (filterCuenta) {
-    conditions.push(eq(accesosDashboard.id_cuenta, Number(filterCuenta)));
-  } else if (!isPlatformAdmin && session.user.id_cuenta) {
+  if (!isPlatformAdmin) {
+    if (!session.user.id_cuenta) {
+      return NextResponse.json({ accesos: [], resumen: [], dias }, { status: 200 });
+    }
     conditions.push(eq(accesosDashboard.id_cuenta, session.user.id_cuenta));
+  } else if (filterCuenta) {
+    conditions.push(eq(accesosDashboard.id_cuenta, Number(filterCuenta)));
   }
 
   const rows = await db
