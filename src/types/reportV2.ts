@@ -55,6 +55,8 @@ export interface ReportV2Meta {
   canalesActivos: Record<ReportV2Canal, boolean>;
   /** true si el pase IA (WS1) aún no cubre el periodo → cualitativo parcial. */
   enriquecimientoParcial: boolean;
+  hasGeminiKey: boolean;
+  geminiPremiumStatus: "active" | "paused_invalid_key" | "paused_quota_exceeded" | null;
 }
 
 // ─── kpis ────────────────────────────────────────────────────────────────────

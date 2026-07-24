@@ -63,7 +63,12 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     const cuentaRow = await db
-      .select({ nombre_cuenta: cuentas.nombre_cuenta, subdominio: cuentas.subdominio })
+      .select({
+        nombre_cuenta: cuentas.nombre_cuenta,
+        subdominio: cuentas.subdominio,
+        gemini_api_key: cuentas.gemini_api_key,
+        gemini_premium_status: cuentas.gemini_premium_status,
+      })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
       .then((rows) => rows[0] ?? null);
@@ -81,8 +86,13 @@ export async function GET(req: Request): Promise<Response> {
         },
         periodType,
         periodoPrevio: calcPrevPeriod(from, to, periodType),
-        geminiApiKey: null,
+        geminiApiKey: (cuentaRow.gemini_premium_status !== "paused_invalid_key" && cuentaRow.gemini_premium_status !== "paused_quota_exceeded")
+          ? cuentaRow.gemini_api_key ?? null
+          : null,
       });
+
+      report.meta.hasGeminiKey = !!cuentaRow.gemini_api_key;
+      report.meta.geminiPremiumStatus = (cuentaRow.gemini_premium_status as "active" | "paused_invalid_key" | "paused_quota_exceeded") ?? null;
 
       return NextResponse.json(report);
     } catch (err) {

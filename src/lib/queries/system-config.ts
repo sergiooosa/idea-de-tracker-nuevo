@@ -26,6 +26,8 @@ export interface SystemConfigData {
   embudo_personalizado: EmbudoEtapa[];
   tipos_eventos_config: TipoEventoConfig[];
   has_openai_key: boolean;
+  has_gemini_key: boolean;
+  gemini_premium_status: "active" | "paused_invalid_key" | "paused_quota_exceeded" | null;
   fuente_datos_financieros: "nativa" | "api_externa";
   seccion_chats_dashboard: boolean;
   configuracion_ads: ConfiguracionAds;
@@ -43,10 +45,11 @@ export interface SystemConfigData {
   exclusiones_coach: ExclusionesCoach | null;
 }
 
-export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "fuente_llamadas">> {
+export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData, "has_openai_key" | "has_gemini_key" | "gemini_premium_status" | "fuente_llamadas">> {
   fuente_llamadas?: "twilio" | "ghl";
   ghl_location_id?: string | null;
   openai_api_key?: string;
+  gemini_api_key?: string;
   seccion_chats_dashboard?: boolean;
   chat_config?: ChatConfigData;
   idioma?: "es" | "en";
@@ -87,6 +90,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         configuracion_ads: cuentas.configuracion_ads,
         categorias_llamadas: cuentas.categorias_llamadas,
         exclusiones_coach: cuentas.exclusiones_coach,
+        gemini_api_key: cuentas.gemini_api_key,
+        gemini_premium_status: cuentas.gemini_premium_status,
       })
       .from(cuentas)
       .where(eq(cuentas.id_cuenta, idCuenta))
@@ -110,6 +115,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       embudo_personalizado: [],
       tipos_eventos_config: [],
       has_openai_key: false,
+      has_gemini_key: false,
+      gemini_premium_status: null,
       fuente_datos_financieros: "nativa",
       seccion_chats_dashboard: true,
       roles_config: [],
@@ -139,6 +146,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     embudo_personalizado: Array.isArray(r.embudo_personalizado) ? normalizeEmbudoEtapas(r.embudo_personalizado) : [],
     tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
     has_openai_key: !!r.openai_api_key,
+    has_gemini_key: !!r.gemini_api_key,
+    gemini_premium_status: (r.gemini_premium_status as SystemConfigData["gemini_premium_status"]) ?? null,
     fuente_datos_financieros: r.configuracion_ui?.fuente_datos_financieros ?? "nativa",
     seccion_chats_dashboard: r.configuracion_ui?.modulos_activos?.seccion_chats_dashboard !== false,
     roles_config: Array.isArray(r.roles_config) ? r.roles_config : [],
@@ -204,6 +213,10 @@ export async function updateSystemConfig(
   }
   if (data.tipos_eventos_config !== undefined) setClause.tipos_eventos_config = data.tipos_eventos_config;
   if (data.openai_api_key !== undefined) setClause.openai_api_key = data.openai_api_key;
+  if (data.gemini_api_key !== undefined) {
+    setClause.gemini_api_key = data.gemini_api_key;
+    setClause.gemini_premium_status = "active";
+  }
   if (data.roles_config !== undefined) setClause.roles_config = data.roles_config;
   if (data.metricas_config !== undefined && data.embudo_personalizado === undefined) setClause.metricas_config = data.metricas_config;
   if (data.metricas_manual_data !== undefined) setClause.metricas_manual_data = data.metricas_manual_data;

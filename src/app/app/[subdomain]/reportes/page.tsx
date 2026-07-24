@@ -34,6 +34,7 @@ import {
   SectionFrasesRepetitivas,
   SectionConclusiones,
 } from '@/components/report-v2';
+import PremiumGate from '@/components/dashboard/PremiumGate';
 import type { ReportV2Data } from '@/types/report-v2';
 import type { ReportV2 } from '@/types/reportV2';
 import { adaptReportV2 } from '@/lib/adapters/reportV2Adapter';
@@ -444,12 +445,14 @@ export default function ReportesPage() {
           {/* Higiene CRM */}
           <SectionHigieneCRM data={reportData.higieneCRM} from={from} to={to} />
 
-          {/* Desglose por canal */}
-          <SectionPorCanal
-            llamadas={reportData.porCanal.llamadas}
-            chats={reportData.porCanal.chats}
-            video={reportData.porCanal.video}
-          />
+          {/* Desglose por canal (narrativa es premium) */}
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionPorCanal
+              llamadas={reportData.porCanal.llamadas}
+              chats={reportData.porCanal.chats}
+              video={reportData.porCanal.video}
+            />
+          </PremiumGate>
 
           {/* Demografía */}
           <SectionDemografia data={reportData.demografia} />
@@ -458,26 +461,38 @@ export default function ReportesPage() {
           <SectionComparativo data={reportData.comparativo} />
 
           {/* Cobertura / respuesta */}
-          <SectionCobertura data={reportData.cobertura} />
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionCobertura data={reportData.cobertura} />
+          </PremiumGate>
 
           {/* Análisis de conversaciones por canal */}
-          <SectionConversaciones
-            llamadas={reportData.conversaciones.llamadas}
-            chats={reportData.conversaciones.chats}
-            video={reportData.conversaciones.video}
-          />
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionConversaciones
+              llamadas={reportData.conversaciones.llamadas}
+              chats={reportData.conversaciones.chats}
+              video={reportData.conversaciones.video}
+            />
+          </PremiumGate>
 
-          {/* Ranking de asesores */}
-          <SectionRankingAsesores data={reportData.rankingAsesores} />
+          {/* Ranking de asesores (narrativa es premium) */}
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionRankingAsesores data={reportData.rankingAsesores} />
+          </PremiumGate>
 
           {/* Objeciones */}
-          <SectionObjeciones data={reportData.objeciones} />
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionObjeciones data={reportData.objeciones} />
+          </PremiumGate>
 
           {/* Frases repetitivas */}
-          <SectionFrasesRepetitivas data={reportData.frasesRepetitivas} />
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionFrasesRepetitivas data={reportData.frasesRepetitivas} />
+          </PremiumGate>
 
           {/* Conclusiones */}
-          <SectionConclusiones data={reportData.conclusiones} />
+          <PremiumGate hasGeminiKey={reportData.hasGeminiKey} premiumStatus={reportData.geminiPremiumStatus}>
+            <SectionConclusiones data={reportData.conclusiones} />
+          </PremiumGate>
         </div>
       )}
     </>

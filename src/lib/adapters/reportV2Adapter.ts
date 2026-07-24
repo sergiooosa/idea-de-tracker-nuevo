@@ -102,6 +102,8 @@ export function adaptReportV2(api: ReportV2): ReportV2Data {
       subdominio: api.meta.subdominio,
       canalesActivos,
     },
+    hasGeminiKey: api.meta.hasGeminiKey ?? false,
+    geminiPremiumStatus: api.meta.geminiPremiumStatus ?? null,
     periodo: {
       from: api.meta.periodo.from,
       to: api.meta.periodo.to,

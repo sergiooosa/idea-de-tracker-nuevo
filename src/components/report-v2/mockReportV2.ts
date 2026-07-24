@@ -11,6 +11,8 @@ export function getMockReportV2(canales: ('llamadas' | 'chats' | 'video')[]): Re
       subdominio: 'demo',
       canalesActivos: canales,
     },
+    hasGeminiKey: true,
+    geminiPremiumStatus: 'active',
     periodo: { from: '2026-06-01', to: '2026-06-30', dias: 30 },
     kpis: {
       leadsAnalizados: 342,

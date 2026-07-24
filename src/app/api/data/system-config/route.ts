@@ -29,7 +29,7 @@ export async function PUT(req: Request) {
     const data = await updateSystemConfig(idCuenta, body);
     // Registrar qué secciones se modificaron (sin guardar valores sensibles como tokens)
     const seccionesEditadas = Object.keys(body).filter(k =>
-      !["token_ghl", "openai_api_key", "twilio_sid", "auth_twilio"].includes(k)
+      !["token_ghl", "openai_api_key", "gemini_api_key", "twilio_sid", "auth_twilio"].includes(k)
     );
     void logAudit(idCuenta, email, "EDIT_SISTEMA", { secciones: seccionesEditadas });
     return NextResponse.json(data);
