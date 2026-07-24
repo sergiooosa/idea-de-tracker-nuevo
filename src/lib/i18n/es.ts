@@ -18,6 +18,7 @@ export const es = {
     "tablero-enfoque": "Tablero de operación",
     asignacion: "Asignación de leads",
     reportes: "Reportes",
+    accesos: "Registro de accesos",
   },
   dashboard: {
     titulo: "Panel ejecutivo",

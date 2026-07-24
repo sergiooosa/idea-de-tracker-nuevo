@@ -28,6 +28,7 @@ import {
   GitCompareArrows,
   UserPlus,
   Activity,
+  LogIn,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -113,7 +114,7 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
   );
 }
 
-export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion";
+export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion" | "accesos";
 
 const NAV_KEY_TO_PATH: Record<NavKey, string> = {
   dashboard: "/dashboard",
@@ -130,6 +131,7 @@ const NAV_KEY_TO_PATH: Record<NavKey, string> = {
   sesiones: "/sesiones",
   "tablero-enfoque": "/tablero-enfoque",
   asignacion: "/asignacion",
+  accesos: "/accesos",
 };
 
 const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType; beta?: boolean }[] = [
@@ -147,6 +149,7 @@ const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.Elem
   { path: "/system", navKey: "sistema", label: "Control del sistema", icon: Target },
   { path: "/documentacion", navKey: "documentacion", label: "Documentación", icon: BookOpen },
   { path: "/configuracion", navKey: "configuracion", label: "Configuración", icon: UserCog },
+  { path: "/accesos", navKey: "accesos", label: "Registro de accesos", icon: LogIn },
 ];
 
 function SoloMisDatosToggle() {

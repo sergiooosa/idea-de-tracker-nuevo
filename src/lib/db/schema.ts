@@ -866,6 +866,23 @@ export const eventosLlamadasTiempoReal = pgTable("eventos_llamadas_tiempo_real",
   objeciones_ia: jsonb("objeciones_ia").$type<ObjecionIA[]>(),
 });
 
+/* ------------------------------------------------------------------ */
+/*  accesos_dashboard — registro de logins al dashboard (AUT-1818)     */
+/* ------------------------------------------------------------------ */
+
+export const accesosDashboard = pgTable("accesos_dashboard", {
+  id: serial("id").primaryKey(),
+  id_cuenta: integer("id_cuenta"),
+  email: text("email").notNull(),
+  nombre: text("nombre"),
+  ip: text("ip"),
+  user_agent: text("user_agent"),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_accesos_dashboard_cuenta").on(table.id_cuenta),
+  index("idx_accesos_dashboard_created").on(table.created_at),
+]);
+
 export const enfoqueAdminAudit = pgTable("enfoque_admin_audit", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   id_cuenta: integer("id_cuenta"),

@@ -44,6 +44,7 @@ export const NAV_PERMISOS: Record<string, PermisoId> = {
   "/sesiones": "ver_enfoque",
   "/tablero-enfoque": "ver_enfoque",
   "/asignacion": "ver_enfoque",
+  "/accesos": "configurar_sistema",
 };
 
 /** Permisos que dan acceso al toggle "Solo data del asesor" (ver datos de todos) */
