@@ -20,6 +20,7 @@ export const en: Translations = {
     "tablero-enfoque": "Operations Board",
     asignacion: "Lead Assignment",
     reportes: "Reports",
+    accesos: "Access Log",
   },
   dashboard: {
     titulo: "Executive Panel",

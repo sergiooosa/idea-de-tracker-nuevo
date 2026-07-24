@@ -2,8 +2,9 @@
 
 import { signIn, auth } from "@/lib/auth";
 import { AuthError } from "next-auth";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { usuariosDashboard, cuentas } from "@/lib/db/schema";
+import { usuariosDashboard, cuentas, accesosDashboard } from "@/lib/db/schema";
 import { normalizeSubdominio } from "@/lib/subdomain";
 import { eq } from "drizzle-orm";
 
@@ -43,6 +44,27 @@ export async function loginAction(formData: {
   }
 
   const session = await auth();
+
+  // AUT-1818: registrar acceso al dashboard (fail-open)
+  if (session?.user) {
+    try {
+      const hdrs = await headers();
+      const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim()
+        ?? hdrs.get("x-real-ip")
+        ?? null;
+      const userAgent = hdrs.get("user-agent") ?? null;
+      await db.insert(accesosDashboard).values({
+        id_cuenta: session.user.id_cuenta ?? null,
+        email,
+        nombre: session.user.name ?? null,
+        ip,
+        user_agent: userAgent,
+      });
+    } catch (e) {
+      console.error("[login] error registrando acceso:", e);
+    }
+  }
+
   if (session?.user?.platformAdmin) {
     return { platformAdmin: true };
   }
