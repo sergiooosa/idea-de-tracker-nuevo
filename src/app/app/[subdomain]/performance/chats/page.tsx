@@ -253,7 +253,10 @@ export default function PerformanceChatsPage() {
       const key = (!raw || INVALID.has(raw))
         ? 'Sin asignar'
         : (c.asesorAsignado?.trim() || c.agentName?.trim())!;
-      if (selectedAdvisors.length > 0 && !isAdvisorVisible(key.toLowerCase())) continue;
+      // `key` es el nombre del asesor sin normalizar (igual que las llaves de
+      // advisorMetrics que alimentan el filtro); no lo pasamos a minúsculas o el
+      // filtro de "solo ver" no matchea nombres con mayúsculas (p. ej. "Ángel").
+      if (selectedAdvisors.length > 0 && !isAdvisorVisible(key)) continue;
       if (!map[key]) map[key] = [];
       map[key].push(c);
     }
