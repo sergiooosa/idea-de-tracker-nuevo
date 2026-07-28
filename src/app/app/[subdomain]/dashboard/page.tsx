@@ -10,6 +10,7 @@ import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import HelpTooltip from '@/components/dashboard/HelpTooltip';
+import AdvisorDrillDown from '@/components/dashboard/AdvisorDrillDown';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse, DashboardAdvisorRow, LeadDetailItem, DashboardObjecionConDetalle, DashboardObjecionesPorCanal } from '@/types';
 import Link from 'next/link';
@@ -81,6 +82,7 @@ export default function DashboardPage() {
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
   const [showRazonesPerdida, setShowRazonesPerdida] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showRP') !== 'false' : true);
   const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
+  const [drillDownAdvisor, setDrillDownAdvisor] = useState<{ name: string; email: string | null } | null>(null);
   const [modalLeads, setModalLeads] = useState<{ titulo: string; leads: LeadDetailItem[] } | null>(null);
   const [rankingColsOpen, setRankingColsOpen] = useState(false);
   const [rankingColsVisible, setRankingColsVisible] = useState<RankingColKey[]>(ALL_RANKING_COL_KEYS);
@@ -990,7 +992,7 @@ export default function DashboardPage() {
                     })
                     .map((a, i) => (
                       <React.Fragment key={a.advisorEmail ?? a.advisorName}>
-                        <tr onClick={() => setExpandedAdvisor(expandedAdvisor === (a.advisorEmail ?? a.advisorName) ? null : (a.advisorEmail ?? a.advisorName))} className={clsx('border-t border-surface-500 hover:bg-surface-700/50 cursor-pointer', i === 0 && 'bg-accent-green/10')}>
+                        <tr onClick={() => setDrillDownAdvisor({ name: a.advisorName, email: a.advisorEmail })} className={clsx('border-t border-surface-500 hover:bg-surface-700/50 cursor-pointer', i === 0 && 'bg-accent-green/10')}>
                           <td className="px-2 py-2">
                             {i === 0 ? (
                               <span className="inline-flex items-center gap-1.5 font-medium text-accent-amber">
@@ -1048,19 +1050,6 @@ export default function DashboardPage() {
                             </td>
                           ))}
                         </tr>
-                        {expandedAdvisor === (a.advisorEmail ?? a.advisorName) && (
-                          <tr className="bg-surface-800/60">
-                            <td colSpan={1 + rankingColsVisible.length} className="px-4 py-3">
-                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                                <div><span className="text-gray-500 block">Leads nuevos</span><span className="text-accent-amber font-semibold">{a.leadsGenerados}</span></div>
-                                <div><span className="text-gray-500 block">Reactivados</span><span className="text-accent-purple font-semibold">{a.leadsReactivados}</span></div>
-                                <div><span className="text-gray-500 block">Llamadas</span><span className="text-accent-cyan font-semibold">{a.callsMade}</span></div>
-                                <div><span className="text-gray-500 block">Citas</span><span className="text-accent-purple font-semibold">{a.meetingsBooked}</span></div>
-                                <div><span className="text-gray-500 block">Speed to lead</span><span className="text-gray-300 font-semibold">{a.speedToLeadAvg != null ? minFmt(a.speedToLeadAvg) : '—'}</span></div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
                       </React.Fragment>
                     ))}
                 </tbody>
@@ -1132,6 +1121,16 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {drillDownAdvisor && (
+        <AdvisorDrillDown
+          advisorName={drillDownAdvisor.name}
+          advisorEmail={drillDownAdvisor.email}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onClose={() => setDrillDownAdvisor(null)}
+        />
       )}
     </>
   );
