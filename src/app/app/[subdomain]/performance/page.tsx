@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, Fragment } from 'react';
+import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
 import { useT } from '@/contexts/LocaleContext';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -20,7 +21,6 @@ import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
 import { formatCurrency } from '@/lib/format';
 import { useSession } from '@/hooks/useSession';
-import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
 import { exportVideollamadas } from '@/lib/export-performance';
 import { Download } from 'lucide-react';
 
@@ -115,11 +115,10 @@ export default function PerformanceVideollamadasPage() {
 
   useEffect(() => {
     if (!data?.advisorMetrics) return;
-    const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
-      key,
-      name: m.advisorName || key,
-    }));
-    setAdvisorOptions(options);
+    const opts = Object.entries(data.advisorMetrics)
+      .map(([key, m]) => ({ key, name: m.advisorName || key }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    setAdvisorOptions(opts);
   }, [data?.advisorMetrics, setAdvisorOptions]);
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[], apiMeetings?: ApiVideollamada[]) => {
@@ -128,12 +127,43 @@ export default function PerformanceVideollamadasPage() {
     else setModalSelectorMeetings(meetingsOfLead);
   };
 
-  const agg = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, cerradas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
+  const aggRaw = data?.agg ?? { agendadas: 0, asistidas: 0, canceladas: 0, efectivas: 0, cerradas: 0, noShows: 0, revenue: 0, cashCollected: 0, ticket: 0 };
+
+  const agg = useMemo(() => {
+    if (!data?.advisorMetrics) return aggRaw;
+    const visibleKeys = Object.keys(data.advisorMetrics).filter(isAdvisorVisible);
+    if (visibleKeys.length === Object.keys(data.advisorMetrics).length) return aggRaw;
+    let agendadas = 0, asistencias = 0, cerradas = 0, facturacion = 0, cashCollected = 0, canceladas = 0, noShows = 0;
+    for (const key of visibleKeys) {
+      const m = data.advisorMetrics[key];
+      agendadas += m.agendadas;
+      asistencias += m.asistencias;
+      cerradas += m.cerradas;
+      facturacion += m.facturacion;
+      cashCollected += m.cashCollected;
+    }
+    if (data.registros) {
+      for (const r of data.registros) {
+        const rKey = r.closerCanonicalKey ?? r.closer ?? 'Sin asignar';
+        if (!isAdvisorVisible(rKey)) continue;
+        if (r.canceled) canceladas++;
+        if (r.outcome === 'no_show') noShows++;
+      }
+    }
+    return {
+      agendadas, asistidas: asistencias, canceladas, efectivas: cerradas, cerradas, noShows,
+      revenue: facturacion, cashCollected, ticket: cerradas > 0 ? cashCollected / cerradas : 0,
+    };
+  }, [aggRaw, data?.advisorMetrics, data?.registros, isAdvisorVisible]);
 
   const leadsCalificados = useMemo(() => {
     if (!data?.registros) return 0;
-    return data.registros.filter((r) => r.qualified && !r.excludedFromDashboard).length;
-  }, [data?.registros]);
+    return data.registros.filter((r) => {
+      if (!r.qualified || r.excludedFromDashboard) return false;
+      const rKey = r.closerCanonicalKey ?? r.closer ?? 'Sin asignar';
+      return isAdvisorVisible(rKey);
+    }).length;
+  }, [data?.registros, isAdvisorVisible]);
 
   const isCerrada = (r: ApiVideollamada) =>
     r.outcome === 'cerrada' || r.outcome === 'cerrado' || r.outcome === 'closed';

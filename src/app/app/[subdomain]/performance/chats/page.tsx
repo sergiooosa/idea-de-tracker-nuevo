@@ -152,21 +152,40 @@ export default function PerformanceChatsPage() {
     return map;
   }, [asesoresCtx]);
 
-  const agg = data?.agg ?? { assigned: 0, activos: 0, seguimientosTotal: 0, speedAvg: 0 };
+  const aggRaw = data?.agg ?? { assigned: 0, activos: 0, seguimientosTotal: 0, speedAvg: 0 };
 
-  // KPIs adicionales calculados en el cliente
+  const visibleChats = useMemo(() => {
+    if (!data?.chats) return [];
+    const INVALID = new Set(['', 'agente', 'agent', 'bot', 'por asignar', 'workflow', 'api/bot', 'campaña', 'campaign']);
+    return data.chats.filter((c) => {
+      const raw = (c.asesorAsignado?.trim() || c.agentName?.trim() || '').toLowerCase();
+      const key = (!raw || INVALID.has(raw)) ? 'Sin asignar' : (c.asesorAsignado?.trim() || c.agentName?.trim())!;
+      return isAdvisorVisible(key);
+    });
+  }, [data?.chats, isAdvisorVisible]);
+
+  const agg = useMemo(() => {
+    if (!data?.chats || visibleChats.length === data.chats.length) return aggRaw;
+    const activos = visibleChats.filter((c) => ((c as { agentMessages?: number }).agentMessages ?? 0) > 0).length;
+    const seguimientosTotal = visibleChats.reduce((s, c) => s + ((c as { totalMessages?: number }).totalMessages ?? 0), 0);
+    const speeds = visibleChats.map((c) => (c as { speedToLeadSec?: number | null }).speedToLeadSec).filter((v): v is number => v != null && v > 0);
+    const speedAvg = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+    return { assigned: visibleChats.length, activos, seguimientosTotal, speedAvg };
+  }, [aggRaw, data?.chats, visibleChats]);
+
   const extraKpis = useMemo(() => {
     if (!data) return { sinRespuesta: 0, pctSinContactar: 0, calificados: 0 };
-    const sinRespuesta = data.chats.filter((c) => c.minutesSinceLastLeadMsg != null).length;
+    const chats = visibleChats;
+    const sinRespuesta = chats.filter((c) => c.minutesSinceLastLeadMsg != null).length;
     const isPerdido = (e: string | null) => { const l = (e ?? '').trim().toLowerCase(); return l === 'perdido' || l === 'perdida'; };
-    const sinContactar = data.chats.filter((c) => !c.humanTookOver && !isPerdido(c.estado)).length;
-    const pctSinContactar = data.chats.length > 0 ? Math.round((sinContactar / data.chats.length) * 100) : 0;
+    const sinContactar = chats.filter((c) => !c.humanTookOver && !isPerdido(c.estado)).length;
+    const pctSinContactar = chats.length > 0 ? Math.round((sinContactar / chats.length) * 100) : 0;
     const criterios = criteriosData?.categorias;
-    const calificados = data.chats.filter((c) =>
+    const calificados = chats.filter((c) =>
       criterios == null ? false : c.iaCategoria != null && criterios.includes(c.iaCategoria),
     ).length;
     return { sinRespuesta, pctSinContactar, calificados };
-  }, [data, criteriosData]);
+  }, [data, visibleChats, criteriosData]);
 
   /**
    * Determina si un chat califica según los criterios configurados.
@@ -181,11 +200,9 @@ export default function PerformanceChatsPage() {
     return criterios.includes(chat.iaCategoria);
   };
 
-  // Distribución de ia_categoria (top 6 temas de interés)
   const categoriasDistrib = useMemo(() => {
-    if (!data) return [];
     const counts: Record<string, number> = {};
-    for (const c of data.chats) {
+    for (const c of visibleChats) {
       if (c.iaCategoria) {
         counts[c.iaCategoria] = (counts[c.iaCategoria] ?? 0) + 1;
       }
@@ -195,13 +212,11 @@ export default function PerformanceChatsPage() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 6)
       .map(([cat, count]) => ({ cat, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }));
-  }, [data]);
+  }, [visibleChats]);
 
-  // Distribución de objeciones IA (top 8)
   const objecionesDistrib = useMemo(() => {
-    if (!data) return [];
     const counts: Record<string, number> = {};
-    for (const c of data.chats) {
+    for (const c of visibleChats) {
       if (c.iaObjeciones) {
         for (const obj of c.iaObjeciones) {
           const key = obj.categoria ?? 'otra';
@@ -214,13 +229,11 @@ export default function PerformanceChatsPage() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 8)
       .map(([cat, count]) => ({ cat, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }));
-  }, [data]);
+  }, [visibleChats]);
 
-  // Total de objeciones detectadas
   const totalObjeciones = useMemo(() => {
-    if (!data) return 0;
-    return data.chats.reduce((s, c) => s + (c.iaObjeciones?.length ?? 0), 0);
-  }, [data]);
+    return visibleChats.reduce((s, c) => s + (c.iaObjeciones?.length ?? 0), 0);
+  }, [visibleChats]);
 
   // Compute canal counts for badges
   const canalCounts = useMemo(() => {
@@ -253,9 +266,6 @@ export default function PerformanceChatsPage() {
       const key = (!raw || INVALID.has(raw))
         ? 'Sin asignar'
         : (c.asesorAsignado?.trim() || c.agentName?.trim())!;
-      // `key` es el nombre del asesor sin normalizar (igual que las llaves de
-      // advisorMetrics que alimentan el filtro); no lo pasamos a minúsculas o el
-      // filtro de "solo ver" no matchea nombres con mayúsculas (p. ej. "Ángel").
       if (selectedAdvisors.length > 0 && !isAdvisorVisible(key)) continue;
       if (!map[key]) map[key] = [];
       map[key].push(c);
