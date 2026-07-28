@@ -81,7 +81,6 @@ export default function DashboardPage() {
   const [showObjeciones, setShowObjeciones] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showObj') !== 'false' : true);
   const [showVolumen, setShowVolumen] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showVol') !== 'false' : true);
   const [showRazonesPerdida, setShowRazonesPerdida] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('dash_showRP') !== 'false' : true);
-  const [expandedAdvisor, setExpandedAdvisor] = useState<string | null>(null);
   const [drillDownAdvisor, setDrillDownAdvisor] = useState<{ name: string; email: string | null } | null>(null);
   const [modalLeads, setModalLeads] = useState<{ titulo: string; leads: LeadDetailItem[] } | null>(null);
   const [rankingColsOpen, setRankingColsOpen] = useState(false);
