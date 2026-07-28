@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useT } from '@/contexts/LocaleContext';
 import type { Locale } from '@/lib/i18n';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info, CheckCircle2 } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -285,8 +285,6 @@ export default function SystemPage() {
   const [metricRules, setMetricRules] = useState<MetricRule[]>([]);
   const [metas, setMetas] = useState<MetasData>({ meta_llamadas_diarias: 50, leads_nuevos_dia_1: 3, leads_nuevos_dia_2: 4, leads_nuevos_dia_3: 5, meta_citas_semanales: null, meta_cierres_semanales: null, meta_revenue_mensual: null, meta_cash_collected_mensual: null, meta_tasa_cierre: null, meta_tasa_contestacion: null, meta_speed_to_lead_min: null, meta_llamadas_semanales: null, meta_contestacion_llamadas: null, meta_speed_llamadas_min: null, meta_citas_semanales_video: null, meta_cierre_video: null, meta_revenue_video: null, meta_chats_diarios: null, meta_chats_contestacion: null, meta_speed_chat_min: null });
 
-  const [openaiKey, setOpenaiKey] = useState('');
-  const [hasOpenaiKey, setHasOpenaiKey] = useState(false);
   const [geminiKey, setGeminiKey] = useState('');
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
   const [geminiPremiumStatus, setGeminiPremiumStatus] = useState<'active' | 'paused_invalid_key' | 'paused_quota_exceeded' | null>(null);
@@ -433,7 +431,6 @@ export default function SystemPage() {
           ? cfg.embudo_personalizado.map((e: EmbudoEtapa) => ({ ...e, nombre: e.nombre ?? e.name ?? e.id }))
           : [];
         setEmbudoEtapas(loadedEmbudo.length > 0 ? loadedEmbudo : DEFAULT_EMBUDO_CONFIG);
-        setHasOpenaiKey(cfg.has_openai_key ?? false);
         setHasGeminiKey(cfg.has_gemini_key ?? false);
         setGeminiPremiumStatus(cfg.gemini_premium_status ?? null);
         setFuenteFinanciera(cfg.fuente_datos_financieros ?? 'nativa');
@@ -597,7 +594,6 @@ export default function SystemPage() {
         cerradas_cuentan_como_calificadas: cerradasCuentanComoCal,
         categorias_llamadas: categoriasLlamadas,
       };
-      if (openaiKey) payload.openai_api_key = openaiKey;
       if (geminiKey) payload.gemini_api_key = geminiKey;
       const res = await fetch('/api/data/system-config', {
         method: 'PUT',
@@ -613,10 +609,6 @@ export default function SystemPage() {
           return false;
         }
         throw new Error('Error al guardar');
-      }
-      if (openaiKey) {
-        setHasOpenaiKey(true);
-        setOpenaiKey('');
       }
       if (geminiKey) {
         setHasGeminiKey(true);
@@ -797,7 +789,7 @@ export default function SystemPage() {
             { id: 6, title: 'Metas', icon: Target, color: 'cyan' },
             { id: 7, title: 'Embudo IA', icon: GitBranch, color: 'purple' },
             { id: 8, title: 'Chat Triggers', icon: MessageSquare, color: 'amber' },
-            { id: 9, title: 'OpenAI Key', icon: Key, color: 'green' },
+            { id: 9, title: 'Motor IA', icon: Key, color: 'purple' },
             { id: 10, title: 'Fuente financiera', icon: Database, color: 'blue' },
             { id: 11, title: 'Integraciones de Ads', icon: BarChart3, color: 'purple' },
             { id: 12, title: 'Coach de ventas', icon: ShieldCheck, color: 'green' },
@@ -2373,10 +2365,10 @@ export default function SystemPage() {
                 {/* Estimado de costos */}
                 <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-2.5 text-xs text-gray-400 space-y-1">
                   <p className="font-semibold text-gray-300">Estimado de costos</p>
-                  <p>💡 Usamos GPT-4o-mini, el modelo más eficiente de OpenAI.</p>
-                  <p>Precio: <span className="text-accent-amber">$0.15/1M tokens entrada · $0.60/1M tokens salida</span></p>
-                  <p>Estimado por chat: ~$0.00008 USD (500 tokens entrada + 100 salida)</p>
-                  <p className="text-gray-500">Si usas tu propia API Key (Paso 9), los costos van a tu cuenta de OpenAI directamente.</p>
+                  <p>💡 Usamos Gemini 2.5 Flash, el modelo más eficiente de Google.</p>
+                  <p>Precio: <span className="text-accent-amber">$0.075/1M tokens entrada · $0.30/1M tokens salida</span></p>
+                  <p>Estimado por chat: ~$0.00004 USD (500 tokens entrada + 100 salida)</p>
+                  <p className="text-gray-500">Los costos van directamente a tu cuenta de Google AI Studio. Sin markup.</p>
                 </div>
 
                 {/* ── Recuperar chats históricos ── */}
@@ -2388,42 +2380,41 @@ export default function SystemPage() {
 
           {currentStep === 9 && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-accent-green/30">
-                <div className="rounded-lg p-2 bg-accent-green/20 border border-accent-green/40"><Key className="w-5 h-5 text-accent-green" /></div>
+              <div className="flex items-center gap-2 pb-2 border-b border-accent-purple/30">
+                <div className="rounded-lg p-2 bg-accent-purple/20 border border-accent-purple/40"><Sparkles className="w-5 h-5 text-accent-purple" /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Bring Your Own Key (OpenAI)</h3>
-                  <p className="text-sm text-gray-400">Conecta tu propia API Key de OpenAI para procesar llamadas sin límites ni colas.</p>
+                  <h3 className="text-lg font-semibold text-white">Motor IA</h3>
+                  <p className="text-sm text-gray-400">Toda la inteligencia del sistema funciona con Google Gemini.</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-lg border border-surface-500 bg-surface-700/50 px-4 py-3">
-                <div className={`w-3 h-3 rounded-full ${hasOpenaiKey ? 'bg-accent-green animate-pulse' : 'bg-gray-600'}`} />
-                <span className="text-sm text-white font-medium">
-                  {hasOpenaiKey ? 'API Key conectada' : 'Sin API Key propia'}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${hasOpenaiKey ? 'bg-accent-green/20 text-accent-green' : 'bg-surface-600 text-gray-500'}`}>
-                  {hasOpenaiKey ? 'Activa' : 'No configurada'}
-                </span>
+              <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 px-4 py-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-accent-purple shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-white">Para usar las funciones de IA necesitas configurar tu API key de Gemini.</p>
+                    <p className="text-xs text-gray-400 mt-1">El análisis de chats, llamadas, citas, reportes cualitativos y el coach de ventas funcionan con Google Gemini (modelo <code className="text-accent-purple">gemini-2.5-flash</code>). Sin llave propia, estas secciones aparecen bloqueadas.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(13)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-purple text-white text-sm font-semibold hover:bg-accent-purple/90 transition-colors"
+                >
+                  <Key className="w-4 h-4" />
+                  Configurar llave de Gemini (Paso 13)
+                </button>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                  {hasOpenaiKey ? 'Reemplazar API Key' : 'Ingresar API Key'}
-                </label>
-                <input
-                  type="password"
-                  value={openaiKey}
-                  onChange={(e) => setOpenaiKey(e.target.value)}
-                  placeholder="sk-proj-..."
-                  className="w-full rounded-lg bg-surface-600 border border-surface-500 px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green/50"
-                />
-                <p className="text-[11px] text-gray-500 mt-1.5">Tu key se guarda encriptada y solo se usa para procesar tus llamadas. Nunca se expone en el frontend.</p>
-              </div>
-              <div className="rounded-lg border border-accent-green/30 bg-accent-green/5 px-3 py-2 text-sm text-gray-400 space-y-1">
-                <p><strong className="text-accent-green">Ventajas de tu propia key:</strong></p>
-                <ul className="list-disc list-inside text-gray-500 space-y-0.5">
-                  <li>Procesamiento inmediato sin cola compartida</li>
-                  <li>Control total de costos con tu cuenta de OpenAI</li>
-                  <li>Acceso al modelo GPT más reciente disponible</li>
-                </ul>
+              <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-3 text-xs text-gray-400 space-y-2">
+                <p className="font-semibold text-gray-300">Costos estimados con Gemini 2.5 Flash</p>
+                <div className="space-y-1 text-gray-500">
+                  <p>Entrada: <span className="text-accent-amber">$0.075 / 1M tokens</span> · Salida: <span className="text-accent-amber">$0.30 / 1M tokens</span></p>
+                  <p>Estimado por chat analizado: ~<span className="text-accent-green">$0.00004 USD</span></p>
+                  <p>Estimado por llamada (transcripción + análisis): ~<span className="text-accent-green">$0.0002 USD</span></p>
+                </div>
+                <div className="border-t border-surface-600 pt-2 flex items-start gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-accent-green shrink-0 mt-0.5" />
+                  <p className="text-gray-400"><strong className="text-white">Somos transparentes contigo:</strong> solo te cobramos lo que consumes. Tu llave va directo a tu cuenta de Google AI Studio — los costos son tuyos, sin markup.</p>
+                </div>
               </div>
             </div>
           )}
@@ -3392,6 +3383,16 @@ export default function SystemPage() {
                 </span>
               </div>
 
+              {!hasGeminiKey && (
+                <div className="rounded-lg border border-accent-purple/40 bg-accent-purple/5 px-4 py-3 flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-accent-purple shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-white">Para usar estas funciones necesitas poner tu API key de Gemini.</p>
+                    <p className="text-xs text-gray-400 mt-1">El análisis cualitativo, reportes narrativos, coach de ventas y clasificación de chats/llamadas requieren tu llave de Google AI Studio. Es gratis para empezar.</p>
+                  </div>
+                </div>
+              )}
+
               {geminiPremiumStatus === 'paused_invalid_key' && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -3433,6 +3434,20 @@ export default function SystemPage() {
               <div className="rounded-lg border border-surface-500 bg-surface-800/60 px-3 py-2 text-sm text-gray-400">
                 <strong className="text-white">¿Dónde consigo la llave?</strong>
                 <p className="text-xs text-gray-500 mt-1">Andá a <code className="text-accent-purple">aistudio.google.com/apikey</code>, creá un proyecto y generá una API Key. El modelo usado es <code className="text-accent-purple">gemini-2.5-flash</code>.</p>
+              </div>
+
+              <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-3 text-xs text-gray-400 space-y-2">
+                <p className="font-semibold text-gray-300">Costos estimados (Gemini 2.5 Flash)</p>
+                <div className="space-y-1 text-gray-500">
+                  <p>Entrada: <span className="text-accent-amber">$0.075 / 1M tokens</span> · Salida: <span className="text-accent-amber">$0.30 / 1M tokens</span></p>
+                  <p>Estimado por chat analizado: ~<span className="text-accent-green">$0.00004 USD</span></p>
+                  <p>Estimado por llamada: ~<span className="text-accent-green">$0.0002 USD</span></p>
+                  <p>Estimado por reporte cualitativo: ~<span className="text-accent-green">$0.002 USD</span></p>
+                </div>
+                <div className="border-t border-surface-600 pt-2 flex items-start gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-accent-green shrink-0 mt-0.5" />
+                  <p className="text-gray-300"><strong className="text-white">Somos transparentes contigo:</strong> solo te cobramos lo que consumes. Los costos van directamente a tu cuenta de Google AI Studio, sin markup ni sorpresas.</p>
+                </div>
               </div>
             </div>
           )}
