@@ -3,7 +3,7 @@ import { registrosDeLlamada, logLlamadas, cuentas, chatsLogs } from "@/lib/db/sc
 import { eq, and, isNull, lt, gt, gte, lte, sql, inArray, isNotNull } from "drizzle-orm";
 import { zonedDayRange } from "@/lib/date-range";
 
-export type CanalLeadsEnEspera = "llamada" | "chat" | "ninguno";
+export type CanalLeadsEnEspera = "llamada" | "chat" | "ninguno" | "chat_sin_contestar";
 
 export interface LeadEnEspera {
   nombre_lead: string;
@@ -237,6 +237,61 @@ async function getLeadsChat(
   });
 }
 
+async function getLeadsChatSinContestar(
+  idCuenta: number,
+  umbralTs: Date,
+  range: DateRange,
+  closerEmails: string[],
+  closerEmailMap: Map<string, string>,
+): Promise<LeadEnEspera[]> {
+  const rows = await db
+    .select({
+      nombre_lead: chatsLogs.nombre_lead,
+      asesor_asignado: chatsLogs.asesor_asignado,
+      notas_extra: chatsLogs.notas_extra,
+      origen: chatsLogs.origen,
+      id_lead: chatsLogs.id_lead,
+      min_sin_respuesta: sql<number>`ROUND(EXTRACT(EPOCH FROM (NOW() - (${chatsLogs.chat}->-1->>'timestamp')::timestamptz))/60)::int`,
+      phone: sql<string | null>`(SELECT r.phone_raw_format FROM registros_de_llamada r WHERE r.ghl_contact_id = ${chatsLogs.id_lead} AND r.id_cuenta = ${String(idCuenta)} LIMIT 1)`,
+    })
+    .from(chatsLogs)
+    .where(
+      and(
+        eq(chatsLogs.id_cuenta, idCuenta),
+        sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${chatsLogs.chat}) elem WHERE elem->>'role' = 'agent')`,
+        sql`(${chatsLogs.chat}->-1->>'role') = 'agent'`,
+        sql`(${chatsLogs.chat}->-1->>'timestamp')::timestamptz < ${umbralTs}`,
+        sql`COALESCE(${chatsLogs.excluida_dashboard}, false) = false`,
+        range.fromDate ? gte(chatsLogs.primer_msg_lead_at, range.fromDate) : undefined,
+        range.toDate ? lte(chatsLogs.primer_msg_lead_at, range.toDate) : undefined,
+        closerEmails.length > 0
+          ? sql`COALESCE(${chatsLogs.asesor_asignado}, NULLIF(TRIM(${chatsLogs.notas_extra}), 'por asignar')) IN (${sql.join(closerEmails.map(e => sql`${e}`), sql`, `)})`
+          : undefined,
+      ),
+    )
+    .orderBy(sql`ROUND(EXTRACT(EPOCH FROM (NOW() - (${chatsLogs.chat}->-1->>'timestamp')::timestamptz))/60)::int DESC`);
+
+  return rows.map((row) => {
+    const resolvedCloser = row.asesor_asignado?.trim()
+      || (row.notas_extra?.trim() !== "por asignar" ? row.notas_extra?.trim() : null)
+      || null;
+    const resolvedMail = resolvedCloser
+      ? (closerEmailMap.get(resolvedCloser.toLowerCase()) ?? resolvedCloser)
+      : null;
+    return {
+      nombre_lead: row.nombre_lead ?? "Lead sin nombre",
+      nombre_closer: resolvedCloser,
+      closer_mail: resolvedMail,
+      creativo_origen: row.origen,
+      min_sin_llamar: Number(row.min_sin_respuesta) || 0,
+      phone: row.phone ?? null,
+      mail_lead: null,
+      canal_origen: "chat" as const,
+      contact_id: row.id_lead,
+    };
+  });
+}
+
 function agruparPorCloser(leads: LeadEnEspera[]): CloserConLeadsEnEspera[] {
   const mapaClosers = new Map<string, CloserConLeadsEnEspera>();
 
@@ -285,6 +340,9 @@ export async function getLeadsEnEspera(
   } else if (canal === "chat") {
     const closerEmailMap = await getCloserEmailMap(idCuenta);
     leads = await getLeadsChat(idCuenta, umbralTs, range, emails, closerEmailMap);
+  } else if (canal === "chat_sin_contestar") {
+    const closerEmailMap = await getCloserEmailMap(idCuenta);
+    leads = await getLeadsChatSinContestar(idCuenta, umbralTs, range, emails, closerEmailMap);
   } else {
     leads = await getLeadsLlamada(idCuenta, umbralTs, range, emails, true);
   }

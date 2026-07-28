@@ -3,7 +3,7 @@ import { withAuthFull, enforceCloserFilter } from "@/lib/api-auth";
 import { getLeadsEnEspera } from "@/lib/queries/leads-en-espera";
 import type { CanalLeadsEnEspera } from "@/lib/queries/leads-en-espera";
 
-const CANALES_VALIDOS = new Set<CanalLeadsEnEspera>(["llamada", "chat", "ninguno"]);
+const CANALES_VALIDOS = new Set<CanalLeadsEnEspera>(["llamada", "chat", "ninguno", "chat_sin_contestar"]);
 
 export async function GET(req: Request) {
   return withAuthFull(req, async (ctx) => {

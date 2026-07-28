@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail, MessageSquare, PhoneCall, Ban } from "lucide-react";
+import { Clock, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, User, Phone, Mail, MessageSquare, PhoneCall, Ban, MessageSquareX } from "lucide-react";
 import { useApiData } from "@/hooks/useApiData";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -68,12 +68,14 @@ const CANAL_OPTIONS: { value: CanalLeadsEnEspera; label: string; icon: typeof Ph
   { value: "ninguno", label: "Ninguno", icon: Ban },
   { value: "llamada", label: "Llamada", icon: PhoneCall },
   { value: "chat", label: "Chat", icon: MessageSquare },
+  { value: "chat_sin_contestar", label: "Sin contestar", icon: MessageSquareX },
 ];
 
 const CANAL_SUBTITULO: Record<CanalLeadsEnEspera, string> = {
   llamada: "primera llamada",
   chat: "primera respuesta en chat",
   ninguno: "ningún tipo de contacto",
+  chat_sin_contestar: "respuesta del lead en chat",
 };
 
 function CanalSelector({ canal, onChange }: { canal: CanalLeadsEnEspera; onChange: (c: CanalLeadsEnEspera) => void }) {
@@ -113,7 +115,9 @@ function LeadRow({ lead, asesorBasePath, canal }: { lead: LeadEnEspera; asesorBa
     ? "sin contacto"
     : canal === "chat"
       ? "sin responder"
-      : "sin llamar";
+      : canal === "chat_sin_contestar"
+        ? "sin contestar"
+        : "sin llamar";
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm">
@@ -180,7 +184,7 @@ function CloserCard({ grupo, asesorBasePath, canal }: { grupo: CloserConLeadsEnE
               {grupo.nombre_closer}
             </p>
             <p className="text-xs text-slate-500">
-              {grupo.leads.length} lead{grupo.leads.length !== 1 ? "s" : ""} sin contacto
+              {grupo.leads.length} lead{grupo.leads.length !== 1 ? "s" : ""} {canal === "chat_sin_contestar" ? "sin contestar" : "sin contacto"}
             </p>
           </div>
         </div>
@@ -230,23 +234,32 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
   }
 
   if (error) return null;
+  const isSinContestar = canal === "chat_sin_contestar";
+  const seccionTitulo = isSinContestar ? "Sin contestar (chat)" : "Leads sin contacto inicial";
+  const helpTitulo = isSinContestar ? "Sin contestar (chat)" : "Leads sin contacto inicial";
+  const helpContenido = isSinContestar
+    ? `Leads contactados por un asesor o bot cuyo lead dejó de responder. Llevan más de ${data?.umbral_min ?? 60} min sin contestar.\n\nSolo aparecen chats donde ya hubo una respuesta del negocio, pero el lead no ha vuelto a escribir.`
+    : `Muestra leads que llevan más de ${data?.umbral_min ?? 60} min sin recibir contacto.\n\n• Llamada — leads sin primera llamada realizada\n• Chat — leads cuyo primer mensaje no ha sido respondido por un agente\n• Ninguno — leads sin ningún tipo de contacto (ni llamada ni respuesta en chat)`;
+
   if (!data || data.total === 0) {
     return (
       <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-            <h2 className="text-base font-semibold text-slate-100">Leads sin contacto inicial</h2>
+            <h2 className="text-base font-semibold text-slate-100">{seccionTitulo}</h2>
             <HelpTooltip
-              titulo="Leads sin contacto inicial"
-              contenido={`Muestra leads que llevan más de ${data?.umbral_min ?? 60} min sin recibir contacto.\n\n• Llamada — leads sin primera llamada realizada\n• Chat — leads cuyo primer mensaje no ha sido respondido por un agente\n• Ninguno — leads sin ningún tipo de contacto (ni llamada ni respuesta en chat)`}
+              titulo={helpTitulo}
+              contenido={helpContenido}
             />
           </div>
           <CanalSelector canal={canal} onChange={setCanal} />
         </div>
         <div className="px-5 py-4">
           <span className="text-sm text-emerald-300">
-            Todo al día — ningún lead lleva más de {data?.umbral_min ?? 60} min sin {CANAL_SUBTITULO[canal]}.
+            Todo al día — {isSinContestar
+              ? `ningún lead contactado lleva más de ${data?.umbral_min ?? 60} min sin contestar.`
+              : `ningún lead lleva más de ${data?.umbral_min ?? 60} min sin ${CANAL_SUBTITULO[canal]}.`}
           </span>
         </div>
       </div>
@@ -260,11 +273,11 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
         <div className="flex items-center gap-2">
           <AlertCircle className="h-5 w-5 text-orange-400" />
           <h2 className="text-base font-semibold text-slate-100">
-            Leads sin contacto inicial
+            {seccionTitulo}
           </h2>
           <HelpTooltip
-            titulo="Leads sin contacto inicial"
-            contenido={`Leads que llevan más de ${data.umbral_min} min sin recibir contacto.\n\n• Llamada — leads sin primera llamada realizada\n• Chat — leads cuyo primer mensaje no ha sido respondido por un agente\n• Ninguno — leads sin ningún tipo de contacto (ni llamada ni respuesta en chat)`}
+            titulo={helpTitulo}
+            contenido={helpContenido}
           />
           <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
             {data.total}
@@ -272,7 +285,9 @@ export default function LeadsEnEspera({ dateFrom, dateTo }: { dateFrom?: string;
         </div>
         <div className="flex items-center gap-3">
           <p className="hidden text-xs text-slate-500 sm:block">
-            Llevan más de {data.umbral_min} min esperando {CANAL_SUBTITULO[canal]}
+            {isSinContestar
+              ? `Contactados hace más de ${data.umbral_min} min sin respuesta del lead`
+              : `Llevan más de ${data.umbral_min} min esperando ${CANAL_SUBTITULO[canal]}`}
           </p>
           <CanalSelector canal={canal} onChange={setCanal} />
         </div>
