@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Save, Plus, Trash2 } from "lucide-react";
+import { X, Save, Plus, Trash2, Copy, Check } from "lucide-react";
 import type {
   MetricaConfig,
   MetricaCampoConfig,
@@ -142,6 +142,21 @@ export default function MetricaEditSheet({
   const [entradas, setEntradas] = useState<MetricaManualEntry[]>([]);
 
   const [saving, setSaving] = useState(false);
+
+  const [tenantApiKey, setTenantApiKey] = useState<string | null>(null);
+  const [copiedApiKey, setCopiedApiKey] = useState(false);
+
+  useEffect(() => {
+    if (tipo === "webhook" || tipoInicial === "webhook") {
+      fetch("/api/data/api-keys")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { keys: { token: string; activa: boolean }[] } | null) => {
+          const active = data?.keys?.find((k) => k.activa);
+          if (active) setTenantApiKey(active.token);
+        })
+        .catch(() => {});
+    }
+  }, [tipo, tipoInicial]);
 
   useEffect(() => {
     if (editingMetric) {
@@ -569,10 +584,30 @@ export default function MetricaEditSheet({
 
           {tipo === "webhook" && (
             <div className="space-y-3">
-              <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-1">
+              <div className="rounded-lg bg-accent-cyan/5 border border-accent-cyan/20 p-3 text-xs text-gray-400 space-y-2">
                 <p className="text-white font-medium">¿Cómo funciona?</p>
                 <p>Envía datos desde cualquier sistema externo (n8n, GHL, Zapier) al webhook de tu cuenta. El valor de este campo aparecerá aquí automáticamente.</p>
                 <p className="text-accent-cyan">URL: <code className="bg-surface-700 px-1 py-0.5 rounded">autokpi.net/webhooks/proxy/metricas/{subdominio ?? '[tu-subdominio]'}</code></p>
+                {tenantApiKey ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 shrink-0">Tu API Key:</span>
+                    <code className="bg-surface-700 px-1.5 py-0.5 rounded text-accent-cyan font-mono text-[11px] select-all truncate">{tenantApiKey}</code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(tenantApiKey);
+                        setCopiedApiKey(true);
+                        setTimeout(() => setCopiedApiKey(false), 2000);
+                      }}
+                      className="p-0.5 text-gray-500 hover:text-white transition-colors shrink-0"
+                      title="Copiar API Key"
+                    >
+                      {copiedApiKey ? <Check className="w-3.5 h-3.5 text-accent-green" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-amber-400">No tienes API Keys — créala en Documentación &rarr; Webhooks.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-accent-cyan mb-1">
@@ -635,7 +670,7 @@ export default function MetricaEditSheet({
                 )}
               </div>
               <div className="rounded-lg bg-surface-700/40 p-3 text-xs text-gray-500 font-mono whitespace-pre">
-                {`POST autokpi.net/webhooks/proxy/metricas/${subdominio ?? '[tu-subdominio]'}\nx-api-key: [tu API key]\n\n{\n  "${webhookCampo || "nombre_campo"}": 42,\n  "fecha": "2026-04-08T14:30:00-05:00"\n}`}
+                {`POST autokpi.net/webhooks/proxy/metricas/${subdominio ?? '[tu-subdominio]'}\nx-api-key: ${tenantApiKey ?? '[crea una API Key en Documentación]'}\n\n{\n  "${webhookCampo || "nombre_campo"}": 42,\n  "fecha": "2026-04-08T14:30:00-05:00"\n}`}
               </div>
               <p className="text-[10px] text-gray-500">
                 💡 El campo <code className="bg-surface-700 px-1 rounded text-accent-cyan">fecha</code> acepta fecha (<code>2026-04-08</code>) o fecha+hora con zona horaria (<code>2026-04-08T14:30:00-05:00</code>). El sistema convierte automáticamente a UTC.
