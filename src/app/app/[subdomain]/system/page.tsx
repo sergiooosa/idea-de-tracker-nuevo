@@ -2366,8 +2366,8 @@ export default function SystemPage() {
                 <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-2.5 text-xs text-gray-400 space-y-1">
                   <p className="font-semibold text-gray-300">Estimado de costos</p>
                   <p>💡 Usamos Gemini 2.5 Flash, el modelo más eficiente de Google.</p>
-                  <p>Precio: <span className="text-accent-amber">$0.075/1M tokens entrada · $0.30/1M tokens salida</span></p>
-                  <p>Estimado por chat: ~$0.00004 USD (500 tokens entrada + 100 salida)</p>
+                  <p>Precio: <span className="text-accent-amber">$0.30/1M tokens entrada · $2.50/1M tokens salida</span></p>
+                  <p>Estimado por chat: ~$0.0004 USD (500 tokens entrada + 100 salida)</p>
                   <p className="text-gray-500">Los costos van directamente a tu cuenta de Google AI Studio. Sin markup.</p>
                 </div>
 
@@ -2407,9 +2407,9 @@ export default function SystemPage() {
               <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-3 text-xs text-gray-400 space-y-2">
                 <p className="font-semibold text-gray-300">Costos estimados con Gemini 2.5 Flash</p>
                 <div className="space-y-1 text-gray-500">
-                  <p>Entrada: <span className="text-accent-amber">$0.075 / 1M tokens</span> · Salida: <span className="text-accent-amber">$0.30 / 1M tokens</span></p>
-                  <p>Estimado por chat analizado: ~<span className="text-accent-green">$0.00004 USD</span></p>
-                  <p>Estimado por llamada (transcripción + análisis): ~<span className="text-accent-green">$0.0002 USD</span></p>
+                  <p>Entrada: <span className="text-accent-amber">$0.30 / 1M tokens</span> · Salida: <span className="text-accent-amber">$2.50 / 1M tokens</span></p>
+                  <p>Estimado por chat analizado: ~<span className="text-accent-green">$0.0004 USD</span></p>
+                  <p>Estimado por llamada (transcripción + análisis): ~<span className="text-accent-green">$0.001 USD</span></p>
                 </div>
                 <div className="border-t border-surface-600 pt-2 flex items-start gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-accent-green shrink-0 mt-0.5" />
@@ -3439,10 +3439,10 @@ export default function SystemPage() {
               <div className="rounded-lg border border-surface-500 bg-surface-700/40 px-3 py-3 text-xs text-gray-400 space-y-2">
                 <p className="font-semibold text-gray-300">Costos estimados (Gemini 2.5 Flash)</p>
                 <div className="space-y-1 text-gray-500">
-                  <p>Entrada: <span className="text-accent-amber">$0.075 / 1M tokens</span> · Salida: <span className="text-accent-amber">$0.30 / 1M tokens</span></p>
-                  <p>Estimado por chat analizado: ~<span className="text-accent-green">$0.00004 USD</span></p>
-                  <p>Estimado por llamada: ~<span className="text-accent-green">$0.0002 USD</span></p>
-                  <p>Estimado por reporte cualitativo: ~<span className="text-accent-green">$0.002 USD</span></p>
+                  <p>Entrada: <span className="text-accent-amber">$0.30 / 1M tokens</span> · Salida: <span className="text-accent-amber">$2.50 / 1M tokens</span></p>
+                  <p>Estimado por chat analizado: ~<span className="text-accent-green">$0.0004 USD</span></p>
+                  <p>Estimado por llamada: ~<span className="text-accent-green">$0.001 USD</span></p>
+                  <p>Estimado por reporte cualitativo: ~<span className="text-accent-green">$0.01 USD</span></p>
                 </div>
                 <div className="border-t border-surface-600 pt-2 flex items-start gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-accent-green shrink-0 mt-0.5" />
