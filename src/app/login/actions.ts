@@ -1,6 +1,6 @@
 "use server";
 
-import { signIn, auth } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
 import { AuthError } from "next-auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
@@ -43,29 +43,36 @@ export async function loginAction(formData: {
     throw error;
   }
 
-  const session = await auth();
+  // AUT-1875: registrar acceso buscando el usuario directamente en BD,
+  // no vía auth() que no tiene la cookie aún en este request.
+  const userRows = await db
+    .select({
+      id_cuenta: usuariosDashboard.id_cuenta,
+      nombre: usuariosDashboard.nombre,
+    })
+    .from(usuariosDashboard)
+    .where(eq(usuariosDashboard.email, email))
+    .limit(1);
 
-  // AUT-1818: registrar acceso al dashboard (fail-open)
-  if (session?.user) {
-    try {
-      const hdrs = await headers();
-      const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim()
-        ?? hdrs.get("x-real-ip")
-        ?? null;
-      const userAgent = hdrs.get("user-agent") ?? null;
-      await db.insert(accesosDashboard).values({
-        id_cuenta: session.user.id_cuenta ?? null,
-        email,
-        nombre: session.user.name ?? null,
-        ip,
-        user_agent: userAgent,
-      });
-    } catch (e) {
-      console.error("[login] error registrando acceso:", e);
-    }
+  try {
+    const hdrs = await headers();
+    const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? hdrs.get("x-real-ip")
+      ?? null;
+    const userAgent = hdrs.get("user-agent") ?? null;
+    await db.insert(accesosDashboard).values({
+      id_cuenta: userRows[0]?.id_cuenta ?? null,
+      email,
+      nombre: userRows[0]?.nombre ?? null,
+      ip,
+      user_agent: userAgent,
+    });
+  } catch (e) {
+    console.error("[login] error registrando acceso:", e);
   }
 
-  if (session?.user?.platformAdmin) {
+  const platformEmail = process.env.PLATFORM_ADMIN_EMAIL?.trim().toLowerCase();
+  if (platformEmail && email === platformEmail) {
     return { platformAdmin: true };
   }
 
