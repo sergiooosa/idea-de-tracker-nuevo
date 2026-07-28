@@ -14,6 +14,9 @@ import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { LlamadasResponse, ApiLlamadaLog, LlamadaLead } from '@/types';
+import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
+import { exportLlamadas } from '@/lib/export-performance';
+import { Download } from 'lucide-react';
 
 const minFmt = (m: number | null | undefined) => {
   if (m == null || m === undefined) return '—';
@@ -101,7 +104,17 @@ export default function PerformanceLlamadasPage() {
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [resultadoFiltro, setResultadoFiltro] = useState<ResultadoFiltro>('todos');
 
+  const { isAdvisorVisible, setAdvisorOptions, selectedAdvisors } = usePerformanceFilter();
   const { data, loading, refetch } = useApiData<LlamadasResponse>('/api/data/llamadas', { from: dateFrom, to: dateTo });
+
+  useEffect(() => {
+    if (!data?.advisorMetrics) return;
+    const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
+      key,
+      name: m.advisorName || key,
+    }));
+    setAdvisorOptions(options);
+  }, [data?.advisorMetrics, setAdvisorOptions]);
 
   const contestadasLeadIds = useMemo(() => {
     const ids = new Set<number>();
@@ -155,11 +168,12 @@ export default function PerformanceLlamadasPage() {
       const email = l.closer_mail?.trim().toLowerCase();
       const nombre = (l as { nombre_closer?: string | null }).nombre_closer?.trim().toLowerCase();
       const key = email || nombre || 'sin asignar';
+      if (selectedAdvisors.length > 0 && !isAdvisorVisible(key)) continue;
       if (!map[key]) map[key] = [];
       map[key].push(l);
     }
     return map;
-  }, [leadsFiltered]);
+  }, [leadsFiltered, selectedAdvisors, isAdvisorVisible]);
 
   /** Leads pendientes por llamar — estado PDTE, nunca contactados en el rango de fechas */
   const leadsPendientes = useMemo(() => {
@@ -329,6 +343,21 @@ export default function PerformanceLlamadasPage() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" /> Nueva entrada
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const allLeads = Object.values(leadsByAdvisor).flat();
+            const advisorName = selectedAdvisors.length === 1
+              ? (data?.advisorMetrics[selectedAdvisors[0]]?.advisorName ?? selectedAdvisors[0])
+              : undefined;
+            exportLlamadas(allLeads, data?.registros ?? [], dateFrom, dateTo, advisorName);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/20 text-accent-green border border-accent-green/30 text-xs font-semibold hover:bg-accent-green/30 transition-colors"
+          title={selectedAdvisors.length > 0 ? `Exportar datos filtrados (${selectedAdvisors.length} asesor${selectedAdvisors.length > 1 ? 'es' : ''})` : 'Exportar todos los datos'}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar {selectedAdvisors.length > 0 ? `(${Object.values(leadsByAdvisor).flat().length} leads)` : 'todo'}
         </button>
         <span className="text-xs text-gray-400">Rango de fechas (actividad):</span>
         <DateRangePicker

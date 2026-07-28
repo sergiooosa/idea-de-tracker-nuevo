@@ -20,6 +20,9 @@ import { BarChart3 } from 'lucide-react';
 import { outcomeVideollamadaToSpanish } from '@/utils/outcomeLabels';
 import { formatCurrency } from '@/lib/format';
 import { useSession } from '@/hooks/useSession';
+import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
+import { exportVideollamadas } from '@/lib/export-performance';
+import { Download } from 'lucide-react';
 
 const fm = formatCurrency;
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -85,6 +88,7 @@ export default function PerformanceVideollamadasPage() {
 
   const { session } = useSession();
   const canConfigureSystem = session?.rol === 'superadmin' || session?.permisosArray?.includes('configurar_sistema');
+  const { isAdvisorVisible, setAdvisorOptions, selectedAdvisors, filterMode } = usePerformanceFilter();
 
   const loadSystemConfig = useCallback(async () => {
     try {
@@ -108,6 +112,15 @@ export default function PerformanceVideollamadasPage() {
 
   const { data, loading, refetch } = useApiData<VideollamadasResponse>('/api/data/videollamadas', { from: dateFrom, to: dateTo, tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined, includeExcluded: showExcluded ? 'true' : undefined });
   const rendimientoMetrics = data?.metricasComputadas ?? [];
+
+  useEffect(() => {
+    if (!data?.advisorMetrics) return;
+    const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
+      key,
+      name: m.advisorName || key,
+    }));
+    setAdvisorOptions(options);
+  }, [data?.advisorMetrics, setAdvisorOptions]);
 
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[], apiMeetings?: ApiVideollamada[]) => {
     if (apiMeetings) setApiMeetingsForModal(apiMeetings);
@@ -138,7 +151,12 @@ export default function PerformanceVideollamadasPage() {
     if (!data?.registros) return [];
     let records = data.registros;
     if (!showExcluded) records = records.filter((r) => !r.excludedFromDashboard);
-    // Search filter
+    if (selectedAdvisors.length > 0) {
+      records = records.filter((r) => {
+        const key = r.closerCanonicalKey ?? r.closer ?? 'Sin asignar';
+        return isAdvisorVisible(key);
+      });
+    }
     const q = leadSearch.trim();
     if (q) {
       records = records.filter((r) =>
@@ -162,7 +180,7 @@ export default function PerformanceVideollamadasPage() {
     if (filterCompro === 'si') records = records.filter(isCerrada);
     else if (filterCompro === 'no') records = records.filter((r) => !isCerrada(r));
     return records;
-  }, [data?.registros, leadSearch, filterAsistio, filterCalificada, filterCompro, showExcluded]);
+  }, [data?.registros, leadSearch, filterAsistio, filterCalificada, filterCompro, showExcluded, selectedAdvisors, isAdvisorVisible]);
 
   const meetingsByAdvisor = useMemo(() => {
     const map: Record<string, ApiVideollamada[]> = {};
@@ -242,6 +260,20 @@ export default function PerformanceVideollamadasPage() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan text-black text-xs font-semibold hover:bg-accent-cyan/90 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" /> Nueva entrada
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const advisorName = selectedAdvisors.length === 1
+              ? (data?.advisorMetrics[selectedAdvisors[0]]?.advisorName ?? selectedAdvisors[0])
+              : undefined;
+            exportVideollamadas(registrosFiltrados, dateFrom, dateTo, advisorName);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/20 text-accent-green border border-accent-green/30 text-xs font-semibold hover:bg-accent-green/30 transition-colors"
+          title={selectedAdvisors.length > 0 ? `Exportar datos filtrados (${selectedAdvisors.length} asesor${selectedAdvisors.length > 1 ? 'es' : ''})` : 'Exportar todos los datos'}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar {selectedAdvisors.length > 0 ? `(${registrosFiltrados.length})` : 'todo'}
         </button>
         <span className="text-xs text-gray-400">Rango de fechas (actividad):</span>
         <DateRangePicker

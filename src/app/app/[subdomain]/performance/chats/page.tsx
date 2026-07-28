@@ -16,6 +16,9 @@ import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import InsightsChat from '@/components/dashboard/InsightsChat';
 import { useUserFilter } from '@/contexts/UserFilterContext';
+import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
+import { exportChats } from '@/lib/export-performance';
+import { Download } from 'lucide-react';
 
 interface CriteriosData {
   categorias: string[] | null;
@@ -118,7 +121,17 @@ export default function PerformanceChatsPage() {
   const [criteriosData, setCriteriosData] = useState<CriteriosData | null>(null);
 
   const { asesores: asesoresCtx } = useUserFilter();
+  const { isAdvisorVisible, setAdvisorOptions, selectedAdvisors } = usePerformanceFilter();
   const { data, loading, refetch } = useApiData<ChatsResponse>('/api/data/chats', { from: dateFrom, to: dateTo });
+
+  useEffect(() => {
+    if (!data?.advisorMetrics) return;
+    const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
+      key,
+      name: m.advisorName || key,
+    }));
+    setAdvisorOptions(options);
+  }, [data?.advisorMetrics, setAdvisorOptions]);
 
   // Cargar criterios de calificación
   useEffect(() => {
@@ -240,11 +253,12 @@ export default function PerformanceChatsPage() {
       const key = (!raw || INVALID.has(raw))
         ? 'Sin asignar'
         : (c.asesorAsignado?.trim() || c.agentName?.trim())!;
+      if (selectedAdvisors.length > 0 && !isAdvisorVisible(key.toLowerCase())) continue;
       if (!map[key]) map[key] = [];
       map[key].push(c);
     }
     return map;
-  }, [filteredChats]);
+  }, [filteredChats, selectedAdvisors, isAdvisorVisible]);
 
   const defaultTo = new Date();
   const defaultFrom = subDays(defaultTo, 14);
@@ -289,6 +303,20 @@ export default function PerformanceChatsPage() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple border border-accent-purple/40 text-xs font-semibold hover:bg-accent-purple/30 transition-colors"
         >
           <Sparkles className="w-3.5 h-3.5" /> Habla con tus datos
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const allChats = Object.values(chatsByAgent).flat();
+            const advisorName = selectedAdvisors.length === 1 ? selectedAdvisors[0] : undefined;
+            exportChats(allChats, dateFrom, dateTo, advisorName);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/20 text-accent-green border border-accent-green/30 text-xs font-semibold hover:bg-accent-green/30 transition-colors"
+          title={selectedAdvisors.length > 0 ? `Exportar datos filtrados (${selectedAdvisors.length} asesor${selectedAdvisors.length > 1 ? 'es' : ''})` : 'Exportar todos los datos'}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar {selectedAdvisors.length > 0 ? `(${Object.values(chatsByAgent).flat().length} chats)` : 'todo'}
         </button>
 
         <span className="text-xs text-gray-400">Rango de fechas:</span>
