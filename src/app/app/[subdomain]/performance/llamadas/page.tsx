@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment } from 'react';
+import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
 import { useT } from '@/contexts/LocaleContext';
 import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
@@ -14,7 +15,6 @@ import { matchesLeadSearch } from '@/lib/performance-search';
 import { toast } from 'sonner';
 import EditRecordSheet from '@/components/dashboard/EditRecordSheet';
 import type { LlamadasResponse, ApiLlamadaLog, LlamadaLead } from '@/types';
-import { usePerformanceFilter } from '@/contexts/PerformanceFilterContext';
 import { exportLlamadas } from '@/lib/export-performance';
 import { Download } from 'lucide-react';
 
@@ -109,6 +109,14 @@ export default function PerformanceLlamadasPage() {
 
   useEffect(() => {
     if (!data?.advisorMetrics) return;
+    const opts = Object.entries(data.advisorMetrics)
+      .map(([key, m]) => ({ key, name: m.advisorName || key }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    setAdvisorOptions(opts);
+  }, [data?.advisorMetrics, setAdvisorOptions]);
+
+  useEffect(() => {
+    if (!data?.advisorMetrics) return;
     const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
       key,
       name: m.advisorName || key,
@@ -149,16 +157,20 @@ export default function PerformanceLlamadasPage() {
     return counts;
   }, [data?.leads, contestadasLeadIds]);
 
-  const leadsCalificados = useMemo(() => {
-    if (!data?.leads) return 0;
-    return data.leads.filter((l) => esLeadCalificado(l.estado)).length;
-  }, [data?.leads]);
-
   const leadsFiltered = useMemo(() => {
-    if (!data?.leads || resultadoFiltro === 'todos') return data?.leads ?? [];
-    if (resultadoFiltro === 'contestadas') return data.leads.filter((l) => contestadasLeadIds.has(l.id_registro));
-    return data.leads.filter((l) => categoriaResultado(l.estado) === resultadoFiltro);
-  }, [data?.leads, resultadoFiltro, contestadasLeadIds]);
+    if (!data?.leads) return [];
+    let leads = data.leads.filter((l) => {
+      const key = l.closer_mail?.trim().toLowerCase() || (l as { nombre_closer?: string | null }).nombre_closer?.trim().toLowerCase() || 'sin asignar';
+      return isAdvisorVisible(key);
+    });
+    if (resultadoFiltro === 'contestadas') return leads.filter((l) => contestadasLeadIds.has(l.id_registro));
+    if (resultadoFiltro !== 'todos') return leads.filter((l) => categoriaResultado(l.estado) === resultadoFiltro);
+    return leads;
+  }, [data?.leads, resultadoFiltro, contestadasLeadIds, isAdvisorVisible]);
+
+  const leadsCalificados = useMemo(() => {
+    return leadsFiltered.filter((l) => esLeadCalificado(l.estado)).length;
+  }, [leadsFiltered]);
 
   /** Leads agrupados por asesor (closer_mail); el listado expandido muestra esto */
   const leadsByAdvisor = useMemo(() => {
@@ -233,6 +245,7 @@ export default function PerformanceLlamadasPage() {
   const chartData = useMemo(() => {
     const metricsSource = data?.advisorMetrics ?? {};
     return Object.entries(metricsSource)
+      .filter(([key]) => isAdvisorVisible(key))
       .map(([key, m]) => ({
         name: m.advisorName?.length > 15 ? m.advisorName.slice(0, 14) + '…' : m.advisorName ?? key,
         llamadas: m.llamadas,
@@ -242,7 +255,7 @@ export default function PerformanceLlamadasPage() {
       }))
       .filter((d) => d.llamadas > 0 || d.agendas > 0)
       .sort((a, b) => (b.llamadas + b.agendas) - (a.llamadas + a.agendas));
-  }, [data?.advisorMetrics]);
+  }, [data?.advisorMetrics, isAdvisorVisible]);
 
   const leadsByAdvisorFiltered = useMemo(() => {
     const q = leadSearch.trim();
@@ -323,7 +336,26 @@ export default function PerformanceLlamadasPage() {
 
   const defaultTo = new Date();
   const defaultFrom = subDays(defaultTo, 7);
-  const agg = data?.agg ?? { totalLeads: 0, totalCalls: 0, answered: 0, speedAvg: 0, attemptsAvg: 0, firstContactAttempts: 0, answerRate: 0 };
+  const aggRaw = data?.agg ?? { totalLeads: 0, totalCalls: 0, answered: 0, speedAvg: 0, attemptsAvg: 0, firstContactAttempts: 0, answerRate: 0 };
+  const agg = useMemo(() => {
+    if (!data?.advisorMetrics) return aggRaw;
+    const allKeys = Object.keys(data.advisorMetrics);
+    const visibleKeys = allKeys.filter(isAdvisorVisible);
+    if (visibleKeys.length === allKeys.length) return aggRaw;
+    let totalLeads = 0, totalCalls = 0, answered = 0;
+    const speedValues: number[] = [];
+    for (const key of visibleKeys) {
+      const m = data.advisorMetrics[key];
+      totalLeads += m.leadsAsignados;
+      totalCalls += m.llamadas;
+      answered += m.contestadas;
+      if (m.tiempoAlLead != null) speedValues.push(m.tiempoAlLead);
+    }
+    const speedAvg = speedValues.length > 0 ? speedValues.reduce((a, b) => a + b, 0) / speedValues.length : 0;
+    const answerRate = totalCalls > 0 ? answered / totalCalls : 0;
+    const attemptsAvg = totalLeads > 0 ? totalCalls / totalLeads : 0;
+    return { totalLeads, totalCalls, answered, speedAvg, attemptsAvg, firstContactAttempts: aggRaw.firstContactAttempts, answerRate };
+  }, [aggRaw, data?.advisorMetrics, isAdvisorVisible]);
   const kpiCompact = "[&>p:nth-child(2)]:text-base [&>p:first-child]:text-[9px] [&>p:first-child]:mt-1 rounded-lg pl-3";
 
   if (loading) {
