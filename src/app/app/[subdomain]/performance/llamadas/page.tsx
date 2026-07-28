@@ -351,7 +351,13 @@ export default function PerformanceLlamadasPage() {
             const advisorName = selectedAdvisors.length === 1
               ? (data?.advisorMetrics[selectedAdvisors[0]]?.advisorName ?? selectedAdvisors[0])
               : undefined;
-            exportLlamadas(allLeads, data?.registros ?? [], dateFrom, dateTo, advisorName);
+            const filteredRegistros = selectedAdvisors.length === 0
+              ? (data?.registros ?? [])
+              : (data?.registros ?? []).filter((r) => {
+                  const key = r.closerMail?.trim().toLowerCase() || r.closerName?.trim().toLowerCase() || 'sin asignar';
+                  return isAdvisorVisible(key);
+                });
+            exportLlamadas(allLeads, filteredRegistros, dateFrom, dateTo, advisorName);
           }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/20 text-accent-green border border-accent-green/30 text-xs font-semibold hover:bg-accent-green/30 transition-colors"
           title={selectedAdvisors.length > 0 ? `Exportar datos filtrados (${selectedAdvisors.length} asesor${selectedAdvisors.length > 1 ? 'es' : ''})` : 'Exportar todos los datos'}
