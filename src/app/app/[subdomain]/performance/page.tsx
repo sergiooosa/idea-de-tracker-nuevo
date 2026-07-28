@@ -121,15 +121,6 @@ export default function PerformanceVideollamadasPage() {
     setAdvisorOptions(opts);
   }, [data?.advisorMetrics, setAdvisorOptions]);
 
-  useEffect(() => {
-    if (!data?.advisorMetrics) return;
-    const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
-      key,
-      name: m.advisorName || key,
-    }));
-    setAdvisorOptions(options);
-  }, [data?.advisorMetrics, setAdvisorOptions]);
-
   const openTranscripcionIA = (meetingsOfLead: VideoMeeting[], apiMeetings?: ApiVideollamada[]) => {
     if (apiMeetings) setApiMeetingsForModal(apiMeetings);
     if (meetingsOfLead.length === 1) setModalTranscripcionIA(meetingsOfLead[0]);

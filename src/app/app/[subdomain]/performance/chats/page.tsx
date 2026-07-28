@@ -166,7 +166,7 @@ export default function PerformanceChatsPage() {
 
   const agg = useMemo(() => {
     if (!data?.chats || visibleChats.length === data.chats.length) return aggRaw;
-    const activos = visibleChats.filter((c) => (c as { agentMessages?: number }).agentMessages ?? 0 > 0).length;
+    const activos = visibleChats.filter((c) => ((c as { agentMessages?: number }).agentMessages ?? 0) > 0).length;
     const seguimientosTotal = visibleChats.reduce((s, c) => s + ((c as { totalMessages?: number }).totalMessages ?? 0), 0);
     const speeds = visibleChats.map((c) => (c as { speedToLeadSec?: number | null }).speedToLeadSec).filter((v): v is number => v != null && v > 0);
     const speedAvg = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;

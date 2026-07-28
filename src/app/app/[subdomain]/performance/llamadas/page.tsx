@@ -115,15 +115,6 @@ export default function PerformanceLlamadasPage() {
     setAdvisorOptions(opts);
   }, [data?.advisorMetrics, setAdvisorOptions]);
 
-  useEffect(() => {
-    if (!data?.advisorMetrics) return;
-    const options = Object.entries(data.advisorMetrics).map(([key, m]) => ({
-      key,
-      name: m.advisorName || key,
-    }));
-    setAdvisorOptions(options);
-  }, [data?.advisorMetrics, setAdvisorOptions]);
-
   const contestadasLeadIds = useMemo(() => {
     const ids = new Set<number>();
     if (!data?.leads || !data?.registros) return ids;
