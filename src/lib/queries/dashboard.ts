@@ -725,8 +725,8 @@ export async function getDashboard(
           meetingsAttended: fAttended,
           revenue: fRevenue,
           cashCollected: fCash,
-          contactRate: fLeads > 0 ? fContestadas / fLeads : 0,
-          bookingRate: fLeads > 0 ? fMeetings / fLeads : 0,
+          contactRate: fLeads > 0 ? Math.min(1, fContestadas / fLeads) : 0,
+          bookingRate: fLeads > 0 ? Math.min(1, fMeetings / fLeads) : 0,
         };
       };
 
@@ -746,8 +746,8 @@ export async function getDashboard(
         meetingsAttended: aAsistidas,
         revenue: aRevenue,
         cashCollected: aCash,
-        contactRate: aLeads > 0 ? aLeadsContactados / aLeads : 0,
-        bookingRate: aLeads > 0 ? aMeetingsBooked / aLeads : 0,
+        contactRate: aLeads > 0 ? Math.min(1, aLeadsContactados / aLeads) : 0,
+        bookingRate: aLeads > 0 ? Math.min(1, aMeetingsBooked / aLeads) : 0,
         metricasWebhook: webhookPorUsuario[ac[0]?.closer_mail ?? key] ?? {},
         metricsNuevos: computeFilteredMetrics(newLeadKeys),
         metricsReactivados: computeFilteredMetrics(
