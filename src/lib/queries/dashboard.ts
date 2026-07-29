@@ -1265,6 +1265,7 @@ export async function getDashboard(
         speedToLeadAvg: null,
         speedToLeadMedian: null,
         speedToLeadCount: 0,
+        mensajesPromedioPorLead: null,
         distribucionCanales: {},
         topClosers: [],
       };
@@ -1272,6 +1273,7 @@ export async function getDashboard(
 
     const uniqueChatIds = new Set(chatRows.map((r) => r.chatid).filter(Boolean));
     let chatsConAgente = 0;
+    let totalMensajes = 0;
     const speedValues: number[] = [];
     const distribucionCanales: Record<string, number> = {};
     const closerCounts: Record<string, number> = {};
@@ -1282,6 +1284,7 @@ export async function getDashboard(
 
     for (const row of chatRows) {
       const msgs: ChatMessage[] = Array.isArray(row.chat) ? (row.chat as ChatMessage[]) : [];
+      totalMensajes += msgs.length;
 
       // Si hay bot, "contactado" = hay mensaje de agente DESPUÉS del emoji de toma de atención
       // Si no hay bot, "contactado" = cualquier mensaje de agente
@@ -1361,6 +1364,7 @@ export async function getDashboard(
       speedToLeadAvg: speedAvgChat,
       speedToLeadMedian: speedMedian,
       speedToLeadCount: speedCount,
+      mensajesPromedioPorLead: uniqueChatIds.size > 0 ? totalMensajes / uniqueChatIds.size : null,
       distribucionCanales,
       topClosers,
     };

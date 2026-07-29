@@ -48,6 +48,7 @@ export const es = {
       leadsUnicos: "Leads únicos",
       conRespuesta: "Con respuesta",
       sinRespuesta: "Sin respuesta",
+      msgsPromedio: "Msgs prom/lead",
     },
   },
   performance: {

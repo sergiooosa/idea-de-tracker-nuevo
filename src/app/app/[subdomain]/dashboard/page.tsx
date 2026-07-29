@@ -609,25 +609,28 @@ export default function DashboardPage() {
             </div>
 
             {/* KPI cards de chats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
               {[
                 {
                   label: t.dashboard.kpis.totalChats,
                   value: data!.chatKpis!.total,
                   color: 'cyan',
                   sub: undefined,
+                  tooltip: 'Conversaciones de chat registradas en el período seleccionado (no excluidas). Un chat = una conversación con un lead, sin importar cuántos mensajes tenga.',
                 },
                 {
                   label: t.dashboard.kpis.leadsUnicos,
                   value: data!.chatKpis!.leadsUnicos,
                   color: 'purple',
                   sub: undefined,
+                  tooltip: 'Leads distintos (por chatid) que iniciaron al menos un chat en el período.',
                 },
                 {
                   label: t.dashboard.kpis.conRespuesta,
                   value: data!.chatKpis!.conRespuesta,
                   color: 'green',
                   sub: `${data!.chatKpis!.tasaRespuesta.toFixed(1)}% tasa resp.`,
+                  tooltip: 'Chats donde un agente humano respondió al lead. Si hay chatbot, solo cuenta respuestas después de la toma de atención.',
                 },
                 {
                   label: 'Speed to lead',
@@ -648,10 +651,23 @@ export default function DashboardPage() {
                     const tipo = n < 5 ? 'mediana' : 'promedio';
                     return `${tipo} (n=${n})`;
                   })(),
+                  tooltip: 'Tiempo entre el primer mensaje del lead y la primera respuesta de un agente humano.',
                 },
-              ].map(({ label, value, color, sub }) => (
+                {
+                  label: t.dashboard.kpis.msgsPromedio,
+                  value: data!.chatKpis!.mensajesPromedioPorLead != null
+                    ? data!.chatKpis!.mensajesPromedioPorLead.toFixed(1)
+                    : '—',
+                  color: 'pink',
+                  sub: undefined,
+                  tooltip: 'Total de mensajes (de lead + agente) dividido entre el número de leads únicos en el período.',
+                },
+              ].map(({ label, value, color, sub, tooltip }) => (
                 <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
-                  <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{label}</p>
+                  <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate flex items-center gap-1">
+                    {label}
+                    <HelpTooltip titulo={label} contenido={tooltip} />
+                  </p>
                   <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{value}</p>
                   {sub && <p className="text-[10px] text-gray-500 mt-0.5">{sub}</p>}
                   <div className="kpi-card-spacer" />

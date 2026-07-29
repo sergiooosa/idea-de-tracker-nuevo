@@ -574,6 +574,7 @@ export interface ChatKpis {
   speedToLeadAvg: number | null; // segundos
   speedToLeadMedian: number | null; // segundos
   speedToLeadCount: number;
+  mensajesPromedioPorLead: number | null;
   distribucionCanales: Record<string, number>;
   topClosers: Array<{ name: string; count: number }>;
 }
