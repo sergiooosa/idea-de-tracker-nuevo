@@ -758,7 +758,7 @@ export default function DashboardPage() {
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5 text-accent-red" />
                 Objeciones más comunes
-                <HelpTooltip titulo="Objeciones más comunes" contenido="Objeciones detectadas por IA en citas (Fathom), chats (WhatsApp) y llamadas en tiempo real (Call-AI)." />
+                <HelpTooltip titulo="Objeciones más comunes" contenido="Objeciones detectadas por IA en citas (Fathom), chats (WhatsApp) y llamadas (Twilio / Call-AI). Incluye la respuesta literal del asesor a cada objeción, extraída automáticamente de la transcripción." />
               </h2>
               <button type="button" onClick={toggleObjeciones} className="p-1 rounded hover:bg-surface-600 text-gray-500 hover:text-gray-300 transition-colors" title={showObjeciones ? 'Ocultar' : 'Mostrar'}>
                 {showObjeciones ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1088,6 +1088,11 @@ export default function DashboardPage() {
                   {modalObjecionDetalle.details.map((d, i) => (
                     <li key={i} className="rounded-lg bg-surface-700 p-3 space-y-1">
                       <p className="text-sm text-white italic">&ldquo;{d.quote}&rdquo;</p>
+                      {d.respuestaVendedor && (
+                        <p className="text-xs text-gray-400 pl-3 border-l-2 border-accent-cyan/30">
+                          <span className="text-gray-500">Asesor:</span> &ldquo;{d.respuestaVendedor}&rdquo;
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
                         {d.leadName && <span><span className="text-gray-500">Lead:</span> {d.leadName}</span>}
                         {d.advisorName && <span><span className="text-gray-500">Asesor:</span> {d.advisorName}</span>}

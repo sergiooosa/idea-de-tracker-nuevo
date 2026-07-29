@@ -449,6 +449,7 @@ export const usuariosDashboard = pgTable("usuarios_dashboard", {
 export interface ObjecionIA {
   objecion: string;
   categoria: string;
+  respuesta_vendedor?: string;
 }
 
 export const resumenesDiariosAgendas = pgTable("resumenes_diarios_agendas", {

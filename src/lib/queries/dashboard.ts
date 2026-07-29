@@ -798,14 +798,15 @@ export async function getDashboard(
     chat: {},
     llamada: {},
   };
-  const toList = (x: unknown): Array<{ objecion?: string; categoria?: string }> =>
+  type RawObjecion = { objecion?: string; categoria?: string; respuesta_vendedor?: string };
+  const toList = (x: unknown): RawObjecion[] =>
     Array.isArray(x)
-      ? (x as Array<{ objecion?: string; categoria?: string }>)
+      ? (x as RawObjecion[])
       : (x && typeof x === "object" && Array.isArray((x as { objeciones?: unknown }).objeciones))
-        ? (x as { objeciones: Array<{ objecion?: string; categoria?: string }> }).objeciones
+        ? (x as { objeciones: RawObjecion[] }).objeciones
         : [];
   const mergeObjeciones = (
-    list: Array<{ objecion?: string; categoria?: string }>,
+    list: RawObjecion[],
     canal: ObjecionCanal,
     ctx: { leadName: string; advisorName: string; datetime: string },
   ) => {
@@ -817,6 +818,7 @@ export async function getDashboard(
         advisorName: ctx.advisorName,
         datetime: ctx.datetime,
         quote: obj.objecion ?? key,
+        respuestaVendedor: obj.respuesta_vendedor || undefined,
       };
       // Global map
       if (!objMapGlobal[key]) objMapGlobal[key] = { count: 0, quotes: new Set(), details: [] };
@@ -1200,6 +1202,17 @@ export async function getDashboard(
       leadName: '',
       advisorName: r.closer ?? r.correo_closer ?? '',
       datetime: r.fecha_hora_evento ? String(r.fecha_hora_evento) : '',
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // Objeciones — fase 4: log_llamadas (Twilio histórico)
+  // ----------------------------------------------------------------
+  for (const c of calls) {
+    mergeObjeciones(toList(c.ia_objeciones), 'llamada', {
+      leadName: c.nombre_lead ?? '',
+      advisorName: c.nombre_closer ?? c.closer_mail ?? '',
+      datetime: c.ts ? String(c.ts) : '',
     });
   }
 
