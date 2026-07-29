@@ -413,7 +413,7 @@ function TabLlamadas({
         />
         <KpiMini
           label="Tasa contacto"
-          value={`${Math.min(100, Math.round(kpis.tasaContacto * 100))}%`}
+          value={`${Math.round(kpis.tasaContacto)}%`}
           color="text-accent-green"
         />
         <KpiMini
@@ -515,7 +515,7 @@ function TabChats({
         />
         <KpiMini
           label="Tasa resp."
-          value={`${Math.round(kpis.tasaRespuestaChats * 100)}%`}
+          value={`${Math.round(kpis.tasaRespuestaChats)}%`}
           color="text-accent-cyan"
         />
         <KpiMini
@@ -596,18 +596,11 @@ function TabCitas({
   const { kpis, videollamadas } = data;
   const [search, setSearch] = useState("");
 
-  const asistidas = videollamadas.filter(
-    (v) =>
-      v.categoria === "asistio" ||
-      v.categoria === "calificada" ||
-      v.categoria === "cerrada",
-  ).length;
-  const noShow = videollamadas.filter(
-    (v) => v.categoria === "no_asistio" || v.categoria === "no_show",
-  ).length;
+  const asistidas = kpis.reunionesAsistidas;
+  const noShow = kpis.reunionesNoShow;
   const tasaAsistencia =
     kpis.reunionesAgendadas > 0
-      ? Math.round((asistidas / kpis.reunionesAgendadas) * 100)
+      ? Math.round((kpis.reunionesAsistidas / kpis.reunionesAgendadas) * 100)
       : 0;
 
   const filtered = useMemo(() => {
