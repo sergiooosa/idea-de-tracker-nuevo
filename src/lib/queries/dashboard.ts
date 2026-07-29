@@ -189,6 +189,7 @@ export async function getDashboard(
   const agendaConditions = [
     eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
     fechaFilter,
+    eq(resumenesDiariosAgendas.excluida_dashboard, false),
   ];
   if (emails.length > 0) agendaConditions.push(inArray(resumenesDiariosAgendas.closer, emails));
 
@@ -1060,6 +1061,7 @@ export async function getDashboard(
                 ),
               ),
               sql`LOWER(${resumenesDiariosAgendas.categoria}) = LOWER(${m.id})`,
+              eq(resumenesDiariosAgendas.excluida_dashboard, false),
             )
           );
         
