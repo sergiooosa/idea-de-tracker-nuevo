@@ -122,6 +122,7 @@ export function generateDashboard(): DashboardResponse {
     speedToLeadAvg: rnd(30, 600),
     speedToLeadMedian: rnd(20, 400),
     speedToLeadCount: rnd(10, 80),
+    mensajesPromedioPorLead: 3 + Math.random() * 12,
     distribucionCanales: {
       WhatsApp: rnd(40, 150),
       FB: rnd(10, 60),

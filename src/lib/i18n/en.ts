@@ -50,6 +50,7 @@ export const en: Translations = {
       leadsUnicos: "Unique leads",
       conRespuesta: "With response",
       sinRespuesta: "No response",
+      msgsPromedio: "Avg msgs/lead",
     },
   },
   performance: {
