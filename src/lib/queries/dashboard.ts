@@ -481,6 +481,13 @@ export async function getDashboard(
   const leadsConActividadSize = leadsConActividad.size > 0 ? leadsConActividad.size : 1;
   const tasaAgendamiento = leadsConActividadSize > 0 ? meetingsBooked / leadsConActividadSize : 0;
 
+  const callsNuevos = filteredCalls.filter((c) => leadsNuevosSet.has(normLeadKey(c.mail_lead, c.phone, c.id))).length;
+  const callsReactivados = filteredCalls.length - callsNuevos;
+  const contestadasNuevos = filteredCalls.filter((c) =>
+    esLlamadaContestada(c.tipo_evento ?? "", c.estado_resultado) && leadsNuevosSet.has(normLeadKey(c.mail_lead, c.phone, c.id))
+  ).length;
+  const contestadasReactivados = contestadas - contestadasNuevos;
+
   const kpis: DashboardKpis & Record<string, number> = {
     totalLeads,
     callsMade: filteredCalls.length,
@@ -517,6 +524,12 @@ export async function getDashboard(
     ).size,
     ticket: asistidas > 0 ? revenue / asistidas : 0,
     pendientesLlamadas,
+    callsNuevos,
+    callsReactivados,
+    contestadasNuevos,
+    contestadasReactivados,
+    answerRateNuevos: callsNuevos > 0 ? contestadasNuevos / callsNuevos : 0,
+    answerRateReactivados: callsReactivados > 0 ? contestadasReactivados / callsReactivados : 0,
   };
 
   // pendientesAgendas: leads agendados en el período sin clasificar todavía (PDTE/sin outcome).
@@ -951,7 +964,7 @@ export async function getDashboard(
     if (!webhookPorUsuario[uid]) webhookPorUsuario[uid] = {};
     webhookPorUsuario[uid][row.campo] = (webhookPorUsuario[uid][row.campo] ?? 0) + parseFloat(String(row.valor ?? 0));
   }
-  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[] = [];
+  const metricasComputadas: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[]; subMetrics?: { label: string; value: number; formato?: string }[] }[] = [];
   const metricasValores: Record<string, string | number> = {};
   // Usar KPI_DEFAULT_KEYS como fuente de verdad — nunca hardcodear aquí
   const kpiKeys = new Set<string>([...KPI_DEFAULT_KEYS]);
@@ -1096,6 +1109,28 @@ export async function getDashboard(
   for (const m of sorted) {
     if (computed.has(m.id)) continue;
     metricasComputadas.push({ id: m.id, nombre: m.nombre, valor: "—", descripcion: m.descripcion, ubicacion: m.ubicacion, paneles: m.paneles, formato: m.formato, color: m.color, visualizacion: m.visualizacion });
+  }
+
+  const CALL_SUB_METRICS: Record<string, { label: string; value: number; formato?: string }[]> = {
+    callsMade: [
+      { label: "Nuevos", value: kpis.callsNuevos },
+      { label: "Reactivados", value: kpis.callsReactivados },
+    ],
+    contestadas: [
+      { label: "Nuevos", value: kpis.contestadasNuevos },
+      { label: "Reactivados", value: kpis.contestadasReactivados },
+    ],
+    answerRate: [
+      { label: "Nuevos", value: kpis.answerRateNuevos, formato: "porcentaje" },
+      { label: "Reactivados", value: kpis.answerRateReactivados, formato: "porcentaje" },
+    ],
+  };
+  for (const mc of metricasComputadas) {
+    const cfg = sorted.find((s) => s.id === mc.id);
+    if (cfg?.tipo === "automatica" && cfg.formula?.tipo === "directo" && cfg.formula.fuente) {
+      const subs = CALL_SUB_METRICS[cfg.formula.fuente];
+      if (subs) mc.subMetrics = subs;
+    }
   }
 
   // ----------------------------------------------------------------

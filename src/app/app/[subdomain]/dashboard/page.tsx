@@ -368,11 +368,34 @@ export default function DashboardPage() {
                       case 'decimal': display = raw.toFixed(2); break;
                       case 'numero': display = typeof m.valor === 'number' ? m.valor : raw; break;
                     }
+                    const formatSubVal = (v: number, fmt?: string) => {
+                      if (fmt === 'porcentaje') return pctFmt(v);
+                      if (fmt === 'moneda') return fm(v);
+                      if (fmt === 'tiempo') return minFmt(v);
+                      if (fmt === 'decimal') return v.toFixed(2);
+                      return v;
+                    };
+                    const subs = m.subMetrics;
                     return (
                       <div key={m.id} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed relative group`}>
                         <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1 truncate">{m.nombre}</p>
                         <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{display}</p>
-                        {m.descripcion && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
+                        {subs && subs.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {subs.map((s, i) => (
+                              <React.Fragment key={s.label}>
+                                {i > 0 && <span className="text-gray-600 text-[9px]">|</span>}
+                                <span className="text-[9px] text-gray-400">
+                                  {s.label}{' '}
+                                  <span className={`font-semibold text-accent-${color}`}>
+                                    {formatSubVal(s.value, s.formato || m.formato)}
+                                  </span>
+                                </span>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )}
+                        {m.descripcion && !subs?.length && <p className="text-[10px] text-gray-500 mt-0.5 truncate">{m.descripcion}</p>}
                         <div className="kpi-card-spacer" />
                         <Link
                           href={`/system?step=5&edit=${m.id}`}
