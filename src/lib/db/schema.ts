@@ -506,6 +506,9 @@ export const logLlamadas = pgTable("log_llamadas", {
   speed_to_lead: text("speed_to_lead"),
   ts: timestamp("ts", { withTimezone: true }).notNull().defaultNow(),
   tags_internos: jsonb("tags_internos").$type<string[]>(),
+  gemini_enriquecimiento: jsonb("gemini_enriquecimiento"),
+  duracion_segundos: integer("duracion_segundos"),
+  ia_objeciones: jsonb("ia_objeciones").$type<ObjecionIA[]>(),
 });
 
 /* ------------------------------------------------------------------ */
