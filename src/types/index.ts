@@ -523,6 +523,7 @@ export interface DashboardObjecionDetail {
   advisorName: string;
   datetime: string;
   quote: string;
+  respuestaVendedor?: string;
 }
 
 export type ObjecionCanal = 'videollamada' | 'chat' | 'llamada';
