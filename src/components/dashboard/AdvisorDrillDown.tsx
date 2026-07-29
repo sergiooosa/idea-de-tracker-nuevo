@@ -777,7 +777,7 @@ export default function AdvisorDrillDown({
     return {
       llamadas: data.leads.length,
       chats: data.chats.length,
-      citas: data.videollamadas.length,
+      citas: data.kpis.reunionesAgendadas,
     };
   }, [data]);
 
