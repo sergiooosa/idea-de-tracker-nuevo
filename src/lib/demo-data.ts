@@ -244,6 +244,10 @@ export function generateLlamadas(): LlamadasResponse {
       iaDescripcion: outcome === "answered" ? faker.lorem.sentence() : null,
       speedToLeadMinutes: Math.random() > 0.2 ? rnd(1, 120) + Math.random() : null,
       creativoOrigen: FUENTES[rnd(0, FUENTES.length - 1)],
+      estadoResultado: outcome === "answered" ? (Math.random() > 0.5 ? "interesado" : "no_interesado") : null,
+      duracionSegundos: outcome === "answered" ? rnd(30, 600) : null,
+      enrichment: null,
+      objeciones: null,
     };
   });
 

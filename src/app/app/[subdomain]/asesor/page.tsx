@@ -11,7 +11,9 @@ import { useApiData } from '@/hooks/useApiData';
 import { useUserFilter } from '@/contexts/UserFilterContext';
 import ModalConversacionChat from '@/components/dashboard/modals/ModalConversacionChat';
 import MergeSuggestionsModal, { type MergeSuggestion } from '@/components/asesores/MergeSuggestionsModal';
+import LlamadasReport from '@/components/asesores/LlamadasReport';
 import type {
+  LlamadasResponse,
   AsesorResponse,
   AsesorLeadCRM,
   AsesorVideollamada,
@@ -38,6 +40,8 @@ import {
   AlertTriangle,
   EyeOff,
   Eye,
+  BarChart2,
+  LayoutList,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
@@ -290,6 +294,9 @@ function TabLlamadas({
   setExpandedKpi,
   breakdown,
   onToggleExcluirLead,
+  llamadasData,
+  llamadasLoading,
+  advisorName,
 }: {
   kpis: AsesorKpis;
   leads: AsesorLeadCRM[];
@@ -302,8 +309,12 @@ function TabLlamadas({
   setExpandedKpi: (val: string | null) => void;
   breakdown?: any;
   onToggleExcluirLead?: (id: string, excluir: boolean) => void;
+  llamadasData?: LlamadasResponse | null;
+  llamadasLoading?: boolean;
+  advisorName?: string | null;
 }) {
   const t = useT();
+  const [llamadasView, setLlamadasView] = useState<'pipeline' | 'reporte'>('pipeline');
 
   // Agrupar leads por estadoNormalizado
   const leadsByEstado = useMemo(() => {
@@ -414,7 +425,52 @@ function TabLlamadas({
         </div>
       </section>
 
+      {/* View toggle */}
+      <section className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setLlamadasView('pipeline')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            llamadasView === 'pipeline'
+              ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30'
+              : 'bg-surface-700 text-gray-400 hover:text-white border border-surface-500/60'
+          }`}
+        >
+          <LayoutList className="w-3.5 h-3.5" />
+          Pipeline
+        </button>
+        <button
+          type="button"
+          onClick={() => setLlamadasView('reporte')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            llamadasView === 'reporte'
+              ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30'
+              : 'bg-surface-700 text-gray-400 hover:text-white border border-surface-500/60'
+          }`}
+        >
+          <BarChart2 className="w-3.5 h-3.5" />
+          Reporte de llamadas
+        </button>
+      </section>
+
+      {/* Reporte de llamadas */}
+      {llamadasView === 'reporte' && (
+        <section>
+          {llamadasLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="text-gray-400 text-sm animate-pulse">Cargando reporte…</div>
+            </div>
+          ) : (
+            <LlamadasReport
+              calls={llamadasData?.registros ?? []}
+              advisorName={advisorName}
+            />
+          )}
+        </section>
+      )}
+
       {/* Pipeline */}
+      {llamadasView === 'pipeline' && (
       <section>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           Pipeline de llamadas — estado actual de cada lead
@@ -466,6 +522,7 @@ function TabLlamadas({
           </div>
         )}
       </section>
+      )}
 
       {/* Breakdown Modal */}
       {expandedKpi && breakdown && (
@@ -1143,6 +1200,16 @@ export default function AsesorPage() {
 
   const { data, loading, refetch } = useApiData<AsesorResponse>('/api/data/asesor', apiParams);
 
+  // Llamadas data for the call report — built from same params
+  const llamadasApiParams = useMemo(() => {
+    const base: Record<string, string> = { from: dateFrom, to: dateTo };
+    const closerEmail = canViewAll ? asesorSeleccionado : undefined;
+    if (closerEmail) base.closerEmails = closerEmail;
+    return base;
+  }, [dateFrom, dateTo, canViewAll, asesorSeleccionado]);
+
+  const { data: llamadasData, loading: llamadasLoading } = useApiData<LlamadasResponse>('/api/data/llamadas', llamadasApiParams);
+
   const handleToggleExcluirLead = async (id: string, excluir: boolean) => {
     await fetch('/api/data/asesor', {
       method: 'PATCH',
@@ -1196,6 +1263,9 @@ export default function AsesorPage() {
   const modulosHabilitados = data?.modulosHabilitados ?? canales;
   const breakdown = data?.breakdown;
   const advisorsList = data?.advisorsList ?? data?.advisors ?? asesoresContext;
+  const advisorName = asesorSeleccionado
+    ? advisorsList.find((a) => (a.email ?? a.id) === asesorSeleccionado)?.name ?? asesorSeleccionado
+    : null;
 
   const systemPath = pathname.split('/asesor')[0] + '/system';
 
@@ -1367,6 +1437,9 @@ export default function AsesorPage() {
                   setExpandedKpi={setExpandedKpi}
                   breakdown={breakdown}
                   onToggleExcluirLead={handleToggleExcluirLead}
+                  llamadasData={llamadasData}
+                  llamadasLoading={llamadasLoading}
+                  advisorName={advisorName}
                 />
               )}
               {validActiveTab === 'videollamadas' && (

@@ -273,6 +273,16 @@ export interface VideollamadasResponse {
   metricasComputadas?: MetricaComputada[];
 }
 
+export interface LlamadaEnrichment {
+  tono_lead: string | null;
+  engagement: string | null;
+  recepcion_lead: string | null;
+  calidad_cierre: string | null;
+  aceptacion_propuesta: string | null;
+  razon_calificacion: string | null;
+  frases_relevantes: string[];
+}
+
 export interface ApiLlamadaLog {
   id: number;
   /** Enlace a registros_de_llamada; prioridad para asociar historial al lead correcto */
@@ -289,6 +299,10 @@ export interface ApiLlamadaLog {
   iaDescripcion: string | null;
   speedToLeadMinutes: number | null;
   creativoOrigen: string | null;
+  estadoResultado: string | null;
+  duracionSegundos: number | null;
+  enrichment: LlamadaEnrichment | null;
+  objeciones: { objecion: string; frase_textual: string | null }[] | null;
 }
 
 export interface LlamadasAdvisorMetrics {

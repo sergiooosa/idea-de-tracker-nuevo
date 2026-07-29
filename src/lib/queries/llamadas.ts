@@ -5,6 +5,7 @@ import { zonedDayRange } from "@/lib/date-range";
 import { mapCategoria } from "@/lib/queries/videollamadas";
 import type {
   ApiLlamadaLog,
+  LlamadaEnrichment,
   LlamadasAdvisorMetrics,
   LlamadasResponse,
   ApiAdvisor,
@@ -116,22 +117,44 @@ export async function getLlamadas(
 
   const regRowsResolved = await regRows;
 
-  const registros: ApiLlamadaLog[] = rows.map((r) => ({
-    id: r.id,
-    id_registro: r.id_registro != null && r.id_registro > 0 ? r.id_registro : null,
-    datetime: r.ts.toISOString(),
-    leadName: r.nombre_lead,
-    leadEmail: r.mail_lead,
-    phone: r.phone,
-    closerMail: r.closer_mail,
-    closerName: r.nombre_closer,
-    tipoEvento: r.tipo_evento,
-    outcome: mapTipoEvento(r.tipo_evento, r.estado_resultado),
-    transcripcion: r.transcripcion,
-    iaDescripcion: r.ia_descripcion,
-    speedToLeadMinutes: r.speed_to_lead ? parseFloat(r.speed_to_lead) || null : null,
-    creativoOrigen: r.creativo_origen,
-  }));
+  const registros: ApiLlamadaLog[] = rows.map((r) => {
+    const gem = r.gemini_enriquecimiento as Record<string, unknown> | null;
+    const enrichment: LlamadaEnrichment | null = gem
+      ? {
+          tono_lead: (gem.tono_lead as string) ?? null,
+          engagement: (gem.engagement as string) ?? null,
+          recepcion_lead: (gem.recepcion_lead as string) ?? null,
+          calidad_cierre: (gem.calidad_cierre as string) ?? null,
+          aceptacion_propuesta: (gem.aceptacion_propuesta as string) ?? null,
+          razon_calificacion: (gem.razon_calificacion as string) ?? null,
+          frases_relevantes: Array.isArray(gem.frases_relevantes) ? (gem.frases_relevantes as string[]) : [],
+        }
+      : null;
+    const rawObjeciones = r.ia_objeciones as { objecion: string; frase_textual?: string | null }[] | null;
+    const objeciones = Array.isArray(rawObjeciones) && rawObjeciones.length > 0
+      ? rawObjeciones.map((o) => ({ objecion: o.objecion, frase_textual: o.frase_textual ?? null }))
+      : null;
+    return {
+      id: r.id,
+      id_registro: r.id_registro != null && r.id_registro > 0 ? r.id_registro : null,
+      datetime: r.ts.toISOString(),
+      leadName: r.nombre_lead,
+      leadEmail: r.mail_lead,
+      phone: r.phone,
+      closerMail: r.closer_mail,
+      closerName: r.nombre_closer,
+      tipoEvento: r.tipo_evento,
+      outcome: mapTipoEvento(r.tipo_evento, r.estado_resultado),
+      transcripcion: r.transcripcion,
+      iaDescripcion: r.ia_descripcion,
+      speedToLeadMinutes: r.speed_to_lead ? parseFloat(r.speed_to_lead) || null : null,
+      creativoOrigen: r.creativo_origen,
+      estadoResultado: r.estado_resultado ?? null,
+      duracionSegundos: r.duracion_segundos ?? null,
+      enrichment,
+      objeciones,
+    };
+  });
 
   const leadKey = (r: ApiLlamadaLog) =>
     (r.leadEmail?.trim() && r.leadEmail) || (r.phone?.trim() && r.phone) || `id:${r.id}`;
