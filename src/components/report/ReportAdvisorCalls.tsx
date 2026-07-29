@@ -2,7 +2,7 @@
 // Ranking + tarjetas por asesor con métricas de llamadas
 
 import { Phone, AlertTriangle, Clock } from 'lucide-react';
-import { formatPct, formatMinutes } from '@/lib/format';
+import { formatMinutes } from '@/lib/format';
 import type { ReportAdvisorCallsData, ReportAsesorCalls } from '@/types/report';
 import AdvisorCard from '@/components/report/AdvisorCard';
 
@@ -10,10 +10,10 @@ interface Props {
   data: ReportAdvisorCallsData | null;
 }
 
-// Semáforo tasa de contacto (para tabla resumen)
+// Semáforo tasa de contacto (recibe 0-100)
 function contactoColor(tasa: number) {
-  if (tasa >= 0.6) return 'text-accent-green';
-  if (tasa >= 0.4) return 'text-accent-amber';
+  if (tasa >= 60) return 'text-accent-green';
+  if (tasa >= 40) return 'text-accent-amber';
   return 'text-accent-red';
 }
 
@@ -55,7 +55,7 @@ function CallsAdvisorCard({
         },
         {
           label: 'Contacto',
-          value: formatPct(asesor.tasaContacto),
+          value: `${asesor.tasaContacto.toFixed(1)}%`,
           colorClass: contactoColor(asesor.tasaContacto),
           sublabel: `${asesor.contestadas} contest.`,
         },
@@ -63,7 +63,7 @@ function CallsAdvisorCard({
           label: 'Agendadas',
           value: asesor.agendadas,
           colorClass: 'text-accent-purple',
-          sublabel: formatPct(asesor.tasaAgendamiento),
+          sublabel: `${asesor.tasaAgendamiento.toFixed(1)}%`,
         },
       ]}
       footer={
@@ -116,7 +116,7 @@ export default function ReportAdvisorCalls({ data }: Props) {
         <div className="text-xs text-gray-500">
           Equipo:{' '}
           <span className={`font-semibold ${contactoColor(data.tasaContactoEquipo)}`}>
-            {formatPct(data.tasaContactoEquipo)}
+            {data.tasaContactoEquipo.toFixed(1)}%
           </span>{' '}
           contacto
           <span className="text-gray-600 mx-1">·</span>
@@ -149,10 +149,10 @@ export default function ReportAdvisorCalls({ data }: Props) {
                 <td className="px-3 py-2 text-accent-blue">{a.leads}</td>
                 <td className="px-3 py-2 text-accent-cyan">{a.llamadas}</td>
                 <td className={`px-3 py-2 font-medium ${contactoColor(a.tasaContacto)}`}>
-                  {formatPct(a.tasaContacto)}
+                  {a.tasaContacto.toFixed(1)}%
                 </td>
                 <td className="px-3 py-2 text-accent-purple">{a.agendadas}</td>
-                <td className="px-3 py-2 text-gray-300">{formatPct(a.tasaAgendamiento)}</td>
+                <td className="px-3 py-2 text-gray-300">{a.tasaAgendamiento.toFixed(1)}%</td>
                 <td className="px-3 py-2 text-gray-300">
                   {a.speedToLeadAvgMin !== null ? formatMinutes(a.speedToLeadAvgMin) : '—'}
                 </td>

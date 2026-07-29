@@ -240,13 +240,13 @@ export async function getAsesorData(
   // ── CALCULAR KPIs ─────────────────────────────────────────────────────────
   const contestadas = callRowsForKpi.filter((c) => c.tipo_evento.startsWith("efectiva_")).length;
 
-  // leadsAsignados = leads únicos incluyendo pdte (son leads asignados)
-  const leadKeyFromCall = (c: { mail_lead: string | null; phone: string | null; id: number }) =>
-    c.mail_lead?.trim() || c.phone?.trim() || `id:${c.id}`;
+  // leadsAsignados = leads únicos — alineado con dashboard.ts advisorRanking (AUT-1889)
+  const leadKeyFromCall = (c: { mail_lead: string | null; phone: string | null; contact_id_ghl?: string | null; id: number }) =>
+    c.mail_lead?.trim().toLowerCase() || c.phone?.trim() || c.contact_id_ghl?.trim() || String(c.id);
   const leadKeyFromAgenda = (a: { idcliente?: string | null; ghl_contact_id?: string | null; email_lead: string | null; id_registro_agenda: number }) =>
     agendaDedupKey(a);
   const leadKeyFromReg = (r: { mail_lead: string | null; phone_raw_format: string | null; id_registro: number }) =>
-    r.mail_lead?.trim() || r.phone_raw_format?.trim() || `reg:${r.id_registro}`;
+    r.mail_lead?.trim().toLowerCase() || r.phone_raw_format?.trim() || `reg:${r.id_registro}`;
 
   const leadsFromCalls = new Set(callRowsForKpi.map(leadKeyFromCall).filter(Boolean));
   const leadsFromAgendas = new Set(agendaRows.map(leadKeyFromAgenda).filter(Boolean));
@@ -294,7 +294,7 @@ export async function getAsesorData(
     leadsAsignados: allLeads.size,
     llamadasRealizadas: callRowsForKpi.length,
     llamadasContestadas: contestadas,
-    tasaContacto: callRowsForKpi.length > 0 ? (contestadas / callRowsForKpi.length) * 100 : 0,
+    tasaContacto: callRowsForKpi.length > 0 ? Math.min(100, (contestadas / callRowsForKpi.length) * 100) : 0,
     reunionesAgendadas: new Set(agendaRows.map(agendaDedupKey)).size,
     reunionesAsistidas: videoAsistidas,
     reunionesCalificadas: videoCalificadas,
