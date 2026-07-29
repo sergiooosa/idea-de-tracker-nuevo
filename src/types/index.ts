@@ -448,6 +448,18 @@ export interface DashboardKpis {
   attemptsToFirstContactAvg: number;
   noShows: number;
   pendientesAgendas?: number;
+  callsNuevos: number;
+  callsReactivados: number;
+  contestadasNuevos: number;
+  contestadasReactivados: number;
+  answerRateNuevos: number;
+  answerRateReactivados: number;
+}
+
+export interface SubMetric {
+  label: string;
+  value: number;
+  formato?: string;
 }
 
 export interface LeadDetailItem {
@@ -635,7 +647,7 @@ export interface DashboardResponse {
   tagsDisponibles?: string[];
   tagCounts?: Record<string, number>;
   metricasPersonalizadas?: MetricaPersonalizadaUI[];
-  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[] }[];
+  metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[]; subMetrics?: SubMetric[] }[];
   dashboardsPersonalizados?: { id: string; nombre: string; icono?: string | null }[];
   chatKpis?: ChatKpis;
   alertasMetas?: AlertaMeta[];
