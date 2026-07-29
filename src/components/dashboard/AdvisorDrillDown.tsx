@@ -11,10 +11,7 @@ import {
   Calendar,
   ChevronRight,
   ChevronLeft,
-  Filter,
   PhoneCall,
-  CheckCircle2,
-  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useApiData } from "@/hooks/useApiData";
@@ -27,7 +24,7 @@ import type {
   AsesorChatMessage,
 } from "@/types";
 
-type Tab = "contestaron" | "interesados" | "agendaron" | "todos";
+type ChannelTab = "llamadas" | "chats" | "citas";
 
 interface Props {
   advisorName: string;
@@ -99,131 +96,67 @@ function estadoColor(estado: AsesorLeadCRM["estadoNormalizado"]): string {
   return map[estado] ?? "bg-gray-500/20 text-gray-400";
 }
 
-interface LeadUnificado {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  estado: string | null;
-  estadoNormalizado: AsesorLeadCRM["estadoNormalizado"];
-  intentosContacto: number;
-  speedToLead: string;
-  notasLlamadas: { date: string; text: string }[];
-  videollamadas: AsesorVideollamada[];
-  chats: AsesorChat[];
-  contestado: boolean;
-  interesado: boolean;
-  agendado: boolean;
+function categoriaLabel(cat: string): string {
+  const map: Record<string, string> = {
+    asistio: "Asistió",
+    no_asistio: "No asistió",
+    cancelada: "Cancelada",
+    calificada: "Calificada",
+    cerrada: "Cerrada",
+    no_show: "No show",
+  };
+  return map[cat] ?? cat;
 }
 
-function unificarLeads(
-  leads: AsesorLeadCRM[],
-  videollamadas: AsesorVideollamada[],
-  chats: AsesorChat[],
-): LeadUnificado[] {
-  const map = new Map<string, LeadUnificado>();
-
-  for (const lead of leads) {
-    const key = (lead.email ?? lead.phone ?? lead.name).toLowerCase();
-    const contestado =
-      lead.estadoNormalizado !== "pendiente" &&
-      lead.estadoNormalizado !== "no_contesto" &&
-      lead.estadoNormalizado !== "buzon";
-    const interesado =
-      lead.estadoNormalizado === "interesado" ||
-      lead.estadoNormalizado === "programado" ||
-      lead.estadoNormalizado === "calificada" ||
-      lead.estadoNormalizado === "cerrada";
-
-    map.set(key, {
-      id: lead.id,
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      estado: lead.estado,
-      estadoNormalizado: lead.estadoNormalizado,
-      intentosContacto: lead.intentosContacto,
-      speedToLead: lead.speedToLead,
-      notasLlamadas: lead.notasLlamadas,
-      videollamadas: [],
-      chats: [],
-      contestado,
-      interesado,
-      agendado: false,
-    });
-  }
-
-  for (const vl of videollamadas) {
-    const key = (
-      vl.leadEmail ??
-      vl.leadName ??
-      ""
-    ).toLowerCase();
-    const existing = map.get(key);
-    if (existing) {
-      existing.videollamadas.push(vl);
-      existing.agendado = true;
-    } else {
-      map.set(key, {
-        id: `vl-${vl.id}`,
-        name: vl.leadName ?? "—",
-        email: vl.leadEmail,
-        phone: null,
-        estado: vl.categoria,
-        estadoNormalizado: "programado",
-        intentosContacto: 0,
-        speedToLead: "—",
-        notasLlamadas: [],
-        videollamadas: [vl],
-        chats: [],
-        contestado: true,
-        interesado: true,
-        agendado: true,
-      });
-    }
-  }
-
-  for (const chat of chats) {
-    const key = (
-      chat.leadEmail ??
-      chat.leadName ??
-      ""
-    ).toLowerCase();
-    const existing = map.get(key);
-    if (existing) {
-      existing.chats.push(chat);
-    } else {
-      map.set(key, {
-        id: `chat-${chat.chatId}`,
-        name: chat.leadName ?? "—",
-        email: chat.leadEmail,
-        phone: null,
-        estado: chat.estado,
-        estadoNormalizado: "pendiente",
-        intentosContacto: 0,
-        speedToLead: "—",
-        notasLlamadas: [],
-        videollamadas: [],
-        chats: [chat],
-        contestado: chat.respondido,
-        interesado: false,
-        agendado: false,
-      });
-    }
-  }
-
-  return Array.from(map.values());
+function categoriaColor(cat: string): string {
+  const map: Record<string, string> = {
+    asistio: "bg-accent-green/20 text-accent-green",
+    calificada: "bg-accent-cyan/20 text-accent-cyan",
+    cerrada: "bg-accent-green/20 text-accent-green",
+    no_asistio: "bg-accent-red/20 text-accent-red",
+    no_show: "bg-accent-red/20 text-accent-red",
+    cancelada: "bg-accent-amber/20 text-accent-amber",
+  };
+  return map[cat] ?? "bg-gray-500/20 text-gray-400";
 }
 
-function LeadContactCard({
+function formatDuration(seconds: number | null): string {
+  if (seconds === null || seconds === 0) return "—";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
+function ChatBubble({ msg }: { msg: AsesorChatMessage }) {
+  const isLead = msg.role === "lead";
+  return (
+    <div className={`flex ${isLead ? "justify-start" : "justify-end"} mt-1.5`}>
+      <div
+        className={`max-w-[80%] rounded-lg px-2.5 py-1.5 text-xs ${
+          isLead
+            ? "bg-surface-600 text-gray-300"
+            : "bg-accent-cyan/20 text-accent-cyan"
+        }`}
+      >
+        <p className="whitespace-pre-wrap break-words">{msg.message}</p>
+        <p
+          className={`text-[10px] mt-0.5 ${isLead ? "text-gray-500" : "text-accent-cyan/60"}`}
+        >
+          {formatDate(msg.timestamp)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function LeadCallDetail({
   lead,
   onBack,
 }: {
-  lead: LeadUnificado;
+  lead: AsesorLeadCRM;
   onBack: () => void;
 }) {
-  const [chatExpanded, setChatExpanded] = useState<string | null>(null);
-
   return (
     <div className="flex flex-col h-full">
       <button
@@ -231,10 +164,8 @@ function LeadContactCard({
         onClick={onBack}
         className="flex items-center gap-1 text-xs text-gray-400 hover:text-white mb-3 self-start"
       >
-        <ChevronLeft className="w-3.5 h-3.5" /> Volver al listado
+        <ChevronLeft className="w-3.5 h-3.5" /> Volver
       </button>
-
-      {/* Header */}
       <div className="rounded-lg bg-surface-700 p-4 mb-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-accent-cyan/20 flex items-center justify-center shrink-0">
@@ -273,12 +204,10 @@ function LeadContactCard({
           </div>
         </div>
       </div>
-
-      {/* Llamadas */}
-      {lead.notasLlamadas.length > 0 && (
-        <section className="mb-4">
+      {lead.notasLlamadas.length > 0 ? (
+        <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            <Phone className="w-3.5 h-3.5" /> Llamadas (
+            <Phone className="w-3.5 h-3.5" /> Historial de llamadas (
             {lead.notasLlamadas.length})
           </h4>
           <div className="space-y-1.5">
@@ -293,189 +222,519 @@ function LeadContactCard({
             ))}
           </div>
         </section>
+      ) : (
+        <p className="text-gray-500 text-sm text-center py-6">
+          Sin historial de llamadas para este lead.
+        </p>
       )}
+    </div>
+  );
+}
 
-      {/* Videollamadas */}
-      {lead.videollamadas.length > 0 && (
-        <section className="mb-4">
-          <h4 className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            <Video className="w-3.5 h-3.5" /> Videollamadas (
-            {lead.videollamadas.length})
-          </h4>
-          <div className="space-y-1.5">
-            {lead.videollamadas.map((vl) => (
-              <div
-                key={vl.id}
-                className="rounded-lg bg-surface-700 px-3 py-2 text-xs"
+function ChatDetail({
+  chat,
+  onBack,
+}: {
+  chat: AsesorChat;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1 text-xs text-gray-400 hover:text-white mb-3 self-start"
+      >
+        <ChevronLeft className="w-3.5 h-3.5" /> Volver
+      </button>
+      <div className="rounded-lg bg-surface-700 p-4 mb-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-accent-amber/20 flex items-center justify-center shrink-0">
+            <MessageSquare className="w-5 h-5 text-accent-amber" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-white text-sm truncate">
+              {chat.leadName ?? "—"}
+            </h3>
+            {chat.leadEmail && (
+              <p className="text-xs text-gray-400 mt-0.5">{chat.leadEmail}</p>
+            )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                  chat.respondido
+                    ? "bg-accent-green/20 text-accent-green"
+                    : "bg-accent-red/20 text-accent-red"
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">
-                    {formatDate(vl.fechaReunion)}
-                  </span>
-                  <span className="text-accent-purple text-[10px] uppercase">
-                    {vl.categoria}
-                  </span>
-                </div>
-                {vl.resumenIa && (
-                  <p className="text-gray-300 mt-1 whitespace-pre-wrap line-clamp-4">
-                    {vl.resumenIa}
-                  </p>
-                )}
-                {vl.fathomUrl && (
-                  <a
-                    href={vl.fathomUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent-cyan hover:underline text-[10px] mt-1 inline-block"
-                  >
-                    Ver grabación
-                  </a>
-                )}
-              </div>
-            ))}
+                {chat.respondido ? "Respondido" : "Sin respuesta"}
+              </span>
+              {chat.estado && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-surface-600 text-gray-300">
+                  {chat.estado}
+                </span>
+              )}
+              {chat.speedToLeadSeg !== null && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-surface-600 text-gray-300">
+                  <Clock className="w-3 h-3" />{" "}
+                  {formatDuration(chat.speedToLeadSeg)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      {chat.messages.length > 0 ? (
+        <div className="space-y-0 flex-1 overflow-y-auto">
+          {chat.messages.map((msg, mi) => (
+            <ChatBubble key={mi} msg={msg} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-500 text-sm text-center py-6">
+          Sin mensajes en este chat.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CitaDetail({
+  cita,
+  onBack,
+}: {
+  cita: AsesorVideollamada;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1 text-xs text-gray-400 hover:text-white mb-3 self-start"
+      >
+        <ChevronLeft className="w-3.5 h-3.5" /> Volver
+      </button>
+      <div className="rounded-lg bg-surface-700 p-4 mb-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-accent-purple/20 flex items-center justify-center shrink-0">
+            <Video className="w-5 h-5 text-accent-purple" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-white text-sm truncate">
+              {cita.leadName ?? "—"}
+            </h3>
+            {cita.leadEmail && (
+              <p className="text-xs text-gray-400 mt-0.5">{cita.leadEmail}</p>
+            )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${categoriaColor(cita.categoria)}`}
+              >
+                {categoriaLabel(cita.categoria)}
+              </span>
+              {cita.fechaReunion && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-surface-600 text-gray-300">
+                  <Calendar className="w-3 h-3" />{" "}
+                  {formatDate(cita.fechaReunion)}
+                </span>
+              )}
+              {cita.facturacion > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-accent-green/20 text-accent-green">
+                  ${cita.facturacion.toLocaleString()}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      {cita.resumenIa && (
+        <section className="mb-4">
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Resumen IA
+          </h4>
+          <div className="rounded-lg bg-surface-700 px-3 py-2 text-xs text-gray-300 whitespace-pre-wrap">
+            {cita.resumenIa}
           </div>
         </section>
       )}
+      {cita.fathomUrl && (
+        <a
+          href={cita.fathomUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-accent-cyan hover:underline text-xs"
+        >
+          <Video className="w-3.5 h-3.5" /> Ver grabación
+        </a>
+      )}
+      {!cita.resumenIa && !cita.fathomUrl && (
+        <p className="text-gray-500 text-sm text-center py-6">
+          Sin detalles adicionales para esta cita.
+        </p>
+      )}
+    </div>
+  );
+}
 
-      {/* Chats */}
-      {lead.chats.length > 0 && (
-        <section className="mb-4">
-          <h4 className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            <MessageSquare className="w-3.5 h-3.5" /> Chats ({lead.chats.length}
-            )
-          </h4>
-          <div className="space-y-1.5">
-            {lead.chats.map((chat) => {
-              const isOpen = chatExpanded === chat.chatId;
-              return (
-                <div
-                  key={chat.chatId}
-                  className="rounded-lg bg-surface-700 overflow-hidden"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setChatExpanded(isOpen ? null : chat.chatId)
-                    }
-                    className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-surface-600"
+function TabLlamadas({
+  data,
+  onSelectLead,
+}: {
+  data: AsesorResponse;
+  onSelectLead: (lead: AsesorLeadCRM) => void;
+}) {
+  const { kpis, leads } = data;
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return leads;
+    const q = search.toLowerCase();
+    return leads.filter(
+      (l) =>
+        l.name.toLowerCase().includes(q) ||
+        (l.email && l.email.toLowerCase().includes(q)) ||
+        (l.phone && l.phone.includes(q)),
+    );
+  }, [leads, search]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-4 gap-2">
+        <KpiMini
+          label="Realizadas"
+          value={kpis.llamadasRealizadas}
+          color="text-white"
+        />
+        <KpiMini
+          label="Contestadas"
+          value={kpis.llamadasContestadas}
+          color="text-accent-cyan"
+        />
+        <KpiMini
+          label="Tasa contacto"
+          value={`${Math.min(100, Math.round(kpis.tasaContacto * 100))}%`}
+          color="text-accent-green"
+        />
+        <KpiMini
+          label="Agendadas"
+          value={kpis.reunionesAgendadas}
+          color="text-accent-purple"
+        />
+      </div>
+
+      <input
+        type="text"
+        placeholder="Buscar lead..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:ring-1 focus:ring-accent-cyan/50 focus:border-accent-cyan outline-none"
+      />
+
+      {filtered.length === 0 ? (
+        <p className="text-gray-500 text-sm text-center py-8">
+          {search ? "Sin resultados." : "Sin leads de llamadas en este período."}
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {filtered.map((lead) => (
+            <button
+              key={lead.id}
+              type="button"
+              onClick={() => onSelectLead(lead)}
+              className="w-full text-left rounded-lg bg-surface-700 hover:bg-surface-600 px-3 py-2.5 transition-colors group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-surface-600 flex items-center justify-center shrink-0 group-hover:bg-surface-500">
+                    <User className="w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-white truncate">
+                      {lead.name}
+                    </p>
+                    <p className="text-[10px] text-gray-500 truncate">
+                      {lead.email ?? lead.phone ?? "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${estadoColor(lead.estadoNormalizado)}`}
                   >
-                    <span className="text-gray-300">
+                    {estadoLabel(lead.estadoNormalizado)}
+                  </span>
+                  {lead.intentosContacto > 0 && (
+                    <span className="text-[10px] text-gray-500">
+                      {lead.intentosContacto} int.
+                    </span>
+                  )}
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400" />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabChats({
+  data,
+  onSelectChat,
+}: {
+  data: AsesorResponse;
+  onSelectChat: (chat: AsesorChat) => void;
+}) {
+  const { kpis, chats } = data;
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return chats;
+    const q = search.toLowerCase();
+    return chats.filter(
+      (c) =>
+        (c.leadName && c.leadName.toLowerCase().includes(q)) ||
+        (c.leadEmail && c.leadEmail.toLowerCase().includes(q)),
+    );
+  }, [chats, search]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-4 gap-2">
+        <KpiMini
+          label="Total chats"
+          value={kpis.totalChats}
+          color="text-white"
+        />
+        <KpiMini
+          label="Respondidos"
+          value={kpis.chatsConRespuesta}
+          color="text-accent-green"
+        />
+        <KpiMini
+          label="Tasa resp."
+          value={`${Math.round(kpis.tasaRespuestaChats * 100)}%`}
+          color="text-accent-cyan"
+        />
+        <KpiMini
+          label="Speed to lead"
+          value={
+            kpis.speedToLeadChatsAvg !== null
+              ? formatDuration(Math.round(kpis.speedToLeadChatsAvg))
+              : "—"
+          }
+          color="text-accent-amber"
+        />
+      </div>
+
+      <input
+        type="text"
+        placeholder="Buscar chat..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:ring-1 focus:ring-accent-cyan/50 focus:border-accent-cyan outline-none"
+      />
+
+      {filtered.length === 0 ? (
+        <p className="text-gray-500 text-sm text-center py-8">
+          {search ? "Sin resultados." : "Sin chats en este período."}
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {filtered.map((chat) => (
+            <button
+              key={chat.chatId}
+              type="button"
+              onClick={() => onSelectChat(chat)}
+              className="w-full text-left rounded-lg bg-surface-700 hover:bg-surface-600 px-3 py-2.5 transition-colors group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-surface-600 flex items-center justify-center shrink-0 group-hover:bg-surface-500">
+                    <MessageSquare className="w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-white truncate">
+                      {chat.leadName ?? "—"}
+                    </p>
+                    <p className="text-[10px] text-gray-500 truncate">
                       {formatDate(chat.fechaUltimoMensaje)} ·{" "}
                       {chat.messages.length} msgs
-                    </span>
-                    <ChevronRight
-                      className={`w-3.5 h-3.5 text-gray-500 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-3 pb-3 space-y-1.5 max-h-60 overflow-y-auto border-t border-surface-600">
-                      {chat.messages.map((msg, mi) => (
-                        <ChatBubble key={mi} msg={msg} />
-                      ))}
-                    </div>
-                  )}
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      chat.respondido
+                        ? "bg-accent-green/20 text-accent-green"
+                        : "bg-accent-red/20 text-accent-red"
+                    }`}
+                  >
+                    {chat.respondido ? "Respondido" : "Sin resp."}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400" />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
       )}
-
-      {lead.notasLlamadas.length === 0 &&
-        lead.videollamadas.length === 0 &&
-        lead.chats.length === 0 && (
-          <p className="text-gray-500 text-sm text-center py-6">
-            Sin interacciones registradas para este lead.
-          </p>
-        )}
     </div>
   );
 }
 
-function ChatBubble({ msg }: { msg: AsesorChatMessage }) {
-  const isLead = msg.role === "lead";
-  return (
-    <div className={`flex ${isLead ? "justify-start" : "justify-end"} mt-1.5`}>
-      <div
-        className={`max-w-[80%] rounded-lg px-2.5 py-1.5 text-xs ${
-          isLead
-            ? "bg-surface-600 text-gray-300"
-            : "bg-accent-cyan/20 text-accent-cyan"
-        }`}
-      >
-        <p className="whitespace-pre-wrap break-words">{msg.message}</p>
-        <p
-          className={`text-[10px] mt-0.5 ${isLead ? "text-gray-500" : "text-accent-cyan/60"}`}
-        >
-          {formatDate(msg.timestamp)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function LeadRow({
-  lead,
-  onClick,
+function TabCitas({
+  data,
+  onSelectCita,
 }: {
-  lead: LeadUnificado;
-  onClick: () => void;
+  data: AsesorResponse;
+  onSelectCita: (cita: AsesorVideollamada) => void;
 }) {
-  const channels: string[] = [];
-  if (lead.notasLlamadas.length > 0) channels.push("llamadas");
-  if (lead.videollamadas.length > 0) channels.push("video");
-  if (lead.chats.length > 0) channels.push("chat");
+  const { kpis, videollamadas } = data;
+  const [search, setSearch] = useState("");
+
+  const asistidas = videollamadas.filter(
+    (v) =>
+      v.categoria === "asistio" ||
+      v.categoria === "calificada" ||
+      v.categoria === "cerrada",
+  ).length;
+  const noShow = videollamadas.filter(
+    (v) => v.categoria === "no_asistio" || v.categoria === "no_show",
+  ).length;
+  const tasaAsistencia =
+    kpis.reunionesAgendadas > 0
+      ? Math.round((asistidas / kpis.reunionesAgendadas) * 100)
+      : 0;
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return videollamadas;
+    const q = search.toLowerCase();
+    return videollamadas.filter(
+      (v) =>
+        (v.leadName && v.leadName.toLowerCase().includes(q)) ||
+        (v.leadEmail && v.leadEmail.toLowerCase().includes(q)),
+    );
+  }, [videollamadas, search]);
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left rounded-lg bg-surface-700 hover:bg-surface-600 px-3 py-2.5 transition-colors group"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-surface-600 flex items-center justify-center shrink-0 group-hover:bg-surface-500">
-            <User className="w-3.5 h-3.5 text-gray-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-white truncate">
-              {lead.name}
-            </p>
-            <p className="text-[10px] text-gray-500 truncate">
-              {lead.email ?? lead.phone ?? "—"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span
-            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${estadoColor(lead.estadoNormalizado)}`}
-          >
-            {estadoLabel(lead.estadoNormalizado)}
-          </span>
-          <div className="flex gap-1">
-            {channels.includes("llamadas") && (
-              <Phone className="w-3 h-3 text-accent-cyan" />
-            )}
-            {channels.includes("video") && (
-              <Video className="w-3 h-3 text-accent-purple" />
-            )}
-            {channels.includes("chat") && (
-              <MessageSquare className="w-3 h-3 text-accent-amber" />
-            )}
-          </div>
-          <ChevronRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400" />
-        </div>
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-4 gap-2">
+        <KpiMini
+          label="Agendadas"
+          value={kpis.reunionesAgendadas}
+          color="text-white"
+        />
+        <KpiMini
+          label="Asistidas"
+          value={asistidas}
+          color="text-accent-green"
+        />
+        <KpiMini
+          label="No-show"
+          value={noShow}
+          color="text-accent-red"
+        />
+        <KpiMini
+          label="Tasa asist."
+          value={`${tasaAsistencia}%`}
+          color="text-accent-cyan"
+        />
       </div>
-    </button>
+
+      <input
+        type="text"
+        placeholder="Buscar cita..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:ring-1 focus:ring-accent-cyan/50 focus:border-accent-cyan outline-none"
+      />
+
+      {filtered.length === 0 ? (
+        <p className="text-gray-500 text-sm text-center py-8">
+          {search ? "Sin resultados." : "Sin citas en este período."}
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {filtered.map((cita) => (
+            <button
+              key={cita.id}
+              type="button"
+              onClick={() => onSelectCita(cita)}
+              className="w-full text-left rounded-lg bg-surface-700 hover:bg-surface-600 px-3 py-2.5 transition-colors group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-surface-600 flex items-center justify-center shrink-0 group-hover:bg-surface-500">
+                    <Video className="w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-white truncate">
+                      {cita.leadName ?? "—"}
+                    </p>
+                    <p className="text-[10px] text-gray-500 truncate">
+                      {formatDate(cita.fechaReunion)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${categoriaColor(cita.categoria)}`}
+                  >
+                    {categoriaLabel(cita.categoria)}
+                  </span>
+                  {cita.facturacion > 0 && (
+                    <span className="text-[10px] text-accent-green">
+                      ${cita.facturacion.toLocaleString()}
+                    </span>
+                  )}
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400" />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
-const TABS: { key: Tab; label: string; icon: typeof CheckCircle2 }[] = [
-  { key: "contestaron", label: "Contestaron", icon: CheckCircle2 },
-  { key: "interesados", label: "Interesados", icon: AlertCircle },
-  { key: "agendaron", label: "Agendaron", icon: Calendar },
-  { key: "todos", label: "Todos", icon: Filter },
+const CHANNEL_TABS: {
+  key: ChannelTab;
+  label: string;
+  icon: typeof Phone;
+  tooltip: string;
+}[] = [
+  {
+    key: "llamadas",
+    label: "Llamadas",
+    icon: Phone,
+    tooltip:
+      "Métricas de llamadas del asesor: realizadas, contestadas, tasa de contacto y leads agendados desde llamadas.",
+  },
+  {
+    key: "chats",
+    label: "Chats",
+    icon: MessageSquare,
+    tooltip:
+      "Métricas de chats del asesor: total de conversaciones, respondidos, tasa de respuesta y velocidad de atención.",
+  },
+  {
+    key: "citas",
+    label: "Citas",
+    icon: Calendar,
+    tooltip:
+      "Métricas de citas/videollamadas del asesor: agendadas, asistidas, no-show y tasa de asistencia.",
+  },
 ];
+
+type DetailView =
+  | { kind: "lead"; data: AsesorLeadCRM }
+  | { kind: "chat"; data: AsesorChat }
+  | { kind: "cita"; data: AsesorVideollamada };
 
 export default function AdvisorDrillDown({
   advisorName,
@@ -484,9 +743,8 @@ export default function AdvisorDrillDown({
   dateTo,
   onClose,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>("todos");
-  const [selectedLead, setSelectedLead] = useState<LeadUnificado | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<ChannelTab>("llamadas");
+  const [detail, setDetail] = useState<DetailView | null>(null);
 
   const hasEmail = Boolean(advisorEmail);
 
@@ -500,47 +758,35 @@ export default function AdvisorDrillDown({
     { enabled: hasEmail },
   );
 
-  const leadsUnificados = useMemo(() => {
-    if (!data) return [];
-    return unificarLeads(data.leads, data.videollamadas, data.chats);
+  const availableTabs = useMemo(() => {
+    if (!data) return CHANNEL_TABS;
+    return CHANNEL_TABS.filter((tab) => {
+      switch (tab.key) {
+        case "llamadas":
+          return data.canales.llamadas;
+        case "chats":
+          return data.canales.chats;
+        case "citas":
+          return data.canales.videollamadas;
+        default:
+          return true;
+      }
+    });
   }, [data]);
 
-  const filteredLeads = useMemo(() => {
-    let result = leadsUnificados;
-
-    switch (activeTab) {
-      case "contestaron":
-        result = result.filter((l) => l.contestado);
-        break;
-      case "interesados":
-        result = result.filter((l) => l.interesado);
-        break;
-      case "agendaron":
-        result = result.filter((l) => l.agendado);
-        break;
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (l) =>
-          l.name.toLowerCase().includes(q) ||
-          (l.email && l.email.toLowerCase().includes(q)) ||
-          (l.phone && l.phone.includes(q)),
-      );
-    }
-
-    return result;
-  }, [leadsUnificados, activeTab, searchQuery]);
+  const validActiveTab = useMemo(() => {
+    if (availableTabs.some((t) => t.key === activeTab)) return activeTab;
+    return availableTabs[0]?.key ?? "llamadas";
+  }, [availableTabs, activeTab]);
 
   const tabCounts = useMemo(() => {
+    if (!data) return { llamadas: 0, chats: 0, citas: 0 };
     return {
-      contestaron: leadsUnificados.filter((l) => l.contestado).length,
-      interesados: leadsUnificados.filter((l) => l.interesado).length,
-      agendaron: leadsUnificados.filter((l) => l.agendado).length,
-      todos: leadsUnificados.length,
+      llamadas: data.leads.length,
+      chats: data.chats.length,
+      citas: data.videollamadas.length,
     };
-  }, [leadsUnificados]);
+  }, [data]);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -550,7 +796,6 @@ export default function AdvisorDrillDown({
         aria-hidden
       />
       <div className="relative w-full max-w-2xl ml-auto h-full bg-surface-800 border-l border-surface-500 shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-surface-500 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-accent-cyan/20 flex items-center justify-center">
@@ -561,8 +806,8 @@ export default function AdvisorDrillDown({
                 {advisorName}
                 <HelpTooltip
                   titulo="Detalle del asesor"
-                  contenido="Vista unificada de todos los leads de este asesor. Usa las pestañas para filtrar: Contestaron (leads que respondieron), Interesados (mostraron interés o avanzaron en el embudo), Agendaron (tienen cita programada). Haz click en cualquier lead para ver su tarjeta de contacto con toda su historia."
-                  comoProbar="Haz click en un lead para ver su tarjeta. Cambia de pestaña para ver los leads por estado. Usa el buscador para encontrar un lead específico."
+                  contenido="Vista por canal de todas las interacciones de este asesor. Navega entre Llamadas, Chats y Citas para ver métricas específicas y la lista de contactos de cada canal. Haz click en cualquier registro para ver su detalle completo."
+                  comoProbar="Cambia de pestaña para ver cada canal. Haz click en un lead/chat/cita para ver su detalle."
                 />
               </h2>
               <p className="text-xs text-gray-500">
@@ -589,58 +834,28 @@ export default function AdvisorDrillDown({
                 Este asesor no tiene email registrado.
               </p>
               <p className="text-xs text-gray-600">
-                Sin email no es posible cargar sus leads individuales. Verifica que el asesor tenga un email asignado en el CRM.
+                Sin email no es posible cargar sus datos. Verifica que el asesor
+                tenga un email asignado en el CRM.
               </p>
             </div>
           </div>
         ) : (
           <>
-            {/* KPIs */}
-            {data && (
-              <div className="grid grid-cols-4 gap-2 px-4 pt-3 pb-2 shrink-0">
-                <KpiMini
-                  label="Leads"
-                  value={data.kpis.leadsAsignados}
-                  color="text-white"
-                />
-                <KpiMini
-                  label="Contacto"
-                  value={`${Math.round(data.kpis.tasaContacto * 100)}%`}
-                  color="text-accent-cyan"
-                />
-                <KpiMini
-                  label="Citas"
-                  value={data.kpis.reunionesAgendadas}
-                  color="text-accent-purple"
-                />
-                <KpiMini
-                  label={data.canales.chats ? "Chats" : "Asistidas"}
-                  value={
-                    data.canales.chats
-                      ? data.kpis.totalChats
-                      : data.kpis.reunionesAsistidas
-                  }
-                  color={data.canales.chats ? "text-accent-amber" : "text-accent-green"}
-                />
-              </div>
-            )}
-
-            {/* Tabs */}
             <div className="flex gap-1 px-4 py-2 border-b border-surface-500 shrink-0 overflow-x-auto">
-              {TABS.map((tab) => {
+              {availableTabs.map((tab) => {
                 const count = tabCounts[tab.key];
-                const isActive = activeTab === tab.key;
+                const isActive = validActiveTab === tab.key;
                 return (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => {
                       setActiveTab(tab.key);
-                      setSelectedLead(null);
+                      setDetail(null);
                     }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                       isActive
-                        ? "bg-accent-cyan/20 text-accent-cyan"
+                        ? "bg-accent-cyan text-surface-900"
                         : "text-gray-400 hover:text-white hover:bg-surface-700"
                     }`}
                   >
@@ -649,32 +864,23 @@ export default function AdvisorDrillDown({
                     <span
                       className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] ${
                         isActive
-                          ? "bg-accent-cyan/30 text-accent-cyan"
+                          ? "bg-surface-900/30 text-surface-900"
                           : "bg-surface-600 text-gray-500"
                       }`}
                     >
                       {count}
                     </span>
+                    <HelpTooltip
+                      titulo={tab.label}
+                      contenido={tab.tooltip}
+                      comoProbar={`Revisa las métricas y la lista de ${tab.label.toLowerCase()} del asesor.`}
+                    />
                   </button>
                 );
               })}
             </div>
 
-            {/* Search */}
-            {!selectedLead && (
-              <div className="px-4 py-2 shrink-0">
-                <input
-                  type="text"
-                  placeholder="Buscar lead por nombre, email o teléfono..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg bg-surface-700 border border-surface-500 px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:ring-1 focus:ring-accent-cyan/50 focus:border-accent-cyan outline-none"
-                />
-              </div>
-            )}
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-4 py-2">
+            <div className="flex-1 overflow-y-auto px-4 py-3">
               {loading && (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-6 h-6 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
@@ -689,31 +895,54 @@ export default function AdvisorDrillDown({
                 </div>
               )}
 
-              {!loading && !error && selectedLead && (
-                <LeadContactCard
-                  lead={selectedLead}
-                  onBack={() => setSelectedLead(null)}
-                />
+              {!loading && !error && detail && (
+                <>
+                  {detail.kind === "lead" && (
+                    <LeadCallDetail
+                      lead={detail.data}
+                      onBack={() => setDetail(null)}
+                    />
+                  )}
+                  {detail.kind === "chat" && (
+                    <ChatDetail
+                      chat={detail.data}
+                      onBack={() => setDetail(null)}
+                    />
+                  )}
+                  {detail.kind === "cita" && (
+                    <CitaDetail
+                      cita={detail.data}
+                      onBack={() => setDetail(null)}
+                    />
+                  )}
+                </>
               )}
 
-              {!loading && !error && !selectedLead && (
+              {!loading && !error && !detail && data && (
                 <>
-                  {filteredLeads.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center py-8">
-                      {searchQuery
-                        ? "Sin resultados para la búsqueda."
-                        : "Sin leads en esta categoría."}
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {filteredLeads.map((lead) => (
-                        <LeadRow
-                          key={lead.id}
-                          lead={lead}
-                          onClick={() => setSelectedLead(lead)}
-                        />
-                      ))}
-                    </div>
+                  {validActiveTab === "llamadas" && (
+                    <TabLlamadas
+                      data={data}
+                      onSelectLead={(lead) =>
+                        setDetail({ kind: "lead", data: lead })
+                      }
+                    />
+                  )}
+                  {validActiveTab === "chats" && (
+                    <TabChats
+                      data={data}
+                      onSelectChat={(chat) =>
+                        setDetail({ kind: "chat", data: chat })
+                      }
+                    />
+                  )}
+                  {validActiveTab === "citas" && (
+                    <TabCitas
+                      data={data}
+                      onSelectCita={(cita) =>
+                        setDetail({ kind: "cita", data: cita })
+                      }
+                    />
                   )}
                 </>
               )}
