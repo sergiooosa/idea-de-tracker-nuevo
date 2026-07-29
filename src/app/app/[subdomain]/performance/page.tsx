@@ -517,6 +517,11 @@ export default function PerformanceVideollamadasPage() {
                               <span className="flex items-center gap-1.5 text-white font-medium">
                                 <User className="w-3.5 h-3.5 text-accent-purple" />
                                 {metrics?.advisorName ?? advisorMeetings[0]?.closer ?? advisorKey}
+                                {metrics && metrics.agendadas > 0 && (
+                                  <span className="text-[10px] font-normal text-gray-400 ml-1">
+                                    (asistencia: {pct((metrics.asistencias / metrics.agendadas) * 100)})
+                                  </span>
+                                )}
                               </span>
                             </td>
                             <td className="px-2 py-2 text-accent-purple">{metrics?.agendadas ?? 0}</td>

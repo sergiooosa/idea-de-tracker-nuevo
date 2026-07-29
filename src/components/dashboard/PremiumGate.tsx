@@ -31,11 +31,12 @@ export default function PremiumGate({
           <Sparkles className="w-6 h-6 text-accent-purple" />
         </div>
         <h4 className="text-sm font-semibold text-white">
-          Función premium
+          Análisis con IA — Función premium
         </h4>
         <p className="text-xs text-gray-400 max-w-md">
           Activá tu llave de Gemini para desbloquear el análisis cualitativo
-          con inteligencia artificial.
+          con inteligencia artificial: resúmenes de conversaciones, detección
+          de objeciones, ranking narrativo de asesores y reportes automáticos.
         </p>
         <button
           type="button"
