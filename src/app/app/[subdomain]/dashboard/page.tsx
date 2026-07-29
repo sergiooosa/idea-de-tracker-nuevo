@@ -442,31 +442,6 @@ export default function DashboardPage() {
           })()}
         </section>}
 
-        {!seccionesOcultas.includes('panel_ventas') && <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5 text-accent-purple" />
-            Proceso de ventas
-          </h2>
-          <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-            {[
-              { label: t.dashboard.kpis.agendadas, value: kpis.meetingsBooked, color: 'purple', sub: `Tasa agend.: ${pctFmt(kpis.tasaAgendamiento)}` },
-              { label: t.dashboard.kpis.asistidas, value: kpis.meetingsAttended, color: 'cyan', sub: `% Asist.: ${kpis.meetingsBooked > 0 ? pctFmt(kpis.meetingsAttended / kpis.meetingsBooked) : '0%'}` },
-              { label: t.dashboard.kpis.canceladas, value: kpis.meetingsCanceled, color: 'red' },
-              { label: 'No shows', value: kpis.noShows, color: 'amber' },
-              { label: t.dashboard.kpis.cerradas, value: kpis.meetingsClosed, color: 'green', sub: `Tasa cierre: ${pctFmt(kpis.tasaCierre)}` },
-              { label: t.dashboard.kpis.efectivoCobrado, value: fm(kpis.cashCollected), color: 'green' },
-              ...((kpis.pendientesAgendas ?? 0) > 0 ? [{ label: 'Pendientes', value: kpis.pendientesAgendas ?? 0, color: 'blue' as const, sub: 'Sin clasificar aún' }] : []),
-            ].map(({ label, value, color, sub }) => (
-              <div key={label} className={`rounded-lg pl-3 overflow-hidden flex flex-col card-futuristic-${color} kpi-card-fixed`}>
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-tight mt-1">{label}</p>
-                <p className={`text-base font-bold mt-0.5 text-accent-${color} break-words`}>{value}</p>
-                {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
-                <div className="kpi-card-spacer" />
-              </div>
-            ))}
-          </div>
-        </section>}
-
         {(data?.segmentacionCalificadoCanal?.length ?? 0) > 0 && (
           <SegmentacionCalificados
             dateFrom={dateFrom}
