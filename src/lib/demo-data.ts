@@ -255,6 +255,7 @@ export function generateLlamadas(): LlamadasResponse {
       duracionSegundos: outcome === "answered" ? rnd(30, 600) : null,
       enrichment: null,
       objeciones: null,
+      resumenLlamada: null,
     };
   });
 

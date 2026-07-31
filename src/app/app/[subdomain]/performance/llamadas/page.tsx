@@ -7,7 +7,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { BarChart3, CheckCircle2, Clock, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus, CalendarCheck } from 'lucide-react';
+import { BarChart3, CheckCircle2, Clock, ClipboardList, FileText, MapPin, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, Target, User, Users, Wallet, X, Plus, CalendarCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
@@ -797,6 +797,31 @@ export default function PerformanceLlamadasPage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {modalCall.resumenLlamada && (
+                <div>
+                  <h4 className="text-xs font-semibold text-accent-amber mb-2 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5" /> Resumen de la llamada</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      { icon: MapPin, label: "Ubicación", value: modalCall.resumenLlamada.ubicacion },
+                      { icon: Target, label: "Objetivo", value: modalCall.resumenLlamada.objetivo },
+                      { icon: Wallet, label: "Presupuesto", value: modalCall.resumenLlamada.presupuesto },
+                      { icon: Users, label: "Quién decide", value: modalCall.resumenLlamada.quien_decide },
+                      { icon: CheckCircle2, label: "Desenlace", value: modalCall.resumenLlamada.desenlace, fullWidth: true },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <div key={item.label} className={`flex items-start gap-2 rounded-lg bg-surface-700/50 p-2.5 ${("fullWidth" in item && item.fullWidth) ? "sm:col-span-2" : ""}`}>
+                          <Icon className="w-3.5 h-3.5 text-accent-amber mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase tracking-wide text-gray-500">{item.label}</span>
+                            <p className="text-sm text-gray-300 leading-snug">{item.value || "No mencionado"}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {modalCall.transcripcion && (
                 <div>
                   <h4 className="text-xs font-semibold text-accent-cyan mb-1 flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Transcripción</h4>
