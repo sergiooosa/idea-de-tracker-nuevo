@@ -64,12 +64,20 @@ const URGENCIA_STYLES: Record<UrgenciaNivel, { badge: string; dot: string }> = {
   },
 };
 
-const CANAL_OPTIONS: { value: CanalLeadsEnEspera; label: string; icon: typeof Phone }[] = [
+// AUT-1944: detección de "sin contestar" marca como no-contestados leads que sí se contestaron.
+// Reactivar cuando la detección sea confiable.
+const SHOW_CHAT_SIN_CONTESTAR = false;
+
+const ALL_CANAL_OPTIONS: { value: CanalLeadsEnEspera; label: string; icon: typeof Phone }[] = [
   { value: "ninguno", label: "Ninguno", icon: Ban },
   { value: "llamada", label: "Llamada", icon: PhoneCall },
   { value: "chat", label: "Chat", icon: MessageSquare },
   { value: "chat_sin_contestar", label: "Sin contestar", icon: MessageSquareX },
 ];
+
+const CANAL_OPTIONS = SHOW_CHAT_SIN_CONTESTAR
+  ? ALL_CANAL_OPTIONS
+  : ALL_CANAL_OPTIONS.filter((o) => o.value !== "chat_sin_contestar");
 
 const CANAL_SUBTITULO: Record<CanalLeadsEnEspera, string> = {
   llamada: "primera llamada",
