@@ -523,6 +523,7 @@ export interface DashboardObjecionDetail {
   advisorName: string;
   datetime: string;
   quote: string;
+  contexto?: string;
   respuestaVendedor?: string;
 }
 
