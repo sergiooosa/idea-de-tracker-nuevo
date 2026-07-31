@@ -798,7 +798,7 @@ export async function getDashboard(
     chat: {},
     llamada: {},
   };
-  type RawObjecion = { objecion?: string; categoria?: string; respuesta_vendedor?: string };
+  type RawObjecion = { objecion?: string; categoria?: string; respuesta_vendedor?: string; contexto?: string };
   const toList = (x: unknown): RawObjecion[] =>
     Array.isArray(x)
       ? (x as RawObjecion[])
@@ -819,6 +819,7 @@ export async function getDashboard(
         datetime: ctx.datetime,
         quote: obj.objecion ?? key,
         respuestaVendedor: obj.respuesta_vendedor || undefined,
+        contexto: obj.contexto || undefined,
       };
       // Global map
       if (!objMapGlobal[key]) objMapGlobal[key] = { count: 0, quotes: new Set(), details: [] };
