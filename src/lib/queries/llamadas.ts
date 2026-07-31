@@ -215,39 +215,40 @@ export async function getLlamadas(
       ? attemptsToFirstContact.reduce((s, v) => s + v, 0) / attemptsToFirstContact.length
       : 0;
 
-  const leadsNuevosSet = new Set<number>();
-  const leadsReactivadosSet = new Set<number>();
+  // Classify unique leads as nuevo/reactivado using the SAME lead-key base as totalLeads.
+  // A lead is "nuevo" if its earliest fecha_primera_llamada falls within the date range.
+  const fechaPrimeraByLeadKey = new Map<string, Date>();
   for (const r of regRowsResolved) {
+    const k = regLeadKey(r);
     const fp = r.fecha_primera_llamada;
-    if (fp && fp >= fromTs && fp <= toTs) {
-      leadsNuevosSet.add(r.id_registro);
-    } else {
-      leadsReactivadosSet.add(r.id_registro);
+    if (fp) {
+      const prev = fechaPrimeraByLeadKey.get(k);
+      if (!prev || fp < prev) fechaPrimeraByLeadKey.set(k, fp);
     }
   }
 
-  const registroIdToNuevo = new Map<number, boolean>();
-  for (const r of regRowsResolved) {
-    registroIdToNuevo.set(r.id_registro, leadsNuevosSet.has(r.id_registro));
+  const leadKeyIsNuevo = new Map<string, boolean>();
+  for (const k of uniqueLeads) {
+    const fp = fechaPrimeraByLeadKey.get(k);
+    leadKeyIsNuevo.set(k, !!(fp && fp >= fromTs && fp <= toTs));
   }
+
+  const leadsNuevosCount = [...leadKeyIsNuevo.values()].filter(Boolean).length;
+  const leadsReactivadosCount = uniqueLeads.size - leadsNuevosCount;
 
   let contestadasNuevos = 0;
   let contestadasReactivados = 0;
   for (const r of registros) {
     if (r.outcome !== "answered") continue;
-    const regId = r.id_registro;
-    if (regId != null && registroIdToNuevo.has(regId)) {
-      if (registroIdToNuevo.get(regId)) contestadasNuevos++;
-      else contestadasReactivados++;
-    } else {
-      contestadasReactivados++;
-    }
+    const k = leadKey(r);
+    if (leadKeyIsNuevo.get(k)) contestadasNuevos++;
+    else contestadasReactivados++;
   }
 
   const answerRateNuevos = (() => {
     let callsN = 0;
     for (const r of registros) {
-      if (r.id_registro != null && registroIdToNuevo.get(r.id_registro)) callsN++;
+      if (leadKeyIsNuevo.get(leadKey(r))) callsN++;
     }
     return callsN > 0 ? contestadasNuevos / callsN : 0;
   })();
@@ -255,7 +256,7 @@ export async function getLlamadas(
   const answerRateReactivados = (() => {
     let callsR = 0;
     for (const r of registros) {
-      if (r.id_registro == null || !registroIdToNuevo.has(r.id_registro) || !registroIdToNuevo.get(r.id_registro)) callsR++;
+      if (!leadKeyIsNuevo.get(leadKey(r))) callsR++;
     }
     return callsR > 0 ? contestadasReactivados / callsR : 0;
   })();
@@ -268,8 +269,8 @@ export async function getLlamadas(
     attemptsAvg,
     firstContactAttempts,
     answerRate: registros.length > 0 ? answered / registros.length : 0,
-    leadsNuevos: leadsNuevosSet.size,
-    leadsReactivados: leadsReactivadosSet.size,
+    leadsNuevos: leadsNuevosCount,
+    leadsReactivados: leadsReactivadosCount,
     contestadasNuevos,
     contestadasReactivados,
     answerRateNuevos,
