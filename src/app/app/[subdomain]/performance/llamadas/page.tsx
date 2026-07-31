@@ -7,7 +7,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { BarChart3, CheckCircle2, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus, CalendarCheck } from 'lucide-react';
+import { BarChart3, CheckCircle2, Clock, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus, CalendarCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
@@ -43,7 +43,7 @@ function isAnswered(c: ApiLlamadaLog) {
   return c.tipoEvento?.startsWith('efectiva_') ?? false;
 }
 
-type ResultadoFiltro = 'todos' | 'contestadas' | 'no_contestaron' | 'no_interesadas' | 'interesadas';
+type ResultadoFiltro = 'todos' | 'contestadas' | 'no_contestaron' | 'no_interesadas' | 'interesadas' | 'programado';
 
 const ESTADOS_NO_CONTESTARON = new Set([
   'no_contestado', 'buzon_voz', 'no_contesto', 'no_contestada',
@@ -52,8 +52,9 @@ const ESTADOS_NO_INTERESADAS = new Set([
   'no_interesado', 'no_calificada', 'no_elegible',
 ]);
 const ESTADOS_INTERESADAS = new Set([
-  'calificada', 'interesado', 'programado', 'seguimiento', 'reagendado',
+  'calificada', 'interesado', 'seguimiento', 'reagendado',
 ]);
+const ESTADOS_PROGRAMADO = new Set(['programado']);
 
 const ESTADOS_CALIFICADOS = new Set(['calificada', 'calificado']);
 
@@ -71,6 +72,7 @@ function categoriaResultado(estado: string | null): ResultadoFiltro | null {
   if (s.startsWith('seguimiento')) return 'interesadas';
   if (ESTADOS_NO_CONTESTARON.has(s) || s === 'nocontest') return 'no_contestaron';
   if (ESTADOS_NO_INTERESADAS.has(s)) return 'no_interesadas';
+  if (ESTADOS_PROGRAMADO.has(s)) return 'programado';
   if (ESTADOS_INTERESADAS.has(s)) return 'interesadas';
   return null;
 }
@@ -81,6 +83,7 @@ const RESULTADO_FILTROS: { key: ResultadoFiltro; label: string; icon: typeof Pho
   { key: 'no_contestaron', label: 'No contestaron', icon: PhoneMissed, active: 'bg-accent-amber/20 text-accent-amber border-accent-amber/50', inactive: 'hover:border-accent-amber/30', badge: 'bg-accent-amber/30' },
   { key: 'no_interesadas', label: 'No interesadas', icon: PhoneOff, active: 'bg-red-400/20 text-red-400 border-red-400/50', inactive: 'hover:border-red-400/30', badge: 'bg-red-400/30' },
   { key: 'interesadas', label: 'Interesadas', icon: PhoneForwarded, active: 'bg-emerald-400/20 text-emerald-400 border-emerald-400/50', inactive: 'hover:border-emerald-400/30', badge: 'bg-emerald-400/30' },
+  { key: 'programado', label: 'Programado', icon: Clock, active: 'bg-violet-400/20 text-violet-400 border-violet-400/50', inactive: 'hover:border-violet-400/30', badge: 'bg-violet-400/30' },
 ];
 
 export default function PerformanceLlamadasPage() {
@@ -137,7 +140,7 @@ export default function PerformanceLlamadasPage() {
   }, [data?.leads, data?.registros]);
 
   const resultadoCounts = useMemo(() => {
-    const counts: Record<ResultadoFiltro, number> = { todos: 0, contestadas: 0, no_contestaron: 0, no_interesadas: 0, interesadas: 0 };
+    const counts: Record<ResultadoFiltro, number> = { todos: 0, contestadas: 0, no_contestaron: 0, no_interesadas: 0, interesadas: 0, programado: 0 };
     if (!data?.leads) return counts;
     for (const l of data.leads) {
       counts.todos++;
