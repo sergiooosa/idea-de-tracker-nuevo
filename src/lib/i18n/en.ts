@@ -109,6 +109,7 @@ export const en: Translations = {
         contactados: "Contacted",
         mensajes: "Total messages",
         speedToLead: "Speed to lead avg",
+        msgsPromedio: "Avg msgs/lead",
       },
     },
   },

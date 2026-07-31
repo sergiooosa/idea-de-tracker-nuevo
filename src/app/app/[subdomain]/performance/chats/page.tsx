@@ -49,6 +49,7 @@ const chatKpiTooltips = {
   speedToLead: { significado: 'Tiempo promedio desde primer mensaje del lead hasta primera respuesta del agente.', calculo: 'Promedio de (timestamp primer msg agente − timestamp primer msg lead).' },
   sinRespuesta: { significado: 'Chats donde el lead esperó respuesta y aún no hubo una del agente.', calculo: 'Chats con minutesSinceLastLeadMsg != null (el agente no respondió después del último mensaje del lead).' },
   sinContactar: { significado: '% de chats donde ningún humano respondió al lead.', calculo: 'Chats sin humanTookOver / total × 100.' },
+  msgsPromedio: { significado: 'Promedio de mensajes por chat (lead + agente).', calculo: 'Total de mensajes / número de chats asignados en el período.' },
 };
 
 type Canal = 'todos' | 'WhatsApp' | 'FB' | 'IG' | 'SMS' | 'Custom';
@@ -343,12 +344,13 @@ export default function PerformanceChatsPage() {
       </div>
 
       {/* ── KPIs principales ── */}
-      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-8 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
         {[
           { label: t.performance.chats.kpis.asignados, value: agg.assigned, color: 'cyan', tip: chatKpiTooltips.asignados },
           { label: t.performance.chats.kpis.activos, value: agg.activos, color: 'cyan', tip: chatKpiTooltips.activos },
           { label: t.performance.chats.kpis.contactados, value: agg.activos, color: 'cyan', tip: chatKpiTooltips.contactados },
           { label: t.performance.chats.kpis.mensajes, value: agg.seguimientosTotal, color: 'purple', tip: chatKpiTooltips.seguimientos },
+          { label: t.performance.chats.kpis.msgsPromedio, value: agg.assigned > 0 ? (agg.seguimientosTotal / agg.assigned).toFixed(1) : '—', color: 'pink', tip: chatKpiTooltips.msgsPromedio },
           { label: t.performance.chats.kpis.speedToLead, value: minFmt(agg.speedAvg), color: 'purple', tip: chatKpiTooltips.speedToLead },
           { label: 'Sin respuesta', value: extraKpis.sinRespuesta, color: 'amber', tip: chatKpiTooltips.sinRespuesta },
           { label: '% Sin contactar', value: `${extraKpis.pctSinContactar}%`, color: 'amber', tip: chatKpiTooltips.sinContactar },

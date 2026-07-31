@@ -107,6 +107,7 @@ export const es = {
         contactados: "Contactados",
         mensajes: "Mensajes totales",
         speedToLead: "Speed to lead prom.",
+        msgsPromedio: "Msgs prom/lead",
       },
     },
   },
