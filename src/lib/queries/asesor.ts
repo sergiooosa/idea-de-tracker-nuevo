@@ -417,12 +417,34 @@ export async function getAsesorData(
   };
 
   // ── Módulos habilitados a nivel de tenant ─────────────────────────────────
-  // Determina qué tabs mostrar independientemente del asesor seleccionado.
-  // Llamadas se habilita si el tenant tiene Twilio/GHL configurado o tiene datos reales.
+  // Data-driven: si el tenant tiene datos en el rango (de cualquier asesor), habilitar el tab.
+  const [tenantCounts] = await db
+    .execute(
+      sql`SELECT
+        (SELECT COUNT(*) FROM log_llamadas WHERE id_cuenta = ${idCuenta} AND ts >= ${fromTs} AND ts <= ${toTs} AND tipo_evento NOT IN ('pdte','contacto_creado') LIMIT 1) > 0 AS has_llamadas,
+        (SELECT COUNT(*) FROM resumenes_diarios_agendas WHERE id_cuenta = ${idCuenta} AND (
+          (fecha_reunion IS NOT NULL AND fecha_reunion >= ${fromTs} AND fecha_reunion <= ${toTs})
+          OR (fecha_reunion IS NULL AND fecha >= ${dateFrom} AND fecha <= ${dateTo})
+        ) LIMIT 1) > 0 AS has_videollamadas,
+        (SELECT COUNT(*) FROM chats_logs WHERE id_cuenta = ${idCuenta} AND fecha_y_hora_z >= ${fromTs} AND fecha_y_hora_z <= ${toTs} LIMIT 1) > 0 AS has_chats`,
+    )
+    .then(
+      (r) =>
+        r.rows as Array<{
+          has_llamadas: boolean;
+          has_videollamadas: boolean;
+          has_chats: boolean;
+        }>,
+    );
+
   const modulosHabilitados: AsesorCanales = {
-    llamadas: callRows.length > 0 || regRows.length > 0 || !!cuentaRow?.fuente_llamadas,
-    videollamadas: !!modulosActivos.videollamadas_fathom,
-    chats: !!modulosActivos.chats,
+    llamadas:
+      (tenantCounts?.has_llamadas ?? false) || !!cuentaRow?.fuente_llamadas,
+    videollamadas: tenantCounts?.has_videollamadas ?? false,
+    chats:
+      (tenantCounts?.has_chats ?? false) ||
+      !!modulosActivos.chats ||
+      !!modulosActivos.seccion_chats_dashboard,
     metricasCustom: metricasAtribuibles.length > 0,
   };
 

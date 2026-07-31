@@ -330,7 +330,7 @@ export default function PerformanceLlamadasPage() {
 
   const defaultTo = new Date();
   const defaultFrom = subDays(defaultTo, 7);
-  const aggRaw = data?.agg ?? { totalLeads: 0, totalCalls: 0, answered: 0, speedAvg: 0, attemptsAvg: 0, firstContactAttempts: 0, answerRate: 0 };
+  const aggRaw = data?.agg ?? { totalLeads: 0, totalCalls: 0, answered: 0, speedAvg: 0, attemptsAvg: 0, firstContactAttempts: 0, answerRate: 0, leadsNuevos: 0, leadsReactivados: 0, contestadasNuevos: 0, contestadasReactivados: 0, answerRateNuevos: 0, answerRateReactivados: 0 };
   const agg = useMemo(() => {
     if (!data?.advisorMetrics) return aggRaw;
     const allKeys = Object.keys(data.advisorMetrics);
@@ -348,7 +348,7 @@ export default function PerformanceLlamadasPage() {
     const speedAvg = speedValues.length > 0 ? speedValues.reduce((a, b) => a + b, 0) / speedValues.length : 0;
     const answerRate = totalCalls > 0 ? answered / totalCalls : 0;
     const attemptsAvg = totalLeads > 0 ? totalCalls / totalLeads : 0;
-    return { totalLeads, totalCalls, answered, speedAvg, attemptsAvg, firstContactAttempts: aggRaw.firstContactAttempts, answerRate };
+    return { totalLeads, totalCalls, answered, speedAvg, attemptsAvg, firstContactAttempts: aggRaw.firstContactAttempts, answerRate, leadsNuevos: aggRaw.leadsNuevos, leadsReactivados: aggRaw.leadsReactivados, contestadasNuevos: aggRaw.contestadasNuevos, contestadasReactivados: aggRaw.contestadasReactivados, answerRateNuevos: aggRaw.answerRateNuevos, answerRateReactivados: aggRaw.answerRateReactivados };
   }, [aggRaw, data?.advisorMetrics, isAdvisorVisible]);
   const kpiCompact = "[&>p:nth-child(2)]:text-base [&>p:first-child]:text-[9px] [&>p:first-child]:mt-1 rounded-lg pl-3";
 
@@ -417,13 +417,14 @@ export default function PerformanceLlamadasPage() {
           {Object.keys(leadsByAdvisorFiltered).length === 0 ? ' — prueba otro término' : ''}
         </p>
       )}
-      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
-        <KPICard label={t.performance.llamadas.kpis.leads} value={agg.totalLeads} color="blue" className={kpiCompact} tooltip={{ significado: 'Leads únicos con al menos una llamada.', calculo: 'Distintos mail_lead en el rango.' }} />
+      <div className="grid grid-cols-2 min-[500px]:grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-1.5 sm:gap-2 [grid-auto-rows:minmax(64px,auto)]">
+        <KPICard label={t.performance.llamadas.kpis.leads} value={agg.totalLeads} color="blue" className={kpiCompact} subValue={`Nuevos ${agg.leadsNuevos} | Reactivados ${agg.leadsReactivados}`} tooltip={{ significado: 'Leads únicos con al menos una llamada.', calculo: 'Distintos mail_lead en el rango. Nuevos = primera llamada en el período. Reactivados = primera llamada anterior al período.' }} />
         <KPICard label={t.performance.llamadas.kpis.total} value={agg.totalCalls} color="cyan" className={kpiCompact} tooltip={{ significado: 'Todas las llamadas en el rango.', calculo: 'Suma de eventos.' }} />
+        <KPICard label="Contestadas" value={agg.answered} color="green" className={kpiCompact} subValue={`Nuevos ${agg.contestadasNuevos} | Reactivados ${agg.contestadasReactivados}`} tooltip={{ significado: 'Llamadas contestadas en el rango.', calculo: 'Llamadas con outcome = answered. Split por tipo de lead.' }} />
+        <KPICard label="Tasa de contestación" value={pct(agg.answerRate * 100)} color="green" className={kpiCompact} subValue={`Nuevos ${pct(agg.answerRateNuevos * 100)} | Reactivados ${pct(agg.answerRateReactivados * 100)}`} tooltip={{ significado: '% de llamadas contestadas.', calculo: '(Contestadas / Total) × 100. Dividido por leads nuevos vs reactivados.' }} />
         <KPICard label={t.performance.llamadas.kpis.tiempoLead} value={minFmt(agg.speedAvg)} color="purple" className={kpiCompact} tooltip={{ significado: 'Tiempo promedio en contactar al lead.', calculo: 'Promedio de speed_to_lead.' }} />
         <KPICard label={t.performance.llamadas.kpis.intentosProm} value={agg.attemptsAvg.toFixed(1)} color="amber" className={kpiCompact} tooltip={{ significado: 'Intentos promedios por lead.', calculo: 'Total llamadas / leads únicos.' }} />
         <KPICard label={t.performance.llamadas.kpis.intentosPrimerContacto} value={agg.firstContactAttempts.toFixed(1)} color="purple" className={kpiCompact} tooltip={{ significado: 'Llamadas hasta que el lead contesta.', calculo: 'Promedio de intentos por lead.' }} />
-        <KPICard label="Tasa de contestación" value={pct(agg.answerRate * 100)} color="green" className={kpiCompact} tooltip={{ significado: '% de llamadas contestadas.', calculo: '(Contestadas / Total) × 100.' }} />
       </div>
 
       {/* ── KPI Calificados ── */}
