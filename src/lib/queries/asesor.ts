@@ -62,6 +62,23 @@ async function buildCloserMaps(idCuenta: number): Promise<{
       nombreToEmail[u.nombre_closer.toLowerCase()] = u.email;
     }
   }
+
+  const pares = await db
+    .selectDistinct({ email: logLlamadas.closer_mail, nombre: logLlamadas.nombre_closer })
+    .from(logLlamadas)
+    .where(and(
+      eq(logLlamadas.id_cuenta, idCuenta),
+      isNotNull(logLlamadas.closer_mail),
+      isNotNull(logLlamadas.nombre_closer),
+    ));
+  for (const p of pares) {
+    if (!p.email || !p.nombre) continue;
+    const e = p.email.toLowerCase();
+    const n = p.nombre.toLowerCase();
+    if (!emailToNombre[e]) emailToNombre[e] = p.nombre;
+    if (!nombreToEmail[n]) nombreToEmail[n] = p.email;
+  }
+
   return { emailToNombre, nombreToEmail };
 }
 
