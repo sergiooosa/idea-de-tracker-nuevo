@@ -799,7 +799,7 @@ export default function PerformanceLlamadasPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {modalCall.resumenLlamada && (
                 <div>
-                  <h4 className="text-xs font-semibold text-accent-amber mb-2 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5" /> Resumen de la llamada</h4>
+                  <h4 className="text-xs font-semibold text-accent-amber mb-2 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5" /> Resumen de la llamada <KpiTooltip significado="Resumen estructurado generado por IA al finalizar la llamada: dónde vive el prospecto, qué busca, su presupuesto, quién toma la decisión y el desenlace de la conversación." calculo="Extraído automáticamente de la transcripción por el Cerebro." /></h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {[
                       { icon: MapPin, label: "Ubicación", value: modalCall.resumenLlamada.ubicacion },
