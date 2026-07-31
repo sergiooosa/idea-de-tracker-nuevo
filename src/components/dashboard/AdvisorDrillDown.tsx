@@ -751,26 +751,8 @@ export default function AdvisorDrillDown({
     { enabled: hasEmail },
   );
 
-  const availableTabs = useMemo(() => {
-    if (!data) return CHANNEL_TABS;
-    return CHANNEL_TABS.filter((tab) => {
-      switch (tab.key) {
-        case "llamadas":
-          return data.canales.llamadas;
-        case "chats":
-          return data.canales.chats;
-        case "citas":
-          return data.canales.videollamadas;
-        default:
-          return true;
-      }
-    });
-  }, [data]);
-
-  const validActiveTab = useMemo(() => {
-    if (availableTabs.some((t) => t.key === activeTab)) return activeTab;
-    return availableTabs[0]?.key ?? "llamadas";
-  }, [availableTabs, activeTab]);
+  const availableTabs = CHANNEL_TABS;
+  const validActiveTab = activeTab;
 
   const tabCounts = useMemo(() => {
     if (!data) return { llamadas: 0, chats: 0, citas: 0 };
