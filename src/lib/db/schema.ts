@@ -510,7 +510,16 @@ export const logLlamadas = pgTable("log_llamadas", {
   gemini_enriquecimiento: jsonb("gemini_enriquecimiento"),
   duracion_segundos: integer("duracion_segundos"),
   ia_objeciones: jsonb("ia_objeciones").$type<ObjecionIA[]>(),
+  resumen_llamada: jsonb("resumen_llamada").$type<ResumenLlamada>(),
 });
+
+export interface ResumenLlamada {
+  ubicacion: string;
+  objetivo: string;
+  presupuesto: string;
+  quien_decide: string;
+  desenlace: string;
+}
 
 /* ------------------------------------------------------------------ */
 /*  registros_de_llamada — estado actual del lead en ciclo llamadas   */

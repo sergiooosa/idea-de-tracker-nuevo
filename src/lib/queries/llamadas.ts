@@ -10,6 +10,7 @@ import type {
   LlamadasResponse,
   ApiAdvisor,
   LlamadaLead,
+  ResumenLlamada,
 } from "@/types";
 
 const VOZ_CONTESTADA_ESTADOS = new Set([
@@ -153,6 +154,7 @@ export async function getLlamadas(
       duracionSegundos: r.duracion_segundos ?? null,
       enrichment,
       objeciones,
+      resumenLlamada: (r.resumen_llamada as ResumenLlamada | null) ?? null,
     };
   });
 

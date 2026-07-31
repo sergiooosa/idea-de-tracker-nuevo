@@ -303,6 +303,15 @@ export interface ApiLlamadaLog {
   duracionSegundos: number | null;
   enrichment: LlamadaEnrichment | null;
   objeciones: { objecion: string; frase_textual: string | null }[] | null;
+  resumenLlamada: ResumenLlamada | null;
+}
+
+export interface ResumenLlamada {
+  ubicacion: string;
+  objetivo: string;
+  presupuesto: string;
+  quien_decide: string;
+  desenlace: string;
 }
 
 export interface LlamadasAdvisorMetrics {
