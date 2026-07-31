@@ -215,6 +215,51 @@ export async function getLlamadas(
       ? attemptsToFirstContact.reduce((s, v) => s + v, 0) / attemptsToFirstContact.length
       : 0;
 
+  const leadsNuevosSet = new Set<number>();
+  const leadsReactivadosSet = new Set<number>();
+  for (const r of regRowsResolved) {
+    const fp = r.fecha_primera_llamada;
+    if (fp && fp >= fromTs && fp <= toTs) {
+      leadsNuevosSet.add(r.id_registro);
+    } else {
+      leadsReactivadosSet.add(r.id_registro);
+    }
+  }
+
+  const registroIdToNuevo = new Map<number, boolean>();
+  for (const r of regRowsResolved) {
+    registroIdToNuevo.set(r.id_registro, leadsNuevosSet.has(r.id_registro));
+  }
+
+  let contestadasNuevos = 0;
+  let contestadasReactivados = 0;
+  for (const r of registros) {
+    if (r.outcome !== "answered") continue;
+    const regId = r.id_registro;
+    if (regId != null && registroIdToNuevo.has(regId)) {
+      if (registroIdToNuevo.get(regId)) contestadasNuevos++;
+      else contestadasReactivados++;
+    } else {
+      contestadasReactivados++;
+    }
+  }
+
+  const answerRateNuevos = (() => {
+    let callsN = 0;
+    for (const r of registros) {
+      if (r.id_registro != null && registroIdToNuevo.get(r.id_registro)) callsN++;
+    }
+    return callsN > 0 ? contestadasNuevos / callsN : 0;
+  })();
+
+  const answerRateReactivados = (() => {
+    let callsR = 0;
+    for (const r of registros) {
+      if (r.id_registro == null || !registroIdToNuevo.has(r.id_registro) || !registroIdToNuevo.get(r.id_registro)) callsR++;
+    }
+    return callsR > 0 ? contestadasReactivados / callsR : 0;
+  })();
+
   const agg = {
     totalLeads: uniqueLeads.size,
     totalCalls: registros.length,
@@ -223,6 +268,12 @@ export async function getLlamadas(
     attemptsAvg,
     firstContactAttempts,
     answerRate: registros.length > 0 ? answered / registros.length : 0,
+    leadsNuevos: leadsNuevosSet.size,
+    leadsReactivados: leadsReactivadosSet.size,
+    contestadasNuevos,
+    contestadasReactivados,
+    answerRateNuevos,
+    answerRateReactivados,
   };
 
   // Normalizar key de asesor: email en minúsculas tiene prioridad sobre nombre

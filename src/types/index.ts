@@ -354,6 +354,12 @@ export interface LlamadasResponse {
     attemptsAvg: number;
     firstContactAttempts: number;
     answerRate: number;
+    leadsNuevos: number;
+    leadsReactivados: number;
+    contestadasNuevos: number;
+    contestadasReactivados: number;
+    answerRateNuevos: number;
+    answerRateReactivados: number;
   };
   advisorMetrics: Record<string, LlamadasAdvisorMetrics>;
   advisors: ApiAdvisor[];
