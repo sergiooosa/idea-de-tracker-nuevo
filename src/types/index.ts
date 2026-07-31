@@ -303,6 +303,13 @@ export interface ApiLlamadaLog {
   duracionSegundos: number | null;
   enrichment: LlamadaEnrichment | null;
   objeciones: { objecion: string; frase_textual: string | null }[] | null;
+  resumenLlamada: {
+    ubicacion: string;
+    objetivo: string;
+    presupuesto: string;
+    quien_decide: string;
+    desenlace: string;
+  } | null;
 }
 
 export interface LlamadasAdvisorMetrics {
@@ -524,6 +531,7 @@ export interface DashboardObjecionDetail {
   datetime: string;
   quote: string;
   respuestaVendedor?: string;
+  contexto?: string;
 }
 
 export type ObjecionCanal = 'videollamada' | 'chat' | 'llamada';

@@ -134,6 +134,16 @@ export async function getLlamadas(
     const objeciones = Array.isArray(rawObjeciones) && rawObjeciones.length > 0
       ? rawObjeciones.map((o) => ({ objecion: o.objecion, frase_textual: o.frase_textual ?? null }))
       : null;
+    const rawResumen = r.resumen_llamada as { ubicacion?: string; objetivo?: string; presupuesto?: string; quien_decide?: string; desenlace?: string } | null;
+    const resumenLlamada = rawResumen && typeof rawResumen === "object"
+      ? {
+          ubicacion: rawResumen.ubicacion ?? "No mencionado",
+          objetivo: rawResumen.objetivo ?? "No mencionado",
+          presupuesto: rawResumen.presupuesto ?? "No mencionado",
+          quien_decide: rawResumen.quien_decide ?? "No mencionado",
+          desenlace: rawResumen.desenlace ?? "No mencionado",
+        }
+      : null;
     return {
       id: r.id,
       id_registro: r.id_registro != null && r.id_registro > 0 ? r.id_registro : null,
@@ -153,6 +163,7 @@ export async function getLlamadas(
       duracionSegundos: r.duracion_segundos ?? null,
       enrichment,
       objeciones,
+      resumenLlamada,
     };
   });
 

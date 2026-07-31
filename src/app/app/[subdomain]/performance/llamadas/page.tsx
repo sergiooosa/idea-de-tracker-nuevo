@@ -7,7 +7,8 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { BarChart3, CheckCircle2, Clock, FileText, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, User, X, Plus, CalendarCheck } from 'lucide-react';
+import { BarChart3, CheckCircle2, Clock, DollarSign, FileText, Flag, MapPin, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, Target, User, Users, X, Plus, CalendarCheck } from 'lucide-react';
+import HelpTooltip from '@/components/dashboard/HelpTooltip';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
@@ -797,6 +798,40 @@ export default function PerformanceLlamadasPage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {modalCall.resumenLlamada && (
+                <div className="rounded-lg border border-accent-purple/30 bg-accent-purple/5 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Sparkles className="w-3.5 h-3.5 text-accent-purple" />
+                    <h4 className="text-xs font-semibold text-accent-purple">Resumen de la llamada</h4>
+                    <HelpTooltip
+                      titulo="Resumen de la llamada"
+                      contenido="Resumen generado automáticamente por IA a partir de la transcripción. Incluye ubicación del lead, objetivo de compra, presupuesto, quién toma la decisión y el desenlace de la llamada."
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="flex items-start gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <div><span className="text-gray-400 text-xs">Ubicación</span><p className="text-gray-200">{modalCall.resumenLlamada.ubicacion}</p></div>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <div><span className="text-gray-400 text-xs">Objetivo</span><p className="text-gray-200">{modalCall.resumenLlamada.objetivo}</p></div>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <div><span className="text-gray-400 text-xs">Presupuesto</span><p className="text-gray-200">{modalCall.resumenLlamada.presupuesto}</p></div>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <div><span className="text-gray-400 text-xs">Quién decide</span><p className="text-gray-200">{modalCall.resumenLlamada.quien_decide}</p></div>
+                    </div>
+                    <div className="col-span-2 flex items-start gap-1.5">
+                      <Flag className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <div><span className="text-gray-400 text-xs">Desenlace</span><p className="text-gray-200">{modalCall.resumenLlamada.desenlace}</p></div>
+                    </div>
+                  </div>
+                </div>
+              )}
               {modalCall.transcripcion && (
                 <div>
                   <h4 className="text-xs font-semibold text-accent-cyan mb-1 flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Transcripción</h4>
@@ -809,7 +844,7 @@ export default function PerformanceLlamadasPage() {
                   <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed bg-surface-700/50 rounded-lg p-3">{modalCall.iaDescripcion}</div>
                 </div>
               )}
-              {!modalCall.transcripcion && !modalCall.iaDescripcion && (
+              {!modalCall.transcripcion && !modalCall.iaDescripcion && !modalCall.resumenLlamada && (
                 <p className="text-gray-500 text-sm">No hay transcripción ni análisis IA disponible para este evento.</p>
               )}
             </div>
