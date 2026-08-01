@@ -19,6 +19,7 @@ export const en: Translations = {
     sesiones: "Focus Sessions",
     "tablero-enfoque": "Operations Board",
     asignacion: "Lead Assignment",
+    leads: "Lead Journey",
     reportes: "Reports",
     accesos: "Access Log",
   },

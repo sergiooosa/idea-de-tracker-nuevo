@@ -818,3 +818,73 @@ export interface AsesorResponse {
   fuente_llamadas: "twilio" | "ghl";
   ghlLocationId: string | null;
 }
+
+// ── Vista unificada de leads (customer journey) ─────────────────────────────
+
+export type JourneyStage = "solo_chat" | "chat_llamada" | "cita";
+
+export interface UnifiedLeadChat {
+  id: number;
+  datetime: string;
+  estado: string | null;
+  asesor: string | null;
+  totalMessages: number;
+  leadMessages: number;
+  agentMessages: number;
+  speedToLeadSeconds: number | null;
+  humanTookOver: boolean;
+  iaCategoria: string | null;
+  messages: ApiChatMessage[];
+}
+
+export interface UnifiedLeadCall {
+  id: number;
+  datetime: string;
+  tipoEvento: string;
+  outcome: string;
+  closerName: string | null;
+  closerMail: string | null;
+  duracionSegundos: number | null;
+  transcripcion: string | null;
+  iaDescripcion: string | null;
+  speedToLeadMinutes: number | null;
+}
+
+export interface UnifiedLeadAppointment {
+  id: number;
+  datetime: string;
+  closer: string | null;
+  categoria: string | null;
+  attended: boolean;
+  qualified: boolean;
+  canceled: boolean;
+  facturacion: number;
+  cashCollected: number;
+  resumenIa: string | null;
+  linkLlamada: string | null;
+}
+
+export interface UnifiedLead {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  ghlContactId: string | null;
+  journeyStage: JourneyStage;
+  lastActivity: string;
+  advisor: string | null;
+  chats: UnifiedLeadChat[];
+  calls: UnifiedLeadCall[];
+  appointments: UnifiedLeadAppointment[];
+}
+
+export interface UnifiedLeadsResponse {
+  leads: UnifiedLead[];
+  agg: {
+    total: number;
+    soloChat: number;
+    chatLlamada: number;
+    cita: number;
+  };
+  advisors: ApiAdvisor[];
+}
