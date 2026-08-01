@@ -65,6 +65,7 @@ interface TagRule {
   condicion: string;
   acciones: AccionReglaLocal[];
   fuentes: string[];
+  excluye?: string[];
   dynamicValue?: DynamicValueConfigLocal;
   // legacy read-only
   condition?: string;
@@ -424,7 +425,8 @@ export default function SystemPage() {
                 : ((r.fuente ?? r.source) && (r.fuente ?? r.source) !== 'todas')
                   ? [r.fuente ?? r.source] as string[]
                   : ['llamadas', 'videollamadas', 'chats'];
-          return { ...r, condicion: (r.condicion ?? r.condition ?? '') as string, acciones, fuentes, nombre: (r.nombre ?? '') as string };
+          const excluye = Array.isArray(r.excluye) ? r.excluye as string[] : [];
+          return { ...r, condicion: (r.condicion ?? r.condition ?? '') as string, acciones, fuentes, nombre: (r.nombre ?? '') as string, excluye };
         }) : []);
         setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
         const loadedEmbudo = Array.isArray(cfg.embudo_personalizado)
@@ -579,6 +581,7 @@ export default function SystemPage() {
           condicion: r.condicion,
           acciones: r.acciones,
           fuentes: r.fuentes,
+          ...(r.excluye && r.excluye.length > 0 ? { excluye: r.excluye } : {}),
         })),
         metricas_personalizadas: metricRules,
         metricas_config: metricasConfig,
@@ -1378,6 +1381,53 @@ export default function SystemPage() {
                           className="text-[11px] text-accent-amber hover:text-accent-amber/80 transition-colors flex items-center gap-1">
                           <Plus className="w-3 h-3" /> Agregar acción
                         </button>
+                      </div>
+
+                      {/* ── Bloquear etiquetas si esta regla aplica ── */}
+                      <div className="rounded-lg p-3 bg-surface-600/30 border border-surface-500 space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[11px] font-medium text-gray-400">Bloquear etiquetas si esta regla aplica</label>
+                          <HelpTooltip
+                            titulo="¿Qué hace esto?"
+                            contenido="Cuando esta regla se cumple, las etiquetas seleccionadas aquí NO se aplicarán al lead, aunque otra regla las active. Útil para que etiquetas superiores (ej. INTERESADO) bloqueen etiquetas inferiores contradictorias (ej. no_califica)."
+                          />
+                        </div>
+                        {(() => {
+                          const allTags = tagRules
+                            .flatMap((tr) => tr.acciones.filter((a) => a.tipo === 'asignar_etiqueta' && a.valor).map((a) => a.valor as string))
+                            .filter((v, i, arr) => arr.indexOf(v) === i)
+                            .filter((v) => !r.acciones.some((a) => a.tipo === 'asignar_etiqueta' && a.valor === v));
+                          const currentExcluye = r.excluye ?? [];
+                          if (allTags.length === 0) {
+                            return <p className="text-[10px] text-gray-500 italic">No hay otras etiquetas configuradas en las reglas.</p>;
+                          }
+                          return (
+                            <div className="flex flex-wrap gap-1.5">
+                              {allTags.map((tag) => {
+                                const selected = currentExcluye.includes(tag);
+                                return (
+                                  <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={() => {
+                                      const next = selected
+                                        ? currentExcluye.filter((t) => t !== tag)
+                                        : [...currentExcluye, tag];
+                                      updateRule({ excluye: next });
+                                    }}
+                                    className={`px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
+                                      selected
+                                        ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                                        : 'bg-surface-600 text-gray-400 border-surface-500 hover:border-gray-400'
+                                    }`}
+                                  >
+                                    {selected ? '✕ ' : ''}{tag}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex justify-end">
