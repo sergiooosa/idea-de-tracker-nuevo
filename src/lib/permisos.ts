@@ -38,6 +38,7 @@ export const NAV_PERMISOS: Record<string, PermisoId> = {
   "/system": "ver_system",
   "/configuracion": "ver_configuracion",
   "/documentacion": "ver_documentacion",
+  "/leads": "ver_rendimiento",
   "/comisiones": "ver_comisiones",
   "/reportes": "ver_reportes",
   // "/ads": "ver_ads",  // visible para todos — solo se activa si hay ads configurados

@@ -29,6 +29,7 @@ import {
   UserPlus,
   Activity,
   LogIn,
+  Route,
 } from "lucide-react";
 import clsx from "clsx";
 import InsightsChat from "@/components/dashboard/InsightsChat";
@@ -114,10 +115,11 @@ function AccountSwitcher({ currentSubdominio }: { currentSubdominio: string }) {
   );
 }
 
-export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion" | "accesos";
+export type NavKey = "dashboard" | "performance" | "asesor" | "comisiones" | "bandeja" | "adquisicion" | "comparaciones" | "sistema" | "documentacion" | "configuracion" | "reportes" | "sesiones" | "tablero-enfoque" | "asignacion" | "accesos" | "leads";
 
 const NAV_KEY_TO_PATH: Record<NavKey, string> = {
   dashboard: "/dashboard",
+  leads: "/leads",
   performance: "/performance",
   asesor: "/asesor",
   comisiones: "/comisiones",
@@ -136,6 +138,7 @@ const NAV_KEY_TO_PATH: Record<NavKey, string> = {
 
 const NAV_ITEMS: { path: string; navKey: NavKey; label: string; icon: React.ElementType; beta?: boolean }[] = [
   { path: "/dashboard", navKey: "dashboard", label: "Panel ejecutivo", icon: LayoutDashboard },
+  { path: "/leads", navKey: "leads", label: "Recorrido de leads", icon: Route },
   { path: "/performance", navKey: "performance", label: "Rendimiento", icon: BarChart3 },
   { path: "/asesor", navKey: "asesor", label: "Panel asesor", icon: UserCheck },
   { path: "/comisiones", navKey: "comisiones", label: "Comisiones", icon: BadgeDollarSign },

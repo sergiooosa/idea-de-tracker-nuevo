@@ -17,6 +17,7 @@ export const es = {
     sesiones: "Sesiones de enfoque",
     "tablero-enfoque": "Tablero de operación",
     asignacion: "Asignación de leads",
+    leads: "Recorrido de leads",
     reportes: "Reportes",
     accesos: "Registro de accesos",
   },
