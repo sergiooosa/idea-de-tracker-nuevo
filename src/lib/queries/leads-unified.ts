@@ -7,7 +7,7 @@ import {
   usuariosDashboard,
 } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
 import { zonedDayRange } from "@/lib/date-range";
 import type {
   UnifiedLead,
@@ -42,6 +42,18 @@ interface LeadBucket {
   chats: UnifiedLeadChat[];
   calls: UnifiedLeadCall[];
   appointments: UnifiedLeadAppointment[];
+}
+
+const BOT_NAMES = new Set(["agente", "agent", "bot", "por asignar", "workflow", "api/bot", "campaña", "campaign"]);
+
+function normalizeChatCloser(asesor: string | null, notasExtra: string | null): string | null {
+  const candidates = [asesor?.trim(), notasExtra?.trim() !== "por asignar" ? notasExtra?.trim() : undefined];
+  for (const c of candidates) {
+    if (!c) continue;
+    if (BOT_NAMES.has(c.toLowerCase())) continue;
+    return c;
+  }
+  return null;
 }
 
 function chatMsgToApi(m: ChatMessage): ApiChatMessage {
@@ -83,6 +95,7 @@ export async function getUnifiedLeads(
   }
 
   // ── Chats ─────────────────────────────────────────────────────────────────
+  // Enrich with phone/email via ghl_contact_id (same pattern as chats.ts)
   const chatRows = await db
     .select({
       id: chatsLogs.id_evento,
@@ -90,12 +103,27 @@ export async function getUnifiedLeads(
       nombre_lead: chatsLogs.nombre_lead,
       estado: chatsLogs.estado,
       asesor: chatsLogs.asesor_asignado,
+      notasExtra: chatsLogs.notas_extra,
       chat: chatsLogs.chat,
       id_lead: chatsLogs.id_lead,
       iaCategoria: chatsLogs.ia_categoria,
       primerMsgLeadAt: chatsLogs.primer_msg_lead_at,
       primerMsgAt: chatsLogs.primer_msg_at,
       excluida: chatsLogs.excluida_dashboard,
+      leadPhone: sql<string | null>`(
+        SELECT ${registrosDeLlamada.phone_raw_format}
+        FROM ${registrosDeLlamada}
+        WHERE ${registrosDeLlamada.ghl_contact_id} = ${chatsLogs.id_lead}
+          AND ${registrosDeLlamada.id_cuenta} = ${chatsLogs.id_cuenta}::text
+        LIMIT 1
+      )`,
+      leadEmail: sql<string | null>`(
+        SELECT ${registrosDeLlamada.mail_lead}
+        FROM ${registrosDeLlamada}
+        WHERE ${registrosDeLlamada.ghl_contact_id} = ${chatsLogs.id_lead}
+          AND ${registrosDeLlamada.id_cuenta} = ${chatsLogs.id_cuenta}::text
+        LIMIT 1
+      )`,
     })
     .from(chatsLogs)
     .where(
@@ -103,6 +131,7 @@ export async function getUnifiedLeads(
         eq(chatsLogs.id_cuenta, idCuenta),
         gte(chatsLogs.fecha_y_hora_z, start),
         lte(chatsLogs.fecha_y_hora_z, end),
+        sql`${chatsLogs.excluida_dashboard} IS NOT TRUE`,
         ...(closerEmails?.length
           ? [sql`lower(${chatsLogs.asesor_asignado}) = ANY(${sql.raw(`ARRAY[${closerEmails.map((e) => `'${e.toLowerCase().replace(/'/g, "''")}'`).join(",")}]`)})`]
           : []),
@@ -140,6 +169,20 @@ export async function getUnifiedLeads(
     );
 
   // ── Citas (resumenes_diarios_agendas) ─────────────────────────────────────
+  // Fathom stores nombre_closer in the closer column, not email.
+  // Resolve email→nombre_closer so ver_solo_propios works on Fathom tenants.
+  let citasCloserValues: string[] = [];
+  if (closerEmails?.length) {
+    citasCloserValues = closerEmails.map((e) => e.toLowerCase().trim());
+    const nombreRows = await db
+      .select({ email: usuariosDashboard.email, nombre_closer: usuariosDashboard.nombre_closer })
+      .from(usuariosDashboard)
+      .where(and(eq(usuariosDashboard.id_cuenta, idCuenta), inArray(usuariosDashboard.email, citasCloserValues)));
+    for (const u of nombreRows) {
+      if (u.nombre_closer) citasCloserValues.push(u.nombre_closer.toLowerCase().trim());
+    }
+  }
+
   const appointmentRows = await db
     .select({
       id: resumenesDiariosAgendas.id_registro_agenda,
@@ -162,28 +205,11 @@ export async function getUnifiedLeads(
         eq(resumenesDiariosAgendas.id_cuenta, idCuenta),
         gte(resumenesDiariosAgendas.fecha, dateFrom),
         lte(resumenesDiariosAgendas.fecha, dateTo),
-        ...(closerEmails?.length
-          ? [sql`lower(${resumenesDiariosAgendas.closer}) = ANY(${sql.raw(`ARRAY[${closerEmails.map((e) => `'${e.toLowerCase().replace(/'/g, "''")}'`).join(",")}]`)})`]
+        ...(citasCloserValues.length
+          ? [sql`lower(${resumenesDiariosAgendas.closer}) = ANY(${sql.raw(`ARRAY[${citasCloserValues.map((v) => `'${v.replace(/'/g, "''")}'`).join(",")}]`)})`]
           : []),
       ),
     );
-
-  // ── Also get registros_de_llamada for phone/email matching ────────────────
-  const registroRows = await db
-    .select({
-      id_registro: registrosDeLlamada.id_registro,
-      nombre_lead: registrosDeLlamada.nombre_lead,
-      mail_lead: registrosDeLlamada.mail_lead,
-      phone: registrosDeLlamada.phone_raw_format,
-      ghl_contact_id: registrosDeLlamada.ghl_contact_id,
-    })
-    .from(registrosDeLlamada)
-    .where(eq(registrosDeLlamada.id_cuenta, String(idCuenta)));
-
-  const registroByName = new Map<string, typeof registroRows[0]>();
-  for (const r of registroRows) {
-    if (r.nombre_lead) registroByName.set(r.nombre_lead.toLowerCase().trim(), r);
-  }
 
   // ── Merge into lead buckets ───────────────────────────────────────────────
   const buckets = new Map<string, LeadBucket>();
@@ -215,12 +241,10 @@ export async function getUnifiedLeads(
 
   // Process chats
   for (const c of chatRows) {
-    if (c.excluida) continue;
     const name = c.nombre_lead ?? "Sin nombre";
-    const registro = registroByName.get(name.toLowerCase().trim());
-    const email = registro?.mail_lead ?? null;
-    const phone = registro?.phone ?? null;
-    const ghlId = c.id_lead ?? registro?.ghl_contact_id ?? null;
+    const email = c.leadEmail ?? null;
+    const phone = c.leadPhone ?? null;
+    const ghlId = c.id_lead ?? null;
 
     const key = leadKey(email, phone, ghlId) || `name:${name.toLowerCase().trim()}`;
     const bucket = getOrCreate(key, name, email, phone, ghlId);
@@ -251,7 +275,8 @@ export async function getUnifiedLeads(
       messages: messages.map(chatMsgToApi),
     });
 
-    if (c.asesor && !bucket.advisor) bucket.advisor = c.asesor;
+    const normalizedAsesor = normalizeChatCloser(c.asesor, c.notasExtra);
+    if (normalizedAsesor && !bucket.advisor) bucket.advisor = normalizedAsesor;
     if (dt > bucket.lastActivity) bucket.lastActivity = dt;
   }
 
@@ -318,6 +343,48 @@ export async function getUnifiedLeads(
 
     if (a.closer && !bucket.advisor) bucket.advisor = a.closer;
     if (dt > bucket.lastActivity) bucket.lastActivity = dt;
+  }
+
+  // ── Secondary merge: consolidate buckets that share email or phone ────────
+  // A Twilio call keyed by email:x won't merge with a chat keyed by ghl:y
+  // even if both belong to the same lead. Build reverse indexes and merge.
+  const emailIndex = new Map<string, string>();
+  const phoneIndex = new Map<string, string>();
+  const mergedInto = new Map<string, string>();
+
+  function resolveKey(k: string): string {
+    while (mergedInto.has(k)) k = mergedInto.get(k)!;
+    return k;
+  }
+
+  for (const [key, b] of buckets) {
+    const normEmail = b.email?.toLowerCase().trim();
+    const normPhone = normalizePhone(b.phone);
+
+    let targetKey = key;
+
+    if (normEmail && emailIndex.has(normEmail)) {
+      targetKey = resolveKey(emailIndex.get(normEmail)!);
+    } else if (normPhone && phoneIndex.has(normPhone)) {
+      targetKey = resolveKey(phoneIndex.get(normPhone)!);
+    }
+
+    if (targetKey !== key) {
+      const target = buckets.get(targetKey)!;
+      target.chats.push(...b.chats);
+      target.calls.push(...b.calls);
+      target.appointments.push(...b.appointments);
+      if (!target.email && b.email) target.email = b.email;
+      if (!target.phone && b.phone) target.phone = b.phone;
+      if (!target.ghlContactId && b.ghlContactId) target.ghlContactId = b.ghlContactId;
+      if (!target.advisor && b.advisor) target.advisor = b.advisor;
+      if (b.lastActivity > target.lastActivity) target.lastActivity = b.lastActivity;
+      mergedInto.set(key, targetKey);
+      buckets.delete(key);
+    }
+
+    if (normEmail) emailIndex.set(normEmail, resolveKey(key));
+    if (normPhone) phoneIndex.set(normPhone, resolveKey(key));
   }
 
   // ── Build response ────────────────────────────────────────────────────────
