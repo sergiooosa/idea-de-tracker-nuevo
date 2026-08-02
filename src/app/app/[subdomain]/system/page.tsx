@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useT } from '@/contexts/LocaleContext';
 import type { Locale } from '@/lib/i18n';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info, CheckCircle2, Search, ListFilter } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -312,6 +312,8 @@ export default function SystemPage() {
   const [cerradasCuentanComoCal, setCerradasCuentanComoCal] = useState(true);
   const [metricasEditingId, setMetricasEditingId] = useState<string | null>(null);
   const [metricasDeleteConfirm, setMetricasDeleteConfirm] = useState<{ id: string; dependientes: MetricaConfig[] } | null>(null);
+  const [metricasBusqueda, setMetricasBusqueda] = useState('');
+  const [metricasFiltroPanel, setMetricasFiltroPanel] = useState<string>('todos');
   const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
   const [metasPorRol, setMetasPorRol] = useState<MetaPorRolLocal[]>([]);
   const [categoriasLlamadas, setCategoriasLlamadas] = useState<CategoriaLlamada[]>([]);
@@ -1682,54 +1684,135 @@ export default function SystemPage() {
                 </div>
               </div>
 
-              <DndContext
-                sensors={dndSensors}
-                collisionDetection={closestCenter}
-                onDragEnd={(event: DragEndEvent) => {
-                  const { active, over } = event;
-                  if (over && active.id !== over.id) {
-                    setMetricasConfig((prev) => {
-                      const ids = prev.map((x) => x.id);
-                      const oldIdx = ids.indexOf(String(active.id));
-                      const newIdx = ids.indexOf(String(over.id));
-                      if (oldIdx === -1 || newIdx === -1) return prev;
-                      const reordered = arrayMove(prev, oldIdx, newIdx);
-                      return reordered.map((m, i) => ({ ...m, orden: i }));
-                    });
-                  }
-                }}
-              >
-                <SortableContext items={metricasConfig.map((m) => m.id)} strategy={verticalListSortingStrategy}>
-                  <ul className="space-y-2">
-                    {metricasConfig
-                      .sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999))
-                      .map((m) => (
-                        <SortableMetricaCard
-                          key={m.id}
-                          m={m}
-                          onEdit={() => {
-                            setMetricasEditingId(m.id);
-                            setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook' | 'chat');
-                            setMetricasSheetOpen(true);
-                          }}
-                          onDelete={() => {
-                            const deps = getMetricasQueDependenDe(m.id, metricasConfig);
-                            if (deps.length > 0) {
-                              setMetricasDeleteConfirm({ id: m.id, dependientes: deps });
-                            } else {
-                              setMetricasConfig((prev) => prev.filter((x) => x.id !== m.id));
-                              setMetricasManualData((prev) => {
-                                const next = { ...prev };
-                                delete next[m.id];
-                                return next;
-                              });
-                            }
-                          }}
+              {/* ── Buscador + Filtro por panel ── */}
+              {(() => {
+                const panelLabels: Record<string, string> = {
+                  panel_ejecutivo: 'Panel ejecutivo',
+                  rendimiento: 'Rendimiento',
+                  ambos: 'Ambos',
+                };
+                dashboardsPersonalizados.forEach((d) => {
+                  panelLabels[d.id] = d.nombre;
+                });
+                const panelesUsados = Array.from(
+                  new Set(
+                    metricasConfig.flatMap((m) => {
+                      if (m.paneles && m.paneles.length > 0) return m.paneles;
+                      if (m.ubicacion) return [m.ubicacion];
+                      return [];
+                    }),
+                  ),
+                );
+                return (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={metricasBusqueda}
+                        onChange={(e) => setMetricasBusqueda(e.target.value)}
+                        placeholder="Buscar métrica por nombre…"
+                        className="w-full rounded-lg bg-surface-700/80 border border-surface-500 pl-8 pr-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-green/40 focus:border-accent-green/40 transition-colors"
+                      />
+                    </div>
+                    {panelesUsados.length > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <ListFilter className="w-4 h-4 text-gray-500 shrink-0" />
+                        <HelpTooltip
+                          titulo="Filtro por panel"
+                          contenido="Filtra las métricas según el panel al que pertenecen. Cada métrica se asigna a uno o más paneles (Ejecutivo, Rendimiento, Guardias, etc.). Usa este filtro para ver solo las de un panel específico."
                         />
-                      ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
+                        <select
+                          value={metricasFiltroPanel}
+                          onChange={(e) => setMetricasFiltroPanel(e.target.value)}
+                          className="rounded-lg bg-surface-700/80 border border-surface-500 px-2 py-2 text-sm text-white focus:ring-2 focus:ring-accent-green/40 focus:border-accent-green/40 transition-colors"
+                        >
+                          <option value="todos">Todos los paneles</option>
+                          {panelesUsados.map((p) => (
+                            <option key={p} value={p}>
+                              {panelLabels[p] ?? p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const isFiltering = metricasBusqueda !== '' || metricasFiltroPanel !== 'todos';
+                const sorted = [...metricasConfig].sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+                const filteredMetricas = isFiltering
+                  ? sorted.filter((m) => {
+                      if (metricasBusqueda && !m.nombre.toLowerCase().includes(metricasBusqueda.toLowerCase())) return false;
+                      if (metricasFiltroPanel !== 'todos') {
+                        const mp = (m.paneles && m.paneles.length > 0) ? m.paneles : m.ubicacion ? [m.ubicacion] : [];
+                        if (metricasFiltroPanel === 'ambos') {
+                          if (!mp.includes('ambos') && !mp.includes('panel_ejecutivo') && !mp.includes('rendimiento')) return false;
+                        } else if (!mp.includes(metricasFiltroPanel as typeof mp[number]) && !mp.includes('ambos')) return false;
+                      }
+                      return true;
+                    })
+                  : sorted;
+                return (
+                  <>
+                    <DndContext
+                      sensors={dndSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event: DragEndEvent) => {
+                        const { active, over } = event;
+                        if (over && active.id !== over.id) {
+                          setMetricasConfig((prev) => {
+                            const ids = prev.map((x) => x.id);
+                            const oldIdx = ids.indexOf(String(active.id));
+                            const newIdx = ids.indexOf(String(over.id));
+                            if (oldIdx === -1 || newIdx === -1) return prev;
+                            const reordered = arrayMove(prev, oldIdx, newIdx);
+                            return reordered.map((mi, i) => ({ ...mi, orden: i }));
+                          });
+                        }
+                      }}
+                    >
+                      <SortableContext items={metricasConfig.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                        <ul className="space-y-2">
+                          {filteredMetricas.map((m) => (
+                            <SortableMetricaCard
+                              key={m.id}
+                              m={m}
+                              onEdit={() => {
+                                setMetricasEditingId(m.id);
+                                setMetricasSheetTipo(m.tipo as 'manual' | 'automatica' | 'fija' | 'webhook' | 'chat');
+                                setMetricasSheetOpen(true);
+                              }}
+                              onDelete={() => {
+                                const deps = getMetricasQueDependenDe(m.id, metricasConfig);
+                                if (deps.length > 0) {
+                                  setMetricasDeleteConfirm({ id: m.id, dependientes: deps });
+                                } else {
+                                  setMetricasConfig((prev) => prev.filter((x) => x.id !== m.id));
+                                  setMetricasManualData((prev) => {
+                                    const next = { ...prev };
+                                    delete next[m.id];
+                                    return next;
+                                  });
+                                }
+                              }}
+                            />
+                          ))}
+                        </ul>
+                      </SortableContext>
+                    </DndContext>
+                    {isFiltering && (
+                      <p className="text-xs text-gray-500">
+                        {filteredMetricas.length === 0
+                          ? 'No hay métricas que coincidan con el filtro.'
+                          : `Mostrando ${filteredMetricas.length} de ${metricasConfig.length} métricas.`}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
