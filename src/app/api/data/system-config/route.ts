@@ -17,6 +17,17 @@ export async function PUT(req: Request) {
 
     if (body.metricas_config) {
       const configs = parseMetricasConfig(body.metricas_config);
+      // Normalizar: métricas sin paneles heredan de ubicacion o default a panel_ejecutivo
+      for (const m of configs) {
+        if (!m.paneles || m.paneles.length === 0) {
+          m.paneles = m.ubicacion === "ambos"
+            ? ["panel_ejecutivo", "rendimiento"]
+            : m.ubicacion === "rendimiento"
+              ? ["rendimiento"]
+              : ["panel_ejecutivo"];
+        }
+      }
+      body.metricas_config = configs;
       const refsColgantes = validarRefsMetricasConfig(configs);
       if (refsColgantes.length > 0) {
         return NextResponse.json(
