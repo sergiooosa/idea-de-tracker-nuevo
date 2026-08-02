@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/api-auth";
+import { withAuthFull, enforceCloserFilter } from "@/lib/api-auth";
 import { API_BASE_URL } from "@/lib/api-config";
 import { db } from "@/lib/db";
 import { apiKeysCuenta } from "@/lib/db/schema";
@@ -16,7 +16,7 @@ async function getCuentaApiKey(idCuenta: number): Promise<string | null> {
 }
 
 export async function GET(req: Request) {
-  return withAuth(req, async (idCuenta) => {
+  return withAuthFull(req, async ({ idCuenta, email, rol, permisosArray }) => {
     const { searchParams } = new URL(req.url);
 
     const apiKey = await getCuentaApiKey(idCuenta);
@@ -26,6 +26,10 @@ export async function GET(req: Request) {
         { status: 503 },
       );
     }
+
+    const closerEmailsParam = searchParams.get("closerEmails") || searchParams.get("closerEmail") || undefined;
+    const requestedEmails = closerEmailsParam ? closerEmailsParam.split(",").map((e) => e.trim()).filter(Boolean) : undefined;
+    const closerEmails = enforceCloserFilter(requestedEmails, email, permisosArray, rol);
 
     const params = new URLSearchParams();
     params.set("id_cuenta", String(idCuenta));
@@ -39,6 +43,7 @@ export async function GET(req: Request) {
     if (hasta) params.set("hasta", hasta);
     if (asesor) params.set("asesor", asesor);
     if (lead) params.set("lead", lead);
+    if (closerEmails?.length) params.set("closerEmails", closerEmails.join(","));
 
     const cerebroRes = await fetch(
       `${API_BASE_URL}/api/data/mapa-tiempos?${params.toString()}`,
