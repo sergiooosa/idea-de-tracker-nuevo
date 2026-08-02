@@ -11,6 +11,7 @@ import TagFilter from '@/components/dashboard/TagFilter';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import HelpTooltip from '@/components/dashboard/HelpTooltip';
 import AdvisorDrillDown from '@/components/dashboard/AdvisorDrillDown';
+import MapaTiempos from '@/components/dashboard/MapaTiempos';
 import { useApiData } from '@/hooks/useApiData';
 import type { DashboardResponse, DashboardAdvisorRow, LeadDetailItem, DashboardObjecionConDetalle, DashboardObjecionesPorCanal } from '@/types';
 import Link from 'next/link';
@@ -1069,6 +1070,10 @@ export default function DashboardPage() {
               </table>
             </div>
           </div>
+        </section>}
+
+        {!seccionesOcultas.includes('panel_mapa_tiempos') && <section>
+          <MapaTiempos dateFrom={dateFrom} dateTo={dateTo} />
         </section>}
       </div>
 

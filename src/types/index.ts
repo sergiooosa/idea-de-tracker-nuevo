@@ -888,3 +888,31 @@ export interface UnifiedLeadsResponse {
   };
   advisors: ApiAdvisor[];
 }
+
+export interface MapaTiemposAsesor {
+  asesor: string;
+  t1_mediana_seconds: number | null;
+  t1_p90_seconds: number | null;
+  t1_n: number;
+  t2_mediana_seconds: number | null;
+  t2_p90_seconds: number | null;
+  t2_n: number;
+}
+
+export interface MapaTiemposLeadTimeline {
+  id_registro: number;
+  nombre_lead: string | null;
+  asesor: string;
+  t_llegada: string;
+  t_llamada: string | null;
+  t_agenda: string | null;
+  t1_seconds: number | null;
+  t2_seconds: number | null;
+}
+
+export interface MapaTiemposResponse {
+  success: boolean;
+  asesores: MapaTiemposAsesor[];
+  lead_timeline: MapaTiemposLeadTimeline | null;
+  total_leads: number;
+}
