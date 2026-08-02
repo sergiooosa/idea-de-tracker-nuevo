@@ -31,13 +31,14 @@ function makeMetric(id: string, tipo: MetricaConfig["tipo"], nombre?: string): M
 function syncEmbudoMetrics(
   embudoNuevo: EmbudoEtapa[],
   metricsExisting: MetricaConfig[],
+  removedByUser: Set<string> = new Set(),
 ): MetricaConfig[] {
   const result = [...metricsExisting];
   for (const etapa of embudoNuevo) {
     if (etapa.es_fija !== true) {
       const metricId = `embudo-${etapa.id}`;
       const alreadyExists = result.some((m) => m.id === metricId);
-      if (!alreadyExists) {
+      if (!alreadyExists && !removedByUser.has(metricId)) {
         result.push({
           id: metricId,
           nombre: etapa.nombre,
@@ -108,6 +109,41 @@ describe("syncEmbudoMetrics (add + prune)", () => {
     const result = syncEmbudoMetrics(embudo, existing);
 
     expect(result.map((m) => m.id)).toEqual(["embudo-r1"]);
+  });
+
+  it("does not re-create metric explicitly removed by user", () => {
+    const existing: MetricaConfig[] = [
+      makeMetric("kpi-fijo", "fija", "KPI Fijo"),
+    ];
+    const embudo: EmbudoEtapa[] = [
+      makeEtapa("interesado", "Interested"),
+      makeEtapa("programado", "Scheduled"),
+    ];
+    const removedByUser = new Set(["embudo-interesado"]);
+
+    const result = syncEmbudoMetrics(embudo, existing, removedByUser);
+
+    const ids = result.map((m) => m.id);
+    expect(ids).toContain("embudo-programado");
+    expect(ids).not.toContain("embudo-interesado");
+    expect(ids).toContain("kpi-fijo");
+  });
+
+  it("creates metric for new stage even when other metrics were removed", () => {
+    const existing: MetricaConfig[] = [
+      makeMetric("kpi-fijo", "fija", "KPI Fijo"),
+    ];
+    const embudo: EmbudoEtapa[] = [
+      makeEtapa("interesado", "Interested"),
+      makeEtapa("brand-new", "Brand New Stage"),
+    ];
+    const removedByUser = new Set(["embudo-interesado"]);
+
+    const result = syncEmbudoMetrics(embudo, existing, removedByUser);
+
+    const ids = result.map((m) => m.id);
+    expect(ids).toContain("embudo-brand-new");
+    expect(ids).not.toContain("embudo-interesado");
   });
 
   it("does not duplicate existing metric for same stage", () => {
