@@ -228,6 +228,8 @@ export default function MetricaEditSheet({
       setNombre("");
       setDescripcion("");
       setUbicacion("ambos"); // siempre ambos para nuevas métricas
+      setPanelesSeleccionados(["panel_ejecutivo"]);
+      setAtribuibleUsuario(false);
       setTipo(tipoInicial);
       setCampos([]);
       setFormulaTipo("directo");
@@ -309,16 +311,20 @@ export default function MetricaEditSheet({
 
     let config: MetricaConfig;
 
+    const panelesFinal = panelesSeleccionados.length > 0
+      ? panelesSeleccionados
+      : ["panel_ejecutivo" as const];
+
     // Derivar ubicacion legacy desde paneles para backward compat con código que aún lo lee
     const ubicacionLegacy: MetricaConfig["ubicacion"] =
-      panelesSeleccionados.includes("panel_ejecutivo") && panelesSeleccionados.includes("rendimiento")
+      panelesFinal.includes("panel_ejecutivo") && panelesFinal.includes("rendimiento")
         ? "ambos"
-        : panelesSeleccionados.find((p) => p === "panel_ejecutivo" || p === "rendimiento") as MetricaConfig["ubicacion"] ?? "panel_ejecutivo";
+        : panelesFinal.find((p) => p === "panel_ejecutivo" || p === "rendimiento") as MetricaConfig["ubicacion"] ?? "panel_ejecutivo";
 
     const base = {
       id, nombre: nombre.trim(), descripcion: descripcion.trim() || null,
       ubicacion: ubicacionLegacy,
-      paneles: panelesSeleccionados as MetricaConfig["paneles"],
+      paneles: panelesFinal as MetricaConfig["paneles"],
       atribuible_a_usuario: atribuibleUsuario,
       orden, formato, color,
     };

@@ -129,13 +129,31 @@ const KPI_CANONICAL_FORMAT: Partial<Record<string, MetricaConfig["formato"]>> = 
  */
 export function normalizeMetricasConfig(configs: MetricaConfig[]): MetricaConfig[] {
   return configs.map((m) => {
-    if (m.tipo === "automatica" && m.formula?.fuente) {
-      const canonicalFormato = KPI_CANONICAL_FORMAT[m.formula.fuente];
-      if (canonicalFormato && m.formato !== canonicalFormato) {
-        return { ...m, formato: canonicalFormato };
+    let patched = m;
+
+    if (patched.tipo === "automatica" && patched.formula?.fuente) {
+      const canonicalFormato = KPI_CANONICAL_FORMAT[patched.formula.fuente];
+      if (canonicalFormato && patched.formato !== canonicalFormato) {
+        patched = { ...patched, formato: canonicalFormato };
       }
     }
-    return m;
+
+    const ub = patched.ubicacion ?? "panel_ejecutivo";
+    const standardPanels: string[] =
+      ub === "ambos" ? ["panel_ejecutivo", "rendimiento"]
+        : ub === "rendimiento" ? ["rendimiento"]
+          : ["panel_ejecutivo"];
+
+    if (!patched.paneles || patched.paneles.length === 0) {
+      patched = { ...patched, paneles: standardPanels as MetricaConfig["paneles"] };
+    } else {
+      const hasStandard = patched.paneles.some((p) => p === "panel_ejecutivo" || p === "rendimiento");
+      if (!hasStandard) {
+        patched = { ...patched, paneles: [...standardPanels, ...patched.paneles] as MetricaConfig["paneles"] };
+      }
+    }
+
+    return patched;
   });
 }
 
