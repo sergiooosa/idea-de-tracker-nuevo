@@ -3,8 +3,8 @@
  * Mantiene oculta la URL real de Cloud Run.
  *
  * Rutas cubiertas (via next.config rewrite o directamente):
- *   /webhooks/metricas/:subdominio   → Cerebro /webhooks/metricas/:subdominio
- *   /webhooks/external-data/:sub     → Cerebro /webhooks/external-data/:sub
+ *   /webhooks/metricas/:subdominio   → handler interno (direct call)
+ *   /webhooks/external-data/:sub     → handler interno (direct call)
  *   /webhooks/config/:locationId     → Ya existe nativo en /webhooks/config/[locationId]
  *
  * Usage: acceso via POST autokpi.net/webhooks/proxy/metricas/:sub
@@ -12,11 +12,11 @@
  */
 
 import { NextResponse } from "next/server";
+import { POST as metricasHandler } from "@/app/webhooks/metricas/[locationId]/route";
+import { POST as externalDataHandler } from "@/app/webhooks/external-data/[locationId]/route";
 
 const CEREBRO_BASE = process.env.CEREBRO_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
-// metricas y external-data viven en la propia app Next.js — NO en el Cerebro
-// Se manejan vía rewrite interno, no via este proxy
 const ALLOWED_PREFIXES = ["twilio", "ghl", "fathom", "chat", "retry-orphan"];
 
 export async function POST(
@@ -26,27 +26,18 @@ export async function POST(
   const { path } = await params;
   const prefix = path[0] ?? "";
 
-  // metricas y external-data viven en la app Next.js — reenviar internamente
+  // metricas y external-data viven en la app Next.js — llamar al handler directo
   if (prefix === "metricas" || prefix === "external-data") {
-    const internalPath = `/${path.join("/")}`;
-    const appBase = process.env.AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://autokpi.net";
-    const target = `${appBase}/webhooks${internalPath}`;
+    const locationId = path[1] ?? "";
+    if (!locationId) {
+      return NextResponse.json({ error: "locationId requerido" }, { status: 400 });
+    }
     try {
-      const body = await req.text();
-      const headers: Record<string, string> = {
-        "content-type": req.headers.get("content-type") ?? "application/json",
-      };
-      const apiKey = req.headers.get("x-api-key");
-      if (apiKey) headers["x-api-key"] = apiKey;
-      const response = await fetch(target, { method: "POST", headers, body });
-      const responseBody = await response.text();
-      return new NextResponse(responseBody, {
-        status: response.status,
-        headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
-      });
+      const handler = prefix === "metricas" ? metricasHandler : externalDataHandler;
+      return await handler(req, { params: Promise.resolve({ locationId }) });
     } catch (err) {
-      console.error("[WebhookProxy] Error forwarding to internal route:", err);
-      return NextResponse.json({ error: "Upstream error" }, { status: 502 });
+      console.error(`[WebhookProxy] Error calling ${prefix} handler:`, err);
+      return NextResponse.json({ error: "Internal handler error" }, { status: 500 });
     }
   }
 
