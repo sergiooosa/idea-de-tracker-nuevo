@@ -206,9 +206,12 @@ export function VideoRecoveryPage() {
     setRelinkModalOpen(true);
   }, []);
 
-  const handleRelinkSuccess = useCallback(() => {
-    handleSearchPreview();
-  }, []);
+  // Función normal (no memoizada) para que el re-fetch use siempre los `values`
+  // actuales. Con useCallback([]) capturaba el render inicial (id_evento="") y
+  // el preview post-vinculación se caía con 400. AUT-2096.
+  const handleRelinkSuccess = (): void => {
+    void handleSearchPreview();
+  };
 
   const handleRetryErrors = async (): Promise<void> => {
     if (!executionResult) return;
