@@ -121,3 +121,41 @@ export type VideoRecoveryUiState =
   | "executing"
   | "executionDone"
   | "errorGlobal";
+
+export interface AgendaSearchItem {
+  id_registro_agenda: number;
+  nombre_de_lead: string | null;
+  email_lead: string | null;
+  fecha: string | null;
+  categoria: string | null;
+  closer: string | null;
+  fathom_recording_id: number | null;
+}
+
+export interface AgendaSearchRequest {
+  q?: string;
+  fecha_from?: string;
+  fecha_to?: string;
+  categoria?: string;
+  limit?: number;
+}
+
+export interface AgendaSearchResponse {
+  items: AgendaSearchItem[];
+}
+
+export interface RelinkRequest {
+  id_evento: string;
+  recording_id: number;
+  id_registro_agenda: number;
+  meeting_snapshot: MeetingSnapshot;
+}
+
+export interface RelinkResponse {
+  data: {
+    status: string;
+    estado_anterior: string | null;
+    estado_final: string | null;
+    motivo: string;
+  };
+}

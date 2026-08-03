@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { SuggestedAction, VideoRecoveryPreviewItem } from "../types/videoRecovery.types";
@@ -20,6 +20,7 @@ interface VideoRecoveryPreviewTableProps {
   onSetActionForRow: (recordingId: number, action: SuggestedAction) => void;
   onChangeEstadoFilter: (next: string) => void;
   onChangeActionFilter: (next: "all" | "no_skip" | SuggestedAction) => void;
+  onOpenRelink: (item: VideoRecoveryPreviewItem) => void;
 }
 
 function actionVariant(action: SuggestedAction): "default" | "secondary" | "outline" {
@@ -56,6 +57,7 @@ export function VideoRecoveryPreviewTable({
   onSetActionForRow,
   onChangeEstadoFilter,
   onChangeActionFilter,
+  onOpenRelink,
 }: VideoRecoveryPreviewTableProps) {
   const estados = Array.from(new Set(items.map((item) => item.estado_bd_actual))).sort();
 
@@ -144,6 +146,7 @@ export function VideoRecoveryPreviewTable({
               <th className="px-2 py-2">accion_sugerida</th>
               <th className="px-2 py-2">motivo</th>
               <th className="px-2 py-2">share_url</th>
+              <th className="px-2 py-2">Vincular</th>
             </tr>
           </thead>
           <tbody>
@@ -197,6 +200,18 @@ export function VideoRecoveryPreviewTable({
                     ) : (
                       <span className="text-gray-500">-</span>
                     )}
+                  </td>
+                  <td className="px-2 py-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => onOpenRelink(item)}
+                    >
+                      <Link2 className="w-3 h-3 mr-1" />
+                      Vincular
+                    </Button>
                   </td>
                 </tr>
               );

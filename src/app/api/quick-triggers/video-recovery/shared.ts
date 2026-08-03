@@ -22,7 +22,7 @@ export function parseIdEvento(idEventoRaw: string): number | null {
 }
 
 export async function forwardVideoRecoveryRequest(
-  path: "preview" | "execute",
+  path: "preview" | "execute" | "agenda-search" | "relink",
   internalApiKey: string,
   payload: unknown,
 ): Promise<ForwardResult> {

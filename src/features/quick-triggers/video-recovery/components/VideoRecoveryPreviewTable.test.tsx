@@ -36,6 +36,7 @@ describe("VideoRecoveryPreviewTable", () => {
         onSetActionForRow={vi.fn()}
         onChangeEstadoFilter={vi.fn()}
         onChangeActionFilter={vi.fn()}
+        onOpenRelink={vi.fn()}
       />,
     );
 
