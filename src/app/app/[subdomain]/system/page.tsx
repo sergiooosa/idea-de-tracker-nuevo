@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useT } from '@/contexts/LocaleContext';
 import type { Locale } from '@/lib/i18n';
 import PageHeader from '@/components/dashboard/PageHeader';
-import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info, CheckCircle2, Search, ListFilter } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Phone, Video, Tag, BarChart3, Building2, Save, Target, Loader2, Key, GitBranch, MessageSquare, Database, Plus, Trash2, GripVertical, ArrowRight, Pencil, HelpCircle, AlertTriangle, Sparkles, ShieldCheck, Info, CheckCircle2, Search, ListFilter, Users } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -174,6 +174,8 @@ interface SystemConfig {
   configuracion_ads?: ConfiguracionAdsLocal;
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
   categorias_llamadas?: CategoriaLlamada[];
+  secciones_ocultas?: string[];
+  ranking_metrica_base?: string | null;
 }
 interface MetasData {
   // ── Campos originales ─────────────────────────────────────────
@@ -316,6 +318,8 @@ export default function SystemPage() {
   const [metricasFiltroPanel, setMetricasFiltroPanel] = useState<string>('todos');
   const [rolesConfig, setRolesConfig] = useState<RolConfigLocal[]>([]);
   const [metasPorRol, setMetasPorRol] = useState<MetaPorRolLocal[]>([]);
+  const [seccionesOcultas, setSeccionesOcultas] = useState<string[]>([]);
+  const [rankingMetricaBase, setRankingMetricaBase] = useState<string | null>(null);
   const [categoriasLlamadas, setCategoriasLlamadas] = useState<CategoriaLlamada[]>([]);
   const [catEditId, setCatEditId] = useState<string | null>(null);
   const [catNombre, setCatNombre] = useState('');
@@ -459,6 +463,12 @@ export default function SystemPage() {
         if ((cfg as any).cerradas_cuentan_como_calificadas !== undefined) {
           setCerradasCuentanComoCal((cfg as any).cerradas_cuentan_como_calificadas);
         }
+        if (Array.isArray(cfg.secciones_ocultas)) {
+          setSeccionesOcultas(cfg.secciones_ocultas);
+        }
+        if (cfg.ranking_metrica_base !== undefined) {
+          setRankingMetricaBase(cfg.ranking_metrica_base);
+        }
         if (Array.isArray(cfg.roles_config)) {
           setRolesConfig(cfg.roles_config);
         }
@@ -598,6 +608,8 @@ export default function SystemPage() {
         ghl_location_id: ghlLocationId.trim() || null,
         cerradas_cuentan_como_calificadas: cerradasCuentanComoCal,
         categorias_llamadas: categoriasLlamadas,
+        secciones_ocultas: seccionesOcultas,
+        ranking_metrica_base: rankingMetricaBase,
       };
       if (geminiKey) payload.gemini_api_key = geminiKey;
       const res = await fetch('/api/data/system-config', {
@@ -1674,6 +1686,68 @@ export default function SystemPage() {
                   dashboards={dashboardsPersonalizados}
                   onChange={(updated) => setDashboardsPersonalizados(updated)}
                 />
+              </div>
+
+              {/* ── Sección: Ranking por asesor ── */}
+              <div className="rounded-xl border border-surface-500 bg-surface-700/30 p-4 space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-accent-cyan/20">
+                  <div className="rounded-lg p-1.5 bg-accent-cyan/10 border border-accent-cyan/30">
+                    <Users className="w-4 h-4 text-accent-cyan" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-white">Ranking por asesor</h4>
+                    <p className="text-xs text-gray-400">Mostrar u ocultar el ranking y elegir la métrica base para ordenar.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSeccionesOcultas((prev) =>
+                        prev.includes('panel_ranking')
+                          ? prev.filter((s) => s !== 'panel_ranking')
+                          : [...prev, 'panel_ranking'],
+                      );
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!seccionesOcultas.includes('panel_ranking') ? 'bg-accent-cyan' : 'bg-surface-500'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!seccionesOcultas.includes('panel_ranking') ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </button>
+                </div>
+                {!seccionesOcultas.includes('panel_ranking') && (
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400 block">Métrica base del ranking</label>
+                    <select
+                      value={rankingMetricaBase ?? 'score'}
+                      onChange={(e) => setRankingMetricaBase(e.target.value === 'score' ? null : e.target.value)}
+                      className="w-full rounded-lg bg-surface-700/80 border border-surface-500 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-accent-cyan/40 focus:border-accent-cyan/40 transition-colors"
+                    >
+                      <option value="score">Score compuesto (por defecto)</option>
+                      <option value="leads">Leads trabajados</option>
+                      <option value="generados">Leads nuevos</option>
+                      <option value="reactivados">Leads reactivados</option>
+                      <option value="con_actividad">Con actividad</option>
+                      <option value="llamadas">Llamadas</option>
+                      <option value="tiempo_lead">Tiempo al lead</option>
+                      <option value="agendadas">Citas agendadas</option>
+                      <option value="asistidas">Citas asistidas</option>
+                      <option value="facturacion">Facturación</option>
+                      <option value="efectivo">Efectivo</option>
+                      <option value="tasa_contacto">Tasa contacto</option>
+                      <option value="tasa_agend">Tasa agendamiento</option>
+                      {metricasConfig
+                        .filter((m) => m.atribuible_a_usuario && m.webhookCampo)
+                        .map((m) => (
+                          <option key={m.id} value={`webhook:${m.webhookCampo}`}>
+                            {m.nombre}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-[10px] text-gray-500">
+                      Las métricas custom webhook aparecen aquí solo si tienen &quot;Atribuible a asesor&quot; activado.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 pb-2 border-b border-accent-green/30">

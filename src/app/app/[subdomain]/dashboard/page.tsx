@@ -50,7 +50,7 @@ const RANKING_COLS = [
 type RankingColKey = typeof RANKING_COLS[number]['key'];
 const ALL_RANKING_COL_KEYS: RankingColKey[] = RANKING_COLS.map(c => c.key);
 
-type RankingSortKey = 'score' | RankingColKey;
+type RankingSortKey = 'score' | RankingColKey | (string & Record<never, never>);
 
 function rankingSortValue(row: DashboardAdvisorRow, key: RankingSortKey): number {
   switch (key) {
@@ -67,6 +67,13 @@ function rankingSortValue(row: DashboardAdvisorRow, key: RankingSortKey): number
     case 'efectivo': return row.cashCollected;
     case 'tasa_contacto': return row.contactRate;
     case 'tasa_agend': return row.bookingRate;
+    default: {
+      if (key.startsWith('webhook:')) {
+        const campo = key.slice(8);
+        return Number(row.metricasWebhook?.[campo]) || 0;
+      }
+      return 0;
+    }
   }
 }
 
@@ -90,6 +97,7 @@ export default function DashboardPage() {
   const rankingColsPopoverRef = useRef<HTMLDivElement>(null);
   const [rankingSortKey, setRankingSortKey] = useState<RankingSortKey>('score');
   const [rankingSortAsc, setRankingSortAsc] = useState(false);
+  const [rankingSortInitialized, setRankingSortInitialized] = useState(false);
   const [leadFilter, setLeadFilter] = useState<'todos' | 'nuevos' | 'reactivados'>('todos');
 
   const toggleRankingSort = (key: RankingSortKey) => {
@@ -172,6 +180,16 @@ export default function DashboardPage() {
       setRankingColsInitialized(true);
     }
   }, [data, rankingColsInitialized]);
+
+  useEffect(() => {
+    if (!rankingSortInitialized && data?.configuracion_ui) {
+      const base = data.configuracion_ui.ranking_metrica_base as string | undefined;
+      if (base) setRankingSortKey(base);
+      setRankingSortInitialized(true);
+    } else if (!rankingSortInitialized && data) {
+      setRankingSortInitialized(true);
+    }
+  }, [data, rankingSortInitialized]);
 
   // Cerrar popover al hacer click fuera
   useEffect(() => {
