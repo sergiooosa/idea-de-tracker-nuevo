@@ -13,7 +13,7 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { cuentas, apiKeysCuenta, metricasWebhook } from "@/lib/db/schema";
+import { cuentas, apiKeysCuenta, metricasWebhook, type MetricaConfig } from "@/lib/db/schema";
 import { eq, and, or, sql } from "drizzle-orm";
 
 export async function POST(
@@ -34,26 +34,32 @@ export async function POST(
 
     const idCuentaNum = /^\d+$/.test(locationId) ? Number(locationId) : null;
 
-    let cuentaRow: { id_cuenta: number; zona_horaria_iana: string | null } | undefined;
+    let cuentaRow: { id_cuenta: number; zona_horaria_iana: string | null; metricas_config: unknown } | undefined;
+
+    const cuentaSelect = {
+      id_cuenta: cuentas.id_cuenta,
+      zona_horaria_iana: cuentas.zona_horaria_iana,
+      metricas_config: cuentas.metricas_config,
+    };
+
+    const cuentaWhere = or(
+      ...(idCuentaNum !== null ? [eq(cuentas.id_cuenta, idCuentaNum)] : []),
+      eq(cuentas.locationid, locationId),
+      eq(cuentas.subdominio, locationId),
+      eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
+    )!;
 
     if (isGlobalAuth) {
-      // Auth global: key interna válida para cualquier location_id (write-only a métricas)
       [cuentaRow] = await db
-        .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
+        .select(cuentaSelect)
         .from(cuentas)
-        .where(or(
-          ...(idCuentaNum !== null ? [eq(cuentas.id_cuenta, idCuentaNum)] : []),
-          eq(cuentas.locationid, locationId),
-          eq(cuentas.subdominio, locationId),
-          eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
-        )!)
+        .where(cuentaWhere)
         .limit(1);
 
       if (!cuentaRow) {
         return NextResponse.json({ error: "location_id no corresponde a ninguna cuenta" }, { status: 404 });
       }
     } else {
-      // Auth per-cuenta: validar key contra api_keys_cuenta
       const [keyRow] = await db
         .select({ id_cuenta: apiKeysCuenta.id_cuenta })
         .from(apiKeysCuenta)
@@ -65,18 +71,21 @@ export async function POST(
       }
 
       [cuentaRow] = await db
-        .select({ id_cuenta: cuentas.id_cuenta, zona_horaria_iana: cuentas.zona_horaria_iana })
+        .select(cuentaSelect)
         .from(cuentas)
-        .where(or(
-          ...(idCuentaNum !== null ? [eq(cuentas.id_cuenta, idCuentaNum)] : []),
-          eq(cuentas.locationid, locationId),
-          eq(cuentas.subdominio, locationId),
-          eq(cuentas.subdominio, locationId.includes(".") ? locationId : `${locationId}.autokpi.net`),
-        )!)
+        .where(cuentaWhere)
         .limit(1);
 
       if (!cuentaRow || cuentaRow.id_cuenta !== keyRow.id_cuenta) {
         return NextResponse.json({ error: "Cuenta no encontrada o API Key no corresponde" }, { status: 404 });
+      }
+    }
+
+    const configuredCampos = new Set<string>();
+    const configs = cuentaRow.metricas_config as MetricaConfig[] | null;
+    if (Array.isArray(configs)) {
+      for (const m of configs) {
+        if (m.webhookCampo) configuredCampos.add(m.webhookCampo);
       }
     }
 
@@ -162,12 +171,31 @@ export async function POST(
       inserted++;
     }
 
+    const campos_configurados = campos_guardados.filter((c) => configuredCampos.has(c));
+    const campos_no_configurados = campos_guardados.filter((c) => !configuredCampos.has(c));
+
+    const warnings: string[] = [];
+    if (campos_no_configurados.length > 0) {
+      warnings.push(
+        `Los siguientes campos se guardaron en BD pero NO están configurados como métricas en el dashboard: ${campos_no_configurados.join(", ")}. No se mostrarán hasta que se configuren en el panel de métricas custom.`,
+      );
+    }
+    if (configuredCampos.size > 0 && campos_configurados.length === 0 && campos_guardados.length > 0) {
+      warnings.push(
+        `Campos configurados en esta cuenta: ${[...configuredCampos].join(", ")}. Ninguno de los campos enviados coincide.`,
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       message: `Se guardaron ${inserted} campo(s) para ${fecha}`,
       campos_guardados,
+      campos_configurados,
+      campos_no_configurados,
       fecha,
       atribuido_a: ghlUserId ? { userId: ghlUserId, customerId: ghlCustomerId } : null,
+      ...(warnings.length > 0 ? { warnings } : {}),
+      ...(configuredCampos.size > 0 ? { campos_esperados: [...configuredCampos] } : {}),
     });
   } catch (err) {
     console.error("[webhooks/metricas]", err);
