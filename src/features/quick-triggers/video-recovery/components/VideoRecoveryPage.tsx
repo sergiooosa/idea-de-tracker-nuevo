@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { Button } from "@/components/ui/button";
 import { fetchVideoRecoveryUsers } from "../api/videoRecovery.api";
@@ -19,6 +19,7 @@ import {
   toSelectedRecordingsPayload,
   toUniqueTrimmedList,
 } from "../utils/videoRecovery.mappers";
+import { AgendaRelinkModal } from "./AgendaRelinkModal";
 import { VideoRecoveryExecutionResult } from "./VideoRecoveryExecutionResult";
 import { VideoRecoveryFilters, type VideoRecoveryFiltersValues } from "./VideoRecoveryFilters";
 import { VideoRecoveryPreviewTable } from "./VideoRecoveryPreviewTable";
@@ -51,6 +52,8 @@ export function VideoRecoveryPage() {
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   // Por defecto ocultar las ya procesadas ("skip") — solo mostrar las que necesitan acción
   const [actionFilter, setActionFilter] = useState<"all" | "no_skip" | SuggestedAction>("no_skip");
+  const [relinkModalOpen, setRelinkModalOpen] = useState(false);
+  const [relinkItem, setRelinkItem] = useState<VideoRecoveryPreviewItem | null>(null);
   const [values, setValues] = useState<VideoRecoveryFiltersValues>({
     id_evento: "",
     from: toInitialDateTimeLocal(24),
@@ -198,6 +201,15 @@ export function VideoRecoveryPage() {
     await runExecute(previewItems);
   };
 
+  const handleOpenRelink = useCallback((item: VideoRecoveryPreviewItem) => {
+    setRelinkItem(item);
+    setRelinkModalOpen(true);
+  }, []);
+
+  const handleRelinkSuccess = useCallback(() => {
+    handleSearchPreview();
+  }, []);
+
   const handleRetryErrors = async (): Promise<void> => {
     if (!executionResult) return;
     const failedIds = new Set(
@@ -267,6 +279,7 @@ export function VideoRecoveryPage() {
               onSetActionForRow={handleSetActionForRow}
               onChangeEstadoFilter={setEstadoFilter}
               onChangeActionFilter={setActionFilter}
+              onOpenRelink={handleOpenRelink}
             />
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-surface-500 bg-surface-800/80 p-3">
               <p className="text-xs text-gray-300">
@@ -294,6 +307,14 @@ export function VideoRecoveryPage() {
           />
         ) : null}
       </div>
+
+      <AgendaRelinkModal
+        open={relinkModalOpen}
+        onOpenChange={setRelinkModalOpen}
+        item={relinkItem}
+        idEvento={values.id_evento}
+        onRelinkSuccess={handleRelinkSuccess}
+      />
     </>
   );
 }

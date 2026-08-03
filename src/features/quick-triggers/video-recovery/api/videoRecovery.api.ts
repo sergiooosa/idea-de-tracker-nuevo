@@ -1,4 +1,8 @@
 import type {
+  AgendaSearchRequest,
+  AgendaSearchResponse,
+  RelinkRequest,
+  RelinkResponse,
   VideoRecoveryExecuteRequest,
   VideoRecoveryExecuteResponse,
   VideoRecoveryPreviewRequest,
@@ -54,6 +58,26 @@ export async function executeVideoRecovery(
 ): Promise<VideoRecoveryExecuteResponse> {
   return requestJson<VideoRecoveryExecuteResponse, VideoRecoveryExecuteRequest>(
     "/api/quick-triggers/video-recovery/execute",
+    "POST",
+    payload,
+  );
+}
+
+export async function searchAgenda(
+  payload: AgendaSearchRequest,
+): Promise<AgendaSearchResponse> {
+  return requestJson<AgendaSearchResponse, AgendaSearchRequest>(
+    "/api/quick-triggers/video-recovery/agenda-search",
+    "POST",
+    payload,
+  );
+}
+
+export async function relinkRecording(
+  payload: RelinkRequest,
+): Promise<RelinkResponse> {
+  return requestJson<RelinkResponse, RelinkRequest>(
+    "/api/quick-triggers/video-recovery/relink",
     "POST",
     payload,
   );
