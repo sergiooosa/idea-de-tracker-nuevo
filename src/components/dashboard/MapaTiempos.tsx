@@ -141,22 +141,24 @@ export default function MapaTiempos({
         <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
           <Clock className="w-4 h-4" />
           Mapa de tiempos
+          <span className="ml-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase rounded bg-accent-cyan/20 text-accent-cyan tracking-wide">
+            Beta
+          </span>
           <HelpTooltip
             titulo="Mapa de tiempos"
             contenido={
               "Visualiza el tiempo que tarda cada asesor en avanzar los leads por el funnel.\n\n" +
-              "T1 (Llegada a Llamada): tiempo desde que el lead llega hasta la primera llamada.\n" +
-              "T2 (Llamada a Agenda): tiempo desde la primera llamada hasta que se agenda una cita.\n\n" +
-              "Se muestra la mediana (valor central, robusto a outliers). La barra refleja el tamano relativo entre asesores. " +
-              "n = numero de leads con datos para esa etapa.\n\n" +
-              "Etapas futuras (Aparta, Compra) aparecen atenuadas — aun no hay datos suficientes para calcularlas."
+              "T1 (Llegó el lead → Llamarlo): tiempo desde que el lead llega hasta la primera llamada.\n" +
+              "T2 (Llamarlo → Agendar cita): tiempo desde la primera llamada hasta que se agenda una cita.\n\n" +
+              "Se muestra la mediana (valor central, robusto a outliers). La barra refleja el tamaño relativo entre asesores.\n\n" +
+              "Etapas futuras (Que asista, Que aparte, Que compre) aparecen atenuadas — aún no hay datos suficientes para calcularlas."
             }
             comoProbar="Selecciona un asesor del filtro para ver solo sus tiempos. Ingresa un ID de lead para ver su linea de tiempo individual con fechas exactas."
           />
         </h2>
         {!leadId && (
           <span className="text-xs text-gray-500">
-            {totalLeads} leads en el periodo
+            {totalLeads} leads totales
           </span>
         )}
       </div>
@@ -246,7 +248,7 @@ export default function MapaTiempos({
                     onClick={() => toggleSort("t1")}
                   >
                     <span title="Tiempo desde que llega el lead hasta la primera llamada">
-                      T1: Llegada → Llamada
+                      T1: Llegó el lead → Llamarlo
                     </span>
                     <SortIcon col="t1" />
                   </th>
@@ -255,18 +257,23 @@ export default function MapaTiempos({
                     onClick={() => toggleSort("t2")}
                   >
                     <span title="Tiempo desde la primera llamada hasta que se agenda una cita">
-                      T2: Llamada → Agenda
+                      T2: Llamarlo → Agendar cita
                     </span>
                     <SortIcon col="t2" />
                   </th>
                   <th className="px-3 py-2 font-medium text-gray-600">
-                    <span title="Sin datos suficientes para estas etapas">
-                      T3: Agenda → Aparta
+                    <span title="Aún sin datos — etapa beta">
+                      T3: Agendar cita → Que asista
                     </span>
                   </th>
                   <th className="px-3 py-2 font-medium text-gray-600">
-                    <span title="Sin datos suficientes para estas etapas">
-                      T4: Aparta → Compra
+                    <span title="Aún sin datos — etapa beta">
+                      T4: Que asista → Que aparte
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 font-medium text-gray-600">
+                    <span title="Aún sin datos — etapa beta">
+                      T5: Que aparte → Que compre
                     </span>
                   </th>
                 </tr>
@@ -335,10 +342,13 @@ function AsesorRow({
       </td>
       {/* Fase 2 columns — attenuated */}
       <td className="px-3 py-2.5">
-        <span className="text-gray-600 italic text-[10px]">sin datos</span>
+        <span className="text-gray-600 italic text-[10px]">sin datos (beta)</span>
       </td>
       <td className="px-3 py-2.5">
-        <span className="text-gray-600 italic text-[10px]">sin datos</span>
+        <span className="text-gray-600 italic text-[10px]">sin datos (beta)</span>
+      </td>
+      <td className="px-3 py-2.5">
+        <span className="text-gray-600 italic text-[10px]">sin datos (beta)</span>
       </td>
     </tr>
   );
@@ -361,7 +371,6 @@ function TimeBar({
     return (
       <div className="flex items-center gap-2">
         <span className="text-gray-600">—</span>
-        <span className="text-[10px] text-gray-600">n={n}</span>
       </div>
     );
   }
@@ -386,9 +395,6 @@ function TimeBar({
             {formatDuration(seconds)}
           </span>
         </div>
-        <span className="text-[10px] text-gray-500 tabular-nums shrink-0">
-          n={n}
-        </span>
       </div>
       {p90 != null && (
         <span className="text-[10px] text-gray-500">
@@ -423,38 +429,45 @@ function LeadTimelineView({
 
   const stages = [
     {
-      label: "Llegada",
+      label: "Llegó el lead",
       timestamp: timeline.t_llegada,
       delta: null as number | null,
       deltaLabel: "",
       active: true,
     },
     {
-      label: "Primera llamada",
+      label: "Llamarlo",
       timestamp: timeline.t_llamada,
       delta: timeline.t1_seconds,
       deltaLabel: "T1",
       active: !!timeline.t_llamada,
     },
     {
-      label: "Agenda cita",
+      label: "Agendar cita",
       timestamp: timeline.t_agenda,
       delta: timeline.t2_seconds,
       deltaLabel: "T2",
       active: !!timeline.t_agenda,
     },
     {
-      label: "Aparta",
+      label: "Que asista",
       timestamp: null,
       delta: null,
       deltaLabel: "T3",
       active: false,
     },
     {
-      label: "Compra",
+      label: "Que aparte",
       timestamp: null,
       delta: null,
       deltaLabel: "T4",
+      active: false,
+    },
+    {
+      label: "Que compre",
+      timestamp: null,
+      delta: null,
+      deltaLabel: "T5",
       active: false,
     },
   ];
@@ -496,7 +509,7 @@ function LeadTimelineView({
                       stage.active ? "text-gray-500" : "text-gray-700",
                     )}
                   >
-                    {i >= 3 ? "sin datos" : "—"}
+                    {i >= 3 ? "sin datos (beta)" : "—"}
                   </span>
                 )}
               </div>
@@ -529,7 +542,7 @@ function LeadTimelineView({
                 {stage.timestamp
                   ? formatTimestamp(stage.timestamp)
                   : i >= 3
-                    ? "sin datos"
+                    ? "sin datos (beta)"
                     : "—"}
               </span>
             </div>
@@ -540,7 +553,7 @@ function LeadTimelineView({
       {/* Phase 2 legend */}
       <div className="flex items-center gap-1.5 text-[10px] text-gray-600 border-t border-surface-500 pt-3">
         <div className="w-2 h-2 rounded-full border border-gray-600 bg-surface-700 shrink-0" />
-        Aparta y Compra: sin datos suficientes para calcular (Fase 2)
+        Que asista, Que aparte y Que compre: sin datos suficientes para calcular (beta)
       </div>
     </div>
   );
