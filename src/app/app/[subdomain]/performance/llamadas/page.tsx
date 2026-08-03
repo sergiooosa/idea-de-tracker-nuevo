@@ -7,7 +7,7 @@ import KPICard from '@/components/dashboard/KPICard';
 import DateRangePicker from '@/components/dashboard/DateRangePicker';
 import { useApiData } from '@/hooks/useApiData';
 import { format, subDays } from 'date-fns';
-import { BarChart3, CheckCircle2, Clock, ClipboardList, FileText, MapPin, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, Target, User, Users, Wallet, X, Plus, CalendarCheck } from 'lucide-react';
+import { BarChart3, CheckCircle2, Clock, ClipboardList, FileText, Heart, MapPin, Pencil, Phone, PhoneCall, PhoneOff, PhoneMissed, PhoneForwarded, Search, Sparkles, Target, Timer, User, Users, Wallet, X, Plus, CalendarCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import KpiTooltip from '@/components/dashboard/KpiTooltip';
 import NuevoRegistroModal from '@/components/dashboard/NuevoRegistroModal';
@@ -800,13 +800,15 @@ export default function PerformanceLlamadasPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {modalCall.resumenLlamada && (
                 <div>
-                  <h4 className="text-xs font-semibold text-accent-amber mb-2 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5" /> Resumen de la llamada <KpiTooltip significado="Resumen estructurado generado por IA al finalizar la llamada: dónde vive el prospecto, qué busca, su presupuesto, quién toma la decisión y el desenlace de la conversación." calculo="Extraído automáticamente de la transcripción por el Cerebro." /></h4>
+                  <h4 className="text-xs font-semibold text-accent-amber mb-2 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5" /> Resumen de la llamada <KpiTooltip significado="Resumen estructurado generado por IA al finalizar la llamada: interés del lead, ubicación, presupuesto, quién decide, tiempo estimado de compra y desenlace." calculo="Extraído automáticamente de la transcripción por el Cerebro." /></h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {[
+                      ...(modalCall.resumenLlamada.interes_lead ? [{ icon: Heart, label: "Interés del lead", value: modalCall.resumenLlamada.interes_lead }] : []),
                       { icon: MapPin, label: "Ubicación", value: modalCall.resumenLlamada.ubicacion },
-                      { icon: Target, label: "Objetivo", value: modalCall.resumenLlamada.objetivo },
+                      ...(!modalCall.resumenLlamada.interes_lead && modalCall.resumenLlamada.objetivo ? [{ icon: Target, label: "Objetivo", value: modalCall.resumenLlamada.objetivo }] : []),
                       { icon: Wallet, label: "Presupuesto", value: modalCall.resumenLlamada.presupuesto },
                       { icon: Users, label: "Quién decide", value: modalCall.resumenLlamada.quien_decide },
+                      ...(modalCall.resumenLlamada.tiempo_compra ? [{ icon: Timer, label: "Tiempo de compra", value: modalCall.resumenLlamada.tiempo_compra }] : []),
                       { icon: CheckCircle2, label: "Desenlace", value: modalCall.resumenLlamada.desenlace, fullWidth: true },
                     ].map((item) => {
                       const Icon = item.icon;
