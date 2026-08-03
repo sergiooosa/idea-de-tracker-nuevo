@@ -126,7 +126,8 @@ export default function DashboardNodePage() {
           </div>
         )}
 
-        {!loading && data?.advisorRanking && data.advisorRanking.length > 0 && (
+        {!loading && data?.advisorRanking && data.advisorRanking.length > 0 &&
+          !(Array.isArray(data.configuracion_ui?.secciones_ocultas) && (data.configuracion_ui.secciones_ocultas as string[]).includes('panel_ranking')) && (
           <AdvisorRankingWidget advisorRanking={data.advisorRanking} />
         )}
       </div>

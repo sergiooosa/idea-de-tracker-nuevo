@@ -37,6 +37,10 @@ export interface SystemConfigData {
   idioma: "es" | "en";
   /** Columnas visibles en el ranking de asesores. Si undefined → todas visibles. */
   ranking_columnas: string[] | null;
+  /** Secciones ocultas del dashboard (ej. 'panel_ranking'). */
+  secciones_ocultas: string[];
+  /** Métrica base para ordenar el ranking de asesores. Null → score compuesto. */
+  ranking_metrica_base: string | null;
   /** Control de notas en GHL tras procesar videollamada de Fathom */
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
   /** Toggle: si true, las etapas con es_cerrada:true también cuentan como calificadas */
@@ -55,6 +59,8 @@ export interface SystemConfigUpdatePayload extends Partial<Omit<SystemConfigData
   idioma?: "es" | "en";
   configuracion_ads?: ConfiguracionAds;
   ranking_columnas?: string[] | null;
+  secciones_ocultas?: string[];
+  ranking_metrica_base?: string | null;
   ghl_notas?: { ia?: boolean; transcripcion?: boolean };
   cerradas_cuentan_como_calificadas?: boolean;
   categorias_llamadas?: CategoriaLlamada[];
@@ -130,6 +136,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       idioma: "es" as const,
       configuracion_ads: {},
       ranking_columnas: null,
+      secciones_ocultas: [],
+      ranking_metrica_base: null,
       cerradas_cuentan_como_calificadas: true,
       categorias_llamadas: [],
       exclusiones_coach: null,
@@ -164,6 +172,8 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     idioma: (r.configuracion_ui?.idioma === "en" ? "en" : "es") as "es" | "en",
     configuracion_ads: (r.configuracion_ads && typeof r.configuracion_ads === "object") ? r.configuracion_ads as ConfiguracionAds : {},
     ranking_columnas: Array.isArray(r.configuracion_ui?.ranking_columnas) ? r.configuracion_ui.ranking_columnas : null,
+    secciones_ocultas: Array.isArray(r.configuracion_ui?.secciones_ocultas) ? r.configuracion_ui.secciones_ocultas as string[] : [],
+    ranking_metrica_base: (typeof r.configuracion_ui?.ranking_metrica_base === 'string') ? r.configuracion_ui.ranking_metrica_base : null,
     ghl_notas: r.configuracion_ui?.ghl_notas ?? { ia: true, transcripcion: false },
     cerradas_cuentan_como_calificadas: r.configuracion_ui?.cerradas_cuentan_como_calificadas ?? true,
     categorias_llamadas: Array.isArray(r.categorias_llamadas) ? r.categorias_llamadas : [],
@@ -262,6 +272,8 @@ export async function updateSystemConfig(
     data.chat_config !== undefined ||
     data.idioma !== undefined ||
     data.ranking_columnas !== undefined ||
+    data.secciones_ocultas !== undefined ||
+    data.ranking_metrica_base !== undefined ||
     (data as Record<string, unknown>).ghl_notas !== undefined ||
     (data as Record<string, unknown>).cerradas_cuentan_como_calificadas !== undefined
   ) {
@@ -288,6 +300,12 @@ export async function updateSystemConfig(
     }
     if (data.ranking_columnas !== undefined) {
       updatedUi.ranking_columnas = data.ranking_columnas ?? undefined;
+    }
+    if (data.secciones_ocultas !== undefined) {
+      updatedUi.secciones_ocultas = data.secciones_ocultas;
+    }
+    if (data.ranking_metrica_base !== undefined) {
+      updatedUi.ranking_metrica_base = data.ranking_metrica_base ?? undefined;
     }
     if ((data as Record<string, unknown>).ghl_notas !== undefined) {
       updatedUi.ghl_notas = (data as Record<string, unknown>).ghl_notas as { ia?: boolean; transcripcion?: boolean };
