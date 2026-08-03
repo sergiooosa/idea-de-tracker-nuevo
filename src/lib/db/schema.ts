@@ -514,10 +514,12 @@ export const logLlamadas = pgTable("log_llamadas", {
 });
 
 export interface ResumenLlamada {
+  interes_lead?: string;
   ubicacion: string;
-  objetivo: string;
+  objetivo?: string;
   presupuesto: string;
   quien_decide: string;
+  tiempo_compra?: string;
   desenlace: string;
 }
 
