@@ -138,19 +138,13 @@ export function normalizeMetricasConfig(configs: MetricaConfig[]): MetricaConfig
       }
     }
 
-    const ub = patched.ubicacion ?? "panel_ejecutivo";
-    const standardPanels: string[] =
-      ub === "ambos" ? ["panel_ejecutivo", "rendimiento"]
-        : ub === "rendimiento" ? ["rendimiento"]
-          : ["panel_ejecutivo"];
-
     if (!patched.paneles || patched.paneles.length === 0) {
+      const ub = patched.ubicacion ?? "panel_ejecutivo";
+      const standardPanels: string[] =
+        ub === "ambos" ? ["panel_ejecutivo", "rendimiento"]
+          : ub === "rendimiento" ? ["rendimiento"]
+            : ["panel_ejecutivo"];
       patched = { ...patched, paneles: standardPanels as MetricaConfig["paneles"] };
-    } else {
-      const hasStandard = patched.paneles.some((p) => p === "panel_ejecutivo" || p === "rendimiento");
-      if (!hasStandard) {
-        patched = { ...patched, paneles: [...standardPanels, ...patched.paneles] as MetricaConfig["paneles"] };
-      }
     }
 
     return patched;
