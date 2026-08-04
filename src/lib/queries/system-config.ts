@@ -199,27 +199,27 @@ export async function updateSystemConfig(
     setClause.embudo_personalizado = embudoNuevo;
     const metricsExisting = [...(data.metricas_config ?? [])] as MetricaConfig[];
 
-    let removedByUser = new Set<string>();
-    if (data.metricas_config !== undefined) {
-      const [currentRow] = await db
-        .select({ metricas_config: cuentas.metricas_config })
-        .from(cuentas)
-        .where(eq(cuentas.id_cuenta, idCuenta))
-        .limit(1);
-      const currentMetrics = parseMetricasConfig(currentRow?.metricas_config);
-      const incomingIds = new Set(metricsExisting.map((m) => m.id));
-      removedByUser = new Set(
-        currentMetrics
-          .filter((m) => m.tipo === "embudo_etapa" && !incomingIds.has(m.id))
-          .map((m) => m.id),
-      );
-    }
+    const [currentRow] = await db
+      .select({
+        metricas_config: cuentas.metricas_config,
+        embudo_personalizado: cuentas.embudo_personalizado,
+      })
+      .from(cuentas)
+      .where(eq(cuentas.id_cuenta, idCuenta))
+      .limit(1);
+
+    const previousEtapaIds = new Set(
+      (Array.isArray(currentRow?.embudo_personalizado)
+        ? currentRow.embudo_personalizado
+        : []
+      ).map((e: { id: string }) => e.id),
+    );
 
     for (const etapa of embudoNuevo) {
-      if (etapa.es_fija !== true) {
+      if (etapa.es_fija !== true && !previousEtapaIds.has(etapa.id)) {
         const metricId = `embudo-${etapa.id}`;
         const alreadyExists = metricsExisting.some((m) => m.id === metricId);
-        if (!alreadyExists && !removedByUser.has(metricId)) {
+        if (!alreadyExists) {
           const newMetric: MetricaConfig = {
             id: metricId,
             nombre: etapa.nombre,
