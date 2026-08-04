@@ -151,6 +151,9 @@ export default async function middleware(req: NextRequest) {
   // Todas las rutas /api/* pasan directo sin reescribir
   if (pathname.startsWith("/api")) return setCspHeaders(NextResponse.next(), subdomain);
 
+  // Webhooks → públicos, sin auth (GHL/Twilio envían POSTs al subdominio)
+  if (pathname.startsWith("/webhooks")) return setCspHeaders(NextResponse.next(), subdomain);
+
   // Ruta /demo → pública, sin auth
   if (pathname === "/demo" || pathname.startsWith("/demo/")) {
     return setCspHeaders(NextResponse.next(), subdomain);
