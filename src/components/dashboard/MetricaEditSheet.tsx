@@ -354,6 +354,12 @@ export default function MetricaEditSheet({
         setSaving(false);
         onClose();
         return;
+      } else if (tipo === "embudo_etapa") {
+        config = { ...base, tipo: "embudo_etapa" as const };
+        await onSave(config);
+        setSaving(false);
+        onClose();
+        return;
       } else if (tipo === "fija") {
         config = { ...base, tipo: "fija" as const, valorFijo: valorFijo.trim() || "0" };
         await onSave(config);
