@@ -128,17 +128,20 @@ export async function POST(
     const idCuenta = cuentaRow.id_cuenta;
     let inserted = 0;
     const campos_guardados: string[] = [];
+    const campos_no_configurados: string[] = [];
+    const hasConfig = configuredCampos.size > 0;
 
     for (const [campo, valor] of Object.entries(body)) {
       const num = Number(valor);
       if (isNaN(num) || typeof valor === "object") continue;
 
+      // Si la cuenta tiene campos configurados, solo persistir los que están en la config
+      if (hasConfig && !configuredCampos.has(campo)) {
+        campos_no_configurados.push(campo);
+        continue;
+      }
+
       if (ghlUserId !== null || ghlCustomerId !== null) {
-        // ── Modo atribuido: INSERT individual, sin upsert global ────────────
-        // Cada llamada con userId/customerId genera una fila nueva acumulable.
-        // El campo global (sin user/customer) se actualiza por separado abajo
-        // solo si también viene valor sin atribución (caso raro, pero seguro).
-        // INSERT atribuido — acumula por (id_cuenta, fecha, campo, ghl_user_id)
         await db.execute(sql`
           INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, ghl_user_id, ghl_customer_id, updated_at)
           VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, ${ghlUserId}, ${ghlCustomerId}, NOW())
@@ -147,8 +150,6 @@ export async function POST(
               ghl_customer_id = EXCLUDED.ghl_customer_id,
               updated_at = NOW()
         `);
-        // También acumular en el aggregate global (fila con ghl_user_id IS NULL)
-        // Usa el índice parcial uq_metricas_webhook_global WHERE ghl_user_id IS NULL
         await db.execute(sql`
           INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, ghl_user_id, updated_at)
           VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NULL, NOW())
@@ -157,7 +158,6 @@ export async function POST(
               updated_at = NOW()
         `);
       } else {
-        // ── Modo global: upsert simple por índice parcial global ─────────────
         await db.execute(sql`
           INSERT INTO metricas_webhook (id_cuenta, fecha, campo, valor, ghl_user_id, updated_at)
           VALUES (${idCuenta}, ${fecha}, ${campo}, ${String(num)}, NULL, NOW())
@@ -171,16 +171,13 @@ export async function POST(
       inserted++;
     }
 
-    const campos_configurados = campos_guardados.filter((c) => configuredCampos.has(c));
-    const campos_no_configurados = campos_guardados.filter((c) => !configuredCampos.has(c));
-
     const warnings: string[] = [];
     if (campos_no_configurados.length > 0) {
       warnings.push(
-        `Los siguientes campos se guardaron en BD pero NO están configurados como métricas en el dashboard: ${campos_no_configurados.join(", ")}. No se mostrarán hasta que se configuren en el panel de métricas custom.`,
+        `Los siguientes campos fueron ignorados porque NO están configurados como métricas: ${campos_no_configurados.join(", ")}. Configúralos en el panel de métricas custom para que se guarden.`,
       );
     }
-    if (configuredCampos.size > 0 && campos_configurados.length === 0 && campos_guardados.length > 0) {
+    if (hasConfig && campos_guardados.length === 0 && campos_no_configurados.length > 0) {
       warnings.push(
         `Campos configurados en esta cuenta: ${[...configuredCampos].join(", ")}. Ninguno de los campos enviados coincide.`,
       );
@@ -190,7 +187,6 @@ export async function POST(
       ok: true,
       message: `Se guardaron ${inserted} campo(s) para ${fecha}`,
       campos_guardados,
-      campos_configurados,
       campos_no_configurados,
       fecha,
       atribuido_a: ghlUserId ? { userId: ghlUserId, customerId: ghlCustomerId } : null,
