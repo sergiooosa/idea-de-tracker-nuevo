@@ -5,9 +5,10 @@ import { useApiData } from "@/hooks/useApiData";
 import type {
   MapaTiemposResponse,
   MapaTiemposAsesor,
+  MapaTiemposLeadTimeline,
 } from "@/types";
 import HelpTooltip from "./HelpTooltip";
-import { Clock, User, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Clock, User, Search, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import clsx from "clsx";
 
 function formatDuration(seconds: number | null): string {
@@ -29,7 +30,23 @@ function formatTimestamp(ts: string | null): string {
   });
 }
 
-type SortKey = "asesor" | "t1" | "t2";
+type SortKey = "asesor" | "t1" | "t2" | "t3" | "t4" | "t5";
+
+const SORT_FIELD_MAP: Record<Exclude<SortKey, "asesor">, keyof MapaTiemposAsesor> = {
+  t1: "t1_mediana_seconds",
+  t2: "t2_mediana_seconds",
+  t3: "t3_mediana_seconds",
+  t4: "t4_mediana_seconds",
+  t5: "t5_mediana_seconds",
+};
+
+const COLUMN_COLORS: Record<string, "cyan" | "purple" | "amber" | "emerald" | "rose"> = {
+  t1: "cyan",
+  t2: "purple",
+  t3: "amber",
+  t4: "emerald",
+  t5: "rose",
+};
 
 export default function MapaTiempos({
   dateFrom,
@@ -57,42 +74,34 @@ export default function MapaTiempos({
   const asesores = data?.asesores ?? [];
   const leadTimeline = data?.lead_timeline ?? null;
   const totalLeads = data?.total_leads ?? 0;
+  const stuck = data?.stuck ?? null;
 
-  const maxT1 = useMemo(() => {
-    let max = 0;
-    for (const a of asesores) {
-      if (a.t1_mediana_seconds != null && a.t1_mediana_seconds > max) max = a.t1_mediana_seconds;
+  const maxByKey = useMemo(() => {
+    const keys = ["t1", "t2", "t3", "t4", "t5"] as const;
+    const result: Record<string, number> = {};
+    for (const k of keys) {
+      const field = `${k}_mediana_seconds` as keyof MapaTiemposAsesor;
+      let max = 0;
+      for (const a of asesores) {
+        const v = a[field];
+        if (typeof v === "number" && v > max) max = v;
+      }
+      result[k] = max || 1;
     }
-    return max || 1;
-  }, [asesores]);
-
-  const maxT2 = useMemo(() => {
-    let max = 0;
-    for (const a of asesores) {
-      if (a.t2_mediana_seconds != null && a.t2_mediana_seconds > max) max = a.t2_mediana_seconds;
-    }
-    return max || 1;
+    return result;
   }, [asesores]);
 
   const sortedAsesores = useMemo(() => {
     const arr = [...asesores];
     arr.sort((a, b) => {
-      let va: number;
-      let vb: number;
-      switch (sortKey) {
-        case "asesor":
-          return sortAsc
-            ? a.asesor.localeCompare(b.asesor)
-            : b.asesor.localeCompare(a.asesor);
-        case "t1":
-          va = a.t1_mediana_seconds ?? Infinity;
-          vb = b.t1_mediana_seconds ?? Infinity;
-          break;
-        case "t2":
-          va = a.t2_mediana_seconds ?? Infinity;
-          vb = b.t2_mediana_seconds ?? Infinity;
-          break;
+      if (sortKey === "asesor") {
+        return sortAsc
+          ? a.asesor.localeCompare(b.asesor)
+          : b.asesor.localeCompare(a.asesor);
       }
+      const field = SORT_FIELD_MAP[sortKey];
+      const va = (a[field] as number | null) ?? Infinity;
+      const vb = (b[field] as number | null) ?? Infinity;
       return sortAsc ? va - vb : vb - va;
     });
     return arr;
@@ -134,6 +143,8 @@ export default function MapaTiempos({
     return [...new Set(names)].sort();
   }, [asesores]);
 
+  const hasAnyT4T5 = asesores.some((a) => a.t4_n > 0 || a.t5_n > 0);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -141,17 +152,22 @@ export default function MapaTiempos({
         <h2 className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
           <Clock className="w-4 h-4" />
           Mapa de tiempos
-          <span className="ml-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase rounded bg-accent-cyan/20 text-accent-cyan tracking-wide">
-            Beta
-          </span>
+          {!hasAnyT4T5 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase rounded bg-accent-cyan/20 text-accent-cyan tracking-wide">
+              Beta
+            </span>
+          )}
           <HelpTooltip
             titulo="Mapa de tiempos"
             contenido={
               "Visualiza el tiempo que tarda cada asesor en avanzar los leads por el funnel.\n\n" +
               "T1 (Llegó el lead → Llamarlo): tiempo desde que el lead llega hasta la primera llamada.\n" +
-              "T2 (Llamarlo → Agendar cita): tiempo desde la primera llamada hasta que se agenda una cita.\n\n" +
+              "T2 (Llamarlo → Agendar cita): tiempo desde la primera llamada hasta que se agenda una cita.\n" +
+              "T3 (Agendar cita → Que asista): tiempo desde que se agenda hasta que el lead asiste a la cita.\n" +
+              "T4 (Que asista → Que aparte): tiempo desde la asistencia hasta que el lead aparta.\n" +
+              "T5 (Que aparte → Que compre): tiempo desde el apartado hasta el cierre de la venta.\n\n" +
               "Se muestra la mediana (valor central, robusto a outliers). La barra refleja el tamaño relativo entre asesores.\n\n" +
-              "Etapas futuras (Que asista, Que aparte, Que compre) aparecen atenuadas — aún no hay datos suficientes para calcularlas."
+              "T4 y T5 se alimentan del webhook de cambio de etapa de GHL. Si aún no hay datos, la columna aparece vacía."
             }
             comoProbar="Selecciona un asesor del filtro para ver solo sus tiempos. Ingresa un ID de lead para ver su linea de tiempo individual con fechas exactas."
           />
@@ -248,7 +264,7 @@ export default function MapaTiempos({
                     onClick={() => toggleSort("t1")}
                   >
                     <span title="Tiempo desde que llega el lead hasta la primera llamada">
-                      T1: Llegó el lead → Llamarlo
+                      T1: Llegó → Llamar
                     </span>
                     <SortIcon col="t1" />
                   </th>
@@ -257,24 +273,36 @@ export default function MapaTiempos({
                     onClick={() => toggleSort("t2")}
                   >
                     <span title="Tiempo desde la primera llamada hasta que se agenda una cita">
-                      T2: Llamarlo → Agendar cita
+                      T2: Llamar → Agendar
                     </span>
                     <SortIcon col="t2" />
                   </th>
-                  <th className="px-3 py-2 font-medium text-gray-600">
-                    <span title="Aún sin datos — etapa beta">
-                      T3: Agendar cita → Que asista
+                  <th
+                    className="px-3 py-2 font-medium cursor-pointer hover:text-white"
+                    onClick={() => toggleSort("t3")}
+                  >
+                    <span title="Tiempo desde que se agenda hasta que asiste a la cita">
+                      T3: Agendar → Asistir
                     </span>
+                    <SortIcon col="t3" />
                   </th>
-                  <th className="px-3 py-2 font-medium text-gray-600">
-                    <span title="Aún sin datos — etapa beta">
-                      T4: Que asista → Que aparte
+                  <th
+                    className="px-3 py-2 font-medium cursor-pointer hover:text-white"
+                    onClick={() => toggleSort("t4")}
+                  >
+                    <span title="Tiempo desde que asiste hasta que aparta">
+                      T4: Asistir → Apartar
                     </span>
+                    <SortIcon col="t4" />
                   </th>
-                  <th className="px-3 py-2 font-medium text-gray-600">
-                    <span title="Aún sin datos — etapa beta">
-                      T5: Que aparte → Que compre
+                  <th
+                    className="px-3 py-2 font-medium cursor-pointer hover:text-white"
+                    onClick={() => toggleSort("t5")}
+                  >
+                    <span title="Tiempo desde que aparta hasta que compra">
+                      T5: Apartar → Comprar
                     </span>
+                    <SortIcon col="t5" />
                   </th>
                 </tr>
               </thead>
@@ -283,14 +311,18 @@ export default function MapaTiempos({
                   <AsesorRow
                     key={a.asesor}
                     asesor={a}
-                    maxT1={maxT1}
-                    maxT2={maxT2}
+                    maxByKey={maxByKey}
                   />
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {/* Stuck counts */}
+      {!loading && !error && !leadId && stuck && (
+        <StuckBar stuck={stuck} />
       )}
 
       {!loading && !error && !leadId && asesores.length === 0 && (
@@ -302,17 +334,42 @@ export default function MapaTiempos({
   );
 }
 
+function StuckBar({ stuck }: { stuck: { sin_llamar: number; sin_agendar: number; sin_asistir: number; sin_apartar: number; sin_comprar: number } }) {
+  const items = [
+    { label: "Sin llamar", count: stuck.sin_llamar },
+    { label: "Sin agendar", count: stuck.sin_agendar },
+    { label: "Sin asistir", count: stuck.sin_asistir },
+    { label: "Sin apartar", count: stuck.sin_apartar },
+    { label: "Sin comprar", count: stuck.sin_comprar },
+  ];
+  const hasAny = items.some((i) => i.count > 0);
+  if (!hasAny) return null;
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap text-[11px]">
+      <span className="flex items-center gap-1 text-gray-500">
+        <AlertTriangle className="w-3 h-3" />
+        Estancados:
+      </span>
+      {items.map((item) =>
+        item.count > 0 ? (
+          <span key={item.label} className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            {item.label}: {item.count}
+          </span>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
 function AsesorRow({
   asesor,
-  maxT1,
-  maxT2,
+  maxByKey,
 }: {
   asesor: MapaTiemposAsesor;
-  maxT1: number;
-  maxT2: number;
+  maxByKey: Record<string, number>;
 }) {
-  const t1Pct = asesor.t1_mediana_seconds != null ? (asesor.t1_mediana_seconds / maxT1) * 100 : 0;
-  const t2Pct = asesor.t2_mediana_seconds != null ? (asesor.t2_mediana_seconds / maxT2) * 100 : 0;
+  const columns = ["t1", "t2", "t3", "t4", "t5"] as const;
 
   return (
     <tr className="border-t border-surface-500 hover:bg-surface-700/50">
@@ -322,34 +379,29 @@ function AsesorRow({
           <span className="text-gray-200 truncate max-w-[120px]">{asesor.asesor}</span>
         </span>
       </td>
-      <td className="px-3 py-2.5">
-        <TimeBar
-          seconds={asesor.t1_mediana_seconds}
-          p90={asesor.t1_p90_seconds}
-          n={asesor.t1_n}
-          pct={t1Pct}
-          color="cyan"
-        />
-      </td>
-      <td className="px-3 py-2.5">
-        <TimeBar
-          seconds={asesor.t2_mediana_seconds}
-          p90={asesor.t2_p90_seconds}
-          n={asesor.t2_n}
-          pct={t2Pct}
-          color="purple"
-        />
-      </td>
-      {/* Fase 2 columns — attenuated */}
-      <td className="px-3 py-2.5">
-        <span className="text-gray-600 italic text-[10px]">sin datos (beta)</span>
-      </td>
-      <td className="px-3 py-2.5">
-        <span className="text-gray-600 italic text-[10px]">sin datos (beta)</span>
-      </td>
-      <td className="px-3 py-2.5">
-        <span className="text-gray-600 italic text-[10px]">sin datos (beta)</span>
-      </td>
+      {columns.map((col) => {
+        const mediana = asesor[`${col}_mediana_seconds`];
+        const p90 = asesor[`${col}_p90_seconds`];
+        const n = asesor[`${col}_n`];
+        const max = maxByKey[col];
+        const pct = mediana != null ? (mediana / max) * 100 : 0;
+
+        return (
+          <td key={col} className="px-3 py-2.5">
+            {n > 0 ? (
+              <TimeBar
+                seconds={mediana}
+                p90={p90}
+                n={n}
+                pct={pct}
+                color={COLUMN_COLORS[col]}
+              />
+            ) : (
+              <span className="text-gray-600">—</span>
+            )}
+          </td>
+        );
+      })}
     </tr>
   );
 }
@@ -365,7 +417,7 @@ function TimeBar({
   p90: number | null;
   n: number;
   pct: number;
-  color: "cyan" | "purple";
+  color: "cyan" | "purple" | "amber" | "emerald" | "rose";
 }) {
   if (seconds == null || n === 0) {
     return (
@@ -375,32 +427,50 @@ function TimeBar({
     );
   }
 
-  const barColor = color === "cyan" ? "bg-accent-cyan/40" : "bg-accent-purple/40";
-  const textColor = color === "cyan" ? "text-accent-cyan" : "text-accent-purple";
+  const barColors: Record<typeof color, string> = {
+    cyan: "bg-accent-cyan/40",
+    purple: "bg-accent-purple/40",
+    amber: "bg-amber-500/40",
+    emerald: "bg-emerald-500/40",
+    rose: "bg-rose-500/40",
+  };
+
+  const textColors: Record<typeof color, string> = {
+    cyan: "text-accent-cyan",
+    purple: "text-accent-purple",
+    amber: "text-amber-400",
+    emerald: "text-emerald-400",
+    rose: "text-rose-400",
+  };
 
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
         <div className="flex-1 h-5 bg-surface-600 rounded-sm overflow-hidden relative min-w-[60px] max-w-[200px]">
           <div
-            className={clsx("h-full rounded-sm transition-all", barColor)}
+            className={clsx("h-full rounded-sm transition-all", barColors[color])}
             style={{ width: `${Math.max(pct, 4)}%` }}
           />
           <span
             className={clsx(
               "absolute inset-0 flex items-center px-1.5 text-[11px] font-medium",
-              textColor,
+              textColors[color],
             )}
           >
             {formatDuration(seconds)}
           </span>
         </div>
       </div>
-      {p90 != null && (
-        <span className="text-[10px] text-gray-500">
-          p90: {formatDuration(p90)}
+      <div className="flex items-center gap-2">
+        {p90 != null && (
+          <span className="text-[10px] text-gray-500">
+            p90: {formatDuration(p90)}
+          </span>
+        )}
+        <span className="text-[10px] text-gray-600">
+          n={n}
         </span>
-      )}
+      </div>
     </div>
   );
 }
@@ -408,16 +478,7 @@ function TimeBar({
 function LeadTimelineView({
   timeline,
 }: {
-  timeline: {
-    id_registro: number;
-    nombre_lead: string | null;
-    asesor: string;
-    t_llegada: string;
-    t_llamada: string | null;
-    t_agenda: string | null;
-    t1_seconds: number | null;
-    t2_seconds: number | null;
-  } | null;
+  timeline: MapaTiemposLeadTimeline | null;
 }) {
   if (!timeline) {
     return (
@@ -451,24 +512,24 @@ function LeadTimelineView({
     },
     {
       label: "Que asista",
-      timestamp: null,
-      delta: null,
+      timestamp: timeline.t_asista,
+      delta: timeline.t3_seconds,
       deltaLabel: "T3",
-      active: false,
+      active: !!timeline.t_asista,
     },
     {
       label: "Que aparte",
-      timestamp: null,
-      delta: null,
+      timestamp: timeline.t_aparta,
+      delta: timeline.t4_seconds,
       deltaLabel: "T4",
-      active: false,
+      active: !!timeline.t_aparta,
     },
     {
       label: "Que compre",
-      timestamp: null,
-      delta: null,
+      timestamp: timeline.t_compra,
+      delta: timeline.t5_seconds,
       deltaLabel: "T5",
-      active: false,
+      active: !!timeline.t_compra,
     },
   ];
 
@@ -509,7 +570,7 @@ function LeadTimelineView({
                       stage.active ? "text-gray-500" : "text-gray-700",
                     )}
                   >
-                    {i >= 3 ? "sin datos (beta)" : "—"}
+                    —
                   </span>
                 )}
               </div>
@@ -541,19 +602,11 @@ function LeadTimelineView({
               >
                 {stage.timestamp
                   ? formatTimestamp(stage.timestamp)
-                  : i >= 3
-                    ? "sin datos (beta)"
-                    : "—"}
+                  : "—"}
               </span>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Phase 2 legend */}
-      <div className="flex items-center gap-1.5 text-[10px] text-gray-600 border-t border-surface-500 pt-3">
-        <div className="w-2 h-2 rounded-full border border-gray-600 bg-surface-700 shrink-0" />
-        Que asista, Que aparte y Que compre: sin datos suficientes para calcular (beta)
       </div>
     </div>
   );

@@ -899,6 +899,15 @@ export interface MapaTiemposAsesor {
   t2_mediana_seconds: number | null;
   t2_p90_seconds: number | null;
   t2_n: number;
+  t3_mediana_seconds: number | null;
+  t3_p90_seconds: number | null;
+  t3_n: number;
+  t4_mediana_seconds: number | null;
+  t4_p90_seconds: number | null;
+  t4_n: number;
+  t5_mediana_seconds: number | null;
+  t5_p90_seconds: number | null;
+  t5_n: number;
 }
 
 export interface MapaTiemposLeadTimeline {
@@ -908,8 +917,22 @@ export interface MapaTiemposLeadTimeline {
   t_llegada: string;
   t_llamada: string | null;
   t_agenda: string | null;
+  t_asista: string | null;
+  t_aparta: string | null;
+  t_compra: string | null;
   t1_seconds: number | null;
   t2_seconds: number | null;
+  t3_seconds: number | null;
+  t4_seconds: number | null;
+  t5_seconds: number | null;
+}
+
+export interface MapaTiemposStuckCounts {
+  sin_llamar: number;
+  sin_agendar: number;
+  sin_asistir: number;
+  sin_apartar: number;
+  sin_comprar: number;
 }
 
 export interface MapaTiemposResponse {
@@ -917,4 +940,5 @@ export interface MapaTiemposResponse {
   asesores: MapaTiemposAsesor[];
   lead_timeline: MapaTiemposLeadTimeline | null;
   total_leads: number;
+  stuck: MapaTiemposStuckCounts;
 }
