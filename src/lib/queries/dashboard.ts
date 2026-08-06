@@ -129,7 +129,6 @@ export async function getDashboard(
     .select({
       configuracion_ui: cuentas.configuracion_ui,
       embudo_personalizado: cuentas.embudo_personalizado,
-      metricas_personalizadas: cuentas.metricas_personalizadas,
       metricas_config: cuentas.metricas_config,
       metricas_manual_data: cuentas.metricas_manual_data,
       dashboards_personalizados: cuentas.dashboards_personalizados,
@@ -1676,7 +1675,6 @@ export async function getDashboard(
     distribucionEmbudo,
     tagsDisponibles: [...allTags].sort(),
     tagCounts,
-    metricasPersonalizadas: Array.isArray(cuentaRow?.metricas_personalizadas) ? cuentaRow.metricas_personalizadas : [],
     metricasComputadas,
     dashboardsPersonalizados: Array.isArray(cuentaRow?.dashboards_personalizados) ? cuentaRow.dashboards_personalizados as { id: string; nombre: string; icono?: string }[] : [],
     chatKpis: chatKpis.total > 0 ? chatKpis : undefined,

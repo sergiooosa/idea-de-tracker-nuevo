@@ -572,18 +572,8 @@ export interface EmbudoEtapaUI {
   condition?: string;
 }
 
-export interface MetricaPersonalizadaUI {
-  id: string;
-  name: string;
-  description: string;
-  condition: string;
-  increment: number;
-  whenMeasured: string;
-  isRecurring: "recurrente" | "unica";
-  section: string;
-  panel: string;
-  ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
-}
+// [DEPRECADO AUT-2167] `MetricaPersonalizadaUI` retirada (feature metricas_personalizadas
+// legacy, 0/16 adopción). Superada por metricas_config (v3.x). Retiro reversible vía git.
 
 export interface ChatKpis {
   total: number;
@@ -666,7 +656,6 @@ export interface DashboardResponse {
   distribucionEmbudo?: Record<string, number>;
   tagsDisponibles?: string[];
   tagCounts?: Record<string, number>;
-  metricasPersonalizadas?: MetricaPersonalizadaUI[];
   metricasComputadas?: { id: string; nombre: string; valor: string | number; descripcion?: string | null; ubicacion?: string; paneles?: string[]; formato?: string; color?: string; visualizacion?: "kpi_card" | "barra" | "comparativo"; seriesTiempo?: { fecha: string; valor: number }[]; subMetrics?: SubMetric[] }[];
   dashboardsPersonalizados?: { id: string; nombre: string; icono?: string | null }[];
   chatKpis?: ChatKpis;

@@ -79,11 +79,7 @@ interface TagRule {
   metrica_incremento?: number;
   nombre?: string;
 }
-interface MetricRule {
-  id: string; name: string; description: string; condition: string;
-  increment: number; whenMeasured: string; isRecurring: 'recurrente' | 'unica';
-  section: string; panel: string; ubicacion?: 'panel_ejecutivo' | 'rendimiento' | 'ambos';
-}
+// [DEPRECADO AUT-2167] interface `MetricRule` (metricas_personalizadas legacy) retirada.
 interface ReglaAutomatica {
   evento: 'no_show' | 'cancelada' | 'sin_actividad_dias';
   valor?: number;
@@ -161,7 +157,7 @@ interface ConfiguracionAdsLocal {
 }
 interface SystemConfig {
   prompt_ventas: string; prompt_videollamadas: string; prompt_llamadas: string;
-  reglas_etiquetas: (TagRule & Record<string, unknown>)[]; metricas_personalizadas: MetricRule[];
+  reglas_etiquetas: (TagRule & Record<string, unknown>)[];
   metricas_config: MetricaConfig[]; metricas_manual_data: Record<string, MetricaManualEntry[]>;
   dashboards_personalizados?: import('@/lib/db/schema').DashboardPersonalizado[];
   embudo_personalizado: EmbudoEtapa[];
@@ -285,7 +281,6 @@ export default function SystemPage() {
   const [promptEvaluacion, setPromptEvaluacion] = useState('');
   const [promptLlamadas, setPromptLlamadas] = useState('');
   const [tagRules, setTagRules] = useState<TagRule[]>([]);
-  const [metricRules, setMetricRules] = useState<MetricRule[]>([]);
   const [metas, setMetas] = useState<MetasData>({ meta_llamadas_diarias: 50, leads_nuevos_dia_1: 3, leads_nuevos_dia_2: 4, leads_nuevos_dia_3: 5, meta_citas_semanales: null, meta_cierres_semanales: null, meta_revenue_mensual: null, meta_cash_collected_mensual: null, meta_tasa_cierre: null, meta_tasa_contestacion: null, meta_speed_to_lead_min: null, meta_llamadas_semanales: null, meta_contestacion_llamadas: null, meta_speed_llamadas_min: null, meta_citas_semanales_video: null, meta_cierre_video: null, meta_revenue_video: null, meta_chats_diarios: null, meta_chats_contestacion: null, meta_speed_chat_min: null });
 
   const [geminiKey, setGeminiKey] = useState('');
@@ -434,7 +429,6 @@ export default function SystemPage() {
           const excluye = Array.isArray(r.excluye) ? r.excluye as string[] : [];
           return { ...r, condicion: (r.condicion ?? r.condition ?? '') as string, acciones, fuentes, nombre: (r.nombre ?? '') as string, excluye };
         }) : []);
-        setMetricRules(cfg.metricas_personalizadas.length > 0 ? cfg.metricas_personalizadas : []);
         const loadedEmbudo = Array.isArray(cfg.embudo_personalizado)
           ? cfg.embudo_personalizado.map((e: EmbudoEtapa) => ({ ...e, nombre: e.nombre ?? e.name ?? e.id }))
           : [];
@@ -595,7 +589,6 @@ export default function SystemPage() {
           fuentes: r.fuentes,
           ...(r.excluye && r.excluye.length > 0 ? { excluye: r.excluye } : {}),
         })),
-        metricas_personalizadas: metricRules,
         metricas_config: metricasConfig,
         metricas_manual_data: metricasManualData,
         embudo_personalizado: embudoEtapas,
@@ -686,7 +679,6 @@ export default function SystemPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const addTagRule = () => setTagRules((r) => [...r, { id: Date.now().toString(), condicion: '', acciones: [{ tipo: 'asignar_etiqueta', valor: '' }], fuentes: ['llamadas', 'videollamadas', 'chats'] }]);
-  const addMetricRule = () => setMetricRules((r) => [...r, { id: Date.now().toString(), name: '', description: '', condition: '', increment: 1, whenMeasured: '', isRecurring: 'recurrente', section: '', panel: '', ubicacion: 'ambos' }]);
   const addEmbudoEtapa = () => setEmbudoEtapas((e) => [...e, { id: Date.now().toString(), nombre: '', color: EMBUDO_COLORS[e.length % EMBUDO_COLORS.length], orden: e.length + 1, es_unica: true }]);
   const removeEmbudoEtapa = (id: string) => setEmbudoEtapas((e) => e.filter((x) => x.id !== id).map((x, i) => ({ ...x, orden: i + 1 })));
   const handleAnalizarChats = async () => {
