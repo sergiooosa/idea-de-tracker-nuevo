@@ -517,7 +517,7 @@ export async function withAuth(
 | `prompt_videollamadas` | `text` | Prompt para evaluar videollamadas |
 | `prompt_llamadas` | `text` | Prompt para evaluar llamadas |
 | `reglas_etiquetas` | `jsonb` | Array de `{id, condition, tag, source, funnelStage?}` — usadas por Cerebro (ver GET /webhooks/config) |
-| `metricas_personalizadas` | `jsonb` | Array formato legacy (fallback). `ubicacion`: `panel_ejecutivo` \| `rendimiento` \| `ambos` |
+| ~~`metricas_personalizadas`~~ | `jsonb` | **[DEPRECADO AUT-2167]** Formato legacy v2, 0/16 adopción. Mapeo de código retirado (retiro reversible); columna física conservada en BD con default `'[]'`. Superada por `metricas_config`. |
 | `metricas_config` | `jsonb` | Array de `MetricaConfig` — métricas manuales, automáticas o fijas (v3.0). Cada `MetricaConfig` incluye `paneles?: string[]` (multi-panel), `atribuible_a_usuario?: boolean` y `visualizacion?: "kpi_card"\|"barra"\|"comparativo"` (v3.1) |
 | `metricas_manual_data` | `jsonb` | `Record<metricId, MetricaManualEntry[]>` — datos de métricas manuales. Las entradas pueden incluir `_ghl_user_id` y `_ghl_customer_id` si la métrica es atribuible (v3.1) |
 | `dashboards_personalizados` | `jsonb` | Array de `DashboardPersonalizado` — hasta 3 paneles personalizados por cuenta. Cada uno tiene `id` (`"dashboard-1"\|"dashboard-2"\|"dashboard-3"`), `nombre`, `icono?`, `creado_en` (v3.1) |

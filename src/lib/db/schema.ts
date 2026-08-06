@@ -142,18 +142,10 @@ export function normalizeReglaEtiqueta(r: ReglaEtiqueta): Required<Pick<ReglaEti
   return { ...r, acciones, fuentes, condicion: r.condicion ?? r.condition ?? '', nombre: r.nombre ?? '' };
 }
 
-export interface MetricaPersonalizada {
-  id: string;
-  name: string;
-  description: string;
-  condition: string;
-  increment: number;
-  whenMeasured: string;
-  isRecurring: "recurrente" | "unica";
-  section: string;
-  panel: string;
-  ubicacion?: "panel_ejecutivo" | "rendimiento" | "ambos";
-}
+// [DEPRECADO AUT-2167] `metricas_personalizadas` (formato legacy v2) retirada del
+// código por 0/16 adopción. Superada por `metricas_config` (v3.x). La columna física
+// jsonb `metricas_personalizadas` (nullable, default '[]') NO se elimina de la BD:
+// retiro reversible. Para revertir: `git revert` de este commit restaura el mapeo.
 
 /** Campo de una métrica manual (texto, número, fecha, boolean) */
 export interface MetricaCampoConfig {
@@ -400,7 +392,7 @@ export const cuentas = pgTable("cuentas", {
   prompt_videollamadas: text("prompt_videollamadas"),
   prompt_llamadas: text("prompt_llamadas"),
   reglas_etiquetas: jsonb("reglas_etiquetas").$type<ReglaEtiqueta[]>(),
-  metricas_personalizadas: jsonb("metricas_personalizadas").$type<MetricaPersonalizada[]>(),
+  // [DEPRECADO AUT-2167] columna física conservada en BD; mapeo Drizzle retirado.
   openai_api_key: text("openai_api_key"),
   embudo_personalizado: jsonb("embudo_personalizado").$type<EmbudoEtapa[]>(),
   chat_triggers: jsonb("chat_triggers").$type<ChatTrigger[]>(),

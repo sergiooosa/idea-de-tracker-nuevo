@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { cuentas, metasCuenta, normalizeEmbudoEtapas } from "@/lib/db/schema";
-import type { ReglaEtiqueta, MetricaPersonalizada, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds, DashboardPersonalizado, CategoriaLlamada, ExclusionesCoach } from "@/lib/db/schema";
+import type { ReglaEtiqueta, ChatTrigger, EmbudoEtapa, TipoEventoConfig, RolConfig, MetricaConfig, MetricaManualEntry, ConfiguracionAds, DashboardPersonalizado, CategoriaLlamada, ExclusionesCoach } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { parseMetricasConfig } from "@/lib/metricas-engine";
 
@@ -19,7 +19,6 @@ export interface SystemConfigData {
   fuente_llamadas: "twilio" | "ghl";
   ghl_location_id: string | null;
   reglas_etiquetas: ReglaEtiqueta[];
-  metricas_personalizadas: MetricaPersonalizada[];
   metricas_config: MetricaConfig[];
   metricas_manual_data: Record<string, MetricaManualEntry[]>;
   dashboards_personalizados: DashboardPersonalizado[];
@@ -82,7 +81,6 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
         prompt_videollamadas: cuentas.prompt_videollamadas,
         prompt_llamadas: cuentas.prompt_llamadas,
         reglas_etiquetas: cuentas.reglas_etiquetas,
-        metricas_personalizadas: cuentas.metricas_personalizadas,
         embudo_personalizado: cuentas.embudo_personalizado,
         tipos_eventos_config: cuentas.tipos_eventos_config,
         openai_api_key: cuentas.openai_api_key,
@@ -117,7 +115,6 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
       prompt_videollamadas: DEFAULT_PROMPT_VIDEO,
       prompt_llamadas: DEFAULT_PROMPT_LLAMADAS,
       reglas_etiquetas: [],
-      metricas_personalizadas: [],
       embudo_personalizado: [],
       tipos_eventos_config: [],
       has_openai_key: false,
@@ -150,7 +147,6 @@ export async function getSystemConfig(idCuenta: number): Promise<SystemConfigDat
     prompt_videollamadas: r.prompt_videollamadas ?? DEFAULT_PROMPT_VIDEO,
     prompt_llamadas: r.prompt_llamadas ?? DEFAULT_PROMPT_LLAMADAS,
     reglas_etiquetas: Array.isArray(r.reglas_etiquetas) ? r.reglas_etiquetas : [],
-    metricas_personalizadas: Array.isArray(r.metricas_personalizadas) ? r.metricas_personalizadas : [],
     embudo_personalizado: Array.isArray(r.embudo_personalizado) ? normalizeEmbudoEtapas(r.embudo_personalizado) : [],
     tipos_eventos_config: Array.isArray(r.tipos_eventos_config) ? r.tipos_eventos_config : [],
     has_openai_key: !!r.openai_api_key,
@@ -193,7 +189,6 @@ export async function updateSystemConfig(
   if (data.fuente_llamadas !== undefined) setClause.fuente_llamadas = data.fuente_llamadas;
   if (data.ghl_location_id !== undefined) setClause.ghl_location_id = data.ghl_location_id;
   if (data.reglas_etiquetas !== undefined) setClause.reglas_etiquetas = data.reglas_etiquetas;
-  if (data.metricas_personalizadas !== undefined) setClause.metricas_personalizadas = data.metricas_personalizadas;
   if (data.embudo_personalizado !== undefined) {
     const embudoNuevo = normalizeEmbudoEtapas(data.embudo_personalizado as unknown[]);
     setClause.embudo_personalizado = embudoNuevo;
